@@ -145,39 +145,3 @@ function DashboardCard({
     </Link>
   )
 }
-
-type OverviewCardProps = {
-  title: string
-  value: string
-  description: string
-  icon: IconType
-}
-
-function OverviewCard({
-  title,
-  value,
-  description,
-  icon: Icon,
-}: OverviewCardProps) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-        </div>
-      </div>
-
-      <p className="mt-5 text-sm text-muted-foreground">
-        {title}
-      </p>
-
-      <p className="mt-1 text-3xl font-bold tracking-tight">
-        {value}
-      </p>
-
-      <p className="mt-1 text-xs text-muted-foreground">
-        {description}
-      </p>
-    </div>
-  )
-}
