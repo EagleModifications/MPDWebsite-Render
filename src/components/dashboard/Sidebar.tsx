@@ -337,124 +337,124 @@ function getDiscordDefaultAvatarUrl(
 const ACTIVITY_IMPORTS = [
   [
     "Department",
-    "/activity/imports/department",
+    "/dashboard/activity/department-import",
   ],
   [
     "SWAT",
-    "/activity/imports/swat",
+    "/dashboard/activity/swat-import",
   ],
   [
     "MTF-7",
-    "/activity/imports/mtf-7",
+    "/dashboard/activity/mtf7-import",
   ],
   [
     "MCD",
-    "/activity/imports/mcd",
+    "/dashboard/activity/mcd-import",
   ],
   [
     "TRU",
-    "/activity/imports/tru",
+    "/dashboard/activity/tru-import",
   ],
   [
     "TEU",
-    "/activity/imports/teu",
+    "/dashboard/activity/teu-import",
   ],
   [
     "SAR",
-    "/activity/imports/sar",
+    "/dashboard/activity/sar-import",
   ],
 ] as const
 
 const ACTIVITY_REQUIREMENTS = [
   [
     "Department",
-    "/activity/requirements/department",
+    "/dashboard/activity/department-requirements",
   ],
   [
     "SWAT",
-    "/activity/requirements/swat",
+    "/dashboard/activity/swat-requirements",
   ],
   [
     "MTF-7",
-    "/activity/requirements/mtf-7",
+    "/dashboard/activity/mtf7-requirements",
   ],
   [
     "MCD",
-    "/activity/requirements/mcd",
+    "/dashboard/activity/mcd-requirements",
   ],
   [
     "TRU",
-    "/activity/requirements/tru",
+    "/dashboard/activity/tru-requirements",
   ],
   [
     "TEU",
-    "/activity/requirements/teu",
+    "/dashboard/activity/teu-requirements",
   ],
   [
     "SAR",
-    "/activity/requirements/sar",
+    "/dashboard/activity/sar-requirements",
   ],
 ] as const
 
 const PROMOTION_IMPORTS = [
   [
     "Department",
-    "/promotion-imports/department",
+    "/dashboard/promotion/department-import",
   ],
   [
     "SWAT",
-    "/promotion-imports/swat",
+    "/dashboard/promotion/swat-import",
   ],
   [
     "MTF-7",
-    "/promotion-imports/mtf-7",
+    "/dashboard/promotion/mtf7-import",
   ],
   [
     "MCD",
-    "/promotion-imports/mcd",
+    "/dashboard/promotion/mcd-import",
   ],
   [
     "TRU",
-    "/promotion-imports/tru",
+    "/dashboard/promotion/tru-import",
   ],
   [
     "TEU",
-    "/promotion-imports/teu",
+    "/dashboard/promotion/teu-import",
   ],
   [
     "SAR",
-    "/promotion-imports/sar",
+    "/dashboard/promotion/sar-import",
   ],
 ] as const
 
 const PROMOTION_REQUIREMENTS = [
   [
     "Department",
-    "/promotion-requirements/department",
+    "/dashboard/promotion/department-requirements",
   ],
   [
     "SWAT",
-    "/promotion-requirements/swat",
+    "/dashboard/promotion/swat-requirements",
   ],
   [
     "MTF-7",
-    "/promotion-requirements/mtf-7",
+    "/dashboard/promotion/mtf7-requirements",
   ],
   [
     "MCD",
-    "/promotion-requirements/mcd",
+    "/dashboard/promotion/mcd-requirements",
   ],
   [
     "TRU",
-    "/promotion-requirements/tru",
+    "/dashboard/promotion/tru-requirements",
   ],
   [
     "TEU",
-    "/promotion-requirements/teu",
+    "/dashboard/promotion/teu-requirements",
   ],
   [
     "SAR",
-    "/promotion-requirements/sar",
+    "/dashboard/promotion/sar-requirements",
   ],
 ] as const
 
@@ -1019,14 +1019,14 @@ export default function DashboardSidebar() {
                         asChild
                         tooltip="Activity Roster"
                         isActive={isRouteActive(
-                          "/activity/activityroster",
+                          "/dashboard/activity/activityroster",
                         )}
                         className={
                           navigationButtonClass
                         }
                       >
                         <NavLink
-                          to="/activity/activityroster"
+                          to="/dahboard/activity/activityroster"
                           end
                           className={
                             navigationLinkClass
