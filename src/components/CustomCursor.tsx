@@ -1,12 +1,11 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 
 import {
   Ban,
   Circle,
-  Crosshair,
   Grab,
   Hand,
-  MousePointer,
+  MousePointer2,
   Move,
   MoveDiagonal,
   MoveHorizontal,
@@ -40,17 +39,16 @@ type CursorState = {
   x: number
   y: number
   type: CursorType
-  visible: boolean
 }
 
 const cursorIcons = {
-  default: MousePointer,
+  default: MousePointer2,
   pointer: Hand,
   text: Type,
   move: Move,
   grab: Grab,
   grabbing: Hand,
-  crosshair: Crosshair,
+  crosshair: Circle,
   "ew-resize": MoveHorizontal,
   "ns-resize": MoveVertical,
   "nesw-resize": MoveDiagonal,
@@ -61,80 +59,109 @@ const cursorIcons = {
   wait: Circle,
   progress: Circle,
   help: Search,
-} satisfies Record<CursorType, typeof MousePointer>
+} satisfies Record<CursorType, typeof MousePointer2>
 
 function getCursorType(element: Element | null): CursorType {
-  let current: Element | null = element
+  let current = element
 
   while (current) {
-    const computedCursor = window.getComputedStyle(current).cursor
+    /*
+     * Explicit cursor from the element.
+     */
+    const cursor = window.getComputedStyle(current).cursor
 
-    if (
-      computedCursor &&
-      computedCursor !== "auto" &&
-      computedCursor !== "inherit" &&
-      computedCursor !== "initial"
-    ) {
-      switch (computedCursor) {
-        case "pointer":
-          return "pointer"
+    switch (cursor) {
+      case "pointer":
+        return "pointer"
 
-        case "text":
-        case "vertical-text":
-          return "text"
+      case "text":
+      case "vertical-text":
+        return "text"
 
-        case "move":
-        case "all-scroll":
-          return "move"
+      case "move":
+      case "all-scroll":
+        return "move"
 
-        case "grab":
-          return "grab"
+      case "grab":
+        return "grab"
 
-        case "grabbing":
-          return "grabbing"
+      case "grabbing":
+        return "grabbing"
 
-        case "crosshair":
-          return "crosshair"
+      case "crosshair":
+        return "crosshair"
 
-        case "ew-resize":
-          return "ew-resize"
+      case "ew-resize":
+        return "ew-resize"
 
-        case "ns-resize":
-          return "ns-resize"
+      case "ns-resize":
+        return "ns-resize"
 
-        case "nesw-resize":
-          return "nesw-resize"
+      case "nesw-resize":
+        return "nesw-resize"
 
-        case "nwse-resize":
-          return "nwse-resize"
+      case "nwse-resize":
+        return "nwse-resize"
 
-        case "zoom-in":
-          return "zoom-in"
+      case "zoom-in":
+        return "zoom-in"
 
-        case "zoom-out":
-          return "zoom-out"
+      case "zoom-out":
+        return "zoom-out"
 
-        case "not-allowed":
-        case "no-drop":
-          return "not-allowed"
+      case "not-allowed":
+      case "no-drop":
+        return "not-allowed"
 
-        case "wait":
-          return "wait"
+      case "wait":
+        return "wait"
 
-        case "progress":
-          return "progress"
+      case "progress":
+        return "progress"
 
-        case "help":
-          return "help"
+      case "help":
+        return "help"
 
-        case "default":
-          return "default"
-
-        default:
-          break
-      }
+      default:
+        break
     }
 
+    /*
+     * React/Tailwind elements can sometimes report
+     * cursor:auto even though their semantic element
+     * tells us what they are supposed to do.
+     */
+
+    if (
+      current instanceof HTMLAnchorElement ||
+      current instanceof HTMLButtonElement ||
+      current.getAttribute("role") === "button"
+    ) {
+      return "pointer"
+    }
+
+    if (
+      current instanceof HTMLInputElement ||
+      current instanceof HTMLTextAreaElement ||
+      current instanceof HTMLSelectElement ||
+      current.getAttribute("contenteditable") === "true"
+    ) {
+      return "text"
+    }
+
+    /*
+     * Look for common drag/drop indicators.
+     */
+    if (
+      current.hasAttribute("draggable") &&
+      current.getAttribute("draggable") === "true"
+    ) {
+      return "grab"
+    }
+
+    /*
+     * Continue through parent elements.
+     */
     current = current.parentElement
   }
 
@@ -146,12 +173,6 @@ export default function CustomCursor() {
     x: -100,
     y: -100,
     type: "default",
-    visible: false,
-  })
-
-  const positionRef = useRef({
-    x: -100,
-    y: -100,
   })
 
   useEffect(() => {
@@ -160,72 +181,36 @@ export default function CustomCursor() {
     }
 
     const handleMouseMove = (event: MouseEvent) => {
-      const { clientX, clientY } = event
+      const x = event.clientX
+      const y = event.clientY
 
-      positionRef.current = {
-        x: clientX,
-        y: clientY,
-      }
-
-      const element = document.elementFromPoint(clientX, clientY)
+      const element = document.elementFromPoint(x, y)
 
       setCursor({
-        x: clientX,
-        y: clientY,
+        x,
+        y,
         type: getCursorType(element),
-        visible: true,
-      })
-    }
-
-    const handleMouseLeave = () => {
-      setCursor((current) => ({
-        ...current,
-        visible: false,
-      }))
-    }
-
-    const handleMouseEnter = (event: MouseEvent) => {
-      const { clientX, clientY } = event
-
-      positionRef.current = {
-        x: clientX,
-        y: clientY,
-      }
-
-      const element = document.elementFromPoint(clientX, clientY)
-
-      setCursor({
-        x: clientX,
-        y: clientY,
-        type: getCursorType(element),
-        visible: true,
       })
     }
 
     document.addEventListener("mousemove", handleMouseMove)
-    document.addEventListener("mouseleave", handleMouseLeave)
-    document.addEventListener("mouseenter", handleMouseEnter)
 
     return () => {
       document.removeEventListener("mousemove", handleMouseMove)
-      document.removeEventListener("mouseleave", handleMouseLeave)
-      document.removeEventListener("mouseenter", handleMouseEnter)
     }
   }, [])
-
-  if (!cursor.visible) {
-    return null
-  }
 
   const Icon = cursorIcons[cursor.type]
 
   /*
-   * MousePointer's visual tip is slightly inside its SVG viewBox.
-   * Offset it so the arrow tip sits directly on the actual mouse
-   * position rather than appearing a few pixels down/right.
+   * Pointer-style cursors have a natural hotspot near
+   * the upper-left corner.
+   *
+   * Other cursor types are centered on the mouse.
    */
   const isPointer =
-    cursor.type === "default" || cursor.type === "pointer"
+    cursor.type === "default" ||
+    cursor.type === "pointer"
 
   return (
     <div
@@ -235,14 +220,14 @@ export default function CustomCursor() {
         left: cursor.x,
         top: cursor.y,
         transform: isPointer
-          ? "translate(-3px, -3px)"
+          ? "translate(-2px, -2px)"
           : "translate(-50%, -50%)",
       }}
     >
       <Icon
-        className="text-blue-500 drop-shadow-[0_0_5px_rgba(59,130,246,0.45)]"
-        size={20}
-        strokeWidth={2}
+        size={22}
+        strokeWidth={2.5}
+        className="text-blue-500"
       />
     </div>
   )
