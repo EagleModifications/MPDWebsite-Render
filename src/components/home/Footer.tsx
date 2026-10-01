@@ -7,10 +7,7 @@ export default function Footer() {
         <div className="grid gap-10 md:grid-cols-[1fr_auto] md:items-start">
           {/* Brand */}
           <div className="max-w-md">
-            <Link
-              to="/"
-              className="group inline-flex items-center gap-3"
-            >
+            <div className="inline-flex items-center gap-3">
               <img
                 src="/logo.png"
                 alt="MPD"
@@ -20,7 +17,7 @@ export default function Footer() {
               <span className="text-lg font-black tracking-tight text-white transition-colors">
                 METRO POLICE DEPARTMENT
               </span>
-            </Link>
+            </div>
 
             <p className="mt-4 max-w-sm text-sm leading-6 text-white/50">
               The Metro Police Department is built around immersive law enforcement, dedicated officers,
