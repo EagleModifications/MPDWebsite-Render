@@ -3,201 +3,198 @@
 @import "@fontsource-variable/geist";
 
 /* =========================================================
-DARK MODE
-Tailwind v4 uses the .dark class on <html>
+   DARK MODE
+   Tailwind v4 uses the .dark class on <html>
 ========================================================= */
 
 @custom-variant dark (&:is(.dark *));
 
 /* =========================================================
-THEME TOKENS
+   THEME TOKENS
 ========================================================= */
 
 @theme inline {
---font-heading: var(--font-sans);
---font-sans: "Geist Variable", sans-serif;
+  --font-heading: var(--font-sans);
+  --font-sans: "Geist Variable", sans-serif;
 
---color-background: var(--background);
---color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
 
---color-card: var(--card);
---color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
 
---color-popover: var(--popover);
---color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
 
---color-primary: var(--primary);
---color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
 
---color-secondary: var(--secondary);
---color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
 
---color-muted: var(--muted);
---color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
 
---color-accent: var(--accent);
---color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
 
---color-destructive: var(--destructive);
---color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
 
---color-border: var(--border);
---color-input: var(--input);
---color-ring: var(--ring);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
---color-sidebar: var(--sidebar);
---color-sidebar-foreground: var(--sidebar-foreground);
---color-sidebar-primary: var(--sidebar-primary);
---color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
---color-sidebar-accent: var(--sidebar-accent);
---color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
---color-sidebar-border: var(--sidebar-border);
---color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
---color-chart-1: var(--chart-1);
---color-chart-2: var(--chart-2);
---color-chart-3: var(--chart-3);
---color-chart-4: var(--chart-4);
---color-chart-5: var(--chart-5);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 
---radius-sm: calc(var(--radius) * 0.6);
---radius-md: calc(var(--radius) * 0.8);
---radius-lg: var(--radius);
---radius-xl: calc(var(--radius) * 1.4);
---radius-2xl: calc(var(--radius) * 1.8);
---radius-3xl: calc(var(--radius) * 2.2);
---radius-4xl: calc(var(--radius) * 2.6);
-
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 /* =========================================================
-LIGHT MODE
+   LIGHT MODE
 ========================================================= */
 
 :root {
-color-scheme: light;
+  color-scheme: light;
 
---background: #ffffff;
---foreground: #09090b;
+  --background: #ffffff;
+  --foreground: #09090b;
 
---card: #ffffff;
---card-foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
 
---popover: #ffffff;
---popover-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
 
---primary: #18181b;
---primary-foreground: #ffffff;
+  --primary: #18181b;
+  --primary-foreground: #ffffff;
 
---secondary: #f4f4f5;
---secondary-foreground: #18181b;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
 
---muted: #f4f4f5;
---muted-foreground: #71717a;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
 
---accent: #f4f4f5;
---accent-foreground: #18181b;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
 
---destructive: #dc2626;
---destructive-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
 
---border: #e4e4e7;
---input: #e4e4e7;
---ring: #18181b;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #18181b;
 
---chart-1: #18181b;
---chart-2: #52525b;
---chart-3: #71717a;
---chart-4: #a1a1aa;
---chart-5: #d4d4d8;
+  --chart-1: #18181b;
+  --chart-2: #52525b;
+  --chart-3: #71717a;
+  --chart-4: #a1a1aa;
+  --chart-5: #d4d4d8;
 
---radius: 0.625rem;
+  --radius: 0.625rem;
 
-/* Sidebar */
+  /* Sidebar */
 
---sidebar: #fafafa;
---sidebar-foreground: #09090b;
+  --sidebar: #fafafa;
+  --sidebar-foreground: #09090b;
 
---sidebar-primary: #18181b;
---sidebar-primary-foreground: #ffffff;
+  --sidebar-primary: #18181b;
+  --sidebar-primary-foreground: #ffffff;
 
---sidebar-accent: #f4f4f5;
---sidebar-accent-foreground: #18181b;
+  --sidebar-accent: #f4f4f5;
+  --sidebar-accent-foreground: #18181b;
 
---sidebar-border: #e4e4e7;
---sidebar-ring: #18181b;
-
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #18181b;
 }
 
 /* =========================================================
-DARK MODE
+   DARK MODE
 ========================================================= */
 
 .dark {
-color-scheme: dark;
+  color-scheme: dark;
 
---background: #000000;
---foreground: #fafafa;
+  --background: #000000;
+  --foreground: #fafafa;
 
---card: #09090b;
---card-foreground: #fafafa;
+  --card: #09090b;
+  --card-foreground: #fafafa;
 
---popover: #09090b;
---popover-foreground: #fafafa;
+  --popover: #09090b;
+  --popover-foreground: #fafafa;
 
---primary: #fafafa;
---primary-foreground: #09090b;
+  --primary: #fafafa;
+  --primary-foreground: #09090b;
 
---secondary: #18181b;
---secondary-foreground: #fafafa;
+  --secondary: #18181b;
+  --secondary-foreground: #fafafa;
 
---muted: #18181b;
---muted-foreground: #a1a1aa;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
 
---accent: #18181b;
---accent-foreground: #fafafa;
+  --accent: #18181b;
+  --accent-foreground: #fafafa;
 
---destructive: #ef4444;
---destructive-foreground: #ffffff;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
 
---border: #27272a;
---input: #27272a;
---ring: #a1a1aa;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #a1a1aa;
 
---chart-1: #fafafa;
---chart-2: #d4d4d8;
---chart-3: #a1a1aa;
---chart-4: #71717a;
---chart-5: #52525b;
+  --chart-1: #fafafa;
+  --chart-2: #d4d4d8;
+  --chart-3: #a1a1aa;
+  --chart-4: #71717a;
+  --chart-5: #52525b;
 
-/* Sidebar */
+  /* Sidebar */
 
---sidebar: #09090b;
---sidebar-foreground: #fafafa;
+  --sidebar: #09090b;
+  --sidebar-foreground: #fafafa;
 
---sidebar-primary: #fafafa;
---sidebar-primary-foreground: #09090b;
+  --sidebar-primary: #fafafa;
+  --sidebar-primary-foreground: #09090b;
 
---sidebar-accent: #18181b;
---sidebar-accent-foreground: #fafafa;
+  --sidebar-accent: #18181b;
+  --sidebar-accent-foreground: #fafafa;
 
---sidebar-border: #27272a;
---sidebar-ring: #a1a1aa;
-
+  --sidebar-border: #27272a;
+  --sidebar-ring: #a1a1aa;
 }
 
 /* =========================================================
-BASE
+   BASE
 ========================================================= */
 
 @layer base {
-*,
-*::before,
-*::after {
-@apply border-border outline-ring/50;
-}
+  *,
+  *::before,
+  *::after {
+    @apply border-border outline-ring/50;
+  }
 
-html {
+  html {
     @apply font-sans;
 
     min-height: 100%;
@@ -205,14 +202,26 @@ html {
     color: var(--foreground);
 
     transition:
-        background-color 200ms ease,
-        color 200ms ease;
+      background-color 200ms ease,
+      color 200ms ease;
 
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-}
 
-body {
+    /*
+     * Hide the browser cursor.
+     * CustomCursor renders the replacement cursor.
+     */
+    cursor: none;
+
+    /*
+     * Prevent normal page text dragging/selection.
+     */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body {
     min-height: 100vh;
     margin: 0;
 
@@ -220,82 +229,207 @@ body {
     color: var(--foreground);
 
     transition:
-        background-color 200ms ease,
-        color 200ms ease;
-}
+      background-color 200ms ease,
+      color 200ms ease;
 
-#root {
+    cursor: none;
+
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #root {
     min-height: 100vh;
 
     background-color: var(--background);
     color: var(--foreground);
 
     transition:
-        background-color 200ms ease,
-        color 200ms ease;
-}
+      background-color 200ms ease,
+      color 200ms ease;
 
-button,
-a,
-input,
-textarea,
-select {
+    cursor: none;
+
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /*
+   * Keep the custom cursor hidden from the browser while
+   * allowing normal text/input interaction.
+   */
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  option,
+  [role="button"] {
     font: inherit;
-}
+    cursor: none;
+  }
 
-button,
-a {
+  /*
+   * Inputs still need normal text selection.
+   */
+  input,
+  textarea,
+  [contenteditable="true"] {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  button,
+  a {
     -webkit-tap-highlight-color: transparent;
-}
+  }
 
-::selection {
-    background-color: var(--primary);
-    color: var(--primary-foreground);
-}
+  /*
+   * Disable image dragging.
+   */
+  img,
+  svg {
+    -webkit-user-drag: none;
+  }
 
-::-webkit-scrollbar {
+  /*
+   * Selection styling.
+   */
+  ::selection {
+    background-color: #3b82f6;
+    color: #ffffff;
+  }
+
+  /*
+   * Scrollbars.
+   */
+  ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
-}
+  }
 
-::-webkit-scrollbar-track {
+  ::-webkit-scrollbar-track {
     background: var(--background);
-}
+  }
 
-::-webkit-scrollbar-thumb {
+  ::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 999px;
-}
+  }
 
-::-webkit-scrollbar-thumb:hover {
+  ::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
-}
-
+  }
 }
 
 /* =========================================================
-THEME TRANSITIONS
+   THEME TRANSITIONS
 ========================================================= */
 
 html,
 body,
 #root {
-transition:
-background-color 200ms ease,
-color 200ms ease;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
 }
 
 /* =========================================================
-UTILITY HELPERS
+   SONNER
+========================================================= */
+
+/*
+ * Force Sonner's close button into the actual
+ * top-right corner of the toast.
+ */
+
+[data-sonner-toaster] {
+  --toast-close-button-start: auto !important;
+  --toast-close-button-end: 8px !important;
+  --toast-close-button-transform: none !important;
+}
+
+[data-sonner-toast] {
+  position: relative !important;
+}
+
+[data-sonner-toast] [data-close-button],
+[data-sonner-toast][data-styled="true"] [data-close-button] {
+  position: absolute !important;
+
+  top: 8px !important;
+  right: 8px !important;
+  left: auto !important;
+  bottom: auto !important;
+
+  width: 20px !important;
+  height: 20px !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  transform: none !important;
+  translate: none !important;
+
+  z-index: 100 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  border-radius: 6px !important;
+}
+
+/*
+ * Prevent the close button from being shifted
+ * when Sonner applies hover/focus transforms.
+ */
+[data-sonner-toast] [data-close-button]:hover,
+[data-sonner-toast] [data-close-button]:focus,
+[data-sonner-toast] [data-close-button]:active {
+  transform: none !important;
+  translate: none !important;
+}
+
+/*
+ * Leave room for the close button.
+ */
+[data-sonner-toast] {
+  padding-right: 44px !important;
+}
+
+/* =========================================================
+   UTILITY HELPERS
 ========================================================= */
 
 @layer utilities {
-.text-balance {
-text-wrap: balance;
-}
+  .text-balance {
+    text-wrap: balance;
+  }
 
-.text-pretty {
+  .text-pretty {
     text-wrap: pretty;
+  }
 }
 
+/* =========================================================
+   MOBILE / TOUCH DEVICES
+========================================================= */
+
+/*
+ * On touch devices there is no useful mouse cursor,
+ * so don't interfere with the native touch experience.
+ */
+@media (pointer: coarse) {
+  html,
+  body,
+  #root,
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  [role="button"] {
+    cursor: auto;
+  }
 }
