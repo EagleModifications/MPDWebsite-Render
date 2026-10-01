@@ -6,10 +6,6 @@ export default function SignedOut() {
     window.location.href = "/api/auth/login"
   }
 
-  useEffect(() => {
-    document.title = "Signed Out | Metro Police Department"
-  }, [])
-
   return (
     <main
       className="
