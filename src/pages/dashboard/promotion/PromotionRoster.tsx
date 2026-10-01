@@ -914,7 +914,7 @@ export default function PromotionRoster() {
 
   return (
     <DashboardLayout>
-      <div className="flex min-h-full flex-col gap-6 p-6">
+      <div className="flex min-h-full flex-col gap-4 p-3 sm:gap-6 sm:p-6">
         {/* HEADER */}
 
         <div className="flex shrink-0 flex-col gap-4">
@@ -925,7 +925,7 @@ export default function PromotionRoster() {
               </div>
 
               <div>
-                <h1 className="text-3xl font-semibold tracking-tight">
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                   Promotion Roster
                 </h1>
 
@@ -940,47 +940,49 @@ export default function PromotionRoster() {
 
           {/* Division Tabs */}
 
-          <div className="flex w-fit shrink-0 items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1">
-            {divisions.map((item) => {
-              const active =
-                division === item.id
+          <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="inline-flex min-w-full items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1 sm:min-w-0">
+              {divisions.map((item) => {
+                const active =
+                  division === item.id
 
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    if (
-                      division === item.id
-                    ) {
-                      return
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (
+                        division === item.id
+                      ) {
+                        return
+                      }
+
+                      setDivision(item.id)
+                      setSearch("")
+                      setStatusFilters([])
+                      setRankFilters([])
+                      setSelectedIds([])
+                      setSelectedCopied(false)
+                      setError(null)
+                    }}
+                    className={
+                      active
+                        ? "shrink-0 rounded-md bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-500 shadow-sm transition-colors sm:px-4 sm:text-sm"
+                        : "shrink-0 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground sm:px-4 sm:text-sm"
                     }
-
-                    setDivision(item.id)
-                    setSearch("")
-                    setStatusFilters([])
-                    setRankFilters([])
-                    setSelectedIds([])
-                    setSelectedCopied(false)
-                    setError(null)
-                  }}
-                  className={
-                    active
-                      ? "rounded-md bg-blue-500/10 px-4 py-2 text-sm font-medium text-blue-500 shadow-sm transition-colors"
-                      : "rounded-md px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                  }
-                >
-                  {item.label}
-                </button>
-              )
-            })}
+                  >
+                    {item.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
 
         {/* Stats */}
 
-        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-          <div className="rounded-xl border bg-card p-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <div className="rounded-xl border bg-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 Total
@@ -994,7 +996,7 @@ export default function PromotionRoster() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-emerald-500/10 bg-card p-4">
+          <div className="rounded-xl border border-emerald-500/10 bg-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 Compliant
@@ -1008,7 +1010,7 @@ export default function PromotionRoster() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-red-500/10 bg-card p-4">
+          <div className="rounded-xl border border-red-500/10 bg-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 Non-Compliant
@@ -1022,7 +1024,7 @@ export default function PromotionRoster() {
             </p>
           </div>
 
-          <div className="rounded-xl border bg-card p-4">
+          <div className="rounded-xl border bg-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 Promotion Hours
@@ -1039,7 +1041,7 @@ export default function PromotionRoster() {
 
         {/* Filters */}
 
-        <div className="rounded-xl border bg-card p-4">
+        <div className="rounded-xl border bg-card p-3 sm:p-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
             {/* Search */}
 
@@ -1733,7 +1735,7 @@ export default function PromotionRoster() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[1100px] text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30 text-left">
@@ -1952,6 +1954,192 @@ export default function PromotionRoster() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile roster cards */}
+            <div className="divide-y md:hidden">
+              {filteredMembers.map((member) => {
+                const selected =
+                  selectedIds.includes(
+                    member.discordId,
+                  )
+
+                const StatusIcon =
+                  getStatusIcon(
+                    member.status,
+                  )
+
+                return (
+                  <div
+                    key={
+                      member.discordId ||
+                      `${member.badgeNumber}-${member.callsign}-${member.name}`
+                    }
+                    className={`p-4 transition-colors ${
+                      selected
+                        ? "bg-blue-500/5"
+                        : ""
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="pt-0.5">
+                        <Checkbox
+                          checked={selected}
+                          disabled={!member.discordId}
+                          aria-label={`Select ${member.name}`}
+                          onPointerDown={(
+                            event,
+                          ) => {
+                            shiftSelectingRef.current =
+                              event.shiftKey
+                          }}
+                          onCheckedChange={() => {
+                            const shiftKey =
+                              shiftSelectingRef.current
+
+                            shiftSelectingRef.current =
+                              false
+
+                            handleMemberSelection(
+                              member,
+                              shiftKey,
+                            )
+                          }}
+                        />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-foreground">
+                              {member.callsign}
+                            </p>
+
+                            <p className="truncate text-sm text-muted-foreground">
+                              {member.name}
+                            </p>
+                          </div>
+
+                          <div
+                            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium ${getStatusClasses(
+                              member.status,
+                            )}`}
+                          >
+                            <StatusIcon className="h-3 w-3" />
+                            {getStatusLabel(
+                              member.status,
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                          <div className="min-w-0">
+                            <p className="text-muted-foreground">
+                              Badge
+                            </p>
+                            <p className="mt-0.5 truncate font-medium">
+                              {member.badgeNumber}
+                            </p>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-muted-foreground">
+                              Rank
+                            </p>
+                            <p className="mt-0.5 truncate font-medium">
+                              {member.rank}
+                            </p>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-muted-foreground">
+                              Promotion
+                            </p>
+                            <p className="mt-0.5 font-medium">
+                              {member.promotionHours.toFixed(1)}h
+                            </p>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-muted-foreground">
+                              Required
+                            </p>
+                            <p className="mt-0.5 font-medium">
+                              {member.requiredHours.toFixed(1)}h
+                            </p>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-muted-foreground">
+                              Time in Dept
+                            </p>
+                            <p className="mt-0.5 truncate font-medium">
+                              {member.timeInDept || "—"}
+                            </p>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-muted-foreground">
+                              Time in Rank
+                            </p>
+                            <p className="mt-0.5 truncate font-medium">
+                              {member.timeInRank || "—"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex min-w-0 items-center gap-2">
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            Discord
+                          </span>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="min-w-0 max-w-[calc(100%-60px)] truncate rounded-md px-2 py-1 font-mono text-[11px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+                              >
+                                {member.discordId}
+                              </button>
+                            </DropdownMenuTrigger>
+
+                            <DropdownMenuContent align="start">
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(
+                                      member.discordId,
+                                    )
+
+                                    toast.success(
+                                      "Discord ID copied",
+                                      {
+                                        description: `${member.name}'s Discord ID has been copied to your clipboard.`,
+                                      },
+                                    )
+                                  } catch {
+                                    toast.error(
+                                      "Copy failed",
+                                      {
+                                        description:
+                                          "Your browser could not access the clipboard.",
+                                      },
+                                    )
+                                  }
+                                }}
+                                className="gap-2"
+                              >
+                                <ClipboardList className="h-4 w-4" />
+                                Copy User ID
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
