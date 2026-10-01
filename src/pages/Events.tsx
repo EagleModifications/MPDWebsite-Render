@@ -172,7 +172,6 @@ export default function Events() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
-    document.title = "Events | Metro Police Department"
 
     let active = true
 
