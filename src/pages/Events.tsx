@@ -391,9 +391,6 @@ export default function Events() {
       <Navbar />
 
       <main className="relative min-h-screen overflow-hidden pt-20">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/2 top-[-220px] h-[420px] w-[700px] -translate-x-1/2 rounded-full bg-blue-600/10 blur-[120px]" />
-        </div>
 
         <div className="relative mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-7">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
