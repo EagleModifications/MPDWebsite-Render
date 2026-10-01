@@ -12,6 +12,8 @@ import {
   RefreshCw,
   Home,
   LayoutDashboard,
+  CalendarDays,
+  Images,
 } from "lucide-react"
 
 import {
@@ -986,6 +988,68 @@ export default function DashboardSidebar() {
 
                     <span>
                       Dashboard
+                    </span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* ========================================================
+            Events
+        ======================================================== */}
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                      <SidebarMenuButton
+                  asChild
+                  tooltip="Events"
+                  isActive={isRouteActive("/events", true)}
+                  className={navigationButtonClass}
+                >
+                  <NavLink
+                    to="/events"
+                    end
+                    className={navigationLinkClass}
+                  >
+                    <CalendarDays className="h-4 w-4 shrink-0" />
+
+                    <span>
+                      Events
+                    </span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* ========================================================
+            Gallery
+        ======================================================== */}
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                      <SidebarMenuButton
+                  asChild
+                  tooltip="Gallery"
+                  isActive={isRouteActive("/gallery", true)}
+                  className={navigationButtonClass}
+                >
+                  <NavLink
+                    to="/gallery"
+                    end
+                    className={navigationLinkClass}
+                  >
+                    <Images className="h-4 w-4 shrink-0" />
+
+                    <span>
+                      Gallery
                     </span>
                   </NavLink>
                 </SidebarMenuButton>
