@@ -80,9 +80,6 @@ export default function DepartmentImport() {
     clearFileInput()
   }
 
-  /*
-   * Handle a selected or dropped file.
-   */
   function handleFile(
     selectedFile: File,
   ) {
@@ -113,20 +110,8 @@ export default function DepartmentImport() {
 
     setFile(selectedFile)
     setFileName(selectedFile.name)
-
-    /*
-     * When a file is selected, it becomes
-     * the source of the import.
-     */
     setPasteData("")
 
-    /*
-     * CSV/TXT files are displayed in the
-     * textarea so the user can inspect them.
-     *
-     * XLS/XLSX files remain as files and are
-     * sent directly to the backend.
-     */
     if (
       extension === "csv" ||
       extension === "txt"
@@ -205,10 +190,6 @@ export default function DepartmentImport() {
 
     setIsImporting(true)
 
-    /*
-     * Show a loading notification while
-     * the import is being processed.
-     */
     const loadingToast =
       toast.loading(
         "Importing Department activity...",
@@ -221,9 +202,6 @@ export default function DepartmentImport() {
     try {
       let response: Response
 
-      /*
-       * XLS/XLSX files need multipart/form-data.
-       */
       if (
         file &&
         !pasteData.trim()
@@ -246,10 +224,6 @@ export default function DepartmentImport() {
           },
         )
       } else {
-        /*
-         * CSV/TXT/pasted data is sent
-         * directly as JSON.
-         */
         response = await fetch(
           IMPORT_ENDPOINT,
           {
@@ -306,10 +280,6 @@ export default function DepartmentImport() {
         )
       }
 
-      /*
-       * Replace the loading toast with
-       * the successful notification.
-       */
       toast.success(
         "Department import successful",
         {
@@ -320,10 +290,6 @@ export default function DepartmentImport() {
         },
       )
 
-      /*
-       * Clear the source data after
-       * MongoDB has successfully updated.
-       */
       setPasteData("")
       setFileName("")
       setFile(null)
@@ -423,69 +389,156 @@ export default function DepartmentImport() {
           </div>
         </div>
 
-        {/* Expected Format */}
+        {/* Expected / Command Format */}
 
-        <section
-          className="
-            rounded-xl
-            border
-            border-border
-            bg-card
-            p-5
-            shadow-sm
-          "
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className="
-                flex
-                h-9
-                w-9
-                shrink-0
-                items-center
-                justify-center
-                rounded-lg
-                bg-blue-500/10
-              "
-            >
-              <FileSpreadsheet className="h-4 w-4 text-blue-500" />
-            </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Expected Format */}
 
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold">
-                Expected Format
-              </h2>
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                The Department activity import should contain a
-                Discord ID and the member's total activity hours.
-              </p>
-
-              <pre
+          <section
+            className="
+              rounded-xl
+              border
+              border-border
+              bg-card
+              p-5
+              shadow-sm
+            "
+          >
+            <div className="flex items-start gap-3">
+              <div
                 className="
-                  mt-3
-                  max-w-full
-                  overflow-x-auto
+                  flex
+                  h-9
+                  w-9
+                  shrink-0
+                  items-center
+                  justify-center
                   rounded-lg
-                  border
-                  border-border
-                  bg-background
-                  p-3
-                  font-mono
-                  text-xs
-                  leading-5
-                  text-muted-foreground
-                  [scrollbar-width:none]
-                  [&::-webkit-scrollbar]:hidden
+                  bg-blue-500/10
                 "
               >
+                <FileSpreadsheet className="h-4 w-4 text-blue-500" />
+              </div>
+
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold">
+                  Expected Format
+                </h2>
+
+                <p className="mt-1 text-xs text-muted-foreground">
+                  The Department activity import should contain a
+                  Discord ID and the member's total activity hours.
+                </p>
+
+                <pre
+                  className="
+                    mt-3
+                    max-w-full
+                    overflow-x-auto
+                    rounded-lg
+                    border
+                    border-border
+                    bg-background
+                    p-3
+                    font-mono
+                    text-xs
+                    leading-5
+                    text-muted-foreground
+                    [scrollbar-width:none]
+                    [&::-webkit-scrollbar]:hidden
+                  "
+                >
 {`Discord ID, Hours
 123456789012345678, 12
 987654321098765432, 8`}
-              </pre>
+                </pre>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+          {/* Command Format */}
+
+          <section
+            className="
+              rounded-xl
+              border
+              border-border
+              bg-card
+              p-5
+              shadow-sm
+            "
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="
+                  flex
+                  h-9
+                  w-9
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-lg
+                  bg-blue-500/10
+                "
+              >
+                <ClipboardPaste className="h-4 w-4 text-blue-500" />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-semibold">
+                  Command Format
+                </h2>
+
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Use one of the following commands to export
+                  Department activity data.
+                </p>
+
+                <div className="mt-3 space-y-3">
+                  <pre
+                    className="
+                      max-w-full
+                      overflow-x-auto
+                      rounded-lg
+                      border
+                      border-border
+                      bg-background
+                      p-3
+                      font-mono
+                      text-xs
+                      leading-5
+                      text-muted-foreground
+                      [scrollbar-width:none]
+                      [&::-webkit-scrollbar]:hidden
+                    "
+                  >
+{`/hours tag:Metro Police Department (Main) choices:(This Month, Last Month, This Week, Last Week) hidden:(True, False) exportcsv:True`}
+                  </pre>
+
+                  <pre
+                    className="
+                      max-w-full
+                      overflow-x-auto
+                      rounded-lg
+                      border
+                      border-border
+                      bg-background
+                      p-3
+                      font-mono
+                      text-xs
+                      leading-5
+                      text-muted-foreground
+                      [scrollbar-width:none]
+                      [&::-webkit-scrollbar]:hidden
+                    "
+                  >
+{`/hours tag:Metro Police Department (Main) choices:Custom Date Range hidden:(True, False) exportcsv:True startstr:MM-DD-YYYY endstr:MM-DD-YYYY`}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
 
         {/* Import Areas */}
 
