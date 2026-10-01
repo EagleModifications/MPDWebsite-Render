@@ -1,14 +1,15 @@
+import type { CSSProperties } from "react"
+
 import {
   BrowserRouter,
-  Navigate,
   Route,
   Routes,
 } from "react-router-dom"
 
 import {
+  AlertTriangle,
   CheckCircle2,
   Info,
-  AlertTriangle,
   XCircle,
 } from "lucide-react"
 
@@ -34,6 +35,7 @@ import ActivityImportSAR from "@/pages/dashboard/activity/imports/SAR"
 import ActivityImportSWAT from "@/pages/dashboard/activity/imports/SWAT"
 import ActivityImportTEU from "@/pages/dashboard/activity/imports/TEU"
 import ActivityImportTRU from "@/pages/dashboard/activity/imports/TRU"
+
 import PromotionImportDepartment from "@/pages/dashboard/promotion/imports/Department"
 import PromotionImportMCD from "@/pages/dashboard/promotion/imports/MCD"
 import PromotionImportMTF7 from "@/pages/dashboard/promotion/imports/MTF-7"
@@ -49,6 +51,7 @@ import ActivityRequirementsSAR from "@/pages/dashboard/activity/requirements/SAR
 import ActivityRequirementsSWAT from "@/pages/dashboard/activity/requirements/SWAT"
 import ActivityRequirementsTEU from "@/pages/dashboard/activity/requirements/TEU"
 import ActivityRequirementsTRU from "@/pages/dashboard/activity/requirements/TRU"
+
 import PromotionRequirementsDepartment from "@/pages/dashboard/promotion/requirements/Department"
 import PromotionRequirementsMCD from "@/pages/dashboard/promotion/requirements/MCD"
 import PromotionRequirementsMTF7 from "@/pages/dashboard/promotion/requirements/MTF-7"
@@ -57,11 +60,19 @@ import PromotionRequirementsSWAT from "@/pages/dashboard/promotion/requirements/
 import PromotionRequirementsTEU from "@/pages/dashboard/promotion/requirements/TEU"
 import PromotionRequirementsTRU from "@/pages/dashboard/promotion/requirements/TRU"
 
+const toasterStyle = {
+  "--toast-close-button-start": "auto",
+  "--toast-close-button-end": "8px",
+  "--toast-close-button-transform": "translateY(0)",
+} as CSSProperties
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public */}
+        {/* =====================================================
+            PUBLIC
+        ===================================================== */}
 
         <Route
           path="/"
@@ -84,11 +95,6 @@ export default function App() {
         />
 
         <Route
-          path="*"
-          element={<NotFound />}
-        />
-
-        <Route
           path="/events"
           element={<Events />}
         />
@@ -98,24 +104,36 @@ export default function App() {
           element={<Gallery />}
         />
 
-        {/* Dashboards */}
+        {/* =====================================================
+            DASHBOARD
+        ===================================================== */}
 
         <Route
           path="/dashboard"
           element={<Dashboard />}
         />
 
+        {/* =====================================================
+            ACTIVITY ROSTER
+        ===================================================== */}
+
         <Route
           path="/dashboard/activity/activityroster"
           element={<ActivityRoster />}
         />
+
+        {/* =====================================================
+            PROMOTION ROSTER
+        ===================================================== */}
 
         <Route
           path="/dashboard/promotion/promotionroster"
           element={<PromotionRoster />}
         />
 
-        {/* Imports */}
+        {/* =====================================================
+            ACTIVITY IMPORTS
+        ===================================================== */}
 
         <Route
           path="/dashboard/activity/department-import"
@@ -152,6 +170,10 @@ export default function App() {
           element={<ActivityImportTRU />}
         />
 
+        {/* =====================================================
+            PROMOTION IMPORTS
+        ===================================================== */}
+
         <Route
           path="/dashboard/promotion/department-import"
           element={<PromotionImportDepartment />}
@@ -187,7 +209,9 @@ export default function App() {
           element={<PromotionImportTRU />}
         />
 
-        {/* Requirements */}
+        {/* =====================================================
+            ACTIVITY REQUIREMENTS
+        ===================================================== */}
 
         <Route
           path="/dashboard/activity/department-requirements"
@@ -224,6 +248,10 @@ export default function App() {
           element={<ActivityRequirementsTRU />}
         />
 
+        {/* =====================================================
+            PROMOTION REQUIREMENTS
+        ===================================================== */}
+
         <Route
           path="/dashboard/promotion/department-requirements"
           element={<PromotionRequirementsDepartment />}
@@ -259,80 +287,43 @@ export default function App() {
           element={<PromotionRequirementsTRU />}
         />
 
-        {/* Fallback */}
+        {/* =====================================================
+            404
+        ===================================================== */}
 
         <Route
           path="*"
-          element={
-            <Navigate
-              to="/"
-              replace
-            />
-          }
+          element={<NotFound />}
         />
       </Routes>
 
-      {/* Global notifications */}
-      {/*
-      Positions:
-      top-left
-      top-center
-      top-right
-      bottom-left
-      bottom-center
-      bottom-right
+      {/* =======================================================
+          GLOBAL NOTIFICATIONS
+      ======================================================= */}
 
-      Options:
-      position (Where notifications appear)
-      richColors (Uses colored success/error/warning/info styles)
-      closeButton (Adds an X button to each notification)
-      duration (duration={4000} - How long notifications stay open, in ms)
-      expand (Keeps multiple notifications expanded)
-      visibleToasts (visibleToasts={4} - Maximum visible notifications)
-      gap (gap={8} - Space between notifications)
-      offset (offset="24px" - Distance from the screen edge)
-      theme (theme="dark" - Force dark/light/system theme)
-      closeButtonAriaLabel (closeButtonAriaLabel="Close" - Accessibility label for close button)
-      */}
-      {/*<Toaster
-        position="top-left"
-        richColors
-        closeButton
-      />*/}
-      {/*<Toaster
-        position="top-center"
-        richColors
-        closeButton
-      />*/}
-      {/*<Toaster
-        position="top-right"
-        richColors
-        closeButton
-      />*/}
-
-      {/*<Toaster
-        position="bottom-left"
-        richColors
-        closeButton
-      />*/}
-      {/*<Toaster
-        position="bottom-center"
-        richColors
-        closeButton
-      />*/}
       <Toaster
         position="top-right"
         theme="system"
         closeButton
+        style={toasterStyle}
         icons={{
-          success: <CheckCircle2 className="size-5 shrink-0 text-green-500" />,
-          info: <Info className="size-5 shrink-0 text-blue-500" />,
-          warning: <AlertTriangle className="size-5 shrink-0 text-yellow-500" />,
-          error: <XCircle className="size-5 shrink-0 text-red-500" />,
+          success: (
+            <CheckCircle2 className="size-5 shrink-0 text-green-500" />
+          ),
+          info: (
+            <Info className="size-5 shrink-0 text-blue-500" />
+          ),
+          warning: (
+            <AlertTriangle className="size-5 shrink-0 text-yellow-500" />
+          ),
+          error: (
+            <XCircle className="size-5 shrink-0 text-red-500" />
+          ),
         }}
         toastOptions={{
           classNames: {
-            toast: "bg-background text-foreground border-border",
+            toast:
+              "bg-background text-foreground border-border pr-12",
             title: "text-foreground",
             description: "text-muted-foreground",
           },
