@@ -1,9 +1,8 @@
-import {
-  useEffect,
-} from "react"
+import { useEffect } from "react"
 
 import {
   BrowserRouter,
+  Navigate,
   Route,
   Routes,
 } from "react-router-dom"
@@ -72,26 +71,20 @@ function useSiteProtection() {
     /*
      * Disable right-click context menu.
      */
-    const handleContextMenu = (
-      event: MouseEvent,
-    ) => {
+    const handleContextMenu = (event: MouseEvent) => {
       event.preventDefault()
     }
 
     /*
      * Disable common browser developer-tool shortcuts.
      *
-     * This is only a client-side deterrent and is not a
-     * security mechanism.
+     * This is only a client-side deterrent and is NOT
+     * a security mechanism.
      */
-    const handleKeyDown = (
-      event: KeyboardEvent,
-    ) => {
-      const key =
-        event.key.toLowerCase()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
 
-      const isF12 =
-        event.key === "F12"
+      const isF12 = event.key === "F12"
 
       const isDeveloperTools =
         event.ctrlKey &&
@@ -113,11 +106,9 @@ function useSiteProtection() {
     }
 
     /*
-     * Prevent dragging page content/images.
+     * Prevent normal page content from being dragged.
      */
-    const handleDragStart = (
-      event: DragEvent,
-    ) => {
+    const handleDragStart = (event: DragEvent) => {
       event.preventDefault()
     }
 
@@ -166,11 +157,20 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* Custom cursor */}
+      {/* ===================================================
+          CUSTOM CURSOR
+      =================================================== */}
+
       <CustomCursor />
 
+      {/* ===================================================
+          ROUTES
+      =================================================== */}
+
       <Routes>
-        {/* Public */}
+        {/* =================================================
+            PUBLIC
+        ================================================= */}
 
         <Route
           path="/"
@@ -193,11 +193,6 @@ export default function App() {
         />
 
         <Route
-          path="*"
-          element={<NotFound />}
-        />
-
-        <Route
           path="/events"
           element={<Events />}
         />
@@ -207,24 +202,36 @@ export default function App() {
           element={<Gallery />}
         />
 
-        {/* Dashboards */}
+        {/* =================================================
+            DASHBOARD
+        ================================================= */}
 
         <Route
           path="/dashboard"
           element={<Dashboard />}
         />
 
+        {/* =================================================
+            ACTIVITY ROSTER
+        ================================================= */}
+
         <Route
           path="/dashboard/activity/activityroster"
           element={<ActivityRoster />}
         />
+
+        {/* =================================================
+            PROMOTION ROSTER
+        ================================================= */}
 
         <Route
           path="/dashboard/promotion/promotionroster"
           element={<PromotionRoster />}
         />
 
-        {/* Imports */}
+        {/* =================================================
+            ACTIVITY IMPORTS
+        ================================================= */}
 
         <Route
           path="/dashboard/activity/department-import"
@@ -261,6 +268,10 @@ export default function App() {
           element={<ActivityImportTRU />}
         />
 
+        {/* =================================================
+            PROMOTION IMPORTS
+        ================================================= */}
+
         <Route
           path="/dashboard/promotion/department-import"
           element={<PromotionImportDepartment />}
@@ -296,7 +307,9 @@ export default function App() {
           element={<PromotionImportTRU />}
         />
 
-        {/* Requirements */}
+        {/* =================================================
+            ACTIVITY REQUIREMENTS
+        ================================================= */}
 
         <Route
           path="/dashboard/activity/department-requirements"
@@ -333,6 +346,10 @@ export default function App() {
           element={<ActivityRequirementsTRU />}
         />
 
+        {/* =================================================
+            PROMOTION REQUIREMENTS
+        ================================================= */}
+
         <Route
           path="/dashboard/promotion/department-requirements"
           element={<PromotionRequirementsDepartment />}
@@ -368,7 +385,9 @@ export default function App() {
           element={<PromotionRequirementsTRU />}
         />
 
-        {/* Fallback */}
+        {/* =================================================
+            FINAL FALLBACK
+        ================================================= */}
 
         <Route
           path="*"
@@ -381,9 +400,9 @@ export default function App() {
         />
       </Routes>
 
-      {/* =====================================================
+      {/* ===================================================
           GLOBAL NOTIFICATIONS
-      ===================================================== */}
+      =================================================== */}
 
       <Toaster
         position="top-right"
