@@ -83,6 +83,19 @@ export default function Footer() {
             <span className="text-white/35">
               {new Date().getFullYear()} METRO POLICE DEPARTMENT - California Roleplay
             </span>
+
+            <span className="text-white/35">
+              Created by {" "}
+              <a
+                href="https://discord.com/users/1314550564389912609"
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-500 transition-colors hover:text-blue-400"
+              >
+                kieranbe1
+              </a>
+            </span>
+            
           </div>
         </div>
       </div>
