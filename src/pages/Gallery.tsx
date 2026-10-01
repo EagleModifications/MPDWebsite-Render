@@ -40,10 +40,13 @@ type GalleryMedia = {
   storageId?: string
 }
 
+type GalleryCategory = "Community" | "Fleet"
+
 type GalleryItem = {
   id: string
   title: string
   description: string
+  category?: GalleryCategory
   media: GalleryMedia[]
   createdBy: string
   createdAt: string
@@ -55,12 +58,13 @@ type PendingMedia = GalleryMedia & {
   file?: File
 }
 
-type GalleryFilter = "All" | "Images" | "Videos"
+type GalleryFilter = "All" | "Images" | "Videos" | "Fleet"
 
 const GALLERY_FILTERS: GalleryFilter[] = [
   "All",
   "Images",
   "Videos",
+  "Fleet",
 ]
 
 function getMediaLabel(type: GalleryMediaType) {
@@ -144,6 +148,9 @@ export default function Gallery() {
 
   const [description, setDescription] =
     useState("")
+
+  const [category, setCategory] =
+    useState<GalleryCategory>("Community")
 
   const [pendingMedia, setPendingMedia] =
     useState<PendingMedia[]>([])
@@ -259,6 +266,10 @@ export default function Gallery() {
         )
       }
 
+      if (filter === "Fleet") {
+        return item.category === "Fleet"
+      }
+
       return true
     })
   }, [filter, items])
@@ -324,6 +335,7 @@ export default function Gallery() {
 
     setTitle("")
     setDescription("")
+    setCategory("Community")
     setPendingMedia([])
     setUrlInput("")
     setUrlType("image")
@@ -351,6 +363,7 @@ export default function Gallery() {
     setEditingItem(item)
     setTitle(item.title)
     setDescription(item.description)
+    setCategory(item.category ?? "Community")
     setPendingMedia(
       item.media.map(
         makePendingFromMedia,
@@ -748,6 +761,7 @@ export default function Gallery() {
               title: cleanTitle,
               description:
                 description.trim(),
+              category,
               media,
             }),
           },
@@ -1008,7 +1022,7 @@ export default function Gallery() {
             )}
           </div>
 
-          <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
+          <section className="h-auto min-h-0 overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
             <div className="flex flex-col gap-3 border-b border-border/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
               <div>
                 <h2 className="text-sm font-semibold">
@@ -1086,7 +1100,7 @@ export default function Gallery() {
                 )}
               </div>
             ) : (
-              <div className="p-3 sm:p-4">
+              <div className="h-auto p-3 sm:p-4">
                 <div className="columns-1 gap-3 sm:columns-2 lg:columns-3">
                   {filteredItems.map(
                     (item) => {
@@ -1406,7 +1420,7 @@ export default function Gallery() {
             <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-blue-500">
-                  Community
+                  {category}
                 </p>
 
                 <h2 className="mt-1 text-lg font-semibold">
@@ -1463,6 +1477,29 @@ export default function Gallery() {
                     placeholder="Describe this gallery entry..."
                     rows={3}
                   />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Category
+                  </label>
+
+                  <select
+                    value={category}
+                    onChange={(event) =>
+                      setCategory(
+                        event.target.value as GalleryCategory,
+                      )
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="Community">
+                      Community
+                    </option>
+                    <option value="Fleet">
+                      Fleet
+                    </option>
+                  </select>
                 </div>
 
                 <div
