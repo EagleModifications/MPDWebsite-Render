@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { getSession, type User } from "@/lib/auth"
+import Footer from "@/components/Footer"
 
 type GalleryMediaType = "image" | "video"
 
@@ -881,10 +882,7 @@ export default function Gallery() {
               </div>
             </section>
           )}
-
-          <footer className="py-6 text-center text-xs text-muted-foreground">
-            Metro Police Department · Community Gallery
-          </footer>
+          <Footer />
         </div>
       </main>
 
