@@ -299,3 +299,9 @@ text-wrap: balance;
 }
 
 }
+
+
+[data-sonner-toast] [data-close-button] {
+  left: auto !important;
+  right: 8px !important;
+}
