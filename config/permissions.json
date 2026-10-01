@@ -1,34 +1,51 @@
 {
   "view": {
-    "urls": ["/", "/dashboard"],
-    "files": ["dashboard"]
-  },
-  "audit": {
-    "urls": ["/audits", "/activity/masteraudit", "/activity/auditfaliures"],
-    "files": ["audit"]
-  },
-  "import": {
-    "urls": ["/imports"],
-    "files": ["import"]
-  },
-  "requirements": {
-    "urls": ["/requirements"],
-    "files": ["requirements"]
-  },
-  "admin": {
-    "urls": ["/admin"],
-    "files": ["admin"]
+    "urls": ["/", "/events", "/gallery"]
   },
   "activitymanagement": {
-    "urls": ["/dashboard"]
+    "urls": [
+      "/dashboard",
+      "/activity/activityroster",
+      "/activity/imports/department",
+      "/activity/imports/swat",
+      "/activity/imports/mtf7",
+      "/activity/imports/mcd",
+      "/activity/imports/tru",
+      "/activity/imports/teu",
+      "/activity/imports/sar",
+      "/activity/requirements/department",
+      "/activity/requirements/swat",
+      "/activity/requirements/mtf7",
+      "/activity/requirements/mcd",
+      "/activity/requirements/tru",
+      "/activity/requirements/teu",
+      "/activity/requirements/sar"
+    ]
   },
   "promotionmanagement": {
-    "urls": ["/dashboard"]
+    "urls": [
+      "/dashboard",
+      "/promotion/promotionroster",
+      "/promotion/imports/department",
+      "/promotion/imports/swat",
+      "/promotion/imports/mtf7",
+      "/promotion/imports/mcd",
+      "/promotion/imports/tru",
+      "/promotion/imports/teu",
+      "/promotion/imports/sar",
+      "/promotion/requirements/department",
+      "/promotion/requirements/swat",
+      "/promotion/requirements/mtf7",
+      "/promotion/requirements/mcd",
+      "/promotion/requirements/tru",
+      "/promotion/requirements/teu",
+      "/promotion/requirements/sar"
+    ]
   },
   "events": {
-    "urls": [""]
+    "urls": ["/events"]
   },
   "gallery": {
-    "urls": [""]
+    "urls": ["/gallary"]
   }
 }
