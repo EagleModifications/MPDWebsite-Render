@@ -170,9 +170,7 @@ export default function App() {
       <CustomCursor />
 
       <Routes>
-        {/* =====================================================
-            PUBLIC
-        ===================================================== */}
+        {/* Public */}
 
         <Route
           path="/"
@@ -195,6 +193,11 @@ export default function App() {
         />
 
         <Route
+          path="*"
+          element={<NotFound />}
+        />
+
+        <Route
           path="/events"
           element={<Events />}
         />
@@ -204,36 +207,24 @@ export default function App() {
           element={<Gallery />}
         />
 
-        {/* =====================================================
-            DASHBOARD
-        ===================================================== */}
+        {/* Dashboards */}
 
         <Route
           path="/dashboard"
           element={<Dashboard />}
         />
 
-        {/* =====================================================
-            ACTIVITY ROSTER
-        ===================================================== */}
-
         <Route
           path="/dashboard/activity/activityroster"
           element={<ActivityRoster />}
         />
-
-        {/* =====================================================
-            PROMOTION ROSTER
-        ===================================================== */}
 
         <Route
           path="/dashboard/promotion/promotionroster"
           element={<PromotionRoster />}
         />
 
-        {/* =====================================================
-            ACTIVITY IMPORTS
-        ===================================================== */}
+        {/* Imports */}
 
         <Route
           path="/dashboard/activity/department-import"
@@ -270,10 +261,6 @@ export default function App() {
           element={<ActivityImportTRU />}
         />
 
-        {/* =====================================================
-            PROMOTION IMPORTS
-        ===================================================== */}
-
         <Route
           path="/dashboard/promotion/department-import"
           element={<PromotionImportDepartment />}
@@ -309,9 +296,7 @@ export default function App() {
           element={<PromotionImportTRU />}
         />
 
-        {/* =====================================================
-            ACTIVITY REQUIREMENTS
-        ===================================================== */}
+        {/* Requirements */}
 
         <Route
           path="/dashboard/activity/department-requirements"
@@ -348,10 +333,6 @@ export default function App() {
           element={<ActivityRequirementsTRU />}
         />
 
-        {/* =====================================================
-            PROMOTION REQUIREMENTS
-        ===================================================== */}
-
         <Route
           path="/dashboard/promotion/department-requirements"
           element={<PromotionRequirementsDepartment />}
@@ -387,13 +368,16 @@ export default function App() {
           element={<PromotionRequirementsTRU />}
         />
 
-        {/* =====================================================
-            404
-        ===================================================== */}
+        {/* Fallback */}
 
         <Route
           path="*"
-          element={<NotFound />}
+          element={
+            <Navigate
+              to="/"
+              replace
+            />
+          }
         />
       </Routes>
 
