@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
-import { NavLink, useLocation } from "react-router-dom"
+import {
+  useLocation,
+  useNavigate,
+} from "react-router-dom"
 
 import {
   CalendarDays,
@@ -95,18 +98,14 @@ function storeBoolean(
 
 const STORAGE_KEYS = {
   activity: "mpd-sidebar-activity-open",
-
   activityImports:
     "mpd-sidebar-activity-imports-open",
-
   activityRequirements:
     "mpd-sidebar-activity-requirements-open",
 
   promotion: "mpd-sidebar-promotion-open",
-
   promotionImports:
     "mpd-sidebar-promotion-imports-open",
-
   promotionRequirements:
     "mpd-sidebar-promotion-requirements-open",
 }
@@ -133,6 +132,10 @@ const navigationButtonClass = `
 `
 
 const navigationLinkClass = `
+  flex
+  w-full
+  items-center
+  gap-2
   text-sidebar-foreground
   hover:text-sidebar-accent-foreground
   focus:text-sidebar-foreground
@@ -222,9 +225,6 @@ function getDiscordAvatarUrl(
     return undefined
   }
 
-  /*
-   * Avatar is already a complete URL.
-   */
   if (
     cleanAvatar.startsWith("http://") ||
     cleanAvatar.startsWith("https://")
@@ -241,23 +241,14 @@ function getDiscordAvatarUrl(
         "",
       )
 
-      /*
-       * Discord animated avatar.
-       */
       if (hash.startsWith("a_")) {
         return `https://cdn.discordapp.com/avatars/${id}/${hash}.gif?size=256`
       }
     }
 
-    /*
-     * Normal avatar URL.
-     */
     return cleanAvatar
   }
 
-  /*
-   * Avatar is only a Discord hash.
-   */
   if (
     discordId &&
     cleanAvatar.startsWith("a_")
@@ -265,9 +256,6 @@ function getDiscordAvatarUrl(
     return `https://cdn.discordapp.com/avatars/${discordId}/${cleanAvatar}.gif?size=256`
   }
 
-  /*
-   * Normal Discord avatar hash.
-   */
   if (discordId) {
     return `https://cdn.discordapp.com/avatars/${discordId}/${cleanAvatar}.png?size=256`
   }
@@ -427,11 +415,13 @@ const PROMOTION_REQUIREMENTS = [
 
 function SubNavigation({
   items,
+  onNavigate,
 }: {
   items: readonly (readonly [
     string,
     string,
   ])[]
+  onNavigate: (path: string) => void
 }) {
   const location = useLocation()
 
@@ -446,19 +436,17 @@ function SubNavigation({
             key={path}
           >
             <SidebarMenuSubButton
-              asChild
               isActive={active}
               className={navigationButtonClass}
-            >
-              <NavLink
-                to={path}
-                end
-                className={
-                  navigationLinkClass
+              onClick={() => {
+                if (
+                  location.pathname !== path
+                ) {
+                  onNavigate(path)
                 }
-              >
-                <span>{label}</span>
-              </NavLink>
+              }}
+            >
+              <span>{label}</span>
             </SidebarMenuSubButton>
           </SidebarMenuSubItem>
         )
@@ -473,6 +461,7 @@ function SubNavigation({
 
 export default function DashboardSidebar() {
   const location = useLocation()
+  const navigate = useNavigate()
 
   const [user, setUser] =
     useState<User | null>(null)
@@ -619,6 +608,22 @@ export default function DashboardSidebar() {
       STORAGE_KEYS.promotionRequirements,
       value,
     )
+  }
+
+  /* ==============================================================
+     SPA NAVIGATION
+  ============================================================== */
+
+  const handleNavigate = (
+    path: string,
+  ) => {
+    if (
+      location.pathname === path
+    ) {
+      return
+    }
+
+    navigate(path)
   }
 
   /* ==============================================================
@@ -827,7 +832,6 @@ export default function DashboardSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              asChild
               size="lg"
               tooltip="Metro Police Department"
               isActive={isRouteActive(
@@ -837,32 +841,27 @@ export default function DashboardSidebar() {
               className={
                 navigationButtonClass
               }
+              onClick={() =>
+                handleNavigate("/")
+              }
             >
-              <NavLink
-                to="/"
-                end
-                className={
-                  navigationLinkClass
-                }
-              >
-                <div className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg">
-                  <img
-                    src="/logo.png"
-                    alt="Metro Police Department"
-                    className="h-full w-full object-contain"
-                  />
-                </div>
+              <div className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg">
+                <img
+                  src="/logo.png"
+                  alt="Metro Police Department"
+                  className="h-full w-full object-contain"
+                />
+              </div>
 
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">
-                    Metro Police Department
-                  </span>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-semibold">
+                  Metro Police Department
+                </span>
 
-                  <span className="truncate text-xs text-muted-foreground">
-                    Dashboard
-                  </span>
-                </div>
-              </NavLink>
+                <span className="truncate text-xs text-muted-foreground">
+                  Dashboard
+                </span>
+              </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -876,10 +875,6 @@ export default function DashboardSidebar() {
 
         {/* ========================================================
             MAIN NAVIGATION
-
-            Kept inside ONE SidebarGroup so the links have
-            consistent spacing instead of each item receiving
-            its own SidebarGroup spacing.
         ======================================================== */}
 
         <SidebarGroup className="py-0">
@@ -887,9 +882,9 @@ export default function DashboardSidebar() {
             <SidebarMenu className="gap-1">
 
               {/* HOME */}
+
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  asChild
                   tooltip="Home"
                   isActive={isRouteActive(
                     "/",
@@ -898,27 +893,22 @@ export default function DashboardSidebar() {
                   className={
                     navigationButtonClass
                   }
+                  onClick={() =>
+                    handleNavigate("/")
+                  }
                 >
-                  <NavLink
-                    to="/"
-                    end
-                    className={
-                      navigationLinkClass
-                    }
-                  >
-                    <Home className="h-4 w-4 shrink-0" />
+                  <Home className="h-4 w-4 shrink-0" />
 
-                    <span>
-                      Home
-                    </span>
-                  </NavLink>
+                  <span>
+                    Home
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               {/* EVENTS */}
+
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  asChild
                   tooltip="Events"
                   isActive={isRouteActive(
                     "/events",
@@ -927,27 +917,24 @@ export default function DashboardSidebar() {
                   className={
                     navigationButtonClass
                   }
+                  onClick={() =>
+                    handleNavigate(
+                      "/events",
+                    )
+                  }
                 >
-                  <NavLink
-                    to="/events"
-                    end
-                    className={
-                      navigationLinkClass
-                    }
-                  >
-                    <CalendarDays className="h-4 w-4 shrink-0" />
+                  <CalendarDays className="h-4 w-4 shrink-0" />
 
-                    <span>
-                      Events
-                    </span>
-                  </NavLink>
+                  <span>
+                    Events
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               {/* GALLERY */}
+
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  asChild
                   tooltip="Gallery"
                   isActive={isRouteActive(
                     "/gallery",
@@ -956,27 +943,24 @@ export default function DashboardSidebar() {
                   className={
                     navigationButtonClass
                   }
+                  onClick={() =>
+                    handleNavigate(
+                      "/gallery",
+                    )
+                  }
                 >
-                  <NavLink
-                    to="/gallery"
-                    end
-                    className={
-                      navigationLinkClass
-                    }
-                  >
-                    <Images className="h-4 w-4 shrink-0" />
+                  <Images className="h-4 w-4 shrink-0" />
 
-                    <span>
-                      Gallery
-                    </span>
-                  </NavLink>
+                  <span>
+                    Gallery
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               {/* DASHBOARD */}
+
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  asChild
                   tooltip="Dashboard"
                   isActive={isRouteActive(
                     "/dashboard",
@@ -985,20 +969,17 @@ export default function DashboardSidebar() {
                   className={
                     navigationButtonClass
                   }
+                  onClick={() =>
+                    handleNavigate(
+                      "/dashboard",
+                    )
+                  }
                 >
-                  <NavLink
-                    to="/dashboard"
-                    end
-                    className={
-                      navigationLinkClass
-                    }
-                  >
-                    <LayoutDashboard className="h-4 w-4 shrink-0" />
+                  <LayoutDashboard className="h-4 w-4 shrink-0" />
 
-                    <span>
-                      Dashboard
-                    </span>
-                  </NavLink>
+                  <span>
+                    Dashboard
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -1060,7 +1041,6 @@ export default function DashboardSidebar() {
 
                     <SidebarMenuItem>
                       <SidebarMenuButton
-                        asChild
                         tooltip="Activity Roster"
                         isActive={isRouteActive(
                           "/dashboard/activity/activityroster",
@@ -1068,20 +1048,17 @@ export default function DashboardSidebar() {
                         className={
                           navigationButtonClass
                         }
+                        onClick={() =>
+                          handleNavigate(
+                            "/dashboard/activity/activityroster",
+                          )
+                        }
                       >
-                        <NavLink
-                          to="/dashboard/activity/activityroster"
-                          end
-                          className={
-                            navigationLinkClass
-                          }
-                        >
-                          <ClipboardCheck className="h-4 w-4 shrink-0" />
+                        <ClipboardCheck className="h-4 w-4 shrink-0" />
 
-                          <span>
-                            Activity Roster
-                          </span>
-                        </NavLink>
+                        <span>
+                          Activity Roster
+                        </span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
@@ -1135,6 +1112,9 @@ export default function DashboardSidebar() {
                           <SubNavigation
                             items={
                               ACTIVITY_IMPORTS
+                            }
+                            onNavigate={
+                              handleNavigate
                             }
                           />
                         </CollapsibleContent>
@@ -1192,6 +1172,9 @@ export default function DashboardSidebar() {
                             items={
                               ACTIVITY_REQUIREMENTS
                             }
+                            onNavigate={
+                              handleNavigate
+                            }
                           />
                         </CollapsibleContent>
                       </SidebarMenuItem>
@@ -1200,7 +1183,6 @@ export default function DashboardSidebar() {
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>
-
             </SidebarGroup>
           </Collapsible>
         )}
@@ -1259,7 +1241,6 @@ export default function DashboardSidebar() {
 
                     <SidebarMenuItem>
                       <SidebarMenuButton
-                        asChild
                         tooltip="Promotion Roster"
                         isActive={isRouteActive(
                           "/dashboard/promotion/promotionroster",
@@ -1267,20 +1248,17 @@ export default function DashboardSidebar() {
                         className={
                           navigationButtonClass
                         }
+                        onClick={() =>
+                          handleNavigate(
+                            "/dashboard/promotion/promotionroster",
+                          )
+                        }
                       >
-                        <NavLink
-                          to="/dashboard/promotion/promotionroster"
-                          end
-                          className={
-                            navigationLinkClass
-                          }
-                        >
-                          <ClipboardCheck className="h-4 w-4 shrink-0" />
+                        <ClipboardCheck className="h-4 w-4 shrink-0" />
 
-                          <span>
-                            Promotion Roster
-                          </span>
-                        </NavLink>
+                        <span>
+                          Promotion Roster
+                        </span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
@@ -1334,6 +1312,9 @@ export default function DashboardSidebar() {
                           <SubNavigation
                             items={
                               PROMOTION_IMPORTS
+                            }
+                            onNavigate={
+                              handleNavigate
                             }
                           />
                         </CollapsibleContent>
@@ -1391,6 +1372,9 @@ export default function DashboardSidebar() {
                             items={
                               PROMOTION_REQUIREMENTS
                             }
+                            onNavigate={
+                              handleNavigate
+                            }
                           />
                         </CollapsibleContent>
                       </SidebarMenuItem>
@@ -1399,7 +1383,6 @@ export default function DashboardSidebar() {
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>
-
             </SidebarGroup>
           </Collapsible>
         )}
@@ -1532,13 +1515,14 @@ export default function DashboardSidebar() {
                   disabled={
                     refreshingProfile
                   }
-                  asChild
+                  onSelect={() => {
+                    window.location.href =
+                      "/api/auth/logout"
+                  }}
                 >
-                  <a href="/api/auth/logout">
-                    <LogOut className="mr-2 h-4 w-4" />
+                  <LogOut className="mr-2 h-4 w-4" />
 
-                    Sign Out
-                  </a>
+                  Sign Out
                 </DropdownMenuItem>
 
               </DropdownMenuContent>
