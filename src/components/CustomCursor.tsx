@@ -12,7 +12,7 @@ export default function CustomCursor() {
   })
 
   const [visible, setVisible] = useState(false)
-  const [hovering, setHovering] = useState(false)
+  const [clicking, setClicking] = useState(false)
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -22,22 +22,19 @@ export default function CustomCursor() {
       })
 
       setVisible(true)
+    }
 
-      const target = event.target as HTMLElement | null
+    const handleMouseDown = () => {
+      setClicking(true)
+    }
 
-      if (
-        target?.closest(
-          "a, button, [role='button'], input, textarea, select, [data-cursor-hover]",
-        )
-      ) {
-        setHovering(true)
-      } else {
-        setHovering(false)
-      }
+    const handleMouseUp = () => {
+      setClicking(false)
     }
 
     const handleMouseLeave = () => {
       setVisible(false)
+      setClicking(false)
     }
 
     const handleMouseEnter = () => {
@@ -47,6 +44,16 @@ export default function CustomCursor() {
     document.addEventListener(
       "mousemove",
       handleMouseMove,
+    )
+
+    document.addEventListener(
+      "mousedown",
+      handleMouseDown,
+    )
+
+    document.addEventListener(
+      "mouseup",
+      handleMouseUp,
     )
 
     document.documentElement.addEventListener(
@@ -63,6 +70,16 @@ export default function CustomCursor() {
       document.removeEventListener(
         "mousemove",
         handleMouseMove,
+      )
+
+      document.removeEventListener(
+        "mousedown",
+        handleMouseDown,
+      )
+
+      document.removeEventListener(
+        "mouseup",
+        handleMouseUp,
       )
 
       document.documentElement.removeEventListener(
@@ -107,8 +124,8 @@ export default function CustomCursor() {
             : "opacity-0"
         }
         ${
-          hovering
-            ? "h-10 w-10 border-blue-400 bg-blue-500/15 shadow-[0_0_30px_rgba(59,130,246,0.65)]"
+          clicking
+            ? "h-8 w-8 border-blue-400 bg-blue-500/15 shadow-[0_0_25px_rgba(59,130,246,0.55)]"
             : ""
         }
       `}
