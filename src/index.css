@@ -201,21 +201,17 @@
     background-color: var(--background);
     color: var(--foreground);
 
-    transition:
-      background-color 200ms ease,
-      color 200ms ease;
-
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 
     /*
-     * Hide the browser cursor.
-     * CustomCursor renders the replacement cursor.
+     * Hide the native cursor.
+     * CustomCursor renders the blue replacement cursor.
      */
     cursor: none;
 
     /*
-     * Prevent normal page text dragging/selection.
+     * Prevent normal page text selection.
      */
     user-select: none;
     -webkit-user-select: none;
@@ -227,10 +223,6 @@
 
     background-color: var(--background);
     color: var(--foreground);
-
-    transition:
-      background-color 200ms ease,
-      color 200ms ease;
 
     cursor: none;
 
@@ -244,10 +236,6 @@
     background-color: var(--background);
     color: var(--foreground);
 
-    transition:
-      background-color 200ms ease,
-      color 200ms ease;
-
     cursor: none;
 
     user-select: none;
@@ -255,22 +243,22 @@
   }
 
   /*
-   * Keep the custom cursor hidden from the browser while
-   * allowing normal text/input interaction.
+   * Everything that normally displays a native cursor
+   * continues to use the custom cursor instead.
    */
-  button,
   a,
+  button,
   input,
   textarea,
   select,
   option,
-  [role="button"] {
-    font: inherit;
+  [role="button"],
+  [contenteditable="true"] {
     cursor: none;
   }
 
   /*
-   * Inputs still need normal text selection.
+   * Inputs still allow normal text selection.
    */
   input,
   textarea,
@@ -279,13 +267,16 @@
     -webkit-user-select: text;
   }
 
+  /*
+   * Remove the mobile tap highlight.
+   */
   button,
   a {
     -webkit-tap-highlight-color: transparent;
   }
 
   /*
-   * Disable image dragging.
+   * Prevent dragging images/icons.
    */
   img,
   svg {
@@ -293,7 +284,7 @@
   }
 
   /*
-   * Selection styling.
+   * Text selection.
    */
   ::selection {
     background-color: #3b82f6;
@@ -338,11 +329,6 @@ body,
    SONNER
 ========================================================= */
 
-/*
- * Force Sonner's close button into the actual
- * top-right corner of the toast.
- */
-
 [data-sonner-toaster] {
   --toast-close-button-start: auto !important;
   --toast-close-button-end: 8px !important;
@@ -351,6 +337,7 @@ body,
 
 [data-sonner-toast] {
   position: relative !important;
+  padding-right: 44px !important;
 }
 
 [data-sonner-toast] [data-close-button],
@@ -380,10 +367,6 @@ body,
   border-radius: 6px !important;
 }
 
-/*
- * Prevent the close button from being shifted
- * when Sonner applies hover/focus transforms.
- */
 [data-sonner-toast] [data-close-button]:hover,
 [data-sonner-toast] [data-close-button]:focus,
 [data-sonner-toast] [data-close-button]:active {
@@ -391,45 +374,22 @@ body,
   translate: none !important;
 }
 
-/*
- * Leave room for the close button.
- */
-[data-sonner-toast] {
-  padding-right: 44px !important;
-}
-
-/* =========================================================
-   UTILITY HELPERS
-========================================================= */
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  .text-pretty {
-    text-wrap: pretty;
-  }
-}
-
 /* =========================================================
    MOBILE / TOUCH DEVICES
 ========================================================= */
 
-/*
- * On touch devices there is no useful mouse cursor,
- * so don't interfere with the native touch experience.
- */
 @media (pointer: coarse) {
   html,
   body,
   #root,
-  button,
   a,
+  button,
   input,
   textarea,
   select,
-  [role="button"] {
+  option,
+  [role="button"],
+  [contenteditable="true"] {
     cursor: auto;
   }
 }
