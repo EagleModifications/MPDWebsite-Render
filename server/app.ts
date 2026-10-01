@@ -4904,16 +4904,10 @@ export function createApp() {
      Events
   ───────────────────────────────────────── */
 
-  app.get("/api/events", async (req, res) => {
+  app.get("/api/events", async (_req, res) => {
     try {
-      const user = await getRequestUser(req)
-
-      if (!user) {
-        return res.status(401).json({
-          error: "Not authenticated",
-        })
-      }
-
+      // Public read endpoint: guests can view events.
+      // Management endpoints below still require authentication + permission.
       const events = await getCollection<EventDocument>("events")
 
       const results = await events
@@ -5128,18 +5122,10 @@ export function createApp() {
      Gallery
   ───────────────────────────────────────── */
 
-  app.get("/api/gallery", async (req, res) => {
+  app.get("/api/gallery", async (_req, res) => {
     try {
-      const user =
-        await getRequestUser(req)
-
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          error: "Not authenticated",
-        })
-      }
-
+      // Public read endpoint: guests can view the gallery.
+      // Upload/edit/delete endpoints below still require authentication + permission.
       const gallery =
         await getCollection<GalleryDocument>(
           "gallery",
@@ -5264,16 +5250,8 @@ export function createApp() {
     "/api/gallery/file/:id",
     async (req, res) => {
       try {
-        const user =
-          await getRequestUser(req)
-
-        if (!user) {
-          return res.status(401).json({
-            success: false,
-            error: "Not authenticated",
-          })
-        }
-
+        // Public media endpoint: guests need to be able to see
+        // images/videos referenced by the public gallery.
         const id = req.params.id
 
         if (!ObjectId.isValid(id)) {
