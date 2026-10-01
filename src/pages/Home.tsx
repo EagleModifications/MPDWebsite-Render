@@ -38,7 +38,7 @@ export default function Home() {
           <div className="mb-7 flex items-center gap-3">
             <img
               src="/logo.png"
-              alt="CALIRP"
+              alt="MPD"
               className="h-9 w-9 object-contain"
             />
 
