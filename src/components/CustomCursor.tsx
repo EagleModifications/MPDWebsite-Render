@@ -12,7 +12,6 @@ export default function CustomCursor() {
   })
 
   const [visible, setVisible] = useState(false)
-  const [clicking, setClicking] = useState(false)
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -24,17 +23,8 @@ export default function CustomCursor() {
       setVisible(true)
     }
 
-    const handleMouseDown = () => {
-      setClicking(true)
-    }
-
-    const handleMouseUp = () => {
-      setClicking(false)
-    }
-
     const handleMouseLeave = () => {
       setVisible(false)
-      setClicking(false)
     }
 
     const handleMouseEnter = () => {
@@ -42,8 +32,6 @@ export default function CustomCursor() {
     }
 
     document.addEventListener("mousemove", handleMouseMove)
-    document.addEventListener("mousedown", handleMouseDown)
-    document.addEventListener("mouseup", handleMouseUp)
 
     document.documentElement.addEventListener(
       "mouseleave",
@@ -57,8 +45,6 @@ export default function CustomCursor() {
 
     return () => {
       document.removeEventListener("mousemove", handleMouseMove)
-      document.removeEventListener("mousedown", handleMouseDown)
-      document.removeEventListener("mouseup", handleMouseUp)
 
       document.documentElement.removeEventListener(
         "mouseleave",
@@ -73,8 +59,11 @@ export default function CustomCursor() {
   }, [])
 
   return (
-    <div
+    <svg
       aria-hidden="true"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
       className={`
         pointer-events-none
         fixed
@@ -84,8 +73,7 @@ export default function CustomCursor() {
         hidden
         md:block
         transition-opacity
-        duration-150
-        ease-out
+        duration-75
         ${
           visible
             ? "opacity-100"
@@ -97,112 +85,14 @@ export default function CustomCursor() {
         top: position.y,
       }}
     >
-      {/* Soft outer glow */}
-      <div
-        className={`
-          pointer-events-none
-          absolute
-          left-0
-          top-0
-          h-11
-          w-11
-          -translate-x-1/2
-          -translate-y-1/2
-          rounded-full
-          bg-blue-500/[0.04]
-          blur-[7px]
-          transition-[width,height,opacity]
-          duration-200
-          ease-out
-          ${
-            clicking
-              ? "h-12 w-12 opacity-90"
-              : "opacity-70"
-          }
-        `}
+      {/* Blue default-style pointer */}
+      <path
+        d="M2 2L7.2 21.2L11.4 13.1L19.8 17.4L21.8 13.7L13.3 9.5L20.4 5.8L2 2Z"
+        fill="#3b82f6"
+        stroke="#ffffff"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
       />
-
-      {/* Outer ring */}
-      <div
-        className={`
-          pointer-events-none
-          absolute
-          left-0
-          top-0
-          h-7
-          w-7
-          -translate-x-1/2
-          -translate-y-1/2
-          rounded-full
-          border
-          border-blue-400/65
-          transition-[width,height,border-color]
-          duration-150
-          ease-out
-          ${
-            clicking
-              ? "h-8 w-8 border-blue-400/85"
-              : ""
-          }
-        `}
-        style={{
-          boxShadow: `
-            0 0 6px rgba(59, 130, 246, 0.18),
-            0 0 14px rgba(59, 130, 246, 0.12)
-          `,
-        }}
-      />
-
-      {/* Clear gap around the click point */}
-      <div
-        className="
-          pointer-events-none
-          absolute
-          left-0
-          top-0
-          h-[9px]
-          w-[9px]
-          -translate-x-1/2
-          -translate-y-1/2
-          rounded-full
-          bg-transparent
-        "
-      />
-
-      {/* Exact mouse / click point */}
-      <span
-        className={`
-          pointer-events-none
-          absolute
-          left-0
-          top-0
-          h-[5px]
-          w-[5px]
-          -translate-x-1/2
-          -translate-y-1/2
-          rounded-full
-          bg-blue-400
-          transition-[width,height,background-color,box-shadow]
-          duration-100
-          ease-out
-          ${
-            clicking
-              ? "h-[6px] w-[6px] bg-blue-300"
-              : ""
-          }
-        `}
-        style={{
-          boxShadow: clicking
-            ? `
-                0 0 4px rgba(147, 197, 253, 0.9),
-                0 0 8px rgba(96, 165, 250, 0.65)
-              `
-            : `
-                0 0 3px rgba(147, 197, 253, 0.9),
-                0 0 7px rgba(96, 165, 250, 0.55)
-              `,
-        }}
-      />
-    </div>
+    </svg>
   )
 }
