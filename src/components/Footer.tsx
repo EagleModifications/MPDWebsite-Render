@@ -81,7 +81,7 @@ export default function Footer() {
         <div className="mt-10 border-t border-white/10 pt-6">
           <div className="flex flex-col gap-3 text-xs sm:flex-row sm:items-center sm:justify-between">
             <span className="text-white/35">
-              {new Date().getFullYear()} METRO POLICE DEPARTMENT - California Roleplay
+              COPYRIGHT © {new Date().getFullYear()} METRO POLICE DEPARTMENT - California Roleplay, All rights Reserved
             </span>
 
             <span className="text-white/35">
