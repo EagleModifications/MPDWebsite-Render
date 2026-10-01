@@ -1,11 +1,8 @@
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Infinity } from "lucide-react"
 
-type VerificationState = "verifying" | "verified" | "failed"
-
 export default function Verifying() {
-  const [status, setStatus] = useState<VerificationState>("verifying")
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -16,22 +13,16 @@ export default function Verifying() {
         })
 
         if (response.ok) {
-          setStatus("verified")
-
           // Keep the verifying screen visible for 3 seconds.
           setTimeout(() => {
             navigate("/", { replace: true })
           }, 1000)
         } else {
-          setStatus("failed")
-
           setTimeout(() => {
             navigate("/signed-out", { replace: true })
           }, 3000)
         }
       } catch {
-        setStatus("failed")
-
         setTimeout(() => {
           navigate("/signed-out", { replace: true })
         }, 3000)

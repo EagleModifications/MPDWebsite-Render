@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
 import {
-  Check,
   ChevronDown,
   ChevronUp,
   Clock3,

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-  Bell,
   ClipboardCheck,
   FileSpreadsheet,
   History,
@@ -9,8 +8,6 @@ import {
   Search,
   Settings,
   ShieldCheck,
-  Volume2,
-  VolumeX,
   X,
 } from "lucide-react"
 

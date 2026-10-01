@@ -94,12 +94,6 @@ function formatLongDate(value: string) {
   })
 }
 
-function formatShortDate(value: string) {
-  return parseDateKey(value).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-  })
-}
 
 function getMonthStart(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1)
