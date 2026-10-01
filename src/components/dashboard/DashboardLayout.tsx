@@ -22,16 +22,18 @@ export default function DashboardLayout({
       <SidebarProvider>
         <DashboardSidebar />
 
-        <SidebarInset className="flex min-h-screen min-w-0 flex-col">
+        <SidebarInset className="min-w-0">
           <DashboardNavbar />
 
-          <main className="flex flex-1 flex-col">
-            <div className="flex flex-1 flex-col gap-4 p-4">
+          <main className="min-h-[calc(100vh-4rem)] pb-16">
+            <div className="flex flex-col gap-4 p-4">
               {children}
             </div>
           </main>
 
-          <DashboardFooter />
+          <div className="fixed bottom-0 right-0 z-40 w-[calc(100%-var(--sidebar-width))]">
+            <DashboardFooter />
+          </div>
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
