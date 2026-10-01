@@ -5,7 +5,6 @@ export default function SignIn() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    document.title = "Sign In | Metro Police Department"
 
     const params = new URLSearchParams(window.location.search)
     const message = params.get("error")
