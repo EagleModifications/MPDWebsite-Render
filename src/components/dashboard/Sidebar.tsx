@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from "react"
 import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
+import {
+  NavLink,
   useLocation,
-  useNavigate,
 } from "react-router-dom"
 
 import {
@@ -66,7 +70,8 @@ function getStoredBoolean(
   defaultValue: boolean,
 ): boolean {
   try {
-    const stored = sessionStorage.getItem(key)
+    const stored =
+      sessionStorage.getItem(key)
 
     if (stored === null) {
       return defaultValue
@@ -97,15 +102,21 @@ function storeBoolean(
 ================================================================ */
 
 const STORAGE_KEYS = {
-  activity: "mpd-sidebar-activity-open",
+  activity:
+    "mpd-sidebar-activity-open",
+
   activityImports:
     "mpd-sidebar-activity-imports-open",
+
   activityRequirements:
     "mpd-sidebar-activity-requirements-open",
 
-  promotion: "mpd-sidebar-promotion-open",
+  promotion:
+    "mpd-sidebar-promotion-open",
+
   promotionImports:
     "mpd-sidebar-promotion-imports-open",
+
   promotionRequirements:
     "mpd-sidebar-promotion-requirements-open",
 }
@@ -129,17 +140,6 @@ const navigationButtonClass = `
 
   data-[active=true]:!bg-sidebar-accent
   data-[active=true]:!text-sidebar-accent-foreground
-`
-
-const navigationLinkClass = `
-  flex
-  w-full
-  items-center
-  gap-2
-  text-sidebar-foreground
-  hover:text-sidebar-accent-foreground
-  focus:text-sidebar-foreground
-  focus-visible:text-sidebar-accent-foreground
 `
 
 const collapsibleButtonClass = `
@@ -219,27 +219,35 @@ function getDiscordAvatarUrl(
   discordId?: string,
   avatar?: string,
 ): string | undefined {
-  const cleanAvatar = avatar?.trim()
+  const cleanAvatar =
+    avatar?.trim()
 
   if (!cleanAvatar) {
     return undefined
   }
 
   if (
-    cleanAvatar.startsWith("http://") ||
-    cleanAvatar.startsWith("https://")
-  ) {
-    const match = cleanAvatar.match(
-      /\/avatars\/(\d+)\/([^/?#]+)/i,
+    cleanAvatar.startsWith(
+      "http://",
+    ) ||
+    cleanAvatar.startsWith(
+      "https://",
     )
+  ) {
+    const match =
+      cleanAvatar.match(
+        /\/avatars\/(\d+)\/([^/?#]+)/i,
+      )
 
     if (match) {
-      const [, id, hashWithExtension] = match
+      const [, id, hashWithExtension] =
+        match
 
-      const hash = hashWithExtension.replace(
-        /\.(gif|webp|png|jpg|jpeg)$/i,
-        "",
-      )
+      const hash =
+        hashWithExtension.replace(
+          /\.(gif|webp|png|jpg|jpeg)$/i,
+          "",
+        )
 
       if (hash.startsWith("a_")) {
         return `https://cdn.discordapp.com/avatars/${id}/${hash}.gif?size=256`
@@ -271,9 +279,10 @@ function getDiscordDefaultAvatarUrl(
   }
 
   try {
-    const avatarIndex = Number(
-      BigInt(discordId) % 6n,
-    )
+    const avatarIndex =
+      Number(
+        BigInt(discordId) % 6n,
+      )
 
     return `https://cdn.discordapp.com/embed/avatars/${avatarIndex}.png?size=256`
   } catch {
@@ -415,42 +424,46 @@ const PROMOTION_REQUIREMENTS = [
 
 function SubNavigation({
   items,
-  onNavigate,
 }: {
-  items: readonly (readonly [
-    string,
-    string,
-  ])[]
-  onNavigate: (path: string) => void
+  items: readonly (
+    readonly [string, string]
+  )[]
 }) {
-  const location = useLocation()
+  const location =
+    useLocation()
 
   return (
     <SidebarMenuSub>
-      {items.map(([label, path]) => {
-        const active =
-          location.pathname === path
+      {items.map(
+        ([label, path]) => {
+          const active =
+            location.pathname === path
 
-        return (
-          <SidebarMenuSubItem
-            key={path}
-          >
-            <SidebarMenuSubButton
-              isActive={active}
-              className={navigationButtonClass}
-              onClick={() => {
-                if (
-                  location.pathname !== path
-                ) {
-                  onNavigate(path)
-                }
-              }}
+          return (
+            <SidebarMenuSubItem
+              key={path}
             >
-              <span>{label}</span>
-            </SidebarMenuSubButton>
-          </SidebarMenuSubItem>
-        )
-      })}
+              <SidebarMenuSubButton
+                asChild
+                isActive={active}
+                className={
+                  navigationButtonClass
+                }
+              >
+                <NavLink
+                  to={path}
+                  end
+                  className="text-sidebar-foreground"
+                >
+                  <span>
+                    {label}
+                  </span>
+                </NavLink>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+          )
+        },
+      )}
     </SidebarMenuSub>
   )
 }
@@ -460,8 +473,8 @@ function SubNavigation({
 ================================================================ */
 
 export default function DashboardSidebar() {
-  const location = useLocation()
-  const navigate = useNavigate()
+  const location =
+    useLocation()
 
   const [user, setUser] =
     useState<User | null>(null)
@@ -611,22 +624,6 @@ export default function DashboardSidebar() {
   }
 
   /* ==============================================================
-     SPA NAVIGATION
-  ============================================================== */
-
-  const handleNavigate = (
-    path: string,
-  ) => {
-    if (
-      location.pathname === path
-    ) {
-      return
-    }
-
-    navigate(path)
-  }
-
-  /* ==============================================================
      SESSION
   ============================================================== */
 
@@ -639,7 +636,9 @@ export default function DashboardSidebar() {
           return
         }
 
-        setUser(session ?? null)
+        setUser(
+          session ?? null,
+        )
       })
       .catch((error) => {
         console.error(
@@ -675,7 +674,9 @@ export default function DashboardSidebar() {
         const session =
           await getSession()
 
-        setUser(session ?? null)
+        setUser(
+          session ?? null,
+        )
       } catch (error) {
         console.error(
           "[profile] Failed to refresh profile:",
@@ -690,8 +691,13 @@ export default function DashboardSidebar() {
             ),
         )
 
-        setRefreshingProfile(false)
-        setProfileMenuOpen(false)
+        setRefreshingProfile(
+          false,
+        )
+
+        setProfileMenuOpen(
+          false,
+        )
       }
     }
 
@@ -732,7 +738,9 @@ export default function DashboardSidebar() {
     end = true,
   ) => {
     if (end) {
-      return location.pathname === path
+      return (
+        location.pathname === path
+      )
     }
 
     return (
@@ -805,17 +813,18 @@ export default function DashboardSidebar() {
     discordDefaultAvatarUrl,
   ])
 
-  const handleAvatarError = () => {
-    if (
-      discordDefaultAvatarUrl &&
-      avatarSrc !==
-        discordDefaultAvatarUrl
-    ) {
-      setAvatarSrc(
-        discordDefaultAvatarUrl,
-      )
+  const handleAvatarError =
+    () => {
+      if (
+        discordDefaultAvatarUrl &&
+        avatarSrc !==
+          discordDefaultAvatarUrl
+      ) {
+        setAvatarSrc(
+          discordDefaultAvatarUrl,
+        )
+      }
     }
-  }
 
   /* ==============================================================
      RENDER
@@ -823,7 +832,6 @@ export default function DashboardSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-
       {/* ==========================================================
           HEADER
       ========================================================== */}
@@ -832,6 +840,7 @@ export default function DashboardSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
+              asChild
               size="lg"
               tooltip="Metro Police Department"
               isActive={isRouteActive(
@@ -841,27 +850,30 @@ export default function DashboardSidebar() {
               className={
                 navigationButtonClass
               }
-              onClick={() =>
-                handleNavigate("/")
-              }
             >
-              <div className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg">
-                <img
-                  src="/logo.png"
-                  alt="Metro Police Department"
-                  className="h-full w-full object-contain"
-                />
-              </div>
+              <NavLink
+                to="/"
+                end
+                className="text-sidebar-foreground"
+              >
+                <div className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg">
+                  <img
+                    src="/logo.png"
+                    alt="Metro Police Department"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
 
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">
-                  Metro Police Department
-                </span>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">
+                    Metro Police Department
+                  </span>
 
-                <span className="truncate text-xs text-muted-foreground">
-                  Dashboard
-                </span>
-              </div>
+                  <span className="truncate text-xs text-muted-foreground">
+                    Dashboard
+                  </span>
+                </div>
+              </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -872,7 +884,6 @@ export default function DashboardSidebar() {
       ========================================================== */}
 
       <SidebarContent>
-
         {/* ========================================================
             MAIN NAVIGATION
         ======================================================== */}
@@ -880,11 +891,11 @@ export default function DashboardSidebar() {
         <SidebarGroup className="py-0">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
-
               {/* HOME */}
 
               <SidebarMenuItem>
                 <SidebarMenuButton
+                  asChild
                   tooltip="Home"
                   isActive={isRouteActive(
                     "/",
@@ -893,15 +904,18 @@ export default function DashboardSidebar() {
                   className={
                     navigationButtonClass
                   }
-                  onClick={() =>
-                    handleNavigate("/")
-                  }
                 >
-                  <Home className="h-4 w-4 shrink-0" />
+                  <NavLink
+                    to="/"
+                    end
+                    className="text-sidebar-foreground"
+                  >
+                    <Home className="h-4 w-4 shrink-0" />
 
-                  <span>
-                    Home
-                  </span>
+                    <span>
+                      Home
+                    </span>
+                  </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -909,6 +923,7 @@ export default function DashboardSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton
+                  asChild
                   tooltip="Events"
                   isActive={isRouteActive(
                     "/events",
@@ -917,17 +932,18 @@ export default function DashboardSidebar() {
                   className={
                     navigationButtonClass
                   }
-                  onClick={() =>
-                    handleNavigate(
-                      "/events",
-                    )
-                  }
                 >
-                  <CalendarDays className="h-4 w-4 shrink-0" />
+                  <NavLink
+                    to="/events"
+                    end
+                    className="text-sidebar-foreground"
+                  >
+                    <CalendarDays className="h-4 w-4 shrink-0" />
 
-                  <span>
-                    Events
-                  </span>
+                    <span>
+                      Events
+                    </span>
+                  </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -935,6 +951,7 @@ export default function DashboardSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton
+                  asChild
                   tooltip="Gallery"
                   isActive={isRouteActive(
                     "/gallery",
@@ -943,17 +960,18 @@ export default function DashboardSidebar() {
                   className={
                     navigationButtonClass
                   }
-                  onClick={() =>
-                    handleNavigate(
-                      "/gallery",
-                    )
-                  }
                 >
-                  <Images className="h-4 w-4 shrink-0" />
+                  <NavLink
+                    to="/gallery"
+                    end
+                    className="text-sidebar-foreground"
+                  >
+                    <Images className="h-4 w-4 shrink-0" />
 
-                  <span>
-                    Gallery
-                  </span>
+                    <span>
+                      Gallery
+                    </span>
+                  </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -961,6 +979,7 @@ export default function DashboardSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton
+                  asChild
                   tooltip="Dashboard"
                   isActive={isRouteActive(
                     "/dashboard",
@@ -969,20 +988,20 @@ export default function DashboardSidebar() {
                   className={
                     navigationButtonClass
                   }
-                  onClick={() =>
-                    handleNavigate(
-                      "/dashboard",
-                    )
-                  }
                 >
-                  <LayoutDashboard className="h-4 w-4 shrink-0" />
+                  <NavLink
+                    to="/dashboard"
+                    end
+                    className="text-sidebar-foreground"
+                  >
+                    <LayoutDashboard className="h-4 w-4 shrink-0" />
 
-                  <span>
-                    Dashboard
-                  </span>
+                    <span>
+                      Dashboard
+                    </span>
+                  </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -1000,8 +1019,9 @@ export default function DashboardSidebar() {
             className="group/activity"
           >
             <SidebarGroup>
-
-              <CollapsibleTrigger asChild>
+              <CollapsibleTrigger
+                asChild
+              >
                 <button
                   type="button"
                   className={
@@ -1036,11 +1056,11 @@ export default function DashboardSidebar() {
               >
                 <SidebarGroupContent>
                   <SidebarMenu>
-
                     {/* ACTIVITY ROSTER */}
 
                     <SidebarMenuItem>
                       <SidebarMenuButton
+                        asChild
                         tooltip="Activity Roster"
                         isActive={isRouteActive(
                           "/dashboard/activity/activityroster",
@@ -1048,17 +1068,18 @@ export default function DashboardSidebar() {
                         className={
                           navigationButtonClass
                         }
-                        onClick={() =>
-                          handleNavigate(
-                            "/dashboard/activity/activityroster",
-                          )
-                        }
                       >
-                        <ClipboardCheck className="h-4 w-4 shrink-0" />
+                        <NavLink
+                          to="/dashboard/activity/activityroster"
+                          end
+                          className="text-sidebar-foreground"
+                        >
+                          <ClipboardCheck className="h-4 w-4 shrink-0" />
 
-                        <span>
-                          Activity Roster
-                        </span>
+                          <span>
+                            Activity Roster
+                          </span>
+                        </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
@@ -1074,7 +1095,9 @@ export default function DashboardSidebar() {
                       className="group/activity-imports"
                     >
                       <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
+                        <CollapsibleTrigger
+                          asChild
+                        >
                           <SidebarMenuButton
                             tooltip="Imports"
                             className={
@@ -1113,9 +1136,6 @@ export default function DashboardSidebar() {
                             items={
                               ACTIVITY_IMPORTS
                             }
-                            onNavigate={
-                              handleNavigate
-                            }
                           />
                         </CollapsibleContent>
                       </SidebarMenuItem>
@@ -1133,7 +1153,9 @@ export default function DashboardSidebar() {
                       className="group/activity-requirements"
                     >
                       <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
+                        <CollapsibleTrigger
+                          asChild
+                        >
                           <SidebarMenuButton
                             tooltip="Requirements"
                             className={
@@ -1172,14 +1194,10 @@ export default function DashboardSidebar() {
                             items={
                               ACTIVITY_REQUIREMENTS
                             }
-                            onNavigate={
-                              handleNavigate
-                            }
                           />
                         </CollapsibleContent>
                       </SidebarMenuItem>
                     </Collapsible>
-
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>
@@ -1200,8 +1218,9 @@ export default function DashboardSidebar() {
             className="group/promotion"
           >
             <SidebarGroup>
-
-              <CollapsibleTrigger asChild>
+              <CollapsibleTrigger
+                asChild
+              >
                 <button
                   type="button"
                   className={
@@ -1236,11 +1255,11 @@ export default function DashboardSidebar() {
               >
                 <SidebarGroupContent>
                   <SidebarMenu>
-
                     {/* PROMOTION ROSTER */}
 
                     <SidebarMenuItem>
                       <SidebarMenuButton
+                        asChild
                         tooltip="Promotion Roster"
                         isActive={isRouteActive(
                           "/dashboard/promotion/promotionroster",
@@ -1248,17 +1267,18 @@ export default function DashboardSidebar() {
                         className={
                           navigationButtonClass
                         }
-                        onClick={() =>
-                          handleNavigate(
-                            "/dashboard/promotion/promotionroster",
-                          )
-                        }
                       >
-                        <ClipboardCheck className="h-4 w-4 shrink-0" />
+                        <NavLink
+                          to="/dashboard/promotion/promotionroster"
+                          end
+                          className="text-sidebar-foreground"
+                        >
+                          <ClipboardCheck className="h-4 w-4 shrink-0" />
 
-                        <span>
-                          Promotion Roster
-                        </span>
+                          <span>
+                            Promotion Roster
+                          </span>
+                        </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
@@ -1274,7 +1294,9 @@ export default function DashboardSidebar() {
                       className="group/promotion-imports"
                     >
                       <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
+                        <CollapsibleTrigger
+                          asChild
+                        >
                           <SidebarMenuButton
                             tooltip="Imports"
                             className={
@@ -1313,9 +1335,6 @@ export default function DashboardSidebar() {
                             items={
                               PROMOTION_IMPORTS
                             }
-                            onNavigate={
-                              handleNavigate
-                            }
                           />
                         </CollapsibleContent>
                       </SidebarMenuItem>
@@ -1333,7 +1352,9 @@ export default function DashboardSidebar() {
                       className="group/promotion-requirements"
                     >
                       <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
+                        <CollapsibleTrigger
+                          asChild
+                        >
                           <SidebarMenuButton
                             tooltip="Requirements"
                             className={
@@ -1372,21 +1393,16 @@ export default function DashboardSidebar() {
                             items={
                               PROMOTION_REQUIREMENTS
                             }
-                            onNavigate={
-                              handleNavigate
-                            }
                           />
                         </CollapsibleContent>
                       </SidebarMenuItem>
                     </Collapsible>
-
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>
             </SidebarGroup>
           </Collapsible>
         )}
-
       </SidebarContent>
 
       {/* ==========================================================
@@ -1396,7 +1412,6 @@ export default function DashboardSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-
             <DropdownMenu
               open={profileMenuOpen}
               onOpenChange={(open) => {
@@ -1407,10 +1422,14 @@ export default function DashboardSidebar() {
                   return
                 }
 
-                setProfileMenuOpen(open)
+                setProfileMenuOpen(
+                  open,
+                )
               }}
             >
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger
+                asChild
+              >
                 <SidebarMenuButton
                   size="lg"
                   tooltip="Account"
@@ -1458,7 +1477,6 @@ export default function DashboardSidebar() {
               >
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex items-center gap-2">
-
                     <Avatar className="h-8 w-8 shrink-0 rounded-lg">
                       <AvatarImage
                         src={avatarSrc}
@@ -1482,7 +1500,6 @@ export default function DashboardSidebar() {
                         {username}
                       </span>
                     </div>
-
                   </div>
                 </DropdownMenuLabel>
 
@@ -1515,23 +1532,19 @@ export default function DashboardSidebar() {
                   disabled={
                     refreshingProfile
                   }
-                  onSelect={() => {
-                    window.location.href =
-                      "/api/auth/logout"
-                  }}
+                  asChild
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
+                  <a href="/api/auth/logout">
+                    <LogOut className="mr-2 h-4 w-4" />
 
-                  Sign Out
+                    Sign Out
+                  </a>
                 </DropdownMenuItem>
-
               </DropdownMenuContent>
             </DropdownMenu>
-
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-
     </Sidebar>
   )
 }
