@@ -1,28 +1,25 @@
 import { useEffect, useMemo, useState } from "react"
-import {
-  NavLink,
-  useLocation,
-} from "react-router-dom"
+import { NavLink, useLocation } from "react-router-dom"
 
 import {
+  CalendarDays,
   ChevronRight,
   ClipboardCheck,
   FileSpreadsheet,
+  Home,
+  Images,
+  LayoutDashboard,
   LogOut,
   RefreshCw,
-  Home,
-  LayoutDashboard,
-  CalendarDays,
-  Images,
 } from "lucide-react"
 
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
-  SidebarFooter,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -98,20 +95,24 @@ function storeBoolean(
 
 const STORAGE_KEYS = {
   activity: "mpd-sidebar-activity-open",
+
   activityImports:
     "mpd-sidebar-activity-imports-open",
+
   activityRequirements:
     "mpd-sidebar-activity-requirements-open",
 
   promotion: "mpd-sidebar-promotion-open",
+
   promotionImports:
     "mpd-sidebar-promotion-imports-open",
+
   promotionRequirements:
     "mpd-sidebar-promotion-requirements-open",
 }
 
 /* ================================================================
-   NAVIGATION
+   NAVIGATION STYLES
 ================================================================ */
 
 const navigationButtonClass = `
@@ -179,17 +180,6 @@ const profileButtonClass = `
    SECTION HEADER
 ================================================================ */
 
-/*
- * The section name and chevron are hidden when the sidebar
- * switches to icon/collapsed mode.
- *
- * This prevents text such as:
- *
- * Activity Management
- * Promotion Management
- *
- * from being squeezed into the 3rem icon sidebar.
- */
 const sectionButtonClass = `
   flex
   w-full
@@ -222,31 +212,11 @@ const sectionButtonClass = `
    DISCORD AVATAR HELPERS
 ================================================================ */
 
-/*
- * Discord animated avatars have hashes beginning with "a_".
- *
- * Example:
- *
- * https://cdn.discordapp.com/avatars/123456/a_abcdef.gif
- *
- * Depending on how the session/backend stores the avatar,
- * user.avatar may contain:
- *
- * 1. The complete CDN URL
- * 2. A CDN URL ending in .webp
- * 3. A CDN URL ending in .png
- * 4. Just the Discord avatar hash
- *
- * This helper converts animated Discord avatars to their
- * actual GIF CDN URL.
- */
-
 function getDiscordAvatarUrl(
   discordId?: string,
   avatar?: string,
 ): string | undefined {
-  const cleanAvatar =
-    avatar?.trim()
+  const cleanAvatar = avatar?.trim()
 
   if (!cleanAvatar) {
     return undefined
@@ -256,34 +226,25 @@ function getDiscordAvatarUrl(
    * Avatar is already a complete URL.
    */
   if (
-    cleanAvatar.startsWith(
-      "http://",
-    ) ||
-    cleanAvatar.startsWith(
-      "https://",
-    )
+    cleanAvatar.startsWith("http://") ||
+    cleanAvatar.startsWith("https://")
   ) {
-    const match =
-      cleanAvatar.match(
-        /\/avatars\/(\d+)\/([^/?#]+)/i,
-      )
+    const match = cleanAvatar.match(
+      /\/avatars\/(\d+)\/([^/?#]+)/i,
+    )
 
     if (match) {
-      const [, id, hashWithExtension] =
-        match
+      const [, id, hashWithExtension] = match
 
-      const hash =
-        hashWithExtension.replace(
-          /\.(gif|webp|png|jpg|jpeg)$/i,
-          "",
-        )
+      const hash = hashWithExtension.replace(
+        /\.(gif|webp|png|jpg|jpeg)$/i,
+        "",
+      )
 
       /*
        * Discord animated avatar.
        */
-      if (
-        hash.startsWith("a_")
-      ) {
+      if (hash.startsWith("a_")) {
         return `https://cdn.discordapp.com/avatars/${id}/${hash}.gif?size=256`
       }
     }
@@ -305,7 +266,7 @@ function getDiscordAvatarUrl(
   }
 
   /*
-   * Avatar is a normal Discord hash.
+   * Normal Discord avatar hash.
    */
   if (discordId) {
     return `https://cdn.discordapp.com/avatars/${discordId}/${cleanAvatar}.png?size=256`
@@ -322,10 +283,9 @@ function getDiscordDefaultAvatarUrl(
   }
 
   try {
-    const avatarIndex =
-      Number(
-        BigInt(discordId) % 6n,
-      )
+    const avatarIndex = Number(
+      BigInt(discordId) % 6n,
+    )
 
     return `https://cdn.discordapp.com/embed/avatars/${avatarIndex}.png?size=256`
   } catch {
@@ -477,38 +437,32 @@ function SubNavigation({
 
   return (
     <SidebarMenuSub>
-      {items.map(
-        ([label, path]) => {
-          const active =
-            location.pathname === path
+      {items.map(([label, path]) => {
+        const active =
+          location.pathname === path
 
-          return (
-            <SidebarMenuSubItem
-              key={path}
+        return (
+          <SidebarMenuSubItem
+            key={path}
+          >
+            <SidebarMenuSubButton
+              asChild
+              isActive={active}
+              className={navigationButtonClass}
             >
-              <SidebarMenuSubButton
-                asChild
-                isActive={active}
+              <NavLink
+                to={path}
+                end
                 className={
-                  navigationButtonClass
+                  navigationLinkClass
                 }
               >
-                <NavLink
-                  to={path}
-                  end
-                  className={
-                    navigationLinkClass
-                  }
-                >
-                  <span>
-                    {label}
-                  </span>
-                </NavLink>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
-          )
-        },
-      )}
+                <span>{label}</span>
+              </NavLink>
+            </SidebarMenuSubButton>
+          </SidebarMenuSubItem>
+        )
+      })}
     </SidebarMenuSub>
   )
 }
@@ -807,12 +761,6 @@ export default function DashboardSidebar() {
       .slice(0, 2)
       .toUpperCase() || "U"
 
-  /*
-   * Resolve the avatar every time the session changes.
-   *
-   * Animated Discord avatars are explicitly converted to
-   * the .gif CDN URL here.
-   */
   const discordAvatarUrl =
     useMemo(
       () =>
@@ -842,10 +790,6 @@ export default function DashboardSidebar() {
     string | undefined
   >(undefined)
 
-  /*
-   * Update avatar whenever the
-   * logged-in user changes.
-   */
   useEffect(() => {
     setAvatarSrc(
       discordAvatarUrl ||
@@ -856,10 +800,6 @@ export default function DashboardSidebar() {
     discordDefaultAvatarUrl,
   ])
 
-  /*
-   * If the custom avatar fails, use
-   * Discord's default avatar.
-   */
   const handleAvatarError = () => {
     if (
       discordDefaultAvatarUrl &&
@@ -935,23 +875,36 @@ export default function DashboardSidebar() {
       <SidebarContent>
 
         {/* ========================================================
-            HOME
+            MAIN NAVIGATION
+
+            Kept inside ONE SidebarGroup so the links have
+            consistent spacing instead of each item receiving
+            its own SidebarGroup spacing.
         ======================================================== */}
 
-        <SidebarGroup>
+        <SidebarGroup className="py-0">
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
+
+              {/* HOME */}
               <SidebarMenuItem>
-                      <SidebarMenuButton
+                <SidebarMenuButton
                   asChild
                   tooltip="Home"
-                  isActive={isRouteActive("/", true)}
-                  className={navigationButtonClass}
+                  isActive={isRouteActive(
+                    "/",
+                    true,
+                  )}
+                  className={
+                    navigationButtonClass
+                  }
                 >
                   <NavLink
                     to="/"
                     end
-                    className={navigationLinkClass}
+                    className={
+                      navigationLinkClass
+                    }
                   >
                     <Home className="h-4 w-4 shrink-0" />
 
@@ -961,59 +914,26 @@ export default function DashboardSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
-        {/* ========================================================
-            Dashboard
-        ======================================================== */}
-
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
+              {/* EVENTS */}
               <SidebarMenuItem>
-                      <SidebarMenuButton
-                  asChild
-                  tooltip="Dashboard"
-                  isActive={isRouteActive("/dashboard", true)}
-                  className={navigationButtonClass}
-                >
-                  <NavLink
-                    to="/dashboard"
-                    end
-                    className={navigationLinkClass}
-                  >
-                    <LayoutDashboard className="h-4 w-4 shrink-0" />
-
-                    <span>
-                      Dashboard
-                    </span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* ========================================================
-            Events
-        ======================================================== */}
-
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                      <SidebarMenuButton
+                <SidebarMenuButton
                   asChild
                   tooltip="Events"
-                  isActive={isRouteActive("/events", true)}
-                  className={navigationButtonClass}
+                  isActive={isRouteActive(
+                    "/events",
+                    true,
+                  )}
+                  className={
+                    navigationButtonClass
+                  }
                 >
                   <NavLink
                     to="/events"
                     end
-                    className={navigationLinkClass}
+                    className={
+                      navigationLinkClass
+                    }
                   >
                     <CalendarDays className="h-4 w-4 shrink-0" />
 
@@ -1023,28 +943,26 @@ export default function DashboardSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
-        {/* ========================================================
-            Gallery
-        ======================================================== */}
-
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
+              {/* GALLERY */}
               <SidebarMenuItem>
-                      <SidebarMenuButton
+                <SidebarMenuButton
                   asChild
                   tooltip="Gallery"
-                  isActive={isRouteActive("/gallery", true)}
-                  className={navigationButtonClass}
+                  isActive={isRouteActive(
+                    "/gallery",
+                    true,
+                  )}
+                  className={
+                    navigationButtonClass
+                  }
                 >
                   <NavLink
                     to="/gallery"
                     end
-                    className={navigationLinkClass}
+                    className={
+                      navigationLinkClass
+                    }
                   >
                     <Images className="h-4 w-4 shrink-0" />
 
@@ -1054,6 +972,36 @@ export default function DashboardSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
+              {/* DASHBOARD */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip="Dashboard"
+                  isActive={isRouteActive(
+                    "/dashboard",
+                    true,
+                  )}
+                  className={
+                    navigationButtonClass
+                  }
+                >
+                  <NavLink
+                    to="/dashboard"
+                    end
+                    className={
+                      navigationLinkClass
+                    }
+                  >
+                    <LayoutDashboard className="h-4 w-4 shrink-0" />
+
+                    <span>
+                      Dashboard
+                    </span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -1122,7 +1070,7 @@ export default function DashboardSidebar() {
                         }
                       >
                         <NavLink
-                          to="/dahboard/activity/activityroster"
+                          to="/dashboard/activity/activityroster"
                           end
                           className={
                             navigationLinkClass
