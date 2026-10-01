@@ -56,7 +56,7 @@ export default function Home() {
           </div>
 
           {/* Heading */}
-          <h1 className="text-5xl font-black uppercase leading-[0.88] tracking-[-0.02em] sm:text-7xl md:text-8xl lg:text-9xl">
+          <h1 className="text-4xl font-black uppercase leading-[0.88] tracking-[-0.02em] sm:text-5xl md:text-6xl lg:text-7xl">
             <span className="block">
               METRO POLICE
             </span>
