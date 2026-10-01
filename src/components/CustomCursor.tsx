@@ -6,58 +6,63 @@ type CursorPosition = {
 }
 
 export default function CustomCursor() {
-  const [position, setPosition] = useState<CursorPosition>({
-    x: -100,
-    y: -100,
-  })
-
-  const [isTouchDevice, setIsTouchDevice] = useState(false)
+  const [cursor, setCursor] =
+    useState<CursorPosition>({
+      x: -100,
+      y: -100,
+    })
 
   useEffect(() => {
-    const coarse = window.matchMedia("(pointer: coarse)").matches
-
-    if (coarse) {
-      setIsTouchDevice(true)
+    // Do not use the custom cursor on touch devices.
+    if (
+      window.matchMedia("(pointer: coarse)").matches
+    ) {
       return
     }
 
-    const handleMouseMove = (event: MouseEvent) => {
-      setPosition({
+    const handleMouseMove = (
+      event: MouseEvent,
+    ) => {
+      setCursor({
         x: event.clientX,
         y: event.clientY,
       })
     }
 
-    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener(
+      "mousemove",
+      handleMouseMove,
+    )
 
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener(
+        "mousemove",
+        handleMouseMove,
+      )
     }
   }, [])
-
-  if (isTouchDevice) {
-    return null
-  }
 
   return (
     <div
       aria-hidden="true"
-      className="custom-cursor"
+      className="pointer-events-none fixed z-[99999]"
       style={{
-        left: position.x,
-        top: position.y,
+        left: cursor.x,
+        top: cursor.y,
+        width: "16px",
+        height: "16px",
       }}
     >
       <svg
-        width="20"
-        height="24"
-        viewBox="0 0 20 24"
-        fill="none"
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
         xmlns="http://www.w3.org/2000/svg"
+        className="block"
       >
         <path
-          d="M2 1.5L18.2 16.7L11.2 17.4L15.2 23L11.8 24L7.8 18.2L3.2 22.2L2 1.5Z"
-          fill="#FFFFFF"
+          d="M1 0.75L1.25 13.25L4.85 9.85L8.05 15.25L10.25 14L7.05 8.65L12.2 8.1L1 0.75Z"
+          fill="#ffffff"
         />
       </svg>
     </div>
