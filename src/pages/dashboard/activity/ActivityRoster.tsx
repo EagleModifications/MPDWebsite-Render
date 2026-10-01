@@ -1735,7 +1735,8 @@ export default function ActivityRoster() {
               )}
             </div>
           ) : (
-            <div className="hidden overflow-x-auto md:block">
+            <>
+              <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[1100px] text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30 text-left">
@@ -1955,7 +1956,6 @@ export default function ActivityRoster() {
                 </tbody>
               </table>
             </div>
-            </div>
 
             <div className="divide-y md:hidden">
               {filteredMembers.map((member) => {
@@ -2060,6 +2060,7 @@ export default function ActivityRoster() {
                 )
               })}
             </div>
+            </>
           )}
         </div>
       </div>
