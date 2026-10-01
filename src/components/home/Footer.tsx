@@ -23,8 +23,6 @@ export default function Footer() {
             </Link>
 
             <p className="mt-4 max-w-sm text-sm leading-6 text-white/50">
-              A modern FiveM roleplay community focused on high-quality
-              scenes and a city-first vibe.
               The Metro Police Department is built around immersive law enforcement, dedicated officers,
               community interaction, and unforgettable stories across CaliRP.
             </p>
