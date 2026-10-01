@@ -1262,14 +1262,14 @@ export default function DashboardSidebar() {
                         asChild
                         tooltip="Promotion Roster"
                         isActive={isRouteActive(
-                          "/promotion/promotionroster",
+                          "/dashboard/promotion/promotionroster",
                         )}
                         className={
                           navigationButtonClass
                         }
                       >
                         <NavLink
-                          to="/promotion/promotionroster"
+                          to="/dashboard/promotion/promotionroster"
                           end
                           className={
                             navigationLinkClass
