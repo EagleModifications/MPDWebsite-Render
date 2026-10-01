@@ -1049,19 +1049,19 @@ export default function Gallery() {
                       className={[
                         "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
                         filter === item
-                          ? item === "Fleet"
-                            ? "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                            : item === "Images"
-                              ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                              : item === "Videos"
-                                ? "border-violet-500/40 bg-violet-500/15 text-violet-700 dark:text-violet-300"
+                          ? item === "Images"
+                            ? "border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-300"
+                            : item === "Videos"
+                              ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                              : item === "Fleet"
+                                ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300"
                                 : "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                          : item === "Fleet"
-                            ? "border-amber-500/20 bg-amber-500/5 text-amber-600/80 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-300/80 dark:hover:text-amber-200"
-                            : item === "Images"
-                              ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600/80 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-300/80 dark:hover:text-emerald-200"
-                              : item === "Videos"
-                                ? "border-violet-500/20 bg-violet-500/5 text-violet-600/80 hover:bg-violet-500/10 hover:text-violet-700 dark:text-violet-300/80 dark:hover:text-violet-200"
+                          : item === "Images"
+                            ? "border-purple-500/20 bg-purple-500/5 text-purple-600/80 hover:bg-purple-500/10 hover:text-purple-700 dark:text-purple-300/80 dark:hover:text-purple-200"
+                            : item === "Videos"
+                              ? "border-blue-500/20 bg-blue-500/5 text-blue-600/80 hover:bg-blue-500/10 hover:text-blue-700 dark:text-blue-300/80 dark:hover:text-blue-200"
+                              : item === "Fleet"
+                                ? "border-amber-500/20 bg-amber-500/5 text-amber-600/80 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-300/80 dark:hover:text-amber-200"
                                 : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
                       ].join(" ")}
                     >
@@ -1242,12 +1242,37 @@ export default function Gallery() {
             )}
 
             <div className="flex flex-col gap-3 border-t border-border/70 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                Select an image or video to view
-                it full size.
-              </span>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="shrink-0">
+                  Select an image or video to view
+                  it full size.
+                </span>
 
-              <span className="font-medium text-foreground/70">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
+                    <span>
+                      Images
+                    </span>
+                  </span>
+
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                    <span>
+                      Videos
+                    </span>
+                  </span>
+
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                    <span>
+                      Fleet
+                    </span>
+                  </span>
+                </div>
+              </div>
+
+              <span className="shrink-0 font-medium text-foreground/70">
                 {filteredItems.length}{" "}
                 {filteredItems.length === 1
                   ? "gallery entry"
