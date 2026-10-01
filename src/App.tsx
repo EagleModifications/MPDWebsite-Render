@@ -1,5 +1,3 @@
-import type { CSSProperties } from "react"
-
 import {
   BrowserRouter,
   Route,
@@ -59,12 +57,6 @@ import PromotionRequirementsSAR from "@/pages/dashboard/promotion/requirements/S
 import PromotionRequirementsSWAT from "@/pages/dashboard/promotion/requirements/SWAT"
 import PromotionRequirementsTEU from "@/pages/dashboard/promotion/requirements/TEU"
 import PromotionRequirementsTRU from "@/pages/dashboard/promotion/requirements/TRU"
-
-const toasterStyle = {
-  "--toast-close-button-start": "auto",
-  "--toast-close-button-end": "8px",
-  "--toast-close-button-transform": "translateY(0)",
-} as CSSProperties
 
 export default function App() {
   return (
@@ -297,15 +289,14 @@ export default function App() {
         />
       </Routes>
 
-      {/* =======================================================
+      {/* =====================================================
           GLOBAL NOTIFICATIONS
-      ======================================================= */}
+      ===================================================== */}
 
       <Toaster
         position="top-right"
         theme="system"
         closeButton
-        style={toasterStyle}
         icons={{
           success: (
             <CheckCircle2 className="size-5 shrink-0 text-green-500" />
@@ -323,7 +314,7 @@ export default function App() {
         toastOptions={{
           classNames: {
             toast:
-              "bg-background text-foreground border-border pr-12",
+              "relative bg-background text-foreground border-border pr-12 [&_[data-close-button]]:!left-auto [&_[data-close-button]]:!right-1 [&_[data-close-button]]:!top-1 [&_[data-close-button]]:!bottom-auto [&_[data-close-button]]:!translate-x-0 [&_[data-close-button]]:!translate-y-0",
             title: "text-foreground",
             description: "text-muted-foreground",
           },
