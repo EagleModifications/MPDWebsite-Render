@@ -41,20 +41,9 @@ export default function CustomCursor() {
       setVisible(true)
     }
 
-    document.addEventListener(
-      "mousemove",
-      handleMouseMove,
-    )
-
-    document.addEventListener(
-      "mousedown",
-      handleMouseDown,
-    )
-
-    document.addEventListener(
-      "mouseup",
-      handleMouseUp,
-    )
+    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mousedown", handleMouseDown)
+    document.addEventListener("mouseup", handleMouseUp)
 
     document.documentElement.addEventListener(
       "mouseleave",
@@ -67,20 +56,9 @@ export default function CustomCursor() {
     )
 
     return () => {
-      document.removeEventListener(
-        "mousemove",
-        handleMouseMove,
-      )
-
-      document.removeEventListener(
-        "mousedown",
-        handleMouseDown,
-      )
-
-      document.removeEventListener(
-        "mouseup",
-        handleMouseUp,
-      )
+      document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("mousedown", handleMouseDown)
+      document.removeEventListener("mouseup", handleMouseUp)
 
       document.documentElement.removeEventListener(
         "mouseleave",
@@ -133,6 +111,7 @@ export default function CustomCursor() {
         transform: `translate3d(${position.x}px, ${position.y}px, 0) translate(-50%, -50%)`,
       }}
     >
+      {/* ACTUAL CLICK POINT */}
       <span
         className="
           absolute
@@ -148,6 +127,7 @@ export default function CustomCursor() {
         "
       />
 
+      {/* OUTER DECORATIVE RING */}
       <span
         className="
           absolute
