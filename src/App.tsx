@@ -61,29 +61,39 @@ import PromotionRequirementsTRU from "@/pages/dashboard/promotion/requirements/T
 export default function App() {
   return (
     <BrowserRouter>
-      {/* =====================================================
-          SONNER CLOSE BUTTON OVERRIDE
-      ===================================================== */}
-
       <style>
         {`
-          [data-sonner-toast] {
-            position: relative !important;
+          /*
+           * Sonner normally uses:
+           * transform: translate(-35%, -35%);
+           *
+           * That intentionally makes the close button hang
+           * outside the toast. Override Sonner's variables so
+           * the button sits completely inside the corner.
+           */
+          [data-sonner-toaster] {
+            --toast-close-button-start: auto !important;
+            --toast-close-button-end: 8px !important;
+            --toast-close-button-transform: none !important;
           }
 
-          [data-sonner-toast] [data-close-button] {
+          [data-sonner-toast][data-styled="true"] [data-close-button] {
             position: absolute !important;
-
-            top: 5px !important;
-            right: 5px !important;
-
+            top: 8px !important;
+            right: 8px !important;
             left: auto !important;
             bottom: auto !important;
 
-            margin: 0 !important;
-            transform: none !important;
+            width: 20px !important;
+            height: 20px !important;
 
-            z-index: 50 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+
+            transform: none !important;
+            translate: none !important;
+
+            z-index: 10 !important;
           }
         `}
       </style>
@@ -328,15 +338,12 @@ export default function App() {
           success: (
             <CheckCircle2 className="size-5 shrink-0 text-green-500" />
           ),
-
           info: (
             <Info className="size-5 shrink-0 text-blue-500" />
           ),
-
           warning: (
             <AlertTriangle className="size-5 shrink-0 text-yellow-500" />
           ),
-
           error: (
             <XCircle className="size-5 shrink-0 text-red-500" />
           ),
