@@ -1,24 +1,28 @@
 import { useEffect, useState } from "react"
-import { MousePointer2 } from "lucide-react"
 
-type CursorState = {
+type CursorPosition = {
   x: number
   y: number
 }
 
 export default function CustomCursor() {
-  const [cursor, setCursor] = useState<CursorState>({
+  const [position, setPosition] = useState<CursorPosition>({
     x: -100,
     y: -100,
   })
 
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
+
   useEffect(() => {
-    if (window.matchMedia("(pointer: coarse)").matches) {
+    const coarse = window.matchMedia("(pointer: coarse)").matches
+
+    if (coarse) {
+      setIsTouchDevice(true)
       return
     }
 
     const handleMouseMove = (event: MouseEvent) => {
-      setCursor({
+      setPosition({
         x: event.clientX,
         y: event.clientY,
       })
@@ -31,21 +35,31 @@ export default function CustomCursor() {
     }
   }, [])
 
+  if (isTouchDevice) {
+    return null
+  }
+
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[99999]"
+      className="custom-cursor"
       style={{
-        left: cursor.x,
-        top: cursor.y,
-        transform: "translate(-2px, -2px)",
+        left: position.x,
+        top: position.y,
       }}
     >
-      <MousePointer2
-        size={22}
-        strokeWidth={2.5}
-        className="text-blue-500"
-      />
+      <svg
+        width="20"
+        height="24"
+        viewBox="0 0 20 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M2 1.5L18.2 16.7L11.2 17.4L15.2 23L11.8 24L7.8 18.2L3.2 22.2L2 1.5Z"
+          fill="#FFFFFF"
+        />
+      </svg>
     </div>
   )
 }
