@@ -82,60 +82,126 @@ export default function CustomCursor() {
         top-0
         z-[99999]
         hidden
-        h-7
-        w-7
-        -translate-x-1/2
-        -translate-y-1/2
-        rounded-full
-        border
-        border-blue-400/70
-        bg-blue-500/10
-        shadow-[0_0_20px_rgba(59,130,246,0.45)]
-        backdrop-blur-[2px]
-        transition-[width,height,background-color,border-color,box-shadow,opacity]
+        md:block
+        transition-opacity
         duration-150
         ease-out
-        md:block
         ${
           visible
             ? "opacity-100"
             : "opacity-0"
         }
-        ${
-          clicking
-            ? "h-8 w-8 border-blue-400 bg-blue-500/15 shadow-[0_0_25px_rgba(59,130,246,0.55)]"
-            : ""
-        }
       `}
       style={{
-        transform: `translate3d(${position.x}px, ${position.y}px, 0) translate(-50%, -50%)`,
+        left: position.x,
+        top: position.y,
       }}
     >
-      {/* ACTUAL CLICK POINT */}
-      <span
-        className="
+      {/* Soft outer glow */}
+      <div
+        className={`
+          pointer-events-none
           absolute
-          left-1/2
-          top-1/2
-          h-1.5
-          w-1.5
+          left-0
+          top-0
+          h-11
+          w-11
+          -translate-x-1/2
+          -translate-y-1/2
+          rounded-full
+          bg-blue-500/[0.04]
+          blur-[7px]
+          transition-[width,height,opacity]
+          duration-200
+          ease-out
+          ${
+            clicking
+              ? "h-12 w-12 opacity-90"
+              : "opacity-70"
+          }
+        `}
+      />
+
+      {/* Outer ring */}
+      <div
+        className={`
+          pointer-events-none
+          absolute
+          left-0
+          top-0
+          h-7
+          w-7
+          -translate-x-1/2
+          -translate-y-1/2
+          rounded-full
+          border
+          border-blue-400/65
+          transition-[width,height,border-color]
+          duration-150
+          ease-out
+          ${
+            clicking
+              ? "h-8 w-8 border-blue-400/85"
+              : ""
+          }
+        `}
+        style={{
+          boxShadow: `
+            0 0 6px rgba(59, 130, 246, 0.18),
+            0 0 14px rgba(59, 130, 246, 0.12)
+          `,
+        }}
+      />
+
+      {/* Clear gap around the click point */}
+      <div
+        className="
+          pointer-events-none
+          absolute
+          left-0
+          top-0
+          h-[9px]
+          w-[9px]
+          -translate-x-1/2
+          -translate-y-1/2
+          rounded-full
+          bg-transparent
+        "
+      />
+
+      {/* Exact mouse / click point */}
+      <span
+        className={`
+          pointer-events-none
+          absolute
+          left-0
+          top-0
+          h-[5px]
+          w-[5px]
           -translate-x-1/2
           -translate-y-1/2
           rounded-full
           bg-blue-400
-          shadow-[0_0_10px_rgba(96,165,250,0.9)]
-        "
-      />
-
-      {/* OUTER DECORATIVE RING */}
-      <span
-        className="
-          absolute
-          inset-[-5px]
-          rounded-full
-          border
-          border-blue-400/10
-        "
+          transition-[width,height,background-color,box-shadow]
+          duration-100
+          ease-out
+          ${
+            clicking
+              ? "h-[6px] w-[6px] bg-blue-300"
+              : ""
+          }
+        `}
+        style={{
+          boxShadow: clicking
+            ? `
+                0 0 4px rgba(147, 197, 253, 0.9),
+                0 0 8px rgba(96, 165, 250, 0.65)
+              `
+            : `
+                0 0 3px rgba(147, 197, 253, 0.9),
+                0 0 7px rgba(96, 165, 250, 0.55)
+              `,
+        }}
       />
     </div>
   )
