@@ -14,7 +14,7 @@
   "Lieutenant Colonel": ["view", "activitymanagement", "promotionmanagement", "events", "gallery"],
   "Colonel": ["view", "activitymanagement", "promotionmanagement", "events", "gallery"],
   "Chief Of Staff": ["view", "activitymanagement", "promotionmanagement", "events", "gallery"],
-  "Assistant Chief of Police": ["view", "activitymanagement", "promotionmanagement", "events", "gallery"],
-  "Deputy Chief of Police": ["view", "activitymanagement", "promotionmanagement", "events", "gallery"],
-  "Chief of Police": ["view", "activitymanagement", "promotionmanagement", "events", "gallery"]
+  "Assistant Chief Of Police": ["view", "activitymanagement", "promotionmanagement", "events", "gallery"],
+  "Deputy Chief Of Police": ["view", "activitymanagement", "promotionmanagement", "events", "gallery"],
+  "Chief Of Police": ["view", "activitymanagement", "promotionmanagement", "events", "gallery"]
 }
