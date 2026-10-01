@@ -11,6 +11,7 @@ import {
   LogOut,
   RefreshCw,
   Home,
+  LayoutDashboard,
 } from "lucide-react"
 
 import {
@@ -954,6 +955,37 @@ export default function DashboardSidebar() {
 
                     <span>
                       Home
+                    </span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* ========================================================
+            Dashboard
+        ======================================================== */}
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                      <SidebarMenuButton
+                  asChild
+                  tooltip="Dashboard"
+                  isActive={isRouteActive("/dashboard", true)}
+                  className={navigationButtonClass}
+                >
+                  <NavLink
+                    to="/dashboard"
+                    end
+                    className={navigationLinkClass}
+                  >
+                    <LayoutDashboard className="h-4 w-4 shrink-0" />
+
+                    <span>
+                      Dashboard
                     </span>
                   </NavLink>
                 </SidebarMenuButton>
