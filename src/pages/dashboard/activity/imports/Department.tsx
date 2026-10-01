@@ -4,6 +4,8 @@ import {
 } from "react"
 
 import {
+  Check,
+  Clipboard,
   ClipboardPaste,
   FileSpreadsheet,
   Upload,
@@ -34,6 +36,12 @@ const ALLOWED_EXTENSIONS = [
   "txt",
 ]
 
+const COMMAND_ONE =
+  "/hours tag:Metro Police Department (Main) choices:(This Month, Last Month, This Week, Last Week) hidden:(True, False) exportcsv:True"
+
+const COMMAND_TWO =
+  "/hours tag:Metro Police Department (Main) choices:Custom Date Range hidden:(True, False) exportcsv:True startstr:MM-DD-YYYY endstr:MM-DD-YYYY"
+
 function getFileExtension(
   fileName: string,
 ) {
@@ -62,6 +70,9 @@ export default function DepartmentImport() {
   const [isImporting, setIsImporting] =
     useState(false)
 
+  const [copiedCommand, setCopiedCommand] =
+    useState<string | null>(null)
+
   const hasData =
     pasteData.trim().length > 0 ||
     file !== null
@@ -78,6 +89,40 @@ export default function DepartmentImport() {
     setFile(null)
 
     clearFileInput()
+  }
+
+  async function copyCommand(
+    command: string,
+    commandId: string,
+  ) {
+    try {
+      await navigator.clipboard.writeText(
+        command,
+      )
+
+      setCopiedCommand(commandId)
+
+      window.setTimeout(() => {
+        setCopiedCommand((current) =>
+          current === commandId
+            ? null
+            : current,
+        )
+      }, 1800)
+    } catch (error) {
+      console.error(
+        "Failed to copy command:",
+        error,
+      )
+
+      toast.error(
+        "Copy failed",
+        {
+          description:
+            "The command could not be copied to your clipboard.",
+        },
+      )
+    }
   }
 
   function handleFile(
@@ -391,11 +436,12 @@ export default function DepartmentImport() {
 
         {/* Expected / Command Format */}
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-2">
           {/* Expected Format */}
 
           <section
             className="
+              min-w-0
               rounded-xl
               border
               border-border
@@ -404,7 +450,7 @@ export default function DepartmentImport() {
               shadow-sm
             "
           >
-            <div className="flex items-start gap-3">
+            <div className="flex min-w-0 items-start gap-3">
               <div
                 className="
                   flex
@@ -420,7 +466,7 @@ export default function DepartmentImport() {
                 <FileSpreadsheet className="h-4 w-4 text-blue-500" />
               </div>
 
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-semibold">
                   Expected Format
                 </h2>
@@ -460,6 +506,7 @@ export default function DepartmentImport() {
 
           <section
             className="
+              min-w-0
               rounded-xl
               border
               border-border
@@ -468,7 +515,7 @@ export default function DepartmentImport() {
               shadow-sm
             "
           >
-            <div className="flex items-start gap-3">
+            <div className="flex min-w-0 items-start gap-3">
               <div
                 className="
                   flex
@@ -495,45 +542,217 @@ export default function DepartmentImport() {
                 </p>
 
                 <div className="mt-3 space-y-3">
-                  <pre
-                    className="
-                      max-w-full
-                      overflow-x-auto
-                      rounded-lg
-                      border
-                      border-border
-                      bg-background
-                      p-3
-                      font-mono
-                      text-xs
-                      leading-5
-                      text-muted-foreground
-                      [scrollbar-width:none]
-                      [&::-webkit-scrollbar]:hidden
-                    "
-                  >
-{`/hours tag:Metro Police Department (Main) choices:(This Month, Last Month, This Week, Last Week) hidden:(True, False) exportcsv:True`}
-                  </pre>
+                  {/* Command 1 */}
 
-                  <pre
+                  <div
                     className="
-                      max-w-full
-                      overflow-x-auto
+                      relative
+                      min-w-0
                       rounded-lg
                       border
                       border-border
                       bg-background
-                      p-3
-                      font-mono
-                      text-xs
-                      leading-5
-                      text-muted-foreground
-                      [scrollbar-width:none]
-                      [&::-webkit-scrollbar]:hidden
                     "
                   >
-{`/hours tag:Metro Police Department (Main) choices:Custom Date Range hidden:(True, False) exportcsv:True startstr:MM-DD-YYYY endstr:MM-DD-YYYY`}
-                  </pre>
+                    <div
+                      className="
+                        min-w-0
+                        break-words
+                        whitespace-normal
+                        px-3
+                        py-3
+                        pr-12
+                        font-mono
+                        text-xs
+                        leading-5
+                        text-muted-foreground
+                      "
+                    >
+                      {COMMAND_ONE}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        void copyCommand(
+                          COMMAND_ONE,
+                          "command-one",
+                        )
+                      }
+                      className="
+                        absolute
+                        right-1.5
+                        top-1.5
+                        h-8
+                        w-8
+                        shrink-0
+                        rounded-md
+                        text-muted-foreground
+                        transition-all
+                        duration-200
+                        hover:bg-muted
+                        hover:text-foreground
+                      "
+                      aria-label={
+                        copiedCommand ===
+                        "command-one"
+                          ? "Copied"
+                          : "Copy command"
+                      }
+                    >
+                      <span
+                        className="
+                          relative
+                          flex
+                          h-4
+                          w-4
+                          items-center
+                          justify-center
+                        "
+                      >
+                        <Clipboard
+                          className={`
+                            absolute
+                            h-4
+                            w-4
+                            transition-all
+                            duration-200
+                            ${
+                              copiedCommand ===
+                              "command-one"
+                                ? "scale-0 rotate-[-90deg] opacity-0"
+                                : "scale-100 rotate-0 opacity-100"
+                            }
+                          `}
+                        />
+
+                        <Check
+                          className={`
+                            absolute
+                            h-4
+                            w-4
+                            text-emerald-500
+                            transition-all
+                            duration-200
+                            ${
+                              copiedCommand ===
+                              "command-one"
+                                ? "scale-100 rotate-0 opacity-100"
+                                : "scale-0 rotate-90 opacity-0"
+                            }
+                          `}
+                        />
+                      </span>
+                    </Button>
+                  </div>
+
+                  {/* Command 2 */}
+
+                  <div
+                    className="
+                      relative
+                      min-w-0
+                      rounded-lg
+                      border
+                      border-border
+                      bg-background
+                    "
+                  >
+                    <div
+                      className="
+                        min-w-0
+                        break-words
+                        whitespace-normal
+                        px-3
+                        py-3
+                        pr-12
+                        font-mono
+                        text-xs
+                        leading-5
+                        text-muted-foreground
+                      "
+                    >
+                      {COMMAND_TWO}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        void copyCommand(
+                          COMMAND_TWO,
+                          "command-two",
+                        )
+                      }
+                      className="
+                        absolute
+                        right-1.5
+                        top-1.5
+                        h-8
+                        w-8
+                        shrink-0
+                        rounded-md
+                        text-muted-foreground
+                        transition-all
+                        duration-200
+                        hover:bg-muted
+                        hover:text-foreground
+                      "
+                      aria-label={
+                        copiedCommand ===
+                        "command-two"
+                          ? "Copied"
+                          : "Copy command"
+                      }
+                    >
+                      <span
+                        className="
+                          relative
+                          flex
+                          h-4
+                          w-4
+                          items-center
+                          justify-center
+                        "
+                      >
+                        <Clipboard
+                          className={`
+                            absolute
+                            h-4
+                            w-4
+                            transition-all
+                            duration-200
+                            ${
+                              copiedCommand ===
+                              "command-two"
+                                ? "scale-0 rotate-[-90deg] opacity-0"
+                                : "scale-100 rotate-0 opacity-100"
+                            }
+                          `}
+                        />
+
+                        <Check
+                          className={`
+                            absolute
+                            h-4
+                            w-4
+                            text-emerald-500
+                            transition-all
+                            duration-200
+                            ${
+                              copiedCommand ===
+                              "command-two"
+                                ? "scale-100 rotate-0 opacity-100"
+                                : "scale-0 rotate-90 opacity-0"
+                            }
+                          `}
+                        />
+                      </span>
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -542,11 +761,12 @@ export default function DepartmentImport() {
 
         {/* Import Areas */}
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-2">
           {/* Paste */}
 
           <section
             className="
+              min-w-0
               rounded-xl
               border
               border-border
@@ -644,6 +864,7 @@ export default function DepartmentImport() {
 
           <section
             className="
+              min-w-0
               rounded-xl
               border
               border-border
