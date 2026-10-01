@@ -204,15 +204,6 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 
-    /*
-     * Hide the native cursor.
-     * CustomCursor renders the blue replacement cursor.
-     */
-    cursor: none;
-
-    /*
-     * Prevent normal page text selection.
-     */
     user-select: none;
     -webkit-user-select: none;
   }
@@ -224,8 +215,6 @@
     background-color: var(--background);
     color: var(--foreground);
 
-    cursor: none;
-
     user-select: none;
     -webkit-user-select: none;
   }
@@ -236,25 +225,22 @@
     background-color: var(--background);
     color: var(--foreground);
 
-    cursor: none;
-
     user-select: none;
     -webkit-user-select: none;
   }
 
   /*
-   * Everything that normally displays a native cursor
-   * continues to use the custom cursor instead.
+   * Hide the native browser cursor everywhere.
+   *
+   * CustomCursor provides the only visible cursor.
    */
-  a,
-  button,
-  input,
-  textarea,
-  select,
-  option,
-  [role="button"],
-  [contenteditable="true"] {
-    cursor: none;
+  html,
+  body,
+  #root,
+  *,
+  *::before,
+  *::after {
+    cursor: none !important;
   }
 
   /*
@@ -268,7 +254,7 @@
   }
 
   /*
-   * Remove the mobile tap highlight.
+   * Remove mobile tap highlight.
    */
   button,
   a {
@@ -311,6 +297,42 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
   }
+}
+
+/* =========================================================
+   CUSTOM CURSOR
+========================================================= */
+
+.custom-cursor {
+  position: fixed;
+
+  width: 20px;
+  height: 24px;
+
+  pointer-events: none;
+
+  z-index: 999999;
+
+  transform: translate(-1px, -1px);
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+
+  color: #ffffff;
+
+  will-change: left, top;
+}
+
+.custom-cursor svg {
+  display: block;
+
+  width: 20px;
+  height: 24px;
+
+  fill: #ffffff;
+
+  color: #ffffff;
 }
 
 /* =========================================================
@@ -382,14 +404,9 @@ body,
   html,
   body,
   #root,
-  a,
-  button,
-  input,
-  textarea,
-  select,
-  option,
-  [role="button"],
-  [contenteditable="true"] {
-    cursor: auto;
+  *,
+  *::before,
+  *::after {
+    cursor: auto !important;
   }
 }
