@@ -38,14 +38,14 @@ export default function Footer() {
                   href="https://discord.gg/metropd"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-sm text-white/60 transition-colors hover:text-blue-400"
+                  className="text-sm text-white/60 transition-colors hover:text-foreground"
                 >
                   Discord
                 </a>
 
                 <Link
                   to="/events"
-                  className="text-sm text-white/60 transition-colors hover:text-blue-400"
+                  className="text-sm text-white/60 transition-colors hover:text-foreground"
                 >
                   Events
                 </Link>
@@ -61,14 +61,14 @@ export default function Footer() {
               <div className="mt-4 flex flex-col gap-3">
                 <Link
                   to="/sign-in"
-                  className="text-sm text-white/60 transition-colors hover:text-blue-400"
+                  className="text-sm text-white/60 transition-colors hover:text-foreground"
                 >
                   Member Login
                 </Link>
 
                 <Link
                   to="/dashboard"
-                  className="text-sm text-white/60 transition-colors hover:text-blue-400"
+                  className="text-sm text-white/60 transition-colors hover:text-foreground"
                 >
                   Dashboard
                 </Link>
