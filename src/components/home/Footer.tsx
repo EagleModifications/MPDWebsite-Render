@@ -2,14 +2,14 @@ import { Link } from "react-router-dom"
 
 export default function Footer() {
   return (
-    <footer className="border-t border-white/5 bg-black/60">
-      <div className="mx-auto w-full max-w-7xl px-6 py-12">
-        <div className="grid gap-10 md:grid-cols-[1fr_auto]">
+    <footer className="relative z-20 border-t border-white/10 bg-[#050509]">
+      <div className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8">
+        <div className="grid gap-10 md:grid-cols-[1fr_auto] md:items-start">
           {/* Brand */}
           <div className="max-w-md">
             <Link
               to="/"
-              className="inline-flex items-center gap-3"
+              className="group inline-flex items-center gap-3"
             >
               <img
                 src="/logo.png"
@@ -17,22 +17,22 @@ export default function Footer() {
                 className="h-9 w-9 object-contain"
               />
 
-              <span className="text-lg font-black tracking-tight text-foreground">
-                CALIRP
+              <span className="text-lg font-black tracking-tight text-white transition-colors group-hover:text-blue-400">
+                METRO POLICE DEPARTMENT
               </span>
             </Link>
 
-            <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">
+            <p className="mt-4 max-w-sm text-sm leading-6 text-white/50">
               A modern FiveM roleplay community focused on high-quality
               scenes and a city-first vibe.
             </p>
           </div>
 
-          {/* Links */}
-          <div className="grid grid-cols-2 gap-12 sm:gap-20">
+          {/* Navigation */}
+          <div className="grid grid-cols-2 gap-16 sm:gap-24">
             {/* Community */}
             <div>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">
                 Community
               </h3>
 
@@ -41,14 +41,14 @@ export default function Footer() {
                   href="https://discord.gg/metropd"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-sm text-white/60 transition-colors hover:text-blue-400"
                 >
                   Discord
                 </a>
 
                 <Link
                   to="/events"
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-sm text-white/60 transition-colors hover:text-blue-400"
                 >
                   Events
                 </Link>
@@ -57,21 +57,21 @@ export default function Footer() {
 
             {/* Portal */}
             <div>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">
                 Portal
               </h3>
 
               <div className="mt-4 flex flex-col gap-3">
                 <Link
                   to="/login"
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-sm text-white/60 transition-colors hover:text-blue-400"
                 >
                   Member Login
                 </Link>
 
                 <Link
                   to="/ban-appeals"
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-sm text-white/60 transition-colors hover:text-blue-400"
                 >
                   Ban Appeal
                 </Link>
@@ -80,14 +80,14 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom */}
-        <div className="mt-10 border-t border-white/5 pt-6">
-          <div className="flex flex-col gap-3 text-xs text-muted-foreground/60 sm:flex-row sm:items-center sm:justify-between">
-            <span>
+        {/* Bottom divider */}
+        <div className="mt-10 border-t border-white/10 pt-6">
+          <div className="flex flex-col gap-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-white/35">
               {new Date().getFullYear()} CaliRP - California Gaming Network
             </span>
 
-            <span>
+            <span className="text-white/35">
               Not affiliated with Rockstar Games or Take-Two Interactive.
             </span>
           </div>
