@@ -1,10 +1,90 @@
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, LayoutDashboard, LogIn } from "lucide-react"
+import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 
 import Footer from "@/components/home/Footer"
 import Navbar from "@/components/home/Navbar"
 
+type SessionUser = {
+  discordId?: string
+  permissions?: string[]
+}
+
 export default function Home() {
+  const [authChecked, setAuthChecked] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [canViewDashboard, setCanViewDashboard] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+
+    const checkAuth = async () => {
+      try {
+        const sessionResponse = await fetch("/api/auth/session", {
+          credentials: "include",
+        })
+
+        if (!sessionResponse.ok) {
+          if (mounted) {
+            setIsAuthenticated(false)
+            setCanViewDashboard(false)
+          }
+
+          return
+        }
+
+        const sessionData = await sessionResponse.json()
+
+        if (!mounted) {
+          return
+        }
+
+        const authenticated = Boolean(sessionData?.user)
+
+        setIsAuthenticated(authenticated)
+
+        if (!authenticated) {
+          setCanViewDashboard(false)
+          return
+        }
+
+        try {
+          const permissionResponse = await fetch(
+            "/api/auth/check?permission=view",
+            {
+              credentials: "include",
+            },
+          )
+
+          if (!mounted) {
+            return
+          }
+
+          setCanViewDashboard(permissionResponse.ok)
+        } catch {
+          if (mounted) {
+            setCanViewDashboard(false)
+          }
+        }
+      } catch {
+        if (mounted) {
+          setIsAuthenticated(false)
+          setCanViewDashboard(false)
+        }
+      } finally {
+        if (mounted) {
+          setAuthChecked(true)
+        }
+      }
+    }
+
+    void checkAuth()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
       <Navbar />
@@ -73,16 +153,40 @@ export default function Home() {
             unforgettable stories across CaliRP.
           </p>
 
-          {/* CTA */}
-          <div className="mt-8">
+          {/* CTA Buttons */}
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
+            {/* Join Metro PD */}
             <Link
               to="/activity/activityroster"
-              className="group inline-flex items-center gap-3 rounded-md bg-blue-600 px-7 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
+              className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
             >
               <span>Join Metro PD</span>
 
               <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
             </Link>
+
+            {/* Authentication / Dashboard */}
+            {authChecked && !isAuthenticated && (
+              <Link
+                to="/login"
+                className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] px-8 text-sm font-semibold uppercase tracking-wide text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.08]"
+              >
+                <LogIn className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+
+                <span>Member Login</span>
+              </Link>
+            )}
+
+            {authChecked && isAuthenticated && canViewDashboard && (
+              <Link
+                to="/dashboard"
+                className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] px-8 text-sm font-semibold uppercase tracking-wide text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.08]"
+              >
+                <LayoutDashboard className="h-4 w-4 transition-transform duration-200 group-hover:scale-105" />
+
+                <span>Dashboard</span>
+              </Link>
+            )}
           </div>
 
           {/* Secondary links */}
