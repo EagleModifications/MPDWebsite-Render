@@ -46,6 +46,6 @@
     "urls": ["/events"]
   },
   "gallery": {
-    "urls": ["/gallary"]
+    "urls": ["/gallery"]
   }
 }
