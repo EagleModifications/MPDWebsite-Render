@@ -13,7 +13,7 @@ export default function Footer() {
             >
               <img
                 src="/logo.png"
-                alt="CALIRP"
+                alt="MPD"
                 className="h-9 w-9 object-contain"
               />
 
@@ -58,22 +58,22 @@ export default function Footer() {
             {/* Portal */}
             <div>
               <h3 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">
-                Portal
+                Dashboard
               </h3>
 
               <div className="mt-4 flex flex-col gap-3">
                 <Link
-                  to="/login"
+                  to="/sign-in"
                   className="text-sm text-white/60 transition-colors hover:text-blue-400"
                 >
                   Member Login
                 </Link>
 
                 <Link
-                  to="/ban-appeals"
+                  to="/dashboard"
                   className="text-sm text-white/60 transition-colors hover:text-blue-400"
                 >
-                  Ban Appeal
+                  Dashboard
                 </Link>
               </div>
             </div>
@@ -84,7 +84,7 @@ export default function Footer() {
         <div className="mt-10 border-t border-white/10 pt-6">
           <div className="flex flex-col gap-3 text-xs sm:flex-row sm:items-center sm:justify-between">
             <span className="text-white/35">
-              {new Date().getFullYear()} CaliRP - California Gaming Network
+              {new Date().getFullYear()} METRO POLICE DEPARTMENT •- California Roleplay
             </span>
 
             <span className="text-white/35">
