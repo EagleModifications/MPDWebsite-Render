@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { getSession, type User } from "@/lib/auth"
+import Footer from "@/components/Footer"
 
 type EventCategory = "Activities" | "Patrol" | "Operations" | "Meetings"
 
@@ -399,10 +400,6 @@ export default function Events() {
                 <CalendarDays className="h-4 w-4" />
                 COMMUNITY
               </div>
-
-              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-                Events Calendar
-              </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
                 View upcoming Metro Police Department activities, patrols, operations, and meetings.
@@ -790,9 +787,7 @@ export default function Events() {
               </div>
             )}
           </section>
-          <footer className="py-6 text-center text-xs text-muted-foreground">
-            Metro Police Department · Events Calendar
-          </footer>
+          <Footer />
         </div>
       </main>
 
