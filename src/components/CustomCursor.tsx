@@ -50,7 +50,7 @@ export default function CustomCursor() {
         left: cursor.x,
         top: cursor.y,
         width: "16px",
-        height: "16px",
+        height: "18px",
       }}
     >
       <svg
