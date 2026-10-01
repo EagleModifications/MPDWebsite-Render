@@ -1735,7 +1735,8 @@ export default function PromotionRoster() {
               )}
             </div>
           ) : (
-            <div className="hidden overflow-x-auto md:block">
+            <>
+              <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[1100px] text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30 text-left">
@@ -2141,6 +2142,7 @@ export default function PromotionRoster() {
                 )
               })}
             </div>
+            </>
           )}
         </div>
       </div>
