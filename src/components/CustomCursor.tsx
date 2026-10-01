@@ -55,7 +55,7 @@ export default function CustomCursor() {
     >
       <svg
         width="16"
-        height="16"
+        height="20"
         viewBox="0 0 16 20"
         xmlns="http://www.w3.org/2000/svg"
         className="block"
