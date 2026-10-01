@@ -151,19 +151,19 @@ export default function Home() {
           {/* CTA Buttons */}
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
             {/* Join Metro PD */}
-            <Link
-              to="/activity/activityroster"
+            <a
+              href="https://discord.com/metropd"
               className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
             >
               <span>Join Metro PD</span>
 
               <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-            </Link>
-
+            </a>
+            
             {/* Authentication / Dashboard */}
             {authChecked && !isAuthenticated && (
               <Link
-                to="/login"
+                to="/sign-in"
                 className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] px-8 text-sm font-semibold uppercase tracking-wide text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.08]"
               >
                 <LogIn className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
