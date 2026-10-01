@@ -61,6 +61,33 @@ import PromotionRequirementsTRU from "@/pages/dashboard/promotion/requirements/T
 export default function App() {
   return (
     <BrowserRouter>
+      {/* =====================================================
+          SONNER CLOSE BUTTON OVERRIDE
+      ===================================================== */}
+
+      <style>
+        {`
+          [data-sonner-toast] {
+            position: relative !important;
+          }
+
+          [data-sonner-toast] [data-close-button] {
+            position: absolute !important;
+
+            top: 5px !important;
+            right: 5px !important;
+
+            left: auto !important;
+            bottom: auto !important;
+
+            margin: 0 !important;
+            transform: none !important;
+
+            z-index: 50 !important;
+          }
+        `}
+      </style>
+
       <Routes>
         {/* =====================================================
             PUBLIC
@@ -301,12 +328,15 @@ export default function App() {
           success: (
             <CheckCircle2 className="size-5 shrink-0 text-green-500" />
           ),
+
           info: (
             <Info className="size-5 shrink-0 text-blue-500" />
           ),
+
           warning: (
             <AlertTriangle className="size-5 shrink-0 text-yellow-500" />
           ),
+
           error: (
             <XCircle className="size-5 shrink-0 text-red-500" />
           ),
@@ -314,7 +344,7 @@ export default function App() {
         toastOptions={{
           classNames: {
             toast:
-              "relative bg-background text-foreground border-border pr-12 [&_[data-close-button]]:!left-auto [&_[data-close-button]]:!right-1 [&_[data-close-button]]:!top-1 [&_[data-close-button]]:!bottom-auto [&_[data-close-button]]:!translate-x-0 [&_[data-close-button]]:!translate-y-0",
+              "bg-background text-foreground border-border pr-12",
             title: "text-foreground",
             description: "text-muted-foreground",
           },
