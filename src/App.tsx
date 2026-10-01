@@ -1,4 +1,8 @@
 import {
+  useEffect,
+} from "react"
+
+import {
   BrowserRouter,
   Route,
   Routes,
@@ -12,7 +16,6 @@ import {
 } from "lucide-react"
 
 import { Toaster } from "@/components/ui/sonner"
-
 import CustomCursor from "@/components/CustomCursor"
 
 import Home from "@/pages/Home"
@@ -60,46 +63,111 @@ import PromotionRequirementsSWAT from "@/pages/dashboard/promotion/requirements/
 import PromotionRequirementsTEU from "@/pages/dashboard/promotion/requirements/TEU"
 import PromotionRequirementsTRU from "@/pages/dashboard/promotion/requirements/TRU"
 
+/* =========================================================
+   APP PROTECTION
+========================================================= */
+
+function useSiteProtection() {
+  useEffect(() => {
+    /*
+     * Disable right-click context menu.
+     */
+    const handleContextMenu = (
+      event: MouseEvent,
+    ) => {
+      event.preventDefault()
+    }
+
+    /*
+     * Disable common browser developer-tool shortcuts.
+     *
+     * This is only a client-side deterrent and is not a
+     * security mechanism.
+     */
+    const handleKeyDown = (
+      event: KeyboardEvent,
+    ) => {
+      const key =
+        event.key.toLowerCase()
+
+      const isF12 =
+        event.key === "F12"
+
+      const isDeveloperTools =
+        event.ctrlKey &&
+        event.shiftKey &&
+        (key === "i" || key === "j" || key === "c")
+
+      const isViewSource =
+        event.ctrlKey &&
+        key === "u"
+
+      if (
+        isF12 ||
+        isDeveloperTools ||
+        isViewSource
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    }
+
+    /*
+     * Prevent dragging page content/images.
+     */
+    const handleDragStart = (
+      event: DragEvent,
+    ) => {
+      event.preventDefault()
+    }
+
+    document.addEventListener(
+      "contextmenu",
+      handleContextMenu,
+    )
+
+    document.addEventListener(
+      "keydown",
+      handleKeyDown,
+      true,
+    )
+
+    document.addEventListener(
+      "dragstart",
+      handleDragStart,
+    )
+
+    return () => {
+      document.removeEventListener(
+        "contextmenu",
+        handleContextMenu,
+      )
+
+      document.removeEventListener(
+        "keydown",
+        handleKeyDown,
+        true,
+      )
+
+      document.removeEventListener(
+        "dragstart",
+        handleDragStart,
+      )
+    }
+  }, [])
+}
+
+/* =========================================================
+   APP
+========================================================= */
+
 export default function App() {
+  useSiteProtection()
+
   return (
     <BrowserRouter>
+      {/* Custom cursor */}
       <CustomCursor />
-      <style>
-        {`
-          /*
-           * Sonner normally uses:
-           * transform: translate(-35%, -35%);
-           *
-           * That intentionally makes the close button hang
-           * outside the toast. Override Sonner's variables so
-           * the button sits completely inside the corner.
-           */
-          [data-sonner-toaster] {
-            --toast-close-button-start: auto !important;
-            --toast-close-button-end: 8px !important;
-            --toast-close-button-transform: none !important;
-          }
-
-          [data-sonner-toast][data-styled="true"] [data-close-button] {
-            position: absolute !important;
-            top: 8px !important;
-            right: 8px !important;
-            left: auto !important;
-            bottom: auto !important;
-
-            width: 20px !important;
-            height: 20px !important;
-
-            margin: 0 !important;
-            padding: 0 !important;
-
-            transform: none !important;
-            translate: none !important;
-
-            z-index: 10 !important;
-          }
-        `}
-      </style>
 
       <Routes>
         {/* =====================================================
@@ -355,8 +423,10 @@ export default function App() {
           classNames: {
             toast:
               "bg-background text-foreground border-border pr-12",
-            title: "text-foreground",
-            description: "text-muted-foreground",
+            title:
+              "text-foreground",
+            description:
+              "text-muted-foreground",
           },
         }}
       />
