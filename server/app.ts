@@ -301,6 +301,25 @@ const GALLERY_MEDIA_TYPES = [
 type GalleryMediaType =
   (typeof GALLERY_MEDIA_TYPES)[number]
 
+const GALLERY_CATEGORIES = [
+  "Community",
+  "Fleet",
+] as const
+
+type GalleryCategory =
+  (typeof GALLERY_CATEGORIES)[number]
+
+function isGalleryCategory(
+  value: unknown,
+): value is GalleryCategory {
+  return (
+    typeof value === "string" &&
+    GALLERY_CATEGORIES.includes(
+      value as GalleryCategory,
+    )
+  )
+}
+
 type GalleryMedia = {
   id: string
   type: GalleryMediaType
@@ -315,6 +334,7 @@ type GalleryDocument = {
   title: string
   description: string
   media: GalleryMedia[]
+  category?: GalleryCategory
   createdBy: string
   createdAt: Date
   updatedAt: Date
@@ -450,6 +470,7 @@ function serializeGalleryItem(
     id: item._id?.toString() ?? "",
     title: item.title,
     description: item.description,
+    category: item.category ?? "Community",
     media: getGalleryMedia(item),
     createdBy: item.createdBy,
     createdAt: item.createdAt,
@@ -5390,6 +5411,19 @@ export function createApp() {
             req.body?.description,
           )
 
+        if (
+          requestedCategory !== undefined &&
+          !isGalleryCategory(
+            requestedCategory,
+          )
+        ) {
+          return res.status(400).json({
+            success: false,
+            error:
+              "Gallery category must be Community or Fleet",
+          })
+        }
+
         if (!title) {
           return res.status(400).json({
             success: false,
@@ -5498,6 +5532,7 @@ export function createApp() {
         const item: GalleryDocument = {
           title,
           description,
+          category,
           media,
           createdBy: userId,
           createdAt: now,
@@ -5599,6 +5634,22 @@ export function createApp() {
             req.body?.description,
           )
 
+        if (
+          req.body?.category !== undefined &&
+          !isGalleryCategory(
+            req.body?.category,
+          )
+        ) {
+          return res.status(400).json({
+            success: false,
+            error:
+              "Gallery category must be Community or Fleet",
+          })
+        }
+
+        const requestedCategory =
+          req.body?.category
+
         if (!title) {
           return res.status(400).json({
             success: false,
@@ -5627,6 +5678,13 @@ export function createApp() {
               "Gallery item not found",
           })
         }
+
+        const category =
+          isGalleryCategory(
+            requestedCategory,
+          )
+            ? requestedCategory
+            : existing.category ?? "Community"
 
         const rawMedia = req.body?.media
 
@@ -5740,6 +5798,7 @@ export function createApp() {
             $set: {
               title,
               description,
+              category,
               media,
               updatedAt:
                 new Date(),
