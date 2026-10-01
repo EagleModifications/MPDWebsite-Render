@@ -13,7 +13,7 @@ import {
 
 import { Toaster } from "@/components/ui/sonner"
 
-import CustomCursor from "@/components/home/CustomCursor"
+import CustomCursor from "@/components/CustomCursor"
 
 import Home from "@/pages/Home"
 import SignIn from "@/pages/SignIn"
