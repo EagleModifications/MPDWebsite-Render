@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { ArrowLeft, Home, SearchX } from "lucide-react"
+import { ArrowLeft, ArrowRight, Home, SearchX } from "lucide-react"
 
 import Navbar from "@/components/home/Navbar"
 import { Button } from "@/components/ui/button"
@@ -10,11 +10,6 @@ export default function NotFound() {
       <Navbar />
 
       <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 pt-20">
-        {/* Background glow */}
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/2 top-[-220px] h-[420px] w-[700px] -translate-x-1/2 rounded-full bg-blue-600/10 blur-[120px]" />
-        </div>
-
         <div className="relative mx-auto w-full max-w-lg text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
             <SearchX className="h-7 w-7 text-blue-500" />
@@ -33,15 +28,23 @@ export default function NotFound() {
             may have entered an incorrect URL.
           </p>
 
-          <div className="mt-7 flex flex-col justify-center gap-2 sm:flex-row">
-            <Button asChild>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Button
+              asChild
+              className="h-12 min-w-[210px] px-8 text-sm font-semibold uppercase tracking-wide"
+            >
               <Link to="/">
                 <Home className="mr-2 h-4 w-4" />
                 Back to Home
+                <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </Button>
 
-            <Button variant="outline" asChild>
+            <Button
+              variant="outline"
+              asChild
+              className="h-12 min-w-[210px] px-8 text-sm font-semibold uppercase tracking-wide"
+            >
               <button onClick={() => window.history.back()}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Go Back
