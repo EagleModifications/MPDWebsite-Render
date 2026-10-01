@@ -5,11 +5,6 @@ import { Link } from "react-router-dom"
 import Footer from "@/components/home/Footer"
 import Navbar from "@/components/home/Navbar"
 
-type SessionUser = {
-  discordId?: string
-  permissions?: string[]
-}
-
 export default function Home() {
   const [authChecked, setAuthChecked] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
