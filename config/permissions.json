@@ -1,0 +1,34 @@
+{
+  "view": {
+    "urls": ["/", "/dashboard"],
+    "files": ["dashboard"]
+  },
+  "audit": {
+    "urls": ["/audits", "/activity/masteraudit", "/activity/auditfaliures"],
+    "files": ["audit"]
+  },
+  "import": {
+    "urls": ["/imports"],
+    "files": ["import"]
+  },
+  "requirements": {
+    "urls": ["/requirements"],
+    "files": ["requirements"]
+  },
+  "admin": {
+    "urls": ["/admin"],
+    "files": ["admin"]
+  },
+  "activitymanagement": {
+    "urls": ["/dashboard"]
+  },
+  "promotionmanagement": {
+    "urls": ["/dashboard"]
+  },
+  "events": {
+    "urls": [""]
+  },
+  "gallery": {
+    "urls": [""]
+  }
+}

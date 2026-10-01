@@ -1,0 +1,73 @@
+services:
+  - type: web
+    name: mpd-dashboard
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: MPDDashboard
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_PRIVATE_KEY
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: GOOGLE_SHEET_ROSTER_IMPORT
+        value: Roster Import
+      - key: GOOGLE_SHEET_SWAT_ROSTER_IMPORT
+        value: SWAT Roster Import
+      - key: GOOGLE_SHEET_MTF7_ROSTER_IMPORT
+        value: MTF-7 Roster Import
+      - key: GOOGLE_SHEET_MCD_ROSTER_IMPORT
+        value: MCD Roster Import
+      - key: GOOGLE_SHEET_TRU_ROSTER_IMPORT
+        value: TRU Roster Import
+      - key: GOOGLE_SHEET_TEU_ROSTER_IMPORT
+        value: TEU Roster Import
+      - key: GOOGLE_SHEET_SAR_ROSTER_IMPORT
+        value: SAR Roster Import
+      - key: GOOGLE_SHEET_DEPT_IMPORT
+        value: Dept Import
+      - key: GOOGLE_SHEET_SWAT_IMPORT
+        value: SWAT Import
+      - key: GOOGLE_SHEET_MTF7_IMPORT
+        value: MTF-7 Import
+      - key: GOOGLE_SHEET_MCD_IMPORT
+        value: MCD Import
+      - key: GOOGLE_SHEET_TRU_IMPORT
+        value: TRU Import
+      - key: GOOGLE_SHEET_TEU_IMPORT
+        value: TEU Import
+      - key: GOOGLE_SHEET_SAR_IMPORT
+        value: SAR Import
+      - key: GOOGLE_SHEET_DEPT_REQUIREMENTS
+        value: Dept Requirements
+      - key: GOOGLE_SHEET_SWAT_REQUIREMENTS
+        value: SWAT Requirements
+      - key: GOOGLE_SHEET_MTF7_REQUIREMENTS
+        value: MTF-7 Requirements
+      - key: GOOGLE_SHEET_MCD_REQUIREMENTS
+        value: MCD Requirements
+      - key: GOOGLE_SHEET_TRU_REQUIREMENTS
+        value: TRU Requirements
+      - key: GOOGLE_SHEET_TEU_REQUIREMENTS
+        value: TEU Requirements
+      - key: GOOGLE_SHEET_SAR_REQUIREMENTS
+        value: SAR Requirements
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_ORIGIN
+        sync: false
