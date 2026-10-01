@@ -123,7 +123,6 @@ export default function Gallery() {
   const dragDepthRef = useRef(0)
 
   useEffect(() => {
-    document.title = "Gallery | Metro Police Department"
 
     let active = true
 
