@@ -1,16 +1,18 @@
 import {
   ArrowRight,
-  Bell,
   CalendarDays,
   ClipboardCheck,
   FileCheck2,
   Shield,
   Users,
 } from "lucide-react"
+import { type ComponentType } from "react"
 import { Link } from "react-router-dom"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
 import { useRequireAuth } from "@/hooks/useRequireAuth"
+
+type IconType = ComponentType<{ className?: string }>
 
 export default function Dashboard() {
   const { loading, user } = useRequireAuth("view")
@@ -31,38 +33,36 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
-        {/* Welcome */}
+      <div className="mx-auto w-full max-w-[1600px] space-y-8">
+        {/* Header */}
         <section className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-          <div className="absolute right-[-100px] top-[-120px] h-[300px] w-[300px] rounded-full bg-blue-600/10 blur-[100px]" />
-
-          <div className="relative p-6 sm:p-8">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="mb-3 flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/10">
-                    <Shield className="h-4 w-4 text-blue-500" />
+          <div className="relative p-6 sm:p-8 lg:p-10">
+            <div className="flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600/10">
+                    <Shield className="h-5 w-5 text-blue-500" />
                   </div>
 
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-500">
+                  <span className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
                     Metro Police Department
                   </span>
                 </div>
 
-                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                  Welcome back
+                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
+                  Dashboard
                 </h1>
 
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  Your Metro PD dashboard. Access department tools,
-                  activity management, audits, requirements, and more
-                  from one place.
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+                  Welcome to the Metro Police Department member portal.
+                  Access your department tools, rosters, requirements,
+                  imports, and management systems from here.
                 </p>
               </div>
 
               <Link
-                to="/activity/activityroster"
-                className="group inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-6 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
+                to="/dashboard/activity/activityroster"
+                className="group inline-flex h-12 shrink-0 items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
               >
                 Activity Roster
                 <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
@@ -73,200 +73,176 @@ export default function Dashboard() {
 
         {/* Quick Access */}
         <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold">
+          <div className="mb-5">
+            <h2 className="text-xl font-semibold tracking-tight">
               Quick Access
             </h2>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              Jump straight into the tools you use most.
+              Access commonly used Metro PD tools.
             </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <QuickAccessCard
+            <DashboardCard
               title="Activity Roster"
-              description="View and manage department activity."
+              description="View and manage department activity and member records."
               icon={Users}
-              href="/activity/activityroster"
+              href="/dashboard/activity/activityroster"
             />
 
-            <QuickAccessCard
-              title="Master Audit"
-              description="Review department activity compliance."
+            <DashboardCard
+              title="Promotion Roster"
+              description="Review promotion activity and department progression."
               icon={ClipboardCheck}
-              href="/activity/masteraudit"
+              href="/dashboard/promotion/promotionroster"
             />
 
-            <QuickAccessCard
+            <DashboardCard
               title="Requirements"
-              description="View department and division requirements."
+              description="View department and division activity requirements."
               icon={FileCheck2}
-              href="/departmentrequirements"
+              href="/dashboard/activity/department-requirements"
             />
 
-            <QuickAccessCard
+            <DashboardCard
               title="Events"
-              description="View upcoming Metro PD events."
+              description="View upcoming Metro Police Department events."
               icon={CalendarDays}
               href="/events"
             />
           </div>
         </section>
 
-        {/* Overview */}
+        {/* Department Overview */}
         <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold">
+          <div className="mb-5">
+            <h2 className="text-xl font-semibold tracking-tight">
               Department Overview
             </h2>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              A quick look at your department dashboard.
+              A quick overview of current department information.
             </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              icon={Users}
+            <OverviewCard
               title="Department Members"
               value="0"
               description="Active members"
+              icon={Users}
             />
 
-            <StatCard
-              icon={ClipboardCheck}
-              title="Audits"
+            <OverviewCard
+              title="Completed Audits"
               value="0"
-              description="Completed audits"
+              description="Audits completed"
+              icon={ClipboardCheck}
             />
 
-            <StatCard
-              icon={FileCheck2}
+            <OverviewCard
               title="Audit Failures"
               value="0"
-              description="Items requiring review"
+              description="Items requiring attention"
+              icon={FileCheck2}
             />
 
-            <StatCard
-              icon={Bell}
-              title="Notifications"
+            <OverviewCard
+              title="Upcoming Events"
               value="0"
-              description="Unread notifications"
+              description="Scheduled department events"
+              icon={CalendarDays}
             />
           </div>
         </section>
 
-        {/* Recent Activity + Notice */}
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">
-                  Recent Activity
-                </h2>
+        {/* Recent Activity */}
+        <section className="rounded-xl border border-border bg-card shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-border p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">
+                Recent Activity
+              </h2>
 
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Recent department activity will appear here.
-                </p>
-              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Recent department activity will appear here.
+              </p>
             </div>
+          </div>
 
-            <div className="mt-6 rounded-lg border border-dashed border-border p-8 text-center">
-              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+          <div className="p-6">
+            <div className="flex min-h-[180px] flex-col items-center justify-center rounded-lg border border-dashed border-border px-6 py-10 text-center">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted">
                 <ClipboardCheck className="h-5 w-5 text-muted-foreground" />
               </div>
 
-              <p className="mt-3 text-sm font-medium">
+              <h3 className="mt-4 text-sm font-semibold">
                 No recent activity
+              </h3>
+
+              <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+                Department activity, audit updates, and other important
+                actions will appear here.
               </p>
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                Department activity will appear here as it is recorded.
-              </p>
             </div>
-          </section>
-
-          <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600/10">
-              <Shield className="h-5 w-5 text-blue-500" />
-            </div>
-
-            <h2 className="mt-4 text-lg font-semibold">
-              Metro PD Portal
-            </h2>
-
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Use the navigation menu to access department management
-              tools, rosters, audits, requirements, and other resources.
-            </p>
-
-            <div className="mt-5 border-t border-border pt-5">
-              <Link
-                to="/notifications"
-                className="group inline-flex items-center gap-2 text-sm font-semibold text-blue-500 transition-colors hover:text-blue-400"
-              >
-                View notifications
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
-            </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
     </DashboardLayout>
   )
 }
 
-type QuickAccessCardProps = {
+type DashboardCardProps = {
   title: string
   description: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: IconType
   href: string
 }
 
-function QuickAccessCard({
+function DashboardCard({
   title,
   description,
   icon: Icon,
   href,
-}: QuickAccessCardProps) {
+}: DashboardCardProps) {
   return (
     <Link
       to={href}
-      className="group rounded-xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-500/40 hover:shadow-md"
+      className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-500/40 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600/10">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600/10">
           <Icon className="h-5 w-5 text-blue-500" />
         </div>
 
         <ArrowRight className="h-4 w-4 text-muted-foreground transition-all duration-200 group-hover:translate-x-1 group-hover:text-blue-500" />
       </div>
 
-      <h3 className="mt-5 font-semibold">
+      <h3 className="mt-5 text-sm font-semibold">
         {title}
       </h3>
 
-      <p className="mt-1 text-sm leading-5 text-muted-foreground">
+      <p className="mt-2 text-sm leading-5 text-muted-foreground">
         {description}
       </p>
     </Link>
   )
 }
 
-type StatCardProps = {
+type OverviewCardProps = {
   title: string
   value: string
   description: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: IconType
 }
 
-function StatCard({
+function OverviewCard({
   title,
   value,
   description,
   icon: Icon,
-}: StatCardProps) {
+}: OverviewCardProps) {
   return (
     <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="flex items-center justify-between">
