@@ -6,6 +6,9 @@ export default function SignedOut() {
     window.location.href = "/api/auth/login"
   }
 
+  useEffect(() => {
+  }, [])
+
   return (
     <main
       className="
