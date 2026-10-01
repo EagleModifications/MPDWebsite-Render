@@ -17,7 +17,7 @@ export default function Footer() {
                 className="h-9 w-9 object-contain"
               />
 
-              <span className="text-lg font-black tracking-tight text-white transition-colors group-hover:text-blue-400">
+              <span className="text-lg font-black tracking-tight text-white transition-colors">
                 METRO POLICE DEPARTMENT
               </span>
             </Link>
