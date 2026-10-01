@@ -49,6 +49,13 @@ export default function Footer() {
                 >
                   Events
                 </Link>
+
+                <Link
+                  to="/gallery"
+                  className="text-sm text-white/60 transition-colors hover:text-foreground"
+                >
+                  Gallery
+                </Link>
               </div>
             </div>
 
