@@ -2,9 +2,8 @@ import {
   ArrowRight,
   CalendarDays,
   ClipboardCheck,
-  FileCheck2,
+  Images,
   Shield,
-  Users,
 } from "lucide-react"
 import { type ComponentType } from "react"
 import { Link } from "react-router-dom"
@@ -59,14 +58,6 @@ export default function Dashboard() {
                   imports, and management systems from here.
                 </p>
               </div>
-
-              <Link
-                to="/dashboard/activity/activityroster"
-                className="group inline-flex h-12 shrink-0 items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
-              >
-                Activity Roster
-                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-              </Link>
             </div>
           </div>
         </section>
@@ -87,7 +78,7 @@ export default function Dashboard() {
             <DashboardCard
               title="Activity Roster"
               description="View and manage department activity and member records."
-              icon={Users}
+              icon={ClipboardCheck}
               href="/dashboard/activity/activityroster"
             />
 
@@ -99,93 +90,18 @@ export default function Dashboard() {
             />
 
             <DashboardCard
-              title="Requirements"
-              description="View department and division activity requirements."
-              icon={FileCheck2}
-              href="/dashboard/activity/department-requirements"
-            />
-
-            <DashboardCard
               title="Events"
               description="View upcoming Metro Police Department events."
               icon={CalendarDays}
               href="/events"
             />
-          </div>
-        </section>
 
-        {/* Department Overview */}
-        <section>
-          <div className="mb-5">
-            <h2 className="text-xl font-semibold tracking-tight">
-              Department Overview
-            </h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              A quick overview of current department information.
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <OverviewCard
-              title="Department Members"
-              value="0"
-              description="Active members"
-              icon={Users}
+            <DashboardCard
+              title="Gallery"
+              description="View Metro Police Department pictures and videos."
+              icon={Images}
+              href="/gallery"
             />
-
-            <OverviewCard
-              title="Completed Audits"
-              value="0"
-              description="Audits completed"
-              icon={ClipboardCheck}
-            />
-
-            <OverviewCard
-              title="Audit Failures"
-              value="0"
-              description="Items requiring attention"
-              icon={FileCheck2}
-            />
-
-            <OverviewCard
-              title="Upcoming Events"
-              value="0"
-              description="Scheduled department events"
-              icon={CalendarDays}
-            />
-          </div>
-        </section>
-
-        {/* Recent Activity */}
-        <section className="rounded-xl border border-border bg-card shadow-sm">
-          <div className="flex flex-col gap-2 border-b border-border p-6 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">
-                Recent Activity
-              </h2>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                Recent department activity will appear here.
-              </p>
-            </div>
-          </div>
-
-          <div className="p-6">
-            <div className="flex min-h-[180px] flex-col items-center justify-center rounded-lg border border-dashed border-border px-6 py-10 text-center">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted">
-                <ClipboardCheck className="h-5 w-5 text-muted-foreground" />
-              </div>
-
-              <h3 className="mt-4 text-sm font-semibold">
-                No recent activity
-              </h3>
-
-              <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
-                Department activity, audit updates, and other important
-                actions will appear here.
-              </p>
-            </div>
           </div>
         </section>
       </div>
