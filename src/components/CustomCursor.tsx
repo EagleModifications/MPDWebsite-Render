@@ -1,10 +1,11 @@
+import { useEffect, useRef, useState } from "react"
+
 import {
   Ban,
   Circle,
   Crosshair,
   Grab,
   Hand,
-  Maximize2,
   MousePointer,
   Move,
   MoveDiagonal,
@@ -15,16 +16,6 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react"
-import {
-  type ComponentType,
-  useEffect,
-  useState,
-} from "react"
-
-type CursorPosition = {
-  x: number
-  y: number
-}
 
 type CursorType =
   | "default"
@@ -34,10 +25,10 @@ type CursorType =
   | "grab"
   | "grabbing"
   | "crosshair"
-  | "col-resize"
-  | "row-resize"
-  | "nwse-resize"
+  | "ew-resize"
+  | "ns-resize"
   | "nesw-resize"
+  | "nwse-resize"
   | "zoom-in"
   | "zoom-out"
   | "not-allowed"
@@ -45,227 +36,212 @@ type CursorType =
   | "progress"
   | "help"
 
-type CursorIcon = ComponentType<{
-  className?: string
-  strokeWidth?: number
-}>
+type CursorState = {
+  x: number
+  y: number
+  type: CursorType
+  visible: boolean
+}
 
-const cursorIcons: Record<CursorType, CursorIcon> = {
+const cursorIcons = {
   default: MousePointer,
-  pointer: MousePointer,
+  pointer: Hand,
   text: Type,
   move: Move,
   grab: Grab,
   grabbing: Hand,
   crosshair: Crosshair,
-  "col-resize": MoveHorizontal,
-  "row-resize": MoveVertical,
-  "nwse-resize": MoveDiagonal,
+  "ew-resize": MoveHorizontal,
+  "ns-resize": MoveVertical,
   "nesw-resize": MoveDiagonal,
+  "nwse-resize": MoveDiagonal,
   "zoom-in": ZoomIn,
   "zoom-out": ZoomOut,
   "not-allowed": Ban,
   wait: Circle,
   progress: Circle,
   help: Search,
-}
+} satisfies Record<CursorType, typeof MousePointer>
 
 function getCursorType(element: Element | null): CursorType {
-  if (!element) {
-    return "default"
-  }
+  let current: Element | null = element
 
-  const htmlElement = element as HTMLElement
+  while (current) {
+    const computedCursor = window.getComputedStyle(current).cursor
 
-  const computedStyle = window.getComputedStyle(htmlElement)
-  const cursor = computedStyle.cursor as CursorType
+    if (
+      computedCursor &&
+      computedCursor !== "auto" &&
+      computedCursor !== "inherit" &&
+      computedCursor !== "initial"
+    ) {
+      switch (computedCursor) {
+        case "pointer":
+          return "pointer"
 
-  if (cursor === "auto") {
-    return "default"
-  }
+        case "text":
+        case "vertical-text":
+          return "text"
 
-  if (cursor in cursorIcons) {
-    return cursor
+        case "move":
+        case "all-scroll":
+          return "move"
+
+        case "grab":
+          return "grab"
+
+        case "grabbing":
+          return "grabbing"
+
+        case "crosshair":
+          return "crosshair"
+
+        case "ew-resize":
+          return "ew-resize"
+
+        case "ns-resize":
+          return "ns-resize"
+
+        case "nesw-resize":
+          return "nesw-resize"
+
+        case "nwse-resize":
+          return "nwse-resize"
+
+        case "zoom-in":
+          return "zoom-in"
+
+        case "zoom-out":
+          return "zoom-out"
+
+        case "not-allowed":
+        case "no-drop":
+          return "not-allowed"
+
+        case "wait":
+          return "wait"
+
+        case "progress":
+          return "progress"
+
+        case "help":
+          return "help"
+
+        case "default":
+          return "default"
+
+        default:
+          break
+      }
+    }
+
+    current = current.parentElement
   }
 
   return "default"
 }
 
 export default function CustomCursor() {
-  const [position, setPosition] = useState<CursorPosition>({
+  const [cursor, setCursor] = useState<CursorState>({
+    x: -100,
+    y: -100,
+    type: "default",
+    visible: false,
+  })
+
+  const positionRef = useRef({
     x: -100,
     y: -100,
   })
 
-  const [visible, setVisible] = useState(false)
-  const [cursorType, setCursorType] =
-    useState<CursorType>("default")
-
-  const [clicking, setClicking] = useState(false)
-
   useEffect(() => {
-    const updateCursor = (
-      clientX: number,
-      clientY: number,
-    ) => {
-      setPosition({
-        x: clientX,
-        y: clientY,
-      })
-
-      const element = document.elementFromPoint(
-        clientX,
-        clientY,
-      )
-
-      setCursorType(getCursorType(element))
-      setVisible(true)
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      return
     }
 
     const handleMouseMove = (event: MouseEvent) => {
-      updateCursor(
-        event.clientX,
-        event.clientY,
-      )
-    }
+      const { clientX, clientY } = event
 
-    const handleMouseDown = () => {
-      setClicking(true)
-    }
+      positionRef.current = {
+        x: clientX,
+        y: clientY,
+      }
 
-    const handleMouseUp = () => {
-      setClicking(false)
+      const element = document.elementFromPoint(clientX, clientY)
+
+      setCursor({
+        x: clientX,
+        y: clientY,
+        type: getCursorType(element),
+        visible: true,
+      })
     }
 
     const handleMouseLeave = () => {
-      setVisible(false)
-      setClicking(false)
+      setCursor((current) => ({
+        ...current,
+        visible: false,
+      }))
     }
 
-    const handleMouseEnter = () => {
-      setVisible(true)
+    const handleMouseEnter = (event: MouseEvent) => {
+      const { clientX, clientY } = event
+
+      positionRef.current = {
+        x: clientX,
+        y: clientY,
+      }
+
+      const element = document.elementFromPoint(clientX, clientY)
+
+      setCursor({
+        x: clientX,
+        y: clientY,
+        type: getCursorType(element),
+        visible: true,
+      })
     }
 
-    const handleScroll = () => {
-      const element = document.elementFromPoint(
-        position.x,
-        position.y,
-      )
-
-      setCursorType(getCursorType(element))
-    }
-
-    document.addEventListener(
-      "mousemove",
-      handleMouseMove,
-    )
-
-    document.addEventListener(
-      "mousedown",
-      handleMouseDown,
-    )
-
-    document.addEventListener(
-      "mouseup",
-      handleMouseUp,
-    )
-
-    document.addEventListener(
-      "scroll",
-      handleScroll,
-      true,
-    )
-
-    document.documentElement.addEventListener(
-      "mouseleave",
-      handleMouseLeave,
-    )
-
-    document.documentElement.addEventListener(
-      "mouseenter",
-      handleMouseEnter,
-    )
+    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mouseleave", handleMouseLeave)
+    document.addEventListener("mouseenter", handleMouseEnter)
 
     return () => {
-      document.removeEventListener(
-        "mousemove",
-        handleMouseMove,
-      )
-
-      document.removeEventListener(
-        "mousedown",
-        handleMouseDown,
-      )
-
-      document.removeEventListener(
-        "mouseup",
-        handleMouseUp,
-      )
-
-      document.removeEventListener(
-        "scroll",
-        handleScroll,
-        true,
-      )
-
-      document.documentElement.removeEventListener(
-        "mouseleave",
-        handleMouseLeave,
-      )
-
-      document.documentElement.removeEventListener(
-        "mouseenter",
-        handleMouseEnter,
-      )
+      document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("mouseleave", handleMouseLeave)
+      document.removeEventListener("mouseenter", handleMouseEnter)
     }
-  }, [position.x, position.y])
+  }, [])
 
-  const CursorIcon =
-    cursorIcons[cursorType] ?? MousePointer
+  if (!cursor.visible) {
+    return null
+  }
+
+  const Icon = cursorIcons[cursor.type]
+
+  /*
+   * MousePointer's visual tip is slightly inside its SVG viewBox.
+   * Offset it so the arrow tip sits directly on the actual mouse
+   * position rather than appearing a few pixels down/right.
+   */
+  const isPointer =
+    cursor.type === "default" || cursor.type === "pointer"
 
   return (
     <div
       aria-hidden="true"
-      className={`
-        pointer-events-none
-        fixed
-        left-0
-        top-0
-        z-[99999]
-        hidden
-        md:block
-        transition-opacity
-        duration-75
-        ease-out
-        ${
-          visible
-            ? "opacity-100"
-            : "opacity-0"
-        }
-      `}
+      className="pointer-events-none fixed z-[99999]"
       style={{
-        left: position.x,
-        top: position.y,
+        left: cursor.x,
+        top: cursor.y,
+        transform: isPointer
+          ? "translate(-3px, -3px)"
+          : "translate(-50%, -50%)",
       }}
     >
-      <CursorIcon
-        className={`
-          absolute
-          left-0
-          top-0
-          h-[20px]
-          w-[20px]
-          text-blue-500
-          drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]
-          transition-transform
-          duration-75
-          ease-out
-          ${
-            clicking
-              ? "scale-90"
-              : "scale-100"
-          }
-        `}
+      <Icon
+        className="text-blue-500 drop-shadow-[0_0_5px_rgba(59,130,246,0.45)]"
+        size={20}
         strokeWidth={2}
       />
     </div>
