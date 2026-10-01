@@ -13,6 +13,8 @@ import {
 
 import { Toaster } from "@/components/ui/sonner"
 
+import CustomCursor from "@/components/home/CustomCursor"
+
 import Home from "@/pages/Home"
 import SignIn from "@/pages/SignIn"
 import SignedOut from "@/pages/SignedOut"
@@ -61,6 +63,7 @@ import PromotionRequirementsTRU from "@/pages/dashboard/promotion/requirements/T
 export default function App() {
   return (
     <BrowserRouter>
+      <CustomCursor />
       <style>
         {`
           /*
