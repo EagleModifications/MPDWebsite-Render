@@ -2,7 +2,7 @@ import { ArrowRight, LayoutDashboard, LogIn } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 
-import Footer from "@/components/home/Footer"
+import Footer from "@/components/Footer"
 import Navbar from "@/components/home/Navbar"
 
 export default function Home() {
