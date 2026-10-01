@@ -106,156 +106,156 @@ export default function App() {
         />
 
         <Route
-          path="/activity/activityroster"
+          path="/dashboard/activity/activityroster"
           element={<ActivityRoster />}
         />
 
         <Route
-          path="/promotion/promotionroster"
+          path="/dashboard/promotion/promotionroster"
           element={<PromotionRoster />}
         />
 
         {/* Imports */}
 
         <Route
-          path="/activity/imports/department"
+          path="/dashboard/activity/department-import"
           element={<ActivityImportDepartment />}
         />
 
         <Route
-          path="/activity/imports/mcd"
+          path="/dashboard/activity/mcd-import"
           element={<ActivityImportMCD />}
         />
 
         <Route
-          path="/activity/imports/mtf-7"
+          path="/dashboard/activity/mtf7-import"
           element={<ActivityImportMTF7 />}
         />
 
         <Route
-          path="/activity/imports/sar"
+          path="/dashboard/activity/sar-import"
           element={<ActivityImportSAR />}
         />
 
         <Route
-          path="/activity/imports/swat"
+          path="/dashboard/activity/swat-import"
           element={<ActivityImportSWAT />}
         />
 
         <Route
-          path="/activity/imports/teu"
+          path="/dashboard/activity/teu-import"
           element={<ActivityImportTEU />}
         />
 
         <Route
-          path="/activity/imports/tru"
+          path="/dashboard/activity/tru-import"
           element={<ActivityImportTRU />}
         />
 
         <Route
-          path="/promotion/imports/department"
+          path="/dashboard/promotion/department-import"
           element={<PromotionImportDepartment />}
         />
 
         <Route
-          path="/promotion/imports/mcd"
+          path="/dashboard/promotion/mcd-import"
           element={<PromotionImportMCD />}
         />
 
         <Route
-          path="/promotion/imports/mtf-7"
+          path="/dashboard/promotion/mtf7-import"
           element={<PromotionImportMTF7 />}
         />
 
         <Route
-          path="/promotion/imports/sar"
+          path="/dashboard/promotion/sar-import"
           element={<PromotionImportSAR />}
         />
 
         <Route
-          path="/promotion/imports/swat"
+          path="/dashboard/promotion/swat-import"
           element={<PromotionImportSWAT />}
         />
 
         <Route
-          path="/promotion/imports/teu"
+          path="/dashboard/promotion/teu-import"
           element={<PromotionImportTEU />}
         />
 
         <Route
-          path="/promotion/imports/tru"
+          path="/dashboard/promotion/tru-import"
           element={<PromotionImportTRU />}
         />
 
         {/* Requirements */}
 
         <Route
-          path="/activity/requirements/department"
+          path="/dashboard/activity/department-requirements"
           element={<ActivityRequirementsDepartment />}
         />
 
         <Route
-          path="/activity/requirements/mcd"
+          path="/dashboard/activity/mcd-requirements"
           element={<ActivityRequirementsMCD />}
         />
 
         <Route
-          path="/activity/requirements/mtf-7"
+          path="/dashboard/activity/mtf7-requirements"
           element={<ActivityRequirementsMTF7 />}
         />
 
         <Route
-          path="/activity/requirements/sar"
+          path="/dashboard/activity/sar-requirements"
           element={<ActivityRequirementsSAR />}
         />
 
         <Route
-          path="/activity/requirements/swat"
+          path="/dashboard/activity/swat-requirements"
           element={<ActivityRequirementsSWAT />}
         />
 
         <Route
-          path="/activity/requirements/teu"
+          path="/dashboard/activity/teu-requirements"
           element={<ActivityRequirementsTEU />}
         />
 
         <Route
-          path="/activity/requirements/tru"
+          path="/dashboard/activity/tru-requirements"
           element={<ActivityRequirementsTRU />}
         />
 
         <Route
-          path="/promotion/requirements/department"
+          path="/dashboard/promotion/department-requirements"
           element={<PromotionRequirementsDepartment />}
         />
 
         <Route
-          path="/promotion/requirements/mcd"
+          path="/dashboard/promotion/mcd-requirements"
           element={<PromotionRequirementsMCD />}
         />
 
         <Route
-          path="/promotion/requirements/mtf-7"
+          path="/dashboard/promotion/mtf7-requirements"
           element={<PromotionRequirementsMTF7 />}
         />
 
         <Route
-          path="/promotion/requirements/sar"
+          path="/dashboard/promotion/sar-requirements"
           element={<PromotionRequirementsSAR />}
         />
 
         <Route
-          path="/promotion/requirements/swat"
+          path="/dashboard/promotion/swat-requirements"
           element={<PromotionRequirementsSWAT />}
         />
 
         <Route
-          path="/promotion/requirements/teu"
+          path="/dashboard/promotion/teu-requirements"
           element={<PromotionRequirementsTEU />}
         />
 
         <Route
-          path="/promotion/requirements/tru"
+          path="/dashboard/promotion/tru-requirements"
           element={<PromotionRequirementsTRU />}
         />
 
