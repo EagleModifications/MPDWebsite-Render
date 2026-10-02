@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import {
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -186,6 +187,27 @@ function getCategoryClasses(
 
     default:
       return "border-border bg-muted/60 text-muted-foreground"
+  }
+}
+
+function getCategoryDotClasses(
+  category: EventCategory,
+) {
+  switch (category) {
+    case "Activities":
+      return "bg-purple-500"
+
+    case "Patrol":
+      return "bg-blue-500"
+
+    case "Operations":
+      return "bg-emerald-500"
+
+    case "Meetings":
+      return "bg-amber-500"
+
+    default:
+      return "bg-muted-foreground"
   }
 }
 
@@ -828,8 +850,7 @@ export default function Events() {
                           2 && (
                           <div className="px-1 text-[10px] text-muted-foreground">
                             +
-                            {dayEvents.length -
-                              2}{" "}
+                            {dayEvents.length - 2}{" "}
                             more
                           </div>
                         )}
@@ -843,45 +864,35 @@ export default function Events() {
             <div className="flex flex-col gap-3 border-t border-border/70 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
                 <span className="shrink-0">
-                  Click a date to view its
-                  events.
+                  Click a date to view its events.
                 </span>
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
-                    <span>
-                      Activities
-                    </span>
+                    <span>Activities</span>
                   </span>
 
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                    <span>
-                      Patrol
-                    </span>
+                    <span>Patrol</span>
                   </span>
 
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-                    <span>
-                      Operations
-                    </span>
+                    <span>Operations</span>
                   </span>
 
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                    <span>
-                      Meetings
-                    </span>
+                    <span>Meetings</span>
                   </span>
                 </div>
               </div>
 
               <span className="shrink-0 font-medium text-foreground/70">
                 {filteredEvents.length}{" "}
-                {filteredEvents.length ===
-                1
+                {filteredEvents.length === 1
                   ? "event"
                   : "events"}
               </span>
@@ -892,8 +903,7 @@ export default function Events() {
             className={[
               "mt-6 overflow-hidden rounded-2xl bg-card/80 shadow-sm backdrop-blur",
               loading ||
-              upcomingEvents.length ===
-                0
+              upcomingEvents.length === 0
                 ? "border border-dashed border-border"
                 : "border border-border/70",
             ].join(" ")}
@@ -905,16 +915,13 @@ export default function Events() {
                 </h2>
 
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  Scheduled events from today
-                  onwards.
+                  Scheduled events from today onwards.
                 </p>
               </div>
 
-              {categoryFilter !==
-                "All" && (
+              {categoryFilter !== "All" && (
                 <span className="text-xs text-muted-foreground">
-                  Filter:{" "}
-                  {categoryFilter}
+                  Filter: {categoryFilter}
                 </span>
               )}
             </div>
@@ -928,12 +935,10 @@ export default function Events() {
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Please wait while the
-                  calendar is loaded.
+                  Please wait while the calendar is loaded.
                 </p>
               </div>
-            ) : upcomingEvents.length ===
-              0 ? (
+            ) : upcomingEvents.length === 0 ? (
               <div className="px-4 py-10 text-center">
                 <CalendarDays className="mx-auto h-8 w-8 text-muted-foreground" />
 
@@ -942,8 +947,7 @@ export default function Events() {
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  There are no events matching
-                  this filter.
+                  There are no events matching this filter.
                 </p>
 
                 {canManageEvents && (
@@ -985,9 +989,7 @@ export default function Events() {
                                 getCategoryClasses(
                                   event.category,
                                 ),
-                              ].join(
-                                " ",
-                              )}
+                              ].join(" ")}
                             >
                               <span className="text-[9px] font-semibold uppercase opacity-80">
                                 {parseDateKey(
@@ -995,8 +997,7 @@ export default function Events() {
                                 ).toLocaleDateString(
                                   "en-GB",
                                   {
-                                    month:
-                                      "short",
+                                    month: "short",
                                   },
                                 )}
                               </span>
@@ -1011,9 +1012,7 @@ export default function Events() {
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <h3 className="truncate text-sm font-semibold sm:text-base">
-                                  {
-                                    event.title
-                                  }
+                                  {event.title}
                                 </h3>
 
                                 <span
@@ -1022,34 +1021,22 @@ export default function Events() {
                                     getCategoryClasses(
                                       event.category,
                                     ),
-                                  ].join(
-                                    " ",
-                                  )}
+                                  ].join(" ")}
                                 >
-                                  {
-                                    event.category
-                                  }
+                                  {event.category}
                                 </span>
                               </div>
 
                               {event.description && (
                                 <p className="mt-1 line-clamp-1 text-xs text-muted-foreground sm:text-sm">
-                                  {
-                                    event.description
-                                  }
+                                  {event.description}
                                 </p>
                               )}
 
                               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                 <span className="inline-flex items-center gap-1.5">
                                   <Clock3 className="h-3.5 w-3.5" />
-                                  {
-                                    event.startTime
-                                  }{" "}
-                                  -{" "}
-                                  {
-                                    event.endTime
-                                  }
+                                  {event.startTime} - {event.endTime}
                                 </span>
 
                                 {event.location && (
@@ -1057,9 +1044,7 @@ export default function Events() {
                                     <MapPin className="h-3.5 w-3.5" />
 
                                     <span className="truncate">
-                                      {
-                                        event.location
-                                      }
+                                      {event.location}
                                     </span>
                                   </span>
                                 )}
@@ -1070,15 +1055,11 @@ export default function Events() {
                           <div className="flex shrink-0 items-center gap-2 sm:pl-2">
                             {event.discordUrl && (
                               <a
-                                href={
-                                  event.discordUrl
-                                }
+                                href={event.discordUrl}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                onClick={(
-                                  eventClick,
-                                ) =>
+                                onClick={(eventClick) =>
                                   eventClick.stopPropagation()
                                 }
                               >
@@ -1178,8 +1159,7 @@ export default function Events() {
               </Button>
             </div>
 
-            {selectedDateEvents.length ===
-            0 ? (
+            {selectedDateEvents.length === 0 ? (
               <div className="px-5 py-10 text-center">
                 <CalendarDays className="mx-auto h-9 w-9 text-muted-foreground" />
 
@@ -1188,8 +1168,7 @@ export default function Events() {
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  There are no events scheduled
-                  for this date.
+                  There are no events scheduled for this date.
                 </p>
 
                 {canManageEvents && (
@@ -1220,9 +1199,7 @@ export default function Events() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="font-semibold">
-                              {
-                                event.title
-                              }
+                              {event.title}
                             </h3>
 
                             <span
@@ -1231,20 +1208,14 @@ export default function Events() {
                                 getCategoryClasses(
                                   event.category,
                                 ),
-                              ].join(
-                                " ",
-                              )}
+                              ].join(" ")}
                             >
-                              {
-                                event.category
-                              }
+                              {event.category}
                             </span>
                           </div>
 
                           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                            {
-                              event.description
-                            }
+                            {event.description}
                           </p>
                         </div>
 
@@ -1290,25 +1261,19 @@ export default function Events() {
                       <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1.5">
                           <Clock3 className="h-3.5 w-3.5" />
-                          {event.startTime}{" "}
-                          -{" "}
-                          {event.endTime}
+                          {event.startTime} - {event.endTime}
                         </span>
 
                         {event.location && (
                           <span className="inline-flex items-center gap-1.5">
                             <MapPin className="h-3.5 w-3.5" />
-                            {
-                              event.location
-                            }
+                            {event.location}
                           </span>
                         )}
 
                         {event.discordUrl && (
                           <a
-                            href={
-                              event.discordUrl
-                            }
+                            href={event.discordUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-1.5 text-blue-500 hover:underline"
@@ -1379,13 +1344,9 @@ export default function Events() {
                     value={form.title}
                     onChange={(event) =>
                       setForm(
-                        (
-                          current,
-                        ) => ({
+                        (current) => ({
                           ...current,
-                          title: event
-                            .target
-                            .value,
+                          title: event.target.value,
                         }),
                       )
                     }
@@ -1400,21 +1361,12 @@ export default function Events() {
                   </label>
 
                   <Textarea
-                    value={
-                      form.description
-                    }
-                    onChange={(
-                      event,
-                    ) =>
+                    value={form.description}
+                    onChange={(event) =>
                       setForm(
-                        (
-                          current,
-                        ) => ({
+                        (current) => ({
                           ...current,
-                          description:
-                            event
-                              .target
-                              .value,
+                          description: event.target.value,
                         }),
                       )
                     }
@@ -1423,43 +1375,66 @@ export default function Events() {
                   />
                 </div>
 
+                {/* Category */}
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">
                     Category
                   </label>
 
-                  <select
-                    value={
-                      form.category
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setForm(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-                          category:
-                            event
-                              .target
-                              .value as EventCategory,
-                        }),
-                      )
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {EVENT_CATEGORIES.map(
-                      (item) => (
-                        <option
-                          key={item}
-                          value={item}
-                        >
-                          {item}
-                        </option>
-                      ),
-                    )}
-                  </select>
+                  <div className="relative">
+                    <span
+                      aria-hidden="true"
+                      className={[
+                        "pointer-events-none absolute left-3 top-1/2 z-10 h-2.5 w-2.5 -translate-y-1/2 rounded-full ring-2 ring-background",
+                        getCategoryDotClasses(
+                          form.category,
+                        ),
+                      ].join(" ")}
+                    />
+
+                    <select
+                      value={form.category}
+                      onChange={(event) =>
+                        setForm(
+                          (current) => ({
+                            ...current,
+                            category:
+                              event.target
+                                .value as EventCategory,
+                          }),
+                        )
+                      }
+                      className="h-9 w-full appearance-none rounded-md border border-input bg-background pl-8 pr-9 text-sm shadow-xs outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
+                    >
+                      {EVENT_CATEGORIES.map(
+                        (item) => (
+                          <option
+                            key={item}
+                            value={item}
+                          >
+                            {item}
+                          </option>
+                        ),
+                      )}
+                    </select>
+
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span
+                      className={[
+                        "h-2 w-2 rounded-full",
+                        getCategoryDotClasses(
+                          form.category,
+                        ),
+                      ].join(" ")}
+                    />
+
+                    <span>
+                      {form.category} event
+                    </span>
+                  </div>
                 </div>
 
                 <div>
@@ -1472,13 +1447,9 @@ export default function Events() {
                     value={form.date}
                     onChange={(event) =>
                       setForm(
-                        (
-                          current,
-                        ) => ({
+                        (current) => ({
                           ...current,
-                          date: event
-                            .target
-                            .value,
+                          date: event.target.value,
                         }),
                       )
                     }
@@ -1492,21 +1463,12 @@ export default function Events() {
 
                   <Input
                     type="time"
-                    value={
-                      form.startTime
-                    }
-                    onChange={(
-                      event,
-                    ) =>
+                    value={form.startTime}
+                    onChange={(event) =>
                       setForm(
-                        (
-                          current,
-                        ) => ({
+                        (current) => ({
                           ...current,
-                          startTime:
-                            event
-                              .target
-                              .value,
+                          startTime: event.target.value,
                         }),
                       )
                     }
@@ -1520,21 +1482,12 @@ export default function Events() {
 
                   <Input
                     type="time"
-                    value={
-                      form.endTime
-                    }
-                    onChange={(
-                      event,
-                    ) =>
+                    value={form.endTime}
+                    onChange={(event) =>
                       setForm(
-                        (
-                          current,
-                        ) => ({
+                        (current) => ({
                           ...current,
-                          endTime:
-                            event
-                              .target
-                              .value,
+                          endTime: event.target.value,
                         }),
                       )
                     }
@@ -1547,21 +1500,12 @@ export default function Events() {
                   </label>
 
                   <Input
-                    value={
-                      form.location
-                    }
-                    onChange={(
-                      event,
-                    ) =>
+                    value={form.location}
+                    onChange={(event) =>
                       setForm(
-                        (
-                          current,
-                        ) => ({
+                        (current) => ({
                           ...current,
-                          location:
-                            event
-                              .target
-                              .value,
+                          location: event.target.value,
                         }),
                       )
                     }
@@ -1576,21 +1520,12 @@ export default function Events() {
 
                   <Input
                     type="url"
-                    value={
-                      form.discordUrl
-                    }
-                    onChange={(
-                      event,
-                    ) =>
+                    value={form.discordUrl}
+                    onChange={(event) =>
                       setForm(
-                        (
-                          current,
-                        ) => ({
+                        (current) => ({
                           ...current,
-                          discordUrl:
-                            event
-                              .target
-                              .value,
+                          discordUrl: event.target.value,
                         }),
                       )
                     }
@@ -1604,9 +1539,7 @@ export default function Events() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={
-                  closeEventModal
-                }
+                onClick={closeEventModal}
                 disabled={saving}
               >
                 Cancel
