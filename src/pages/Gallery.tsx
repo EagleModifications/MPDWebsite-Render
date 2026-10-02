@@ -154,7 +154,20 @@ function CustomSelect({
           open ? "border-blue-500/50 ring-2 ring-blue-500/20" : "",
         ].join(" ")}
       >
-        <span>{value}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          {id === "gallery-category" && value !== "All" && (
+            <span
+              aria-hidden="true"
+              className={[
+                "h-1.5 w-1.5 shrink-0 rounded-full",
+                value === "Community"
+                  ? "bg-blue-500"
+                  : "bg-amber-500",
+              ].join(" ")}
+            />
+          )}
+          <span>{value}</span>
+        </span>
         <ChevronDown className={["h-4 w-4 text-muted-foreground transition-transform", open ? "rotate-180" : ""].join(" ")} />
       </button>
 
@@ -178,7 +191,20 @@ function CustomSelect({
                   selected ? "bg-blue-500/10 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 ].join(" ")}
               >
-                <span>{option}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  {id === "gallery-category" && option !== "All" && (
+                    <span
+                      aria-hidden="true"
+                      className={[
+                        "h-1.5 w-1.5 shrink-0 rounded-full",
+                        option === "Community"
+                          ? "bg-blue-500"
+                          : "bg-amber-500",
+                      ].join(" ")}
+                    />
+                  )}
+                  <span>{option}</span>
+                </span>
                 {selected && <Check className="h-4 w-4 text-blue-500" />}
               </button>
             )
@@ -1203,6 +1229,17 @@ export default function Gallery() {
                             : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
                         ].join(" ")}
                       >
+                        {item !== "All" && (
+                          <span
+                            aria-hidden="true"
+                            className={[
+                              "mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle",
+                              item === "Community"
+                                ? "bg-blue-500"
+                                : "bg-amber-500",
+                            ].join(" ")}
+                          />
+                        )}
                         {item}
                       </button>
                     ))}
@@ -1841,7 +1878,7 @@ export default function Gallery() {
                   </div>
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <div className="mb-2 flex items-center justify-between">
                     <label className="text-sm font-medium">
                       Media <span className="text-destructive">*</span> (
