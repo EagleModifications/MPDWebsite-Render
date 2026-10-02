@@ -1156,11 +1156,11 @@ export default function Gallery() {
                                 <div className="mb-1.5 flex items-center gap-2">
                                   <span
                                     className={[
-                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                                      item.category === "Fleet"
-                                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                                        : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-                                    ].join(" ")}
+                        "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                        filter === item
+                          ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                          : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                      ].join(" ")}
                                   >
                                     {item.category ?? "Community"}
                                   </span>
@@ -1534,22 +1534,47 @@ export default function Gallery() {
                     Category
                   </label>
 
-                  <select
-                    value={category}
-                    onChange={(event) =>
-                      setCategory(
-                        event.target.value as GalleryCategory,
-                      )
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="Community">
-                      Community
-                    </option>
-                    <option value="Fleet">
-                      Fleet
-                    </option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={category}
+                      onChange={(event) =>
+                        setCategory(
+                          event.target.value as GalleryCategory,
+                        )
+                      }
+                      className="flex h-10 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-10 text-sm font-medium text-foreground shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
+                    >
+                      <option value="Community">
+                        Community
+                      </option>
+                      <option value="Fleet">
+                        Fleet
+                      </option>
+                    </select>
+
+                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center gap-2">
+                      <span
+                        className={[
+                          "h-2.5 w-2.5 rounded-full",
+                          category === "Fleet"
+                            ? "bg-amber-500"
+                            : "bg-blue-500",
+                        ].join(" ")}
+                      />
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="h-4 w-4 text-muted-foreground"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
 
                 <div
