@@ -1,14 +1,5 @@
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react"
 import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-  type ReactNode,
-} from "react"
-import {
-  Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Edit3,
@@ -25,7 +16,6 @@ import {
 import { toast } from "sonner"
 
 import Navbar from "@/components/home/Navbar"
-import Footer from "@/components/Footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -41,17 +31,30 @@ type GalleryMedia = {
   storageId?: string
 }
 
-type GalleryCategory = "Community" | "Fleet"
-
 type GalleryItem = {
   id: string
   title: string
   description: string
-  category?: GalleryCategory
   media: GalleryMedia[]
   createdBy: string
   createdAt: string
   updatedAt: string
+}
+
+
+type GalleryApiResponse = {
+  success?: boolean
+  items?: GalleryItem[]
+  item?: GalleryItem
+  error?: string
+  message?: string
+}
+
+type GalleryUploadResponse = {
+  success?: boolean
+  items?: GalleryMedia[]
+  error?: string
+  message?: string
 }
 
 type PendingMedia = GalleryMedia & {
@@ -59,33 +62,9 @@ type PendingMedia = GalleryMedia & {
   file?: File
 }
 
-type CategoryFilter = "All" | GalleryCategory
-type MediaFilter = "All" | "Images" | "Videos"
+type GalleryFilter = "All" | "Images" | "Videos"
 
-type GalleryApiResponse = {
-  success?: boolean
-  item?: GalleryItem
-  items?: GalleryItem[]
-  error?: string
-  message?: string
-}
-
-const CATEGORY_FILTERS: CategoryFilter[] = [
-  "All",
-  "Community",
-  "Fleet",
-]
-
-const MEDIA_FILTERS: MediaFilter[] = [
-  "All",
-  "Images",
-  "Videos",
-]
-
-const GALLERY_CATEGORIES: GalleryCategory[] = [
-  "Community",
-  "Fleet",
-]
+const GALLERY_FILTERS: GalleryFilter[] = ["All", "Images", "Videos"]
 
 function getMediaLabel(type: GalleryMediaType) {
   return type === "image" ? "Image" : "Video"
@@ -104,31 +83,17 @@ function getAspectClass(ratio?: number) {
     return "aspect-[4/3]"
   }
 
-  if (ratio >= 1.85) {
-    return "aspect-[16/8]"
-  }
-
-  if (ratio >= 1.35) {
-    return "aspect-[4/3]"
-  }
-
-  if (ratio >= 1.05) {
-    return "aspect-square"
-  }
-
-  if (ratio >= 0.8) {
-    return "aspect-[4/5]"
-  }
-
+  if (ratio >= 1.85) return "aspect-[16/8]"
+  if (ratio >= 1.35) return "aspect-[4/3]"
+  if (ratio >= 1.05) return "aspect-square"
+  if (ratio >= 0.8) return "aspect-[4/5]"
   return "aspect-[3/4]"
 }
 
 function formatDate(value: string) {
   const date = new Date(value)
 
-  if (Number.isNaN(date.getTime())) {
-    return ""
-  }
+  if (Number.isNaN(date.getTime())) return ""
 
   return date.toLocaleDateString("en-GB", {
     day: "numeric",
@@ -137,379 +102,67 @@ function formatDate(value: string) {
   })
 }
 
-function makePendingFromMedia(
-  media: GalleryMedia,
-): PendingMedia {
+function makePendingFromMedia(media: GalleryMedia): PendingMedia {
   return {
     ...media,
     previewUrl: media.url,
   }
 }
 
-function getCategoryClasses(
-  category: GalleryCategory,
-) {
-  if (category === "Fleet") {
-    return {
-      badge:
-        "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300",
-      dot: "bg-amber-500",
-    }
-  }
-
-  return {
-    badge:
-      "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300",
-    dot: "bg-blue-500",
-  }
-}
-
-function getFilterClasses(active: boolean) {
-  return active
-    ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-    : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-}
-
-async function readApiResponse(
-  response: Response,
-): Promise<GalleryApiResponse> {
-  const raw = await response.text()
-
-  if (!raw) {
-    return {}
-  }
-
-  try {
-    const parsed = JSON.parse(raw)
-
-    if (
-      parsed &&
-      typeof parsed === "object"
-    ) {
-      return parsed as GalleryApiResponse
-    }
-
-    return {}
-  } catch {
-    return {
-      error: raw
-        .replace(/<[^>]*>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim(),
-    }
-  }
-}
-
-function getApiErrorMessage(
-  response: Response,
-  data: GalleryApiResponse,
-  fallback: string,
-) {
-  if (data.error?.trim()) {
-    return data.error.trim()
-  }
-
-  if (data.message?.trim()) {
-    return data.message.trim()
-  }
-
-  if (response.status === 400) {
-    return "The gallery request was invalid."
-  }
-
-  if (response.status === 401) {
-    return "Your session has expired. Sign in again."
-  }
-
-  if (response.status === 403) {
-    return "You do not have permission to manage the gallery."
-  }
-
-  if (response.status === 404) {
-    return "The gallery API endpoint could not be found."
-  }
-
-  if (response.status === 405) {
-    return "This gallery action is not supported by the API."
-  }
-
-  if (response.status >= 500) {
-    return "The gallery server returned an error. Check the API/server logs for the exact cause."
-  }
-
-  return fallback
-}
-
-function CategorySelect({
-  value,
-  onChange,
-}: {
-  value: GalleryCategory
-  onChange: (value: GalleryCategory) => void
-}) {
-  const [open, setOpen] = useState(false)
-
-  const containerRef =
-    useRef<HTMLDivElement | null>(null)
-
-  const selectedClasses =
-    getCategoryClasses(value)
-
-  useEffect(() => {
-    if (!open) {
-      return
-    }
-
-    function handlePointerDown(
-      event: MouseEvent,
-    ) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(
-          event.target as Node,
-        )
-      ) {
-        setOpen(false)
-      }
-    }
-
-    function handleKeyDown(
-      event: KeyboardEvent,
-    ) {
-      if (event.key === "Escape") {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener(
-      "mousedown",
-      handlePointerDown,
-    )
-
-    document.addEventListener(
-      "keydown",
-      handleKeyDown,
-    )
-
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        handlePointerDown,
-      )
-
-      document.removeEventListener(
-        "keydown",
-        handleKeyDown,
-      )
-    }
-  }, [open])
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative"
-    >
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() =>
-          setOpen((current) => !current)
-        }
-        className="flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          <span
-            className={[
-              "h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background",
-              selectedClasses.dot,
-            ].join(" ")}
-          />
-
-          <span className="truncate">
-            {value}
-          </span>
-        </span>
-
-        <ChevronDown
-          className={[
-            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-            open ? "rotate-180" : "",
-          ].join(" ")}
-        />
-      </button>
-
-      {open && (
-        <div
-          role="listbox"
-          className="absolute left-0 right-0 top-[calc(100%+6px)] z-[80] overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-xl"
-        >
-          {GALLERY_CATEGORIES.map(
-            (item) => {
-              const classes =
-                getCategoryClasses(item)
-
-              const selected =
-                item === value
-
-              return (
-                <button
-                  key={item}
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  onClick={() => {
-                    onChange(item)
-                    setOpen(false)
-                  }}
-                  className={[
-                    "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors",
-                    selected
-                      ? classes.badge
-                      : "text-foreground hover:bg-muted",
-                  ].join(" ")}
-                >
-                  <span className="flex items-center gap-2.5">
-                    <span
-                      className={[
-                        "h-2.5 w-2.5 shrink-0 rounded-full",
-                        classes.dot,
-                      ].join(" ")}
-                    />
-
-                    <span>{item}</span>
-                  </span>
-
-                  {selected && (
-                    <Check className="h-4 w-4 shrink-0" />
-                  )}
-                </button>
-              )
-            },
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function Gallery() {
-  const [items, setItems] =
-    useState<GalleryItem[]>([])
+  const [items, setItems] = useState<GalleryItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [canManageGallery, setCanManageGallery] = useState(false)
 
-  const [loading, setLoading] =
-    useState(true)
+  const [filter, setFilter] = useState<GalleryFilter>("All")
+  const [showModal, setShowModal] = useState(false)
+  const [editingItem, setEditingItem] = useState<GalleryItem | null>(null)
+  const [viewer, setViewer] = useState<{
+    item: GalleryItem
+    index: number
+  } | null>(null)
 
-  const [
-    canManageGallery,
-    setCanManageGallery,
-  ] = useState(false)
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([])
+  const [urlInput, setUrlInput] = useState("")
+  const [urlType, setUrlType] = useState<GalleryMediaType>("image")
+  const [thumbnailInput, setThumbnailInput] = useState("")
+  const [isDragging, setIsDragging] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<GalleryItem | null>(null)
 
-  const [categoryFilter, setCategoryFilter] =
-    useState<CategoryFilter>("All")
-
-  const [mediaFilter, setMediaFilter] =
-    useState<MediaFilter>("All")
-
-  const [showModal, setShowModal] =
-    useState(false)
-
-  const [editingItem, setEditingItem] =
-    useState<GalleryItem | null>(null)
-
-  const [viewer, setViewer] =
-    useState<{
-      item: GalleryItem
-      index: number
-    } | null>(null)
-
-  const [title, setTitle] =
-    useState("")
-
-  const [description, setDescription] =
-    useState("")
-
-  const [category, setCategory] =
-    useState<GalleryCategory>("Community")
-
-  const [pendingMedia, setPendingMedia] =
-    useState<PendingMedia[]>([])
-
-  const [urlInput, setUrlInput] =
-    useState("")
-
-  const [urlType, setUrlType] =
-    useState<GalleryMediaType>("image")
-
-  const [thumbnailInput, setThumbnailInput] =
-    useState("")
-
-  const [isDragging, setIsDragging] =
-    useState(false)
-
-  const [saving, setSaving] =
-    useState(false)
-
-  const [deletingId, setDeletingId] =
-    useState<string | null>(null)
-
-  const [deleteTarget, setDeleteTarget] =
-    useState<GalleryItem | null>(null)
-
-  const fileInputRef =
-    useRef<HTMLInputElement | null>(null)
-
-  const dragDepthRef =
-    useRef(0)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const dragDepthRef = useRef(0)
 
   useEffect(() => {
+    document.title = "Gallery | Metro Police Department"
+
     let active = true
 
     async function load() {
       try {
-        const [
-          galleryResponse,
-          permissionResponse,
-        ] = await Promise.all([
-          fetch("/api/gallery", {
-            credentials: "include",
-          }),
-          fetch(
-            "/api/auth/check?permission=gallery",
-            {
+        const [galleryResponse, permissionResponse] =
+          await Promise.all([
+            fetch("/api/gallery", {
               credentials: "include",
-            },
-          ),
-        ])
+            }),
+            fetch("/api/auth/check?permission=gallery", {
+              credentials: "include",
+            }),
+          ])
 
-        if (!active) {
-          return
-        }
+        if (!active) return
 
-        const galleryData =
-          await readApiResponse(
-            galleryResponse,
-          )
 
         if (!galleryResponse.ok) {
-          throw new Error(
-            getApiErrorMessage(
-              galleryResponse,
-              galleryData,
-              "Failed to load gallery.",
-            ),
-          )
+          throw new Error("Failed to load gallery.")
         }
 
-        setItems(
-          Array.isArray(galleryData.items)
-            ? galleryData.items
-            : [],
-        )
-
-        setCanManageGallery(
-          permissionResponse.ok,
-        )
+        const data: GalleryApiResponse = await galleryResponse.json().catch(() => ({}))
+        setItems(Array.isArray(data.items) ? data.items : [])
+        setCanManageGallery(permissionResponse.ok)
       } catch (error) {
         console.error(error)
 
@@ -521,9 +174,7 @@ export default function Gallery() {
           )
         }
       } finally {
-        if (active) {
-          setLoading(false)
-        }
+        if (active) setLoading(false)
       }
     }
 
@@ -534,139 +185,41 @@ export default function Gallery() {
     }
   }, [])
 
-  useEffect(() => {
-    const shouldLockScroll =
-      showModal ||
-      Boolean(deleteTarget) ||
-      Boolean(viewer)
-
-    if (!shouldLockScroll) {
-      return
-    }
-
-    const previousBodyOverflow =
-      document.body.style.overflow
-
-    const previousDocumentOverflow =
-      document.documentElement.style
-        .overflow
-
-    document.body.style.overflow = "hidden"
-
-    document.documentElement.style.overflow =
-      "hidden"
-
-    return () => {
-      document.body.style.overflow =
-        previousBodyOverflow
-
-      document.documentElement.style.overflow =
-        previousDocumentOverflow
-    }
-  }, [
-    deleteTarget,
-    showModal,
-    viewer,
-  ])
-
-  useEffect(() => {
-    if (!deleteTarget || deletingId) {
-      return
-    }
-
-    function handleKeyDown(
-      event: KeyboardEvent,
-    ) {
-      if (event.key === "Escape") {
-        setDeleteTarget(null)
-      }
-    }
-
-    window.addEventListener(
-      "keydown",
-      handleKeyDown,
-    )
-
-    return () => {
-      window.removeEventListener(
-        "keydown",
-        handleKeyDown,
-      )
-    }
-  }, [deleteTarget, deletingId])
-
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      const itemCategory =
-        item.category ?? "Community"
-
-      if (
-        categoryFilter !== "All" &&
-        itemCategory !== categoryFilter
-      ) {
-        return false
+      if (filter === "Images") {
+        return item.media.some(isImageMedia)
       }
 
-      if (mediaFilter === "Images") {
-        return item.media.some(
-          isImageMedia,
-        )
-      }
-
-      if (mediaFilter === "Videos") {
-        return item.media.some(
-          isVideoMedia,
-        )
+      if (filter === "Videos") {
+        return item.media.some(isVideoMedia)
       }
 
       return true
     })
-  }, [
-    categoryFilter,
-    items,
-    mediaFilter,
-  ])
+  }, [filter, items])
 
   const visibleMediaCount = useMemo(() => {
-    return filteredItems.reduce(
-      (count, item) => {
-        if (mediaFilter === "Images") {
-          return (
-            count +
-            item.media.filter(
-              isImageMedia,
-            ).length
-          )
-        }
+    return filteredItems.reduce((count, item) => {
+      if (filter === "Images") {
+        return count + item.media.filter(isImageMedia).length
+      }
 
-        if (mediaFilter === "Videos") {
-          return (
-            count +
-            item.media.filter(
-              isVideoMedia,
-            ).length
-          )
-        }
+      if (filter === "Videos") {
+        return count + item.media.filter(isVideoMedia).length
+      }
 
-        return count + item.media.length
-      },
-      0,
-    )
-  }, [filteredItems, mediaFilter])
+      return count + item.media.length
+    }, 0)
+  }, [filter, filteredItems])
 
-  function getVisibleMedia(
-    item: GalleryItem,
-  ): GalleryMedia[] {
-    if (mediaFilter === "Images") {
-      return item.media.filter(
-        isImageMedia,
-      )
+  function getVisibleMedia(item: GalleryItem) {
+    if (filter === "Images") {
+      return item.media.filter(isImageMedia)
     }
 
-    if (mediaFilter === "Videos") {
-      return item.media.filter(
-        isVideoMedia,
-      )
+    if (filter === "Videos") {
+      return item.media.filter(isVideoMedia)
     }
 
     return item.media
@@ -674,34 +227,22 @@ export default function Gallery() {
 
   function resetForm() {
     for (const media of pendingMedia) {
-      if (
-        media.file &&
-        media.previewUrl?.startsWith(
-          "blob:",
-        )
-      ) {
-        URL.revokeObjectURL(
-          media.previewUrl,
-        )
+      if (media.file && media.previewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(media.previewUrl)
       }
     }
 
     setTitle("")
     setDescription("")
-    setCategory("Community")
     setPendingMedia([])
     setUrlInput("")
     setUrlType("image")
     setThumbnailInput("")
     setEditingItem(null)
-    setIsDragging(false)
-    dragDepthRef.current = 0
   }
 
   function closeModal() {
-    if (saving) {
-      return
-    }
+    if (saving) return
 
     setShowModal(false)
     resetForm()
@@ -712,48 +253,25 @@ export default function Gallery() {
     setShowModal(true)
   }
 
-  function openEdit(
-    item: GalleryItem,
-  ) {
+  function openEdit(item: GalleryItem) {
     setEditingItem(item)
     setTitle(item.title)
     setDescription(item.description)
-    setCategory(
-      item.category ?? "Community",
-    )
-    setPendingMedia(
-      item.media.map(
-        makePendingFromMedia,
-      ),
-    )
+    setPendingMedia(item.media.map(makePendingFromMedia))
     setUrlInput("")
-    setUrlType("image")
     setThumbnailInput("")
     setShowModal(true)
   }
 
-  function removePendingMedia(
-    id: string,
-  ) {
+  function removePendingMedia(id: string) {
     setPendingMedia((current) => {
-      const media = current.find(
-        (item) => item.id === id,
-      )
+      const media = current.find((item) => item.id === id)
 
-      if (
-        media?.file &&
-        media.previewUrl?.startsWith(
-          "blob:",
-        )
-      ) {
-        URL.revokeObjectURL(
-          media.previewUrl,
-        )
+      if (media?.file && media.previewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(media.previewUrl)
       }
 
-      return current.filter(
-        (item) => item.id !== id,
-      )
+      return current.filter((item) => item.id !== id)
     })
   }
 
@@ -761,33 +279,22 @@ export default function Gallery() {
     const url = urlInput.trim()
 
     if (!url) {
-      toast.error(
-        "Enter a media URL.",
-      )
+      toast.error("Enter a media URL.")
       return
     }
 
     try {
       const parsed = new URL(url)
 
-      if (
-        !["http:", "https:"].includes(
-          parsed.protocol,
-        )
-      ) {
-        throw new Error(
-          "Invalid protocol",
-        )
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        throw new Error("Invalid protocol")
       }
     } catch {
-      toast.error(
-        "Enter a valid HTTP or HTTPS URL.",
-      )
+      toast.error("Enter a valid HTTP or HTTPS URL.")
       return
     }
 
-    const type: GalleryMediaType =
-      urlType
+    const type: GalleryMediaType = urlType
 
     setPendingMedia((current) => [
       ...current,
@@ -795,10 +302,7 @@ export default function Gallery() {
         id: crypto.randomUUID(),
         type,
         url,
-        thumbnailUrl:
-          type === "video"
-            ? thumbnailInput.trim()
-            : "",
+        thumbnailUrl: type === "video" ? thumbnailInput.trim() : "",
         source: "url",
       },
     ])
@@ -808,27 +312,19 @@ export default function Gallery() {
     setThumbnailInput("")
   }
 
-  function handleFiles(
-    files: FileList | null,
-  ) {
-    if (!files?.length) {
-      return
-    }
+  function handleFiles(files: FileList | null) {
+    if (!files?.length) return
 
     const next: PendingMedia[] = []
 
     for (const file of Array.from(files)) {
-      if (
-        !file.type.startsWith("image/") &&
-        !file.type.startsWith("video/")
-      ) {
+      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
         continue
       }
 
-      const type: GalleryMediaType =
-        file.type.startsWith("video/")
-          ? "video"
-          : "image"
+      const type: GalleryMediaType = file.type.startsWith("video/")
+        ? "video"
+        : "image"
 
       next.push({
         id: crypto.randomUUID(),
@@ -836,86 +332,53 @@ export default function Gallery() {
         url: "",
         thumbnailUrl: "",
         source: "upload",
-        previewUrl:
-          URL.createObjectURL(file),
+        previewUrl: URL.createObjectURL(file),
         file,
       })
     }
 
     if (!next.length) {
-      toast.error(
-        "Select image or video files.",
-      )
+      toast.error("Select image or video files.")
       return
     }
 
-    setPendingMedia((current) => [
-      ...current,
-      ...next,
-    ])
+    setPendingMedia((current) => [...current, ...next])
   }
 
-  function handleDragEnter(
-    event: DragEvent<HTMLDivElement>,
-  ) {
+  function handleDragEnter(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
     event.stopPropagation()
 
-    if (
-      !event.dataTransfer.types.includes(
-        "Files",
-      )
-    ) {
-      return
-    }
+    if (!event.dataTransfer.types.includes("Files")) return
 
     dragDepthRef.current += 1
     setIsDragging(true)
   }
 
-  function handleDragOver(
-    event: DragEvent<HTMLDivElement>,
-  ) {
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
     event.stopPropagation()
 
-    if (
-      event.dataTransfer.types.includes(
-        "Files",
-      )
-    ) {
+    if (event.dataTransfer.types.includes("Files")) {
       event.dataTransfer.dropEffect = "copy"
       setIsDragging(true)
     }
   }
 
-  function handleDragLeave(
-    event: DragEvent<HTMLDivElement>,
-  ) {
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
     event.stopPropagation()
 
-    if (
-      !event.dataTransfer.types.includes(
-        "Files",
-      )
-    ) {
-      return
-    }
+    if (!event.dataTransfer.types.includes("Files")) return
 
-    dragDepthRef.current = Math.max(
-      0,
-      dragDepthRef.current - 1,
-    )
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
 
     if (dragDepthRef.current === 0) {
       setIsDragging(false)
     }
   }
 
-  function handleDrop(
-    event: DragEvent<HTMLDivElement>,
-  ) {
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
     event.stopPropagation()
 
@@ -923,119 +386,100 @@ export default function Gallery() {
     setIsDragging(false)
 
     if (event.dataTransfer.files?.length) {
-      handleFiles(
-        event.dataTransfer.files,
-      )
+      handleFiles(event.dataTransfer.files)
     }
   }
 
-  async function uploadPendingFiles(): Promise<
-    GalleryMedia[]
-  > {
+  async function uploadPendingFiles(): Promise<GalleryMedia[]> {
     const files = pendingMedia
-      .filter(
-        (media) =>
-          media.source === "upload" &&
-          media.file,
-      )
-      .map(
-        (media) =>
-          media.file as File,
-      )
+      .filter((media) => media.source === "upload" && media.file)
+      .map((media) => media.file as File)
 
-    if (!files.length) {
-      return []
-    }
+    if (!files.length) return []
 
     const formData = new FormData()
 
     for (const file of files) {
-      formData.append(
-        "files",
-        file,
-        file.name,
-      )
+      formData.append("files", file, file.name)
     }
 
-    const response =
-      await fetch(
-        "/api/gallery/upload",
-        {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        },
-      )
+    const response = await fetch("/api/gallery/upload", {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    })
 
-    const data =
-      await readApiResponse(response)
+    const raw = await response.text()
+    let data: GalleryUploadResponse = {}
+
+    try {
+      data = raw ? JSON.parse(raw) : {}
+    } catch {
+      data = {}
+    }
 
     if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(
+          "Gallery upload API is not deployed. Redeploy the updated app.ts backend before uploading files.",
+        )
+      }
+
+      if (response.status === 401) {
+        throw new Error("Your session has expired. Sign in again.")
+      }
+
+      if (response.status === 403) {
+        throw new Error("You do not have permission to upload gallery media.")
+      }
+
       throw new Error(
-        getApiErrorMessage(
-          response,
-          data,
-          "Gallery upload failed.",
-        ),
+        data.error ||
+          `Gallery upload failed (${response.status}).`,
       )
     }
 
     if (!Array.isArray(data.items)) {
-      throw new Error(
-        "Gallery upload returned an invalid response.",
-      )
+      throw new Error("Gallery upload returned an invalid response.")
     }
 
     return data.items
   }
 
   async function saveGallery() {
-    const cleanTitle =
-      title.trim()
-
-    const cleanDescription =
-      description.trim()
+    const cleanTitle = title.trim()
 
     if (!cleanTitle) {
-      toast.error(
-        "Enter a gallery title.",
-      )
+      toast.error("Enter a gallery title.")
       return
     }
 
-    if (!cleanDescription) {
-      toast.error(
-        "Enter a gallery description.",
-      )
+    if (!description.trim()) {
+      toast.error("Enter a gallery description.")
       return
     }
 
     if (!pendingMedia.length) {
-      toast.error(
-        "Add at least one image or video.",
-      )
+      toast.error("Add at least one image or video.")
       return
     }
 
     setSaving(true)
 
     try {
-      const uploaded =
-        await uploadPendingFiles()
-
+      const uploaded = await uploadPendingFiles()
       let uploadIndex = 0
 
       const media: GalleryMedia[] = []
 
       for (const item of pendingMedia) {
+        // A new local file has a File object. Existing uploaded media
+        // loaded while editing do not, so they must be kept as-is.
         if (item.file) {
-          const uploadedMedia =
-            uploaded[uploadIndex]
+          const uploadedMedia = uploaded[uploadIndex]
 
           if (!uploadedMedia) {
-            throw new Error(
-              "One or more new media files failed to upload.",
-            )
+            throw new Error("One or more new media files failed to upload.")
           }
 
           media.push(uploadedMedia)
@@ -1043,208 +487,100 @@ export default function Gallery() {
           continue
         }
 
+        // Preserve existing GridFS media and external URL media.
         media.push({
           id: item.id,
           type: item.type,
           url: item.url,
-          thumbnailUrl:
-            item.thumbnailUrl || "",
+          thumbnailUrl: item.thumbnailUrl || "",
           source: item.source,
           storageId: item.storageId,
         })
       }
 
-      const isEditing =
-        Boolean(editingItem)
-
-      const endpoint = isEditing
-        ? `/api/gallery/${editingItem?.id}`
-        : "/api/gallery"
-
-      const method = isEditing
-        ? "PUT"
-        : "POST"
-
-      const response =
-        await fetch(endpoint, {
-          method,
+      const response = await fetch(
+        editingItem ? `/api/gallery/${editingItem.id}` : "/api/gallery",
+        {
+          method: editingItem ? "PUT" : "POST",
           credentials: "include",
           headers: {
-            "Content-Type":
-              "application/json",
-            Accept: "application/json",
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             title: cleanTitle,
-            description:
-              cleanDescription,
-            category,
+            description: description.trim(),
             media,
           }),
-        })
+        },
+      )
 
-      const data =
-        await readApiResponse(response)
+      const data: GalleryApiResponse = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        console.error(
-          "Gallery API error:",
-          {
-            status: response.status,
-            statusText:
-              response.statusText,
-            endpoint,
-            method,
-            response: data,
-          },
-        )
-
-        throw new Error(
-          getApiErrorMessage(
-            response,
-            data,
-            isEditing
-              ? "Failed to update gallery item."
-              : "Failed to create gallery item.",
-          ),
-        )
+        throw new Error(data.error || "Failed to save gallery.")
       }
 
       if (!data.item) {
-        console.error(
-          "Gallery API returned no item:",
-          {
-            endpoint,
-            method,
-            response: data,
-          },
-        )
-
-        throw new Error(
-          isEditing
-            ? "The server did not return the updated gallery item."
-            : "The server did not return the created gallery item.",
-        )
+        throw new Error("The server did not return the saved gallery item.")
       }
 
-      const savedItem =
-        data.item
-
-      if (isEditing) {
+      if (editingItem) {
         setItems((current) =>
           current.map((item) =>
-            item.id === editingItem?.id
-              ? savedItem
-              : item,
+            item.id === editingItem.id ? data.item : item,
           ),
         )
-
-        toast.success(
-          "Gallery updated.",
-        )
+        toast.success("Gallery updated.")
       } else {
-        setItems((current) => [
-          savedItem,
-          ...current,
-        ])
-
-        toast.success(
-          "Gallery item created.",
-        )
+        setItems((current) => [data.item, ...current])
+        toast.success("Gallery item created.")
       }
 
       setShowModal(false)
       resetForm()
     } catch (error) {
-      console.error(
-        "Gallery save failed:",
-        error,
-      )
+      console.error(error)
 
       toast.error(
         error instanceof Error
           ? error.message
-          : editingItem
-            ? "Failed to update gallery item."
-            : "Failed to create gallery item.",
+          : "Failed to save gallery.",
       )
     } finally {
       setSaving(false)
     }
   }
 
-  function requestDeleteGallery(
-    item: GalleryItem,
-  ) {
-    if (deletingId) {
-      return
-    }
-
+  function requestDeleteGallery(item: GalleryItem) {
+    if (deletingId) return
     setDeleteTarget(item)
   }
 
   function closeDeleteDialog() {
-    if (deletingId) {
-      return
-    }
-
+    if (deletingId) return
     setDeleteTarget(null)
   }
 
-  async function deleteGallery(
-    item: GalleryItem,
-  ) {
-    if (deletingId) {
-      return
-    }
-
+  async function deleteGallery(item: GalleryItem) {
     setDeletingId(item.id)
 
     try {
-      const response =
-        await fetch(
-          `/api/gallery/${item.id}`,
-          {
-            method: "DELETE",
-            credentials: "include",
-            headers: {
-              Accept: "application/json",
-            },
-          },
-        )
+      const response = await fetch(`/api/gallery/${item.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
 
-      const data =
-        await readApiResponse(response)
+      const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        throw new Error(
-          getApiErrorMessage(
-            response,
-            data,
-            "Failed to delete gallery item.",
-          ),
-        )
+        throw new Error(data.error || "Failed to delete gallery item.")
       }
 
-      setItems((current) =>
-        current.filter(
-          (entry) =>
-            entry.id !== item.id,
-        ),
-      )
-
+      setItems((current) => current.filter((entry) => entry.id !== item.id))
       setViewer(null)
       setDeleteTarget(null)
-
-      toast.success(
-        "Gallery item deleted.",
-      )
+      toast.success("Gallery item deleted.")
     } catch (error) {
-      console.error(
-        "Gallery delete failed:",
-        error,
-      )
-
       toast.error(
         error instanceof Error
           ? error.message
@@ -1255,38 +591,16 @@ export default function Gallery() {
     }
   }
 
-  /*
-   * IMPORTANT:
-   * The viewer accepts a GalleryItem first and
-   * GalleryMedia second. This prevents GalleryItem
-   * from accidentally being passed where GalleryMedia
-   * is expected.
-   */
-  function openViewer(
-    item: GalleryItem,
-    media: GalleryMedia,
-  ) {
-    const mediaList: GalleryMedia[] =
-      getVisibleMedia(item)
-
-    const index =
-      mediaList.findIndex(
-        (entry) =>
-          entry.id === media.id,
-      )
-
-    if (index < 0) {
-      return
-    }
-
-    const viewerItem: GalleryItem = {
-      ...item,
-      media: mediaList,
-    }
+  function openViewer(item: GalleryItem, media: GalleryMedia) {
+    const mediaList = getVisibleMedia(item)
+    const index = mediaList.findIndex((entry) => entry.id === media.id)
 
     setViewer({
-      item: viewerItem,
-      index,
+      item: {
+        ...item,
+        media: mediaList,
+      },
+      index: Math.max(0, index),
     })
   }
 
@@ -1296,22 +610,13 @@ export default function Gallery() {
 
   function showPrevious() {
     setViewer((current) => {
-      if (!current) {
-        return current
-      }
-
-      const mediaCount =
-        current.item.media.length
-
-      if (mediaCount <= 1) {
-        return current
-      }
+      if (!current) return current
 
       return {
         ...current,
         index:
           current.index <= 0
-            ? mediaCount - 1
+            ? current.item.media.length - 1
             : current.index - 1,
       }
     })
@@ -1319,22 +624,12 @@ export default function Gallery() {
 
   function showNext() {
     setViewer((current) => {
-      if (!current) {
-        return current
-      }
-
-      const mediaCount =
-        current.item.media.length
-
-      if (mediaCount <= 1) {
-        return current
-      }
+      if (!current) return current
 
       return {
         ...current,
         index:
-          current.index >=
-          mediaCount - 1
+          current.index >= current.item.media.length - 1
             ? 0
             : current.index + 1,
       }
@@ -1342,36 +637,18 @@ export default function Gallery() {
   }
 
   useEffect(() => {
-    if (!viewer) {
-      return
+    if (!viewer) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") closeViewer()
+      if (event.key === "ArrowLeft") showPrevious()
+      if (event.key === "ArrowRight") showNext()
     }
 
-    function handleKeyDown(
-      event: KeyboardEvent,
-    ) {
-      if (event.key === "Escape") {
-        closeViewer()
-      }
-
-      if (event.key === "ArrowLeft") {
-        showPrevious()
-      }
-
-      if (event.key === "ArrowRight") {
-        showNext()
-      }
-    }
-
-    window.addEventListener(
-      "keydown",
-      handleKeyDown,
-    )
+    window.addEventListener("keydown", handleKeyDown)
 
     return () => {
-      window.removeEventListener(
-        "keydown",
-        handleKeyDown,
-      )
+      window.removeEventListener("keydown", handleKeyDown)
     }
   }, [viewer])
 
@@ -1379,7 +656,11 @@ export default function Gallery() {
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
       <Navbar />
 
-      <main className="relative min-h-screen pt-20">
+      <main className="relative min-h-screen overflow-hidden pt-20">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-1/2 top-[-220px] h-[420px] w-[700px] -translate-x-1/2 rounded-full bg-blue-600/10 blur-[120px]" />
+        </div>
+
         <div className="relative mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-7">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -1393,8 +674,7 @@ export default function Gallery() {
               </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                View photos and videos from the
-                Metro Police Department community.
+                View photos and videos from the Metro Police Department community.
               </p>
             </div>
 
@@ -1410,108 +690,51 @@ export default function Gallery() {
             )}
           </div>
 
-          <section className="h-auto min-h-0 overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
-            <div className="flex flex-col gap-4 border-b border-border/70 p-3 sm:p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold">
-                    Gallery
-                  </h2>
-
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {visibleMediaCount}{" "}
-                    {visibleMediaCount === 1
-                      ? "media item"
-                      : "media items"}
-                  </p>
-                </div>
+          <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
+            <div className="flex flex-col gap-3 border-b border-border/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+              <div>
+                <h2 className="text-sm font-semibold">Gallery</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {visibleMediaCount}{" "}
+                  {visibleMediaCount === 1 ? "media item" : "media items"}
+                </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-xs font-semibold text-muted-foreground">
-                    Category
-                  </span>
-
-                  {CATEGORY_FILTERS.map(
-                    (filterItem) => (
-                      <button
-                        key={filterItem}
-                        type="button"
-                        onClick={() =>
-                          setCategoryFilter(
-                            filterItem,
-                          )
-                        }
-                        className={[
-                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          getFilterClasses(
-                            categoryFilter ===
-                              filterItem,
-                          ),
-                        ].join(" ")}
-                      >
-                        {filterItem}
-                      </button>
-                    ),
-                  )}
-                </div>
-
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-xs font-semibold text-muted-foreground">
-                    Media
-                  </span>
-
-                  {MEDIA_FILTERS.map(
-                    (filterItem) => (
-                      <button
-                        key={filterItem}
-                        type="button"
-                        onClick={() =>
-                          setMediaFilter(
-                            filterItem,
-                          )
-                        }
-                        className={[
-                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          getFilterClasses(
-                            mediaFilter ===
-                              filterItem,
-                          ),
-                        ].join(" ")}
-                      >
-                        {filterItem}
-                      </button>
-                    ),
-                  )}
-                </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {GALLERY_FILTERS.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setFilter(item)}
+                    className={[
+                      "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      filter === item
+                        ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                        : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ].join(" ")}
+                  >
+                    {item}
+                  </button>
+                ))}
               </div>
             </div>
 
             {loading ? (
               <div className="px-4 py-14 text-center">
                 <Images className="mx-auto h-9 w-9 animate-pulse text-muted-foreground" />
-
-                <p className="mt-3 text-sm font-medium">
-                  Loading gallery...
-                </p>
-
+                <p className="mt-3 text-sm font-medium">Loading gallery...</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Please wait while the gallery
-                  is loaded.
+                  Please wait while the gallery is loaded.
                 </p>
               </div>
             ) : filteredItems.length === 0 ? (
               <div className="px-4 py-14 text-center">
                 <ImageIcon className="mx-auto h-9 w-9 text-muted-foreground" />
-
                 <p className="mt-3 text-sm font-medium">
                   No media available
                 </p>
-
                 <p className="mt-1 text-xs text-muted-foreground">
-                  There are no gallery items
-                  matching these filters.
+                  There are no gallery items matching this filter.
                 </p>
 
                 {canManageGallery && (
@@ -1527,175 +750,92 @@ export default function Gallery() {
                 )}
               </div>
             ) : (
-              <div className="h-auto p-3 sm:p-4">
+              <div className="p-3 sm:p-4">
                 <div className="columns-1 gap-3 sm:columns-2 lg:columns-3">
-                  {filteredItems.map(
-                    (item) => {
-                      const mediaList =
-                        getVisibleMedia(item)
+                  {filteredItems.map((item) => {
+                    const mediaList = getVisibleMedia(item)
 
-                      const itemCategory =
-                        item.category ??
-                        "Community"
+                    return (
+                      <article
+                        key={item.id}
+                        className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"
+                      >
+                        <div className="grid gap-1">
+                          {mediaList.map((media) => (
+                            <GalleryMediaCard
+                              key={media.id}
+                              media={media}
+                              title={item.title}
+                              onClick={() => openViewer(item, media)}
+                            />
+                          ))}
+                        </div>
 
-                      const categoryClasses =
-                        getCategoryClasses(
-                          itemCategory,
-                        )
+                        <div className="border-t border-border/70 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h3 className="truncate text-sm font-semibold">
+                                {item.title}
+                              </h3>
 
-                      return (
-                        <article
-                          key={item.id}
-                          className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"
-                        >
-                          <div className="grid gap-1">
-                            {mediaList.map(
-                              (media) => (
-                                <GalleryMediaCard
-                                  key={
-                                    media.id
-                                  }
-                                  media={
-                                    media
-                                  }
-                                  title={
-                                    item.title
-                                  }
-                                  onClick={() =>
-                                    openViewer(
-                                      item,
-                                      media,
-                                    )
-                                  }
-                                />
-                              ),
+                              {item.description && (
+                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                                  {item.description}
+                                </p>
+                              )}
+
+                              <p className="mt-2 text-[10px] text-muted-foreground">
+                                {mediaList.length}{" "}
+                                {mediaList.length === 1 ? "item" : "items"}
+                                {item.createdAt
+                                  ? ` · ${formatDate(item.createdAt)}`
+                                  : ""}
+                              </p>
+                            </div>
+
+                            {canManageGallery && (
+                              <div className="flex shrink-0 items-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openEdit(item)}
+                                  aria-label={`Edit ${item.title}`}
+                                >
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                </Button>
+
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  disabled={deletingId === item.id}
+                                  onClick={() => requestDeleteGallery(item)}
+                                  aria-label={`Delete ${item.title}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             )}
                           </div>
-
-                          <div className="border-t border-border/70 p-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="mb-1.5 flex items-center gap-2">
-                                  <span
-                                    className={[
-                                      "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                                      categoryClasses.badge,
-                                    ].join(" ")}
-                                  >
-                                    <span
-                                      className={[
-                                        "h-1.5 w-1.5 shrink-0 rounded-full",
-                                        categoryClasses.dot,
-                                      ].join(" ")}
-                                    />
-
-                                    {itemCategory}
-                                  </span>
-                                </div>
-
-                                <h3 className="truncate text-sm font-semibold">
-                                  {item.title}
-                                </h3>
-
-                                {item.description && (
-                                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                                    {
-                                      item.description
-                                    }
-                                  </p>
-                                )}
-
-                                <p className="mt-2 text-[10px] text-muted-foreground">
-                                  {
-                                    mediaList.length
-                                  }{" "}
-                                  {mediaList.length ===
-                                  1
-                                    ? "item"
-                                    : "items"}
-                                  {item.createdAt
-                                    ? ` · ${formatDate(item.createdAt)}`
-                                    : ""}
-                                </p>
-                              </div>
-
-                              {canManageGallery && (
-                                <div className="flex shrink-0 items-center gap-1">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() =>
-                                      openEdit(
-                                        item,
-                                      )
-                                    }
-                                    aria-label={`Edit ${item.title}`}
-                                  >
-                                    <Edit3 className="h-3.5 w-3.5" />
-                                  </Button>
-
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive hover:text-destructive"
-                                    disabled={
-                                      deletingId ===
-                                      item.id
-                                    }
-                                    onClick={() =>
-                                      requestDeleteGallery(
-                                        item,
-                                      )
-                                    }
-                                    aria-label={`Delete ${item.title}`}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </article>
-                      )
-                    },
-                  )}
+                        </div>
+                      </article>
+                    )
+                  })}
                 </div>
               </div>
             )}
 
             <div className="flex flex-col gap-3 border-t border-border/70 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-                <span className="shrink-0">
-                  Select an image or video to view
-                  it full size.
-                </span>
+              <span>
+                Select an image or video to view it full size.
+              </span>
 
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
-                    Images
-                  </span>
-
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                    Videos
-                  </span>
-
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                    Fleet
-                  </span>
-                </div>
-              </div>
-
-              <span className="shrink-0 font-medium text-foreground/70">
+              <span className="font-medium text-foreground/70">
                 {filteredItems.length}{" "}
-                {filteredItems.length === 1
-                  ? "gallery entry"
-                  : "gallery entries"}
+                {filteredItems.length === 1 ? "gallery entry" : "gallery entries"}
               </span>
             </div>
           </section>
@@ -1714,15 +854,11 @@ export default function Gallery() {
                   </h2>
 
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    Add, edit, and remove community
-                    media.
+                    Add, edit, and remove community media.
                   </p>
                 </div>
 
-                <Button
-                  type="button"
-                  onClick={openAdd}
-                >
+                <Button type="button" onClick={openAdd}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Media
                 </Button>
@@ -1730,42 +866,30 @@ export default function Gallery() {
 
               <div className="grid gap-3 p-4 sm:grid-cols-3">
                 <ManagementStat
-                  icon={
-                    <Images className="h-4 w-4" />
-                  }
+                  icon={<Images className="h-4 w-4" />}
                   label="Entries"
                   value={String(items.length)}
                 />
 
                 <ManagementStat
-                  icon={
-                    <ImageIcon className="h-4 w-4" />
-                  }
+                  icon={<ImageIcon className="h-4 w-4" />}
                   label="Images"
                   value={String(
                     items.reduce(
                       (count, item) =>
-                        count +
-                        item.media.filter(
-                          isImageMedia,
-                        ).length,
+                        count + item.media.filter(isImageMedia).length,
                       0,
                     ),
                   )}
                 />
 
                 <ManagementStat
-                  icon={
-                    <Video className="h-4 w-4" />
-                  }
+                  icon={<Video className="h-4 w-4" />}
                   label="Videos"
                   value={String(
                     items.reduce(
                       (count, item) =>
-                        count +
-                        item.media.filter(
-                          isVideoMedia,
-                        ).length,
+                        count + item.media.filter(isVideoMedia).length,
                       0,
                     ),
                   )}
@@ -1773,20 +897,18 @@ export default function Gallery() {
               </div>
             </section>
           )}
-        </div>
 
-        <Footer />
+          <footer className="py-6 text-center text-xs text-muted-foreground">
+            Metro Police Department · Community Gallery
+          </footer>
+        </div>
       </main>
 
       {deleteTarget && (
         <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
-            if (
-              event.currentTarget ===
-                event.target &&
-              !deletingId
-            ) {
+            if (event.currentTarget === event.target) {
               closeDeleteDialog()
             }
           }}
@@ -1795,7 +917,6 @@ export default function Gallery() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-gallery-title"
-            aria-describedby="delete-gallery-description"
             className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
           >
             <div className="p-5">
@@ -1805,26 +926,11 @@ export default function Gallery() {
                 </div>
 
                 <div className="min-w-0">
-                  <h2
-                    id="delete-gallery-title"
-                    className="text-base font-semibold"
-                  >
+                  <h2 id="delete-gallery-title" className="text-base font-semibold">
                     Delete gallery entry?
                   </h2>
-
-                  <p
-                    id="delete-gallery-description"
-                    className="mt-1 text-sm leading-5 text-muted-foreground"
-                  >
-                    Are you sure you want to
-                    delete{" "}
-                    <span className="font-semibold text-foreground">
-                      {deleteTarget.title}
-                    </span>
-                    ? This action cannot be
-                    undone and any uploaded media
-                    belonging to this entry will
-                    also be removed.
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                    Are you sure you want to delete <span className="font-medium text-foreground">{deleteTarget.title}</span>? This will permanently remove the gallery entry and any uploaded media stored with it.
                   </p>
                 </div>
               </div>
@@ -1835,33 +941,18 @@ export default function Gallery() {
                 type="button"
                 variant="outline"
                 onClick={closeDeleteDialog}
-                disabled={
-                  deletingId ===
-                  deleteTarget.id
-                }
+                disabled={deletingId === deleteTarget.id}
               >
                 Cancel
               </Button>
-
               <Button
                 type="button"
                 variant="destructive"
-                disabled={
-                  deletingId ===
-                  deleteTarget.id
-                }
-                onClick={() =>
-                  void deleteGallery(
-                    deleteTarget,
-                  )
-                }
+                disabled={deletingId === deleteTarget.id}
+                onClick={() => void deleteGallery(deleteTarget)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-
-                {deletingId ===
-                deleteTarget.id
-                  ? "Deleting..."
-                  : "Delete"}
+                {deletingId === deleteTarget.id ? "Deleting..." : "Delete"}
               </Button>
             </div>
           </div>
@@ -1870,37 +961,21 @@ export default function Gallery() {
 
       {showModal && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
-            if (
-              event.currentTarget ===
-                event.target &&
-              !saving
-            ) {
+            if (event.currentTarget === event.target) {
               closeModal()
             }
           }}
         >
-          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-            <div className="flex shrink-0 items-start justify-between border-b border-border/70 px-5 py-4">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
               <div>
-                <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-blue-500">
-                  <span
-                    className={[
-                      "h-2 w-2 rounded-full",
-                      getCategoryClasses(
-                        category,
-                      ).dot,
-                    ].join(" ")}
-                  />
-
-                  {category}
+                <p className="text-xs font-medium uppercase tracking-wide text-blue-500">
+                  Community
                 </p>
-
                 <h2 className="mt-1 text-lg font-semibold">
-                  {editingItem
-                    ? "Edit Gallery Entry"
-                    : "Add Media"}
+                  {editingItem ? "Edit Gallery Entry" : "Add Media"}
                 </h2>
               </div>
 
@@ -1917,20 +992,15 @@ export default function Gallery() {
               </Button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+            <div className="max-h-[78vh] overflow-y-auto px-5 py-5">
               <div className="grid gap-4">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">
                     Title
                   </label>
-
                   <Input
                     value={title}
-                    onChange={(event) =>
-                      setTitle(
-                        event.target.value,
-                      )
-                    }
+                    onChange={(event) => setTitle(event.target.value)}
                     placeholder="Gallery title"
                     autoFocus
                   />
@@ -1940,41 +1010,12 @@ export default function Gallery() {
                   <label className="mb-1.5 block text-sm font-medium">
                     Description
                   </label>
-
                   <Textarea
                     value={description}
-                    onChange={(event) =>
-                      setDescription(
-                        event.target.value,
-                      )
-                    }
+                    onChange={(event) => setDescription(event.target.value)}
                     placeholder="Describe this gallery entry..."
                     rows={3}
                   />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Category
-                  </label>
-
-                  <CategorySelect
-                    value={category}
-                    onChange={setCategory}
-                  />
-
-                  <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span
-                      className={[
-                        "h-1.5 w-1.5 rounded-full",
-                        getCategoryClasses(
-                          category,
-                        ).dot,
-                      ].join(" ")}
-                    />
-
-                    {category} gallery media
-                  </p>
                 </div>
 
                 <div
@@ -1984,15 +1025,9 @@ export default function Gallery() {
                       ? "border-blue-500 bg-blue-500/10"
                       : "border-border bg-background/40",
                   ].join(" ")}
-                  onDragEnter={
-                    handleDragEnter
-                  }
-                  onDragOver={
-                    handleDragOver
-                  }
-                  onDragLeave={
-                    handleDragLeave
-                  }
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
                   <div className="flex flex-col items-center justify-center text-center">
@@ -2001,24 +1036,18 @@ export default function Gallery() {
                     </div>
 
                     <h3 className="mt-3 text-sm font-semibold">
-                      {isDragging
-                        ? "Drop files here"
-                        : "Drag and drop files"}
+                      {isDragging ? "Drop files here" : "Drag and drop files"}
                     </h3>
 
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Drop images or videos here,
-                      or choose files from your
-                      computer.
+                      Drop images or videos here, or choose files from your computer.
                     </p>
 
                     <Button
                       type="button"
                       variant="outline"
                       className="mt-3"
-                      onClick={() =>
-                        fileInputRef.current?.click()
-                      }
+                      onClick={() => fileInputRef.current?.click()}
                     >
                       <Upload className="mr-2 h-4 w-4" />
                       Choose Files
@@ -2031,12 +1060,8 @@ export default function Gallery() {
                       accept="image/*,video/*"
                       className="hidden"
                       onChange={(event) => {
-                        handleFiles(
-                          event.target.files,
-                        )
-
-                        event.currentTarget.value =
-                          ""
+                        handleFiles(event.target.files)
+                        event.currentTarget.value = ""
                       }}
                     />
                   </div>
@@ -2047,49 +1072,29 @@ export default function Gallery() {
                     <h3 className="text-sm font-semibold">
                       Add media URL
                     </h3>
-
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      URLs can be mixed with uploaded
-                      files.
+                      URLs can be mixed with uploaded files.
                     </p>
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto]">
-                    <div className="relative">
-                      <select
-                        value={urlType}
-                        onChange={(event) =>
-                          setUrlType(
-                            event.target
-                              .value as GalleryMediaType,
-                          )
-                        }
-                        className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 py-1 pr-8 text-sm shadow-xs outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
-                      >
-                        <option value="image">
-                          Image
-                        </option>
-
-                        <option value="video">
-                          Video
-                        </option>
-                      </select>
-
-                      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                    </div>
+                    <select
+                      value={urlType}
+                      onChange={(event) =>
+                        setUrlType(event.target.value as GalleryMediaType)
+                      }
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value="image">Image</option>
+                      <option value="video">Video</option>
+                    </select>
 
                     <Input
                       value={urlInput}
-                      onChange={(event) =>
-                        setUrlInput(
-                          event.target.value,
-                        )
-                      }
+                      onChange={(event) => setUrlInput(event.target.value)}
                       placeholder="https://example.com/image.jpg"
                       onKeyDown={(event) => {
-                        if (
-                          event.key === "Enter"
-                        ) {
+                        if (event.key === "Enter") {
                           event.preventDefault()
                           addExternalUrl()
                         }
@@ -2099,9 +1104,7 @@ export default function Gallery() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={
-                        addExternalUrl
-                      }
+                      onClick={addExternalUrl}
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
                       Add URL
@@ -2110,13 +1113,9 @@ export default function Gallery() {
 
                   <div className="mt-2">
                     <Input
-                      value={
-                        thumbnailInput
-                      }
+                      value={thumbnailInput}
                       onChange={(event) =>
-                        setThumbnailInput(
-                          event.target.value,
-                        )
+                        setThumbnailInput(event.target.value)
                       }
                       placeholder="Optional video thumbnail URL"
                     />
@@ -2131,8 +1130,7 @@ export default function Gallery() {
 
                     {pendingMedia.length > 0 && (
                       <span className="text-xs text-muted-foreground">
-                        Files and URLs can be
-                        mixed.
+                        Files and URLs can be mixed.
                       </span>
                     )}
                   </div>
@@ -2140,99 +1138,75 @@ export default function Gallery() {
                   {pendingMedia.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
                       <FileImage className="mx-auto h-8 w-8 text-muted-foreground" />
-
                       <p className="mt-2 text-sm font-medium">
                         No media added
                       </p>
-
                       <p className="mt-1 text-xs text-muted-foreground">
                         Add files or URLs above.
                       </p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {pendingMedia.map(
-                        (media) => (
-                          <div
-                            key={media.id}
-                            className="group relative overflow-hidden rounded-lg border border-border bg-muted"
-                          >
-                            <div className="aspect-square">
-                              {media.type ===
-                              "image" ? (
-                                <img
-                                  src={
-                                    media.previewUrl ||
-                                    media.url
-                                  }
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : media.thumbnailUrl ? (
-                                <img
-                                  src={
-                                    media.thumbnailUrl
-                                  }
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <video
-                                  src={
-                                    media.previewUrl ||
-                                    media.url
-                                  }
-                                  muted
-                                  preload="metadata"
-                                  className="h-full w-full object-cover"
-                                />
-                              )}
-                            </div>
-
-                            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 px-2 py-1.5 text-[10px] text-white">
-                              <span className="flex items-center gap-1">
-                                {media.type ===
-                                "image" ? (
-                                  <ImageIcon className="h-3 w-3" />
-                                ) : (
-                                  <Video className="h-3 w-3" />
-                                )}
-
-                                {getMediaLabel(
-                                  media.type,
-                                )}
-                              </span>
-
-                              <span>
-                                {media.source ===
-                                "upload"
-                                  ? "File"
-                                  : "URL"}
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                removePendingMedia(
-                                  media.id,
-                                )
-                              }
-                              className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-white opacity-0 transition-opacity hover:bg-black/80 group-hover:opacity-100"
-                              aria-label="Remove media"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                      {pendingMedia.map((media) => (
+                        <div
+                          key={media.id}
+                          className="group relative overflow-hidden rounded-lg border border-border bg-muted"
+                        >
+                          <div className="aspect-square">
+                            {media.type === "image" ? (
+                              <img
+                                src={media.previewUrl || media.url}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : media.thumbnailUrl ? (
+                              <img
+                                src={media.thumbnailUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <video
+                                src={media.previewUrl || media.url}
+                                muted
+                                preload="metadata"
+                                className="h-full w-full object-cover"
+                              />
+                            )}
                           </div>
-                        ),
-                      )}
+
+                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 px-2 py-1.5 text-[10px] text-white">
+                            <span className="flex items-center gap-1">
+                              {media.type === "image" ? (
+                                <ImageIcon className="h-3 w-3" />
+                              ) : (
+                                <Video className="h-3 w-3" />
+                              )}
+                              {getMediaLabel(media.type)}
+                            </span>
+
+                            <span>
+                              {media.source === "upload" ? "File" : "URL"}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removePendingMedia(media.id)}
+                            className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-white opacity-0 transition-opacity hover:bg-black/80 group-hover:opacity-100"
+                            aria-label="Remove media"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="flex shrink-0 justify-end gap-2 border-t border-border/70 px-5 py-4">
+            <div className="flex justify-end gap-2 border-t border-border/70 px-5 py-4">
               <Button
                 type="button"
                 variant="outline"
@@ -2244,9 +1218,7 @@ export default function Gallery() {
 
               <Button
                 type="button"
-                onClick={() =>
-                  void saveGallery()
-                }
+                onClick={() => void saveGallery()}
                 disabled={saving}
               >
                 {saving
@@ -2260,133 +1232,102 @@ export default function Gallery() {
         </div>
       )}
 
-      {viewer &&
-        viewer.item.media[viewer.index] && (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-3 backdrop-blur-sm sm:p-6"
-            onMouseDown={(event) => {
-              if (
-                event.currentTarget ===
-                event.target
-              ) {
-                closeViewer()
-              }
-            }}
-          >
-            <div className="relative flex h-full w-full max-w-6xl flex-col">
-              <div className="flex items-center justify-between pb-3 text-white">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">
-                    {viewer.item.title}
-                  </p>
-
-                  <p className="text-xs text-white/60">
-                    {viewer.index + 1} /{" "}
-                    {viewer.item.media.length}
-                  </p>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 text-white hover:bg-white/10 hover:text-white"
-                  onClick={closeViewer}
-                  aria-label="Close viewer"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
+      {viewer && viewer.item.media[viewer.index] && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-3 backdrop-blur-sm sm:p-6"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) {
+              closeViewer()
+            }
+          }}
+        >
+          <div className="relative flex h-full w-full max-w-6xl flex-col">
+            <div className="flex items-center justify-between pb-3 text-white">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">
+                  {viewer.item.title}
+                </p>
+                <p className="text-xs text-white/60">
+                  {viewer.index + 1} / {viewer.item.media.length}
+                </p>
               </div>
 
-              <div className="relative flex min-h-0 flex-1 items-center justify-center">
-                {viewer.item.media.length > 1 && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute left-1 z-10 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white sm:left-3"
-                      onClick={
-                        showPrevious
-                      }
-                      aria-label="Previous media"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-white hover:bg-white/10 hover:text-white"
+                onClick={closeViewer}
+                aria-label="Close viewer"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 z-10 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white sm:right-3"
-                      onClick={showNext}
-                      aria-label="Next media"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </Button>
-                  </>
-                )}
+            <div className="relative flex min-h-0 flex-1 items-center justify-center">
+              {viewer.item.media.length > 1 && (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute left-1 z-10 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white sm:left-3"
+                    onClick={showPrevious}
+                    aria-label="Previous media"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
 
-                {viewer.item.media[
-                  viewer.index
-                ].type === "image" ? (
-                  <img
-                    src={
-                      viewer.item.media[
-                        viewer.index
-                      ].url
-                    }
-                    alt={viewer.item.title}
-                    className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
-                  />
-                ) : viewer.item.media[
-                    viewer.index
-                  ].thumbnailUrl ? (
-                  <video
-                    src={
-                      viewer.item.media[
-                        viewer.index
-                      ].url
-                    }
-                    controls
-                    poster={
-                      viewer.item.media[
-                        viewer.index
-                      ].thumbnailUrl
-                    }
-                    className="max-h-full max-w-full rounded-xl shadow-2xl"
-                  />
-                ) : (
-                  <video
-                    src={
-                      viewer.item.media[
-                        viewer.index
-                      ].url
-                    }
-                    controls
-                    className="max-h-full max-w-full rounded-xl shadow-2xl"
-                  />
-                )}
-              </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 z-10 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white sm:right-3"
+                    onClick={showNext}
+                    aria-label="Next media"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                </>
+              )}
 
-              <div className="flex items-center justify-center gap-2 pt-3">
-                <a
-                  href={
-                    viewer.item.media[
-                      viewer.index
-                    ].url
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-                >
-                  Open Original
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </div>
+              {viewer.item.media[viewer.index].type === "image" ? (
+                <img
+                  src={viewer.item.media[viewer.index].url}
+                  alt={viewer.item.title}
+                  className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
+                />
+              ) : viewer.item.media[viewer.index].thumbnailUrl ? (
+                <video
+                  src={viewer.item.media[viewer.index].url}
+                  controls
+                  poster={viewer.item.media[viewer.index].thumbnailUrl}
+                  className="max-h-full max-w-full rounded-xl shadow-2xl"
+                />
+              ) : (
+                <video
+                  src={viewer.item.media[viewer.index].url}
+                  controls
+                  className="max-h-full max-w-full rounded-xl shadow-2xl"
+                />
+              )}
+            </div>
+
+            <div className="flex items-center justify-center gap-2 pt-3">
+              <a
+                href={viewer.item.media[viewer.index].url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Open Original
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
             </div>
           </div>
-        )}
+        </div>
+      )}
+
     </div>
   )
 }
@@ -2400,8 +1341,7 @@ function GalleryMediaCard({
   title: string
   onClick: () => void
 }) {
-  const [ratio, setRatio] =
-    useState<number | undefined>()
+  const [ratio, setRatio] = useState<number | undefined>()
 
   return (
     <button
@@ -2419,14 +1359,10 @@ function GalleryMediaCard({
           alt={title}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           onLoad={(event) => {
-            const image =
-              event.currentTarget
+            const image = event.currentTarget
 
             if (image.naturalHeight > 0) {
-              setRatio(
-                image.naturalWidth /
-                  image.naturalHeight,
-              )
+              setRatio(image.naturalWidth / image.naturalHeight)
             }
           }}
         />
@@ -2436,14 +1372,10 @@ function GalleryMediaCard({
           alt={title}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           onLoad={(event) => {
-            const image =
-              event.currentTarget
+            const image = event.currentTarget
 
             if (image.naturalHeight > 0) {
-              setRatio(
-                image.naturalWidth /
-                  image.naturalHeight,
-              )
+              setRatio(image.naturalWidth / image.naturalHeight)
             }
           }}
         />
@@ -2455,14 +1387,10 @@ function GalleryMediaCard({
           preload="metadata"
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           onLoadedMetadata={(event) => {
-            const video =
-              event.currentTarget
+            const video = event.currentTarget
 
             if (video.videoHeight > 0) {
-              setRatio(
-                video.videoWidth /
-                  video.videoHeight,
-              )
+              setRatio(video.videoWidth / video.videoHeight)
             }
           }}
         />
@@ -2477,7 +1405,6 @@ function GalleryMediaCard({
           ) : (
             <Video className="h-3 w-3" />
           )}
-
           {getMediaLabel(media.type)}
         </span>
 
@@ -2505,9 +1432,7 @@ function ManagementStat({
         {label}
       </div>
 
-      <p className="mt-2 text-xl font-semibold tracking-tight">
-        {value}
-      </p>
+      <p className="mt-2 text-xl font-semibold tracking-tight">{value}</p>
     </div>
   )
 }
