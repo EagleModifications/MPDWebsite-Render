@@ -1175,7 +1175,7 @@ export default function Gallery() {
               </div>
 
               <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-                Community Gallery
+                Gallery
               </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
