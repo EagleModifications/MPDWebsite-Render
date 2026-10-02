@@ -63,6 +63,14 @@ type PendingMedia = GalleryMedia & {
 type CategoryFilter = "All" | GalleryCategory
 type MediaFilter = "All" | "Images" | "Videos"
 
+type GalleryApiResponse = {
+  success?: boolean
+  item?: GalleryItem
+  items?: GalleryItem[]
+  error?: string
+  message?: string
+}
+
 const CATEGORY_FILTERS: CategoryFilter[] = [
   "All",
   "Community",
@@ -161,6 +169,76 @@ function getFilterClasses(active: boolean) {
   return active
     ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
     : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+}
+
+async function readApiResponse(
+  response: Response,
+): Promise<GalleryApiResponse> {
+  const raw = await response.text()
+
+  if (!raw) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(raw)
+
+    if (
+      parsed &&
+      typeof parsed === "object"
+    ) {
+      return parsed as GalleryApiResponse
+    }
+
+    return {}
+  } catch {
+    return {
+      error: raw
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
+    }
+  }
+}
+
+function getApiErrorMessage(
+  response: Response,
+  data: GalleryApiResponse,
+  fallback: string,
+) {
+  if (data.error?.trim()) {
+    return data.error.trim()
+  }
+
+  if (data.message?.trim()) {
+    return data.message.trim()
+  }
+
+  if (response.status === 400) {
+    return "The gallery request was invalid."
+  }
+
+  if (response.status === 401) {
+    return "Your session has expired. Sign in again."
+  }
+
+  if (response.status === 403) {
+    return "You do not have permission to manage the gallery."
+  }
+
+  if (response.status === 404) {
+    return "The gallery API endpoint could not be found."
+  }
+
+  if (response.status === 405) {
+    return "This gallery action is not supported by the API."
+  }
+
+  if (response.status >= 500) {
+    return "The gallery server returned an error. Check the API/server logs for the exact cause."
+  }
+
+  return fallback
 }
 
 function CategorySelect({
@@ -416,18 +494,24 @@ export default function Gallery() {
 
         setUser(session)
 
+        const galleryData =
+          await readApiResponse(
+            galleryResponse,
+          )
+
         if (!galleryResponse.ok) {
           throw new Error(
-            "Failed to load gallery.",
+            getApiErrorMessage(
+              galleryResponse,
+              galleryData,
+              "Failed to load gallery.",
+            ),
           )
         }
 
-        const data =
-          await galleryResponse.json()
-
         setItems(
-          Array.isArray(data.items)
-            ? data.items
+          Array.isArray(galleryData.items)
+            ? galleryData.items
             : [],
         )
 
@@ -459,7 +543,12 @@ export default function Gallery() {
   }, [])
 
   useEffect(() => {
-    if (!showModal) {
+    const shouldLockScroll =
+      showModal ||
+      Boolean(deleteTarget) ||
+      Boolean(viewer)
+
+    if (!shouldLockScroll) {
       return
     }
 
@@ -482,7 +571,37 @@ export default function Gallery() {
       document.documentElement.style.overflow =
         previousDocumentOverflow
     }
-  }, [showModal])
+  }, [
+    deleteTarget,
+    showModal,
+    viewer,
+  ])
+
+  useEffect(() => {
+    if (!deleteTarget || deletingId) {
+      return
+    }
+
+    function handleKeyDown(
+      event: KeyboardEvent,
+    ) {
+      if (event.key === "Escape") {
+        setDeleteTarget(null)
+      }
+    }
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown,
+    )
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      )
+    }
+  }, [deleteTarget, deletingId])
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -583,6 +702,8 @@ export default function Gallery() {
     setUrlType("image")
     setThumbnailInput("")
     setEditingItem(null)
+    setIsDragging(false)
+    dragDepthRef.current = 0
   }
 
   function closeModal() {
@@ -852,45 +973,16 @@ export default function Gallery() {
         },
       )
 
-    const raw =
-      await response.text()
-
-    let data: {
-      success?: boolean
-      items?: GalleryMedia[]
-      error?: string
-    } = {}
-
-    try {
-      data = raw
-        ? JSON.parse(raw)
-        : {}
-    } catch {
-      data = {}
-    }
+    const data =
+      await readApiResponse(response)
 
     if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error(
-          "Gallery upload API is not deployed. Redeploy the updated app.ts backend before uploading files.",
-        )
-      }
-
-      if (response.status === 401) {
-        throw new Error(
-          "Your session has expired. Sign in again.",
-        )
-      }
-
-      if (response.status === 403) {
-        throw new Error(
-          "You do not have permission to upload gallery media.",
-        )
-      }
-
       throw new Error(
-        data.error ||
-          `Gallery upload failed (${response.status}).`,
+        getApiErrorMessage(
+          response,
+          data,
+          "Gallery upload failed.",
+        ),
       )
     }
 
@@ -907,6 +999,9 @@ export default function Gallery() {
     const cleanTitle =
       title.trim()
 
+    const cleanDescription =
+      description.trim()
+
     if (!cleanTitle) {
       toast.error(
         "Enter a gallery title.",
@@ -914,7 +1009,7 @@ export default function Gallery() {
       return
     }
 
-    if (!description.trim()) {
+    if (!cleanDescription) {
       toast.error(
         "Enter a gallery description.",
       )
@@ -965,53 +1060,84 @@ export default function Gallery() {
         })
       }
 
+      const isEditing =
+        Boolean(editingItem)
+
+      const endpoint = isEditing
+        ? `/api/gallery/${editingItem?.id}`
+        : "/api/gallery"
+
+      const method = isEditing
+        ? "PUT"
+        : "POST"
+
       const response =
-        await fetch(
-          editingItem
-            ? `/api/gallery/${editingItem.id}`
-            : "/api/gallery",
+        await fetch(endpoint, {
+          method,
+          credentials: "include",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            title: cleanTitle,
+            description:
+              cleanDescription,
+            category,
+            media,
+          }),
+        })
+
+      const data =
+        await readApiResponse(response)
+
+      if (!response.ok) {
+        console.error(
+          "Gallery API error:",
           {
-            method: editingItem
-              ? "PUT"
-              : "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              title: cleanTitle,
-              description:
-                description.trim(),
-              category,
-              media,
-            }),
+            status: response.status,
+            statusText:
+              response.statusText,
+            endpoint,
+            method,
+            response: data,
           },
         )
 
-      const data =
-        await response
-          .json()
-          .catch(() => ({}))
-
-      if (!response.ok) {
         throw new Error(
-          data.error ||
-            "Failed to save gallery.",
+          getApiErrorMessage(
+            response,
+            data,
+            isEditing
+              ? "Failed to update gallery item."
+              : "Failed to create gallery item.",
+          ),
         )
       }
 
       if (!data.item) {
+        console.error(
+          "Gallery API returned no item:",
+          {
+            endpoint,
+            method,
+            response: data,
+          },
+        )
+
         throw new Error(
-          "The server did not return the saved gallery item.",
+          isEditing
+            ? "The server did not return the updated gallery item."
+            : "The server did not return the created gallery item.",
         )
       }
 
-      if (editingItem) {
+      if (isEditing) {
         setItems((current) =>
           current.map((item) =>
-            item.id === editingItem.id
-              ? data.item
+            item.id === editingItem?.id
+              ? data.item as GalleryItem
               : item,
           ),
         )
@@ -1021,7 +1147,7 @@ export default function Gallery() {
         )
       } else {
         setItems((current) => [
-          data.item,
+          data.item as GalleryItem,
           ...current,
         ])
 
@@ -1033,12 +1159,17 @@ export default function Gallery() {
       setShowModal(false)
       resetForm()
     } catch (error) {
-      console.error(error)
+      console.error(
+        "Gallery save failed:",
+        error,
+      )
 
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to save gallery.",
+          : editingItem
+            ? "Failed to update gallery item."
+            : "Failed to create gallery item.",
       )
     } finally {
       setSaving(false)
@@ -1066,6 +1197,10 @@ export default function Gallery() {
   async function deleteGallery(
     item: GalleryItem,
   ) {
+    if (deletingId) {
+      return
+    }
+
     setDeletingId(item.id)
 
     try {
@@ -1075,18 +1210,22 @@ export default function Gallery() {
           {
             method: "DELETE",
             credentials: "include",
+            headers: {
+              Accept: "application/json",
+            },
           },
         )
 
       const data =
-        await response
-          .json()
-          .catch(() => ({}))
+        await readApiResponse(response)
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
+          getApiErrorMessage(
+            response,
+            data,
             "Failed to delete gallery item.",
+          ),
         )
       }
 
@@ -1104,6 +1243,11 @@ export default function Gallery() {
         "Gallery item deleted.",
       )
     } catch (error) {
+      console.error(
+        "Gallery delete failed:",
+        error,
+      )
+
       toast.error(
         error instanceof Error
           ? error.message
@@ -1612,13 +1756,15 @@ export default function Gallery() {
         <Footer />
       </main>
 
+      {/* DELETE CONFIRMATION MODAL */}
       {deleteTarget && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (
               event.currentTarget ===
-              event.target
+                event.target &&
+              !deletingId
             ) {
               closeDeleteDialog()
             }
@@ -1628,6 +1774,7 @@ export default function Gallery() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-gallery-title"
+            aria-describedby="delete-gallery-description"
             className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
           >
             <div className="p-5">
@@ -1644,16 +1791,19 @@ export default function Gallery() {
                     Delete gallery entry?
                   </h2>
 
-                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                  <p
+                    id="delete-gallery-description"
+                    className="mt-1 text-sm leading-5 text-muted-foreground"
+                  >
                     Are you sure you want to
                     delete{" "}
-                    <span className="font-medium text-foreground">
+                    <span className="font-semibold text-foreground">
                       {deleteTarget.title}
                     </span>
-                    ? This will permanently
-                    remove the gallery entry and
-                    any uploaded media stored with
-                    it.
+                    ? This action cannot be
+                    undone and any uploaded media
+                    belonging to this entry will
+                    also be removed.
                   </p>
                 </div>
               </div>
@@ -1697,13 +1847,14 @@ export default function Gallery() {
         </div>
       )}
 
+      {/* ADD / EDIT MODAL */}
       {showModal && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (
               event.currentTarget ===
-              event.target &&
+                event.target &&
               !saving
             ) {
               closeModal()
@@ -2089,10 +2240,11 @@ export default function Gallery() {
         </div>
       )}
 
+      {/* MEDIA VIEWER */}
       {viewer &&
         viewer.item.media[viewer.index] && (
           <div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-3 backdrop-blur-sm sm:p-6"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-3 backdrop-blur-sm sm:p-6"
             onMouseDown={(event) => {
               if (
                 event.currentTarget ===
