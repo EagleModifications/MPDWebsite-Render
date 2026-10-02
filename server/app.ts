@@ -2,7 +2,7 @@ import express from "express"
 import cookieParser from "cookie-parser"
 import multer from "multer"
 import path from "node:path"
-import { readFile } from "node:fs/promises"
+import { access, readFile } from "node:fs/promises"
 import XLSX from "xlsx"
 import puppeteer from "puppeteer"
 
@@ -3847,7 +3847,7 @@ export function createApp() {
    * cannot be used as an arbitrary server-side URL fetcher.
    */
   app.get("/api/og", async (req, res) => {
-    const siteUrl =
+    const configuredSiteUrl =
       (process.env.OG_SITE_URL ||
         process.env.APP_ORIGIN ||
         "https://metropd-calirp.com")
@@ -3857,7 +3857,7 @@ export function createApp() {
     let allowedOrigin: URL
 
     try {
-      allowedOrigin = new URL(siteUrl)
+      allowedOrigin = new URL(configuredSiteUrl)
     } catch {
       return res.status(500).json({
         success: false,
@@ -3873,7 +3873,9 @@ export function createApp() {
     let targetUrl: URL
 
     try {
-      targetUrl = new URL(requestedUrl || siteUrl)
+      targetUrl = new URL(
+        requestedUrl || allowedOrigin.toString(),
+      )
     } catch {
       return res.status(400).json({
         success: false,
@@ -3881,9 +3883,6 @@ export function createApp() {
       })
     }
 
-    // Only allow pages belonging to this website. This prevents the endpoint
-    // from becoming an SSRF/proxy endpoint while still allowing every public
-    // page on the Metro PD site to have its own generated preview.
     if (targetUrl.origin !== allowedOrigin.origin) {
       return res.status(403).json({
         success: false,
@@ -3891,9 +3890,9 @@ export function createApp() {
       })
     }
 
-    // Never allow the renderer to recursively render the OG endpoint itself.
+    // Never render the OG endpoint itself or another API endpoint.
     if (targetUrl.pathname === "/api/og") {
-      targetUrl = new URL(siteUrl)
+      targetUrl = new URL(allowedOrigin.toString())
     }
 
     targetUrl.searchParams.set("og_preview", String(Date.now()))
@@ -3902,16 +3901,63 @@ export function createApp() {
     let page: Awaited<ReturnType<NonNullable<typeof browser>["newPage"]>> | null = null
 
     try {
-      const executablePath =
-        process.env.PUPPETEER_EXECUTABLE_PATH?.trim() ||
-        puppeteer.executablePath()
+      /*
+       * Do NOT blindly pass puppeteer.executablePath() to launch().
+       * Recent Puppeteer versions can return this asynchronously, and a
+       * missing downloaded browser otherwise produces the misleading
+       * "[object Promise]" error.
+       *
+       * We only provide executablePath when an explicitly configured path or
+       * Puppeteer's resolved bundled browser path actually exists. Otherwise
+       * Puppeteer is allowed to use its own configured browser automatically.
+       */
+      let executablePath: string | undefined
 
-      console.log(`[og] Generating preview for ${targetUrl.toString()}`)
-      console.log(`[og] Chromium executable: ${executablePath}`)
+      const configuredExecutable =
+        process.env.PUPPETEER_EXECUTABLE_PATH?.trim()
 
-      browser = await puppeteer.launch({
+      if (configuredExecutable) {
+        try {
+          await access(configuredExecutable)
+          executablePath = configuredExecutable
+        } catch {
+          console.warn(
+            `[og] PUPPETEER_EXECUTABLE_PATH does not exist: ${configuredExecutable}`,
+          )
+        }
+      }
+
+      if (!executablePath) {
+        try {
+          const puppeteerPath = await puppeteer.executablePath()
+
+          if (puppeteerPath) {
+            try {
+              await access(puppeteerPath)
+              executablePath = puppeteerPath
+            } catch {
+              console.warn(
+                `[og] Puppeteer's resolved browser path does not exist: ${puppeteerPath}`,
+              )
+            }
+          }
+        } catch (error) {
+          console.warn(
+            "[og] Could not resolve Puppeteer's bundled browser path:",
+            error,
+          )
+        }
+      }
+
+      console.log(
+        `[og] Generating dynamic preview for ${targetUrl.toString()}`,
+      )
+      console.log(
+        `[og] Browser executable: ${executablePath || "Puppeteer default"}`,
+      )
+
+      const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
         headless: true,
-        executablePath,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -3924,9 +3970,17 @@ export function createApp() {
           "--disable-extensions",
           "--disable-sync",
           "--disable-translate",
+          "--disable-features=Translate,BackForwardCache",
+          "--hide-scrollbars",
+          "--force-device-scale-factor=1",
         ],
-      })
+      }
 
+      if (executablePath) {
+        launchOptions.executablePath = executablePath
+      }
+
+      browser = await puppeteer.launch(launchOptions)
       page = await browser.newPage()
 
       await page.setViewport({
@@ -3955,7 +4009,7 @@ export function createApp() {
 
       const response = await page.goto(targetUrl.toString(), {
         waitUntil: "networkidle2",
-        timeout: 30000,
+        timeout: 45000,
       })
 
       if (!response || !response.ok()) {
@@ -3964,8 +4018,6 @@ export function createApp() {
         )
       }
 
-      // React/Vite pages can initially contain only the #root shell. Wait for
-      // the application to mount before taking the screenshot.
       await page.waitForFunction(
         () => {
           const root = document.querySelector("#root")
@@ -3989,7 +4041,6 @@ export function createApp() {
 
             return new Promise<void>((resolve) => {
               const finish = () => resolve()
-
               image.addEventListener("load", finish, { once: true })
               image.addEventListener("error", finish, { once: true })
             })
@@ -3997,8 +4048,8 @@ export function createApp() {
         )
       })
 
-      // Give the browser a short moment for final layout/animation settling.
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      // Allow React layout, fonts, images and animations to settle.
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
       const screenshot = await page.screenshot({
         type: "png",
@@ -4016,7 +4067,8 @@ export function createApp() {
         "Cache-Control":
           "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
         "Content-Disposition": "inline; filename=metro-pd-og.png",
-        "X-OG-Generated-From": targetUrl.origin + targetUrl.pathname,
+        "X-OG-Generated-From":
+          targetUrl.origin + targetUrl.pathname,
       })
 
       return res.end(screenshot)
