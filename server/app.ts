@@ -3870,10 +3870,37 @@ export function createApp() {
         deviceScaleFactor: 1,
       })
 
-      await page.goto(siteUrl, {
-        waitUntil: "networkidle2",
+      // Log browser-side errors so a failed React render is visible in
+      // Render logs instead of silently producing a blank Discord image.
+      page.on("console", (message) => {
+        if (message.type() === "error") {
+          console.error("[og] Browser console error:", message.text())
+        }
+      })
+
+      page.on("pageerror", (error) => {
+        console.error("[og] Browser page error:", error)
+      })
+
+      // Add a small query parameter so the screenshot request is clearly
+      // separate from the normal browser visit and is not served from a
+      // stale browser cache.
+      const previewUrl = `${siteUrl}/?og_preview=1`
+
+      await page.goto(previewUrl, {
+        waitUntil: "domcontentloaded",
         timeout: 30000,
       })
+
+      // The site is a React SPA, so DOMContentLoaded only means the HTML
+      // shell has loaded. Wait until React has actually mounted something
+      // inside #root before taking the screenshot.
+      await page.waitForSelector("#root > *", {
+        timeout: 20000,
+      })
+
+      // Allow fonts, images, CSS and client-side layout effects to finish.
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
       const screenshot = await page.screenshot({
         type: "png",
