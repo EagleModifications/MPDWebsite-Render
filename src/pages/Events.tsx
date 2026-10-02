@@ -1,8 +1,11 @@
 import {
+  createContext,
+  useContext,
   useEffect,
   useMemo,
   useState,
   type ChangeEvent,
+  type ReactNode,
 } from "react"
 import {
   CalendarDays,
@@ -66,10 +69,9 @@ const EVENT_CATEGORIES: EventCategory[] = [
   "Meetings",
 ]
 
-const CATEGORY_FILTERS: Array<"All" | EventCategory> = [
-  "All",
-  ...EVENT_CATEGORIES,
-]
+const CATEGORY_FILTERS: Array<
+  "All" | EventCategory
+> = ["All", ...EVENT_CATEGORIES]
 
 const WEEKDAYS = [
   "Monday",
@@ -87,7 +89,11 @@ const HOURS = Array.from(
     String(index + 1).padStart(2, "0"),
 )
 
-const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"]
+const MINUTES = Array.from(
+  { length: 60 },
+  (_, index) =>
+    String(index).padStart(2, "0"),
+)
 
 const PERIODS = ["AM", "PM"] as const
 
@@ -104,30 +110,42 @@ const EMPTY_FORM: EventForm = {
   discordUrl: "",
 }
 
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
 function formatDateKey(date: Date) {
   const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
+  const month = String(
+    date.getMonth() + 1,
+  ).padStart(2, "0")
+  const day = String(
+    date.getDate(),
+  ).padStart(2, "0")
 
   return `${year}-${month}-${day}`
 }
 
 function parseDateKey(value: string) {
-  const [year, month, day] = value.split("-").map(Number)
+  const [year, month, day] =
+    value.split("-").map(Number)
 
-  return new Date(year, month - 1, day)
+  return new Date(
+    year,
+    month - 1,
+    day,
+  )
 }
 
 function formatLongDate(value: string) {
-  return parseDateKey(value).toLocaleDateString(
-    "en-GB",
-    {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    },
-  )
+  return parseDateKey(
+    value,
+  ).toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
 }
 
 function getMonthStart(date: Date) {
@@ -152,12 +170,17 @@ function getCalendarDays(month: Date) {
 
   const totalCells =
     Math.ceil(
-      (mondayIndex + daysInMonth) / 7,
+      (mondayIndex + daysInMonth) /
+        7,
     ) * 7
 
   const days: Date[] = []
 
-  for (let index = 0; index < totalCells; index += 1) {
+  for (
+    let index = 0;
+    index < totalCells;
+    index += 1
+  ) {
     days.push(
       new Date(
         month.getFullYear(),
@@ -237,11 +260,14 @@ function sortEvents(
 }
 
 function parseTime(value: string) {
-  const [hourString, minuteString] =
-    value.split(":")
+  const [
+    hourString,
+    minuteString,
+  ] = value.split(":")
 
   const hour = Number(hourString)
-  const minute = minuteString ?? "00"
+  const minute =
+    minuteString ?? "00"
 
   const period: Period =
     hour >= 12 ? "PM" : "AM"
@@ -253,8 +279,14 @@ function parseTime(value: string) {
   }
 
   return {
-    hour: String(displayHour).padStart(2, "0"),
-    minute,
+    hour: String(displayHour).padStart(
+      2,
+      "0",
+    ),
+    minute: String(minute).padStart(
+      2,
+      "0",
+    ),
     period,
   }
 }
@@ -274,29 +306,55 @@ function buildTime(
     numericHour += 12
   }
 
-  return `${String(numericHour).padStart(2, "0")}:${minute}`
+  return `${String(
+    numericHour,
+  ).padStart(2, "0")}:${String(
+    Number(minute),
+  ).padStart(2, "0")}`
 }
 
-function getDateParts(value: string) {
-  if (!value) {
-    return {
-      day: "",
-      month: "",
-      year: "",
-    }
-  }
+/* -------------------------------------------------------------------------- */
+/* Dropdown manager                                                          */
+/* -------------------------------------------------------------------------- */
 
-  const [year, month, day] =
-    value.split("-")
-
-  return {
-    day,
-    month,
-    year,
-  }
+type DropdownContextValue = {
+  openDropdown: string | null
+  setOpenDropdown: (
+    value: string | null,
+  ) => void
 }
+
+const DropdownContext =
+  createContext<
+    DropdownContextValue | null
+  >(null)
+
+function DropdownProvider({
+  children,
+}: {
+  children: ReactNode
+}) {
+  const [openDropdown, setOpenDropdown] =
+    useState<string | null>(null)
+
+  return (
+    <DropdownContext.Provider
+      value={{
+        openDropdown,
+        setOpenDropdown,
+      }}
+    >
+      {children}
+    </DropdownContext.Provider>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Custom dropdown                                                            */
+/* -------------------------------------------------------------------------- */
 
 function CustomSelect({
+  id,
   value,
   options,
   onChange,
@@ -304,6 +362,7 @@ function CustomSelect({
   className = "",
   renderOption,
 }: {
+  id: string
   value: string
   options: readonly string[]
   onChange: (value: string) => void
@@ -312,10 +371,23 @@ function CustomSelect({
   renderOption?: (
     option: string,
     selected: boolean,
-  ) => React.ReactNode
+  ) => ReactNode
 }) {
-  const [open, setOpen] =
-    useState(false)
+  const dropdown =
+    useContext(DropdownContext)
+
+  if (!dropdown) {
+    throw new Error(
+      "CustomSelect must be used inside DropdownProvider.",
+    )
+  }
+
+  const {
+    openDropdown,
+    setOpenDropdown,
+  } = dropdown
+
+  const open = openDropdown === id
 
   useEffect(() => {
     if (!open) {
@@ -330,10 +402,18 @@ function CustomSelect({
 
       if (
         !target.closest(
-          "[data-custom-select]",
+          `[data-custom-select="${id}"]`,
         )
       ) {
-        setOpen(false)
+        setOpenDropdown(null)
+      }
+    }
+
+    function handleKeyDown(
+      event: KeyboardEvent,
+    ) {
+      if (event.key === "Escape") {
+        setOpenDropdown(null)
       }
     }
 
@@ -342,12 +422,27 @@ function CustomSelect({
       handlePointerDown,
     )
 
-    return () =>
+    document.addEventListener(
+      "keydown",
+      handleKeyDown,
+    )
+
+    return () => {
       document.removeEventListener(
         "mousedown",
         handlePointerDown,
       )
-  }, [open])
+
+      document.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      )
+    }
+  }, [
+    id,
+    open,
+    setOpenDropdown,
+  ])
 
   return (
     <div
@@ -355,14 +450,17 @@ function CustomSelect({
         "relative",
         className,
       ].join(" ")}
-      data-custom-select
+      data-custom-select={id}
     >
       <button
         type="button"
         aria-label={ariaLabel}
+        aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() =>
-          setOpen((current) => !current)
+          setOpenDropdown(
+            open ? null : id,
+          )
         }
         className={[
           "flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-all",
@@ -375,7 +473,10 @@ function CustomSelect({
       >
         <span className="flex min-w-0 items-center gap-2">
           {renderOption
-            ? renderOption(value, true)
+            ? renderOption(
+                value,
+                true,
+              )
             : value}
         </span>
 
@@ -388,46 +489,58 @@ function CustomSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[100] overflow-hidden rounded-xl border border-border/80 bg-popover p-1.5 text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5">
-          {options.map((option) => {
-            const selected =
-              option === value
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[100] max-h-60 overflow-y-auto rounded-xl border border-border/80 bg-popover p-1.5 text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5">
+          {options.map(
+            (option) => {
+              const selected =
+                option === value
 
-            return (
-              <button
-                key={option}
-                type="button"
-                onClick={() => {
-                  onChange(option)
-                  setOpen(false)
-                }}
-                className={[
-                  "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
-                  selected
-                    ? "bg-blue-500/10 text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                ].join(" ")}
-              >
-                <span className="flex min-w-0 items-center gap-2.5">
-                  {renderOption
-                    ? renderOption(
-                        option,
-                        selected,
-                      )
-                    : option}
-                </span>
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  role="option"
+                  aria-selected={
+                    selected
+                  }
+                  onClick={() => {
+                    onChange(option)
+                    setOpenDropdown(
+                      null,
+                    )
+                  }}
+                  className={[
+                    "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                    selected
+                      ? "bg-blue-500/10 text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  ].join(" ")}
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    {renderOption
+                      ? renderOption(
+                          option,
+                          selected,
+                        )
+                      : option}
+                  </span>
 
-                {selected && (
-                  <Check className="ml-3 h-4 w-4 shrink-0 text-blue-500" />
-                )}
-              </button>
-            )
-          })}
+                  {selected && (
+                    <Check className="ml-3 h-4 w-4 shrink-0 text-blue-500" />
+                  )}
+                </button>
+              )
+            },
+          )}
         </div>
       )}
     </div>
   )
 }
+
+/* -------------------------------------------------------------------------- */
+/* Category selector                                                          */
+/* -------------------------------------------------------------------------- */
 
 function CategorySelect({
   value,
@@ -440,6 +553,7 @@ function CategorySelect({
 }) {
   return (
     <CustomSelect
+      id="event-category"
       value={value}
       options={EVENT_CATEGORIES}
       ariaLabel="Event category"
@@ -471,10 +585,16 @@ function CategorySelect({
   )
 }
 
+/* -------------------------------------------------------------------------- */
+/* Time selector                                                              */
+/* -------------------------------------------------------------------------- */
+
 function TimeSelect({
+  id,
   value,
   onChange,
 }: {
+  id: string
   value: string
   onChange: (value: string) => void
 }) {
@@ -497,6 +617,7 @@ function TimeSelect({
   return (
     <div className="grid grid-cols-[1fr_1fr_0.9fr] gap-2">
       <CustomSelect
+        id={`${id}-hour`}
         value={parsed.hour}
         options={HOURS}
         ariaLabel="Hour"
@@ -506,6 +627,7 @@ function TimeSelect({
       />
 
       <CustomSelect
+        id={`${id}-minute`}
         value={parsed.minute}
         options={MINUTES}
         ariaLabel="Minute"
@@ -518,6 +640,7 @@ function TimeSelect({
       />
 
       <CustomSelect
+        id={`${id}-period`}
         value={parsed.period}
         options={PERIODS}
         ariaLabel="AM or PM"
@@ -533,6 +656,10 @@ function TimeSelect({
   )
 }
 
+/* -------------------------------------------------------------------------- */
+/* Date picker                                                                */
+/* -------------------------------------------------------------------------- */
+
 function DateSelect({
   value,
   onChange,
@@ -540,107 +667,30 @@ function DateSelect({
   value: string
   onChange: (value: string) => void
 }) {
-  const parts = getDateParts(value)
-
-  const dayOptions = Array.from(
-    { length: 31 },
-    (_, index) =>
-      String(index + 1).padStart(2, "0"),
-  )
-
-  const monthOptions = Array.from(
-    { length: 12 },
-    (_, index) =>
-      String(index + 1).padStart(2, "0"),
-  )
-
-  const currentYear =
-    new Date().getFullYear()
-
-  const yearOptions = Array.from(
-    { length: 5 },
-    (_, index) =>
-      String(currentYear + index),
-  )
-
-  function updateDate(
-    day = parts.day,
-    month = parts.month,
-    year = parts.year,
-  ) {
-    if (
-      !day ||
-      !month ||
-      !year
-    ) {
-      return
-    }
-
-    const numericDay = Number(day)
-    const numericMonth = Number(month)
-    const numericYear = Number(year)
-
-    const maxDays = new Date(
-      numericYear,
-      numericMonth,
-      0,
-    ).getDate()
-
-    const safeDay = Math.min(
-      numericDay,
-      maxDays,
-    )
-
-    onChange(
-      `${year}-${month}-${String(
-        safeDay,
-      ).padStart(2, "0")}`,
-    )
-  }
-
   return (
-    <div className="grid grid-cols-[0.9fr_1fr_1.25fr] gap-2">
-      <CustomSelect
-        value={parts.day || "01"}
-        options={dayOptions}
-        ariaLabel="Day"
-        onChange={(next) =>
-          updateDate(next)
-        }
-      />
+    <div className="relative">
+      <CalendarDays className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
-      <CustomSelect
-        value={parts.month || "01"}
-        options={monthOptions}
-        ariaLabel="Month"
-        onChange={(next) =>
-          updateDate(
-            parts.day || "01",
-            next,
-            parts.year ||
-              String(currentYear),
+      <Input
+        type="date"
+        value={value}
+        onChange={(
+          event: ChangeEvent<HTMLInputElement>,
+        ) =>
+          onChange(
+            event.target.value,
           )
         }
-      />
-
-      <CustomSelect
-        value={
-          parts.year ||
-          String(currentYear)
-        }
-        options={yearOptions}
-        ariaLabel="Year"
-        onChange={(next) =>
-          updateDate(
-            parts.day || "01",
-            parts.month || "01",
-            next,
-          )
-        }
+        className="h-10 rounded-lg pl-10 pr-3 font-medium shadow-sm"
+        aria-label="Event date"
       />
     </div>
   )
 }
+
+/* -------------------------------------------------------------------------- */
+/* Page                                                                       */
+/* -------------------------------------------------------------------------- */
 
 export default function Events() {
   const today = useMemo(
@@ -687,6 +737,10 @@ export default function Events() {
 
   const [deletingId, setDeletingId] =
     useState<string | null>(null)
+
+  /* ------------------------------------------------------------------------ */
+  /* Load events                                                              */
+  /* ------------------------------------------------------------------------ */
 
   useEffect(() => {
     let active = true
@@ -758,16 +812,12 @@ export default function Events() {
     }
   }, [])
 
-  /*
-   * Lock the page behind the modal.
-   * The original scroll position is restored
-   * when the modal closes.
-   */
+  /* ------------------------------------------------------------------------ */
+  /* Lock page scrolling while event modal is open                            */
+  /* ------------------------------------------------------------------------ */
+
   useEffect(() => {
     if (!showEventModal) {
-      document.body.style.overflow = ""
-      document.documentElement.style.overflow = ""
-
       return
     }
 
@@ -775,9 +825,12 @@ export default function Events() {
       document.body.style.overflow
 
     const previousHtmlOverflow =
-      document.documentElement.style.overflow
+      document.documentElement.style
+        .overflow
 
-    document.body.style.overflow = "hidden"
+    document.body.style.overflow =
+      "hidden"
+
     document.documentElement.style.overflow =
       "hidden"
 
@@ -789,6 +842,10 @@ export default function Events() {
         previousHtmlOverflow
     }
   }, [showEventModal])
+
+  /* ------------------------------------------------------------------------ */
+  /* Calendar data                                                            */
+  /* ------------------------------------------------------------------------ */
 
   const calendarDays = useMemo(
     () =>
@@ -842,7 +899,14 @@ export default function Events() {
           event.date >= todayKey,
       )
       .slice(0, 8)
-  }, [filteredEvents, today])
+  }, [
+    filteredEvents,
+    today,
+  ])
+
+  /* ------------------------------------------------------------------------ */
+  /* Event modal                                                              */
+  /* ------------------------------------------------------------------------ */
 
   function openAddEvent(
     date =
@@ -887,6 +951,10 @@ export default function Events() {
     setEditingEvent(null)
     setForm(EMPTY_FORM)
   }
+
+  /* ------------------------------------------------------------------------ */
+  /* Save                                                                     */
+  /* ------------------------------------------------------------------------ */
 
   async function saveEvent() {
     if (!form.title.trim()) {
@@ -964,6 +1032,12 @@ export default function Events() {
         )
       }
 
+      if (!data.event) {
+        throw new Error(
+          "The server did not return the saved event.",
+        )
+      }
+
       if (editingEvent) {
         setEvents((current) =>
           current.map((event) =>
@@ -996,9 +1070,7 @@ export default function Events() {
         ),
       )
 
-      setSelectedDate(
-        form.date,
-      )
+      setSelectedDate(form.date)
 
       setShowEventModal(false)
       setEditingEvent(null)
@@ -1013,6 +1085,10 @@ export default function Events() {
       setSaving(false)
     }
   }
+
+  /* ------------------------------------------------------------------------ */
+  /* Delete                                                                   */
+  /* ------------------------------------------------------------------------ */
 
   async function deleteEvent(
     event: CalendarEvent,
@@ -1076,6 +1152,7 @@ export default function Events() {
 
       <main className="relative min-h-screen pt-20">
         <div className="relative mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-7">
+          {/* Header */}
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-500">
@@ -1084,9 +1161,9 @@ export default function Events() {
               </div>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                View upcoming Metro Police Department
-                activities, patrols, operations, and
-                meetings.
+                View upcoming Metro Police
+                Department activities, patrols,
+                operations, and meetings.
               </p>
             </div>
 
@@ -1104,6 +1181,7 @@ export default function Events() {
             )}
           </div>
 
+          {/* Calendar */}
           <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
             <div className="flex flex-col gap-3 border-b border-border/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
               <div className="flex items-center gap-2">
@@ -1305,7 +1383,8 @@ export default function Events() {
                           2 && (
                           <div className="px-1 text-[10px] text-muted-foreground">
                             +
-                            {dayEvents.length - 2}{" "}
+                            {dayEvents.length -
+                              2}{" "}
                             more
                           </div>
                         )}
@@ -1319,7 +1398,8 @@ export default function Events() {
             <div className="flex flex-col gap-3 border-t border-border/70 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
                 <span className="shrink-0">
-                  Click a date to view its events.
+                  Click a date to view its
+                  events.
                 </span>
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -1356,6 +1436,7 @@ export default function Events() {
             </div>
           </section>
 
+          {/* Upcoming Events */}
           <section
             className={[
               "mt-6 overflow-hidden rounded-2xl bg-card/80 shadow-sm backdrop-blur",
@@ -1372,13 +1453,15 @@ export default function Events() {
                 </h2>
 
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  Scheduled events from today onwards.
+                  Scheduled events from today
+                  onwards.
                 </p>
               </div>
 
               {categoryFilter !== "All" && (
                 <span className="text-xs text-muted-foreground">
-                  Filter: {categoryFilter}
+                  Filter:{" "}
+                  {categoryFilter}
                 </span>
               )}
             </div>
@@ -1392,10 +1475,12 @@ export default function Events() {
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Please wait while the calendar is loaded.
+                  Please wait while the
+                  calendar is loaded.
                 </p>
               </div>
-            ) : upcomingEvents.length === 0 ? (
+            ) : upcomingEvents.length ===
+              0 ? (
               <div className="px-4 py-10 text-center">
                 <CalendarDays className="mx-auto h-8 w-8 text-muted-foreground" />
 
@@ -1404,7 +1489,8 @@ export default function Events() {
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  There are no events matching this filter.
+                  There are no events
+                  matching this filter.
                 </p>
 
                 {canManageEvents && (
@@ -1446,7 +1532,9 @@ export default function Events() {
                                 getCategoryClasses(
                                   event.category,
                                 ),
-                              ].join(" ")}
+                              ].join(
+                                " ",
+                              )}
                             >
                               <span className="text-[9px] font-semibold uppercase opacity-80">
                                 {parseDateKey(
@@ -1454,7 +1542,8 @@ export default function Events() {
                                 ).toLocaleDateString(
                                   "en-GB",
                                   {
-                                    month: "short",
+                                    month:
+                                      "short",
                                   },
                                 )}
                               </span>
@@ -1469,7 +1558,9 @@ export default function Events() {
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <h3 className="truncate text-sm font-semibold sm:text-base">
-                                  {event.title}
+                                  {
+                                    event.title
+                                  }
                                 </h3>
 
                                 <span
@@ -1478,22 +1569,34 @@ export default function Events() {
                                     getCategoryClasses(
                                       event.category,
                                     ),
-                                  ].join(" ")}
+                                  ].join(
+                                    " ",
+                                  )}
                                 >
-                                  {event.category}
+                                  {
+                                    event.category
+                                  }
                                 </span>
                               </div>
 
                               {event.description && (
                                 <p className="mt-1 line-clamp-1 text-xs text-muted-foreground sm:text-sm">
-                                  {event.description}
+                                  {
+                                    event.description
+                                  }
                                 </p>
                               )}
 
                               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                 <span className="inline-flex items-center gap-1.5">
                                   <Clock3 className="h-3.5 w-3.5" />
-                                  {event.startTime} - {event.endTime}
+                                  {
+                                    event.startTime
+                                  }{" "}
+                                  -{" "}
+                                  {
+                                    event.endTime
+                                  }
                                 </span>
 
                                 {event.location && (
@@ -1501,7 +1604,9 @@ export default function Events() {
                                     <MapPin className="h-3.5 w-3.5" />
 
                                     <span className="truncate">
-                                      {event.location}
+                                      {
+                                        event.location
+                                      }
                                     </span>
                                   </span>
                                 )}
@@ -1518,7 +1623,9 @@ export default function Events() {
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                onClick={(eventClick) =>
+                                onClick={(
+                                  eventClick,
+                                ) =>
                                   eventClick.stopPropagation()
                                 }
                               >
@@ -1578,6 +1685,10 @@ export default function Events() {
         <Footer />
       </main>
 
+      {/* -------------------------------------------------------------------- */}
+      {/* Selected date modal                                                  */}
+      {/* -------------------------------------------------------------------- */}
+
       {selectedDate && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
@@ -1618,7 +1729,8 @@ export default function Events() {
               </Button>
             </div>
 
-            {selectedDateEvents.length === 0 ? (
+            {selectedDateEvents.length ===
+            0 ? (
               <div className="px-5 py-10 text-center">
                 <CalendarDays className="mx-auto h-9 w-9 text-muted-foreground" />
 
@@ -1627,7 +1739,8 @@ export default function Events() {
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  There are no events scheduled for this date.
+                  There are no events scheduled
+                  for this date.
                 </p>
 
                 {canManageEvents && (
@@ -1667,14 +1780,20 @@ export default function Events() {
                                 getCategoryClasses(
                                   event.category,
                                 ),
-                              ].join(" ")}
+                              ].join(
+                                " ",
+                              )}
                             >
-                              {event.category}
+                              {
+                                event.category
+                              }
                             </span>
                           </div>
 
                           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                            {event.description}
+                            {
+                              event.description
+                            }
                           </p>
                         </div>
 
@@ -1720,14 +1839,19 @@ export default function Events() {
                       <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1.5">
                           <Clock3 className="h-3.5 w-3.5" />
-                          {event.startTime} -{" "}
+                          {
+                            event.startTime
+                          }{" "}
+                          -{" "}
                           {event.endTime}
                         </span>
 
                         {event.location && (
                           <span className="inline-flex items-center gap-1.5">
                             <MapPin className="h-3.5 w-3.5" />
-                            {event.location}
+                            {
+                              event.location
+                            }
                           </span>
                         )}
 
@@ -1754,13 +1878,18 @@ export default function Events() {
         </div>
       )}
 
+      {/* -------------------------------------------------------------------- */}
+      {/* Add / edit modal                                                     */}
+      {/* -------------------------------------------------------------------- */}
+
       {showEventModal && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (
               event.currentTarget ===
-              event.target
+                event.target &&
+              !saving
             ) {
               closeEventModal()
             }
@@ -1795,212 +1924,225 @@ export default function Events() {
               </Button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Title
-                  </label>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+              <DropdownProvider>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {/* Title */}
+                  <div className="sm:col-span-2">
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Title
+                    </label>
 
-                  <Input
-                    value={form.title}
-                    onChange={(
-                      event: ChangeEvent<HTMLInputElement>,
-                    ) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          title:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    placeholder="Event title"
-                    autoFocus
-                  />
-                </div>
+                    <Input
+                      value={form.title}
+                      onChange={(
+                        event: ChangeEvent<HTMLInputElement>,
+                      ) =>
+                        setForm(
+                          (current) => ({
+                            ...current,
+                            title:
+                              event.target
+                                .value,
+                          }),
+                        )
+                      }
+                      placeholder="Event title"
+                      autoFocus
+                    />
+                  </div>
 
-                <div className="sm:col-span-2">
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Description
-                  </label>
+                  {/* Description */}
+                  <div className="sm:col-span-2">
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Description
+                    </label>
 
-                  <Textarea
-                    value={
-                      form.description
-                    }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          description:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    placeholder="Describe the event..."
-                    rows={4}
-                  />
-                </div>
+                    <Textarea
+                      value={
+                        form.description
+                      }
+                      onChange={(event) =>
+                        setForm(
+                          (current) => ({
+                            ...current,
+                            description:
+                              event.target
+                                .value,
+                          }),
+                        )
+                      }
+                      placeholder="Describe the event..."
+                      rows={4}
+                    />
+                  </div>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Category
-                  </label>
+                  {/* Category */}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Category
+                    </label>
 
-                  <CategorySelect
-                    value={
-                      form.category
-                    }
-                    onChange={(
-                      category,
-                    ) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          category,
-                        }),
-                      )
-                    }
-                  />
-
-                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <span
-                      className={[
-                        "h-2 w-2 rounded-full",
-                        getCategoryDotClasses(
-                          form.category,
-                        ),
-                      ].join(" ")}
+                    <CategorySelect
+                      value={
+                        form.category
+                      }
+                      onChange={(
+                        category,
+                      ) =>
+                        setForm(
+                          (current) => ({
+                            ...current,
+                            category,
+                          }),
+                        )
+                      }
                     />
 
-                    <span>
-                      {form.category} event
-                    </span>
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span
+                        className={[
+                          "h-2 w-2 rounded-full",
+                          getCategoryDotClasses(
+                            form.category,
+                          ),
+                        ].join(" ")}
+                      />
+
+                      <span>
+                        {form.category} event
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Date */}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Date
+                    </label>
+
+                    <DateSelect
+                      value={form.date}
+                      onChange={(date) =>
+                        setForm(
+                          (current) => ({
+                            ...current,
+                            date,
+                          }),
+                        )
+                      }
+                    />
+                  </div>
+
+                  {/* Start time */}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Start Time
+                    </label>
+
+                    <TimeSelect
+                      id="start-time"
+                      value={
+                        form.startTime
+                      }
+                      onChange={(
+                        startTime,
+                      ) =>
+                        setForm(
+                          (current) => ({
+                            ...current,
+                            startTime,
+                          }),
+                        )
+                      }
+                    />
+
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      Hour · Minute · AM/PM
+                    </p>
+                  </div>
+
+                  {/* End time */}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      End Time
+                    </label>
+
+                    <TimeSelect
+                      id="end-time"
+                      value={
+                        form.endTime
+                      }
+                      onChange={(
+                        endTime,
+                      ) =>
+                        setForm(
+                          (current) => ({
+                            ...current,
+                            endTime,
+                          }),
+                        )
+                      }
+                    />
+
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      Hour · Minute · AM/PM
+                    </p>
+                  </div>
+
+                  {/* Location */}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Location
+                    </label>
+
+                    <Input
+                      value={
+                        form.location
+                      }
+                      onChange={(event) =>
+                        setForm(
+                          (current) => ({
+                            ...current,
+                            location:
+                              event.target
+                                .value,
+                          }),
+                        )
+                      }
+                      placeholder="Location"
+                    />
+                  </div>
+
+                  {/* Discord */}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Discord URL
+                    </label>
+
+                    <Input
+                      type="url"
+                      value={
+                        form.discordUrl
+                      }
+                      onChange={(event) =>
+                        setForm(
+                          (current) => ({
+                            ...current,
+                            discordUrl:
+                              event.target
+                                .value,
+                          }),
+                        )
+                      }
+                      placeholder="https://discord.com/..."
+                    />
                   </div>
                 </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Date
-                  </label>
-
-                  <DateSelect
-                    value={form.date}
-                    onChange={(date) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          date,
-                        }),
-                      )
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Start Time
-                  </label>
-
-                  <TimeSelect
-                    value={
-                      form.startTime
-                    }
-                    onChange={(
-                      startTime,
-                    ) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          startTime,
-                        }),
-                      )
-                    }
-                  />
-
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    Hour · Minute · AM/PM
-                  </p>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    End Time
-                  </label>
-
-                  <TimeSelect
-                    value={
-                      form.endTime
-                    }
-                    onChange={(
-                      endTime,
-                    ) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          endTime,
-                        }),
-                      )
-                    }
-                  />
-
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    Hour · Minute · AM/PM
-                  </p>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Location
-                  </label>
-
-                  <Input
-                    value={
-                      form.location
-                    }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          location:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    placeholder="Location"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Discord URL
-                  </label>
-
-                  <Input
-                    type="url"
-                    value={
-                      form.discordUrl
-                    }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          discordUrl:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    placeholder="https://discord.com/..."
-                  />
-                </div>
-              </div>
+              </DropdownProvider>
             </div>
 
+            {/* Footer */}
             <div className="flex shrink-0 justify-end gap-2 border-t border-border/70 px-5 py-4">
               <Button
                 type="button"
