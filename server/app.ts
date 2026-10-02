@@ -5307,10 +5307,34 @@ export function createApp() {
           })
         }
 
+        const metadata =
+          (file.metadata as {
+            contentType?: unknown
+            mediaType?: unknown
+          } | undefined) ?? {}
+
+        const contentType =
+          typeof file.contentType === "string" &&
+          file.contentType.trim()
+            ? file.contentType.trim()
+            : typeof metadata.contentType === "string" &&
+                metadata.contentType.trim()
+              ? metadata.contentType.trim()
+              : typeof metadata.mediaType === "string" &&
+                  metadata.mediaType === "video"
+                ? "video/mp4"
+                : "image/jpeg"
+
         res.setHeader(
           "Content-Type",
-          file.contentType ||
-            "application/octet-stream",
+          contentType,
+        )
+
+        // Tell the browser to render supported images/videos instead of
+        // treating the GridFS response as a downloadable binary file.
+        res.setHeader(
+          "Content-Disposition",
+          "inline",
         )
 
         res.setHeader(
