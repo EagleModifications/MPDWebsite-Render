@@ -1988,7 +1988,7 @@ export default function Events() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium">
-                      Title
+                      Title <span className="text-red-500">*</span>
                     </label>
 
                     <Input
@@ -2006,12 +2006,13 @@ export default function Events() {
                       }
                       placeholder="Event title"
                       autoFocus
+                      required
                     />
                   </div>
 
                   <div className="sm:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium">
-                      Description
+                      Description <span className="text-red-500">*</span>
                     </label>
 
                     <Textarea
@@ -2027,6 +2028,7 @@ export default function Events() {
                       }
                       placeholder="Describe the event..."
                       rows={4}
+                      required
                     />
                   </div>
 
@@ -2065,7 +2067,7 @@ export default function Events() {
 
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
-                      Date
+                      Date <span className="text-red-500">*</span>
                     </label>
 
                     <DateSelect
@@ -2083,7 +2085,7 @@ export default function Events() {
 
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
-                      Start Time
+                      Start Time <span className="text-red-500">*</span>
                     </label>
 
                     <TimeSelect
@@ -2106,7 +2108,7 @@ export default function Events() {
 
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
-                      End Time
+                      End Time <span className="text-red-500">*</span>
                     </label>
 
                     <TimeSelect
