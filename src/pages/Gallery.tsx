@@ -821,6 +821,7 @@ export default function Gallery() {
     return data.items
   }
 
+  // Description is intentionally optional; only title and media are required.
   async function saveGallery() {
     const cleanTitle =
       title.trim()
@@ -828,13 +829,6 @@ export default function Gallery() {
     if (!cleanTitle) {
       toast.error(
         "Enter a gallery title.",
-      )
-      return
-    }
-
-    if (!description.trim()) {
-      toast.error(
-        "Enter a gallery description.",
       )
       return
     }
