@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useState } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import {
   CalendarDays,
   ChevronDown,
@@ -88,25 +93,37 @@ const EMPTY_FORM: EventForm = {
 
 function formatDateKey(date: Date) {
   const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
+  const month = String(
+    date.getMonth() + 1,
+  ).padStart(2, "0")
+  const day = String(
+    date.getDate(),
+  ).padStart(2, "0")
 
   return `${year}-${month}-${day}`
 }
 
 function parseDateKey(value: string) {
-  const [year, month, day] = value.split("-").map(Number)
+  const [year, month, day] =
+    value.split("-").map(Number)
 
-  return new Date(year, month - 1, day)
+  return new Date(
+    year,
+    month - 1,
+    day,
+  )
 }
 
 function formatLongDate(value: string) {
-  return parseDateKey(value).toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  })
+  return parseDateKey(value).toLocaleDateString(
+    "en-GB",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    },
+  )
 }
 
 function getMonthStart(date: Date) {
@@ -118,22 +135,27 @@ function getMonthStart(date: Date) {
 }
 
 function getCalendarDays(month: Date) {
-  const firstDay = getMonthStart(month)
+  const firstDay =
+    getMonthStart(month)
 
   const mondayIndex =
     (firstDay.getDay() + 6) % 7
 
-  const daysInMonth = new Date(
-    month.getFullYear(),
-    month.getMonth() + 1,
-    0,
-  ).getDate()
+  const daysInMonth =
+    new Date(
+      month.getFullYear(),
+      month.getMonth() + 1,
+      0,
+    ).getDate()
 
-  const previousMonthDays = mondayIndex
+  const previousMonthDays =
+    mondayIndex
 
   const totalCells =
     Math.ceil(
-      (previousMonthDays + daysInMonth) / 7,
+      (previousMonthDays +
+        daysInMonth) /
+        7,
     ) * 7
 
   const days: Date[] = []
@@ -147,7 +169,9 @@ function getCalendarDays(month: Date) {
       new Date(
         month.getFullYear(),
         month.getMonth(),
-        1 - previousMonthDays + index,
+        1 -
+          previousMonthDays +
+          index,
       ),
     )
   }
@@ -267,6 +291,14 @@ export default function Events() {
   const [deletingId, setDeletingId] =
     useState<string | null>(null)
 
+  const [
+    categoryDropdownOpen,
+    setCategoryDropdownOpen,
+  ] = useState(false)
+
+  const categoryDropdownRef =
+    useRef<HTMLDivElement | null>(null)
+
   useEffect(() => {
     let active = true
 
@@ -337,6 +369,40 @@ export default function Events() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!categoryDropdownOpen) {
+      return
+    }
+
+    function handleOutsideClick(
+      event: MouseEvent,
+    ) {
+      const target =
+        event.target as Node
+
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(
+          target,
+        )
+      ) {
+        setCategoryDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick,
+    )
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick,
+      )
+    }
+  }, [categoryDropdownOpen])
+
   const calendarDays = useMemo(
     () =>
       getCalendarDays(
@@ -367,7 +433,8 @@ export default function Events() {
     return sortEvents(
       events.filter(
         (event) =>
-          event.date === selectedDate &&
+          event.date ===
+            selectedDate &&
           (categoryFilter === "All" ||
             event.category ===
               categoryFilter),
@@ -397,6 +464,7 @@ export default function Events() {
       formatDateKey(today),
   ) {
     setEditingEvent(null)
+    setCategoryDropdownOpen(false)
 
     setForm({
       ...EMPTY_FORM,
@@ -410,6 +478,7 @@ export default function Events() {
     event: CalendarEvent,
   ) {
     setEditingEvent(event)
+    setCategoryDropdownOpen(false)
 
     setForm({
       title: event.title,
@@ -430,9 +499,23 @@ export default function Events() {
       return
     }
 
+    setCategoryDropdownOpen(false)
     setShowEventModal(false)
     setEditingEvent(null)
     setForm(EMPTY_FORM)
+  }
+
+  function selectCategory(
+    category: EventCategory,
+  ) {
+    setForm(
+      (current) => ({
+        ...current,
+        category,
+      }),
+    )
+
+    setCategoryDropdownOpen(false)
   }
 
   async function saveEvent() {
@@ -1045,7 +1128,8 @@ export default function Events() {
                               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                 <span className="inline-flex items-center gap-1.5">
                                   <Clock3 className="h-3.5 w-3.5" />
-                                  {event.startTime} - {event.endTime}
+                                  {event.startTime} -{" "}
+                                  {event.endTime}
                                 </span>
 
                                 {event.location && (
@@ -1064,11 +1148,15 @@ export default function Events() {
                           <div className="flex shrink-0 items-center gap-2 sm:pl-2">
                             {event.discordUrl && (
                               <a
-                                href={event.discordUrl}
+                                href={
+                                  event.discordUrl
+                                }
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                onClick={(eventClick) =>
+                                onClick={(
+                                  eventClick,
+                                ) =>
                                   eventClick.stopPropagation()
                                 }
                               >
@@ -1279,7 +1367,8 @@ export default function Events() {
                       <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1.5">
                           <Clock3 className="h-3.5 w-3.5" />
-                          {event.startTime} - {event.endTime}
+                          {event.startTime} -{" "}
+                          {event.endTime}
                         </span>
 
                         {event.location && (
@@ -1291,7 +1380,9 @@ export default function Events() {
 
                         {event.discordUrl && (
                           <a
-                            href={event.discordUrl}
+                            href={
+                              event.discordUrl
+                            }
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-1.5 text-blue-500 hover:underline"
@@ -1384,7 +1475,8 @@ export default function Events() {
                       setForm(
                         (current) => ({
                           ...current,
-                          description: event.target.value,
+                          description:
+                            event.target.value,
                         }),
                       )
                     }
@@ -1399,57 +1491,118 @@ export default function Events() {
                     Category
                   </label>
 
-                  <div className="relative">
-                    <div
-                      aria-hidden="true"
-                      className={[
-                        "pointer-events-none absolute left-3 top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full",
-                        "ring-2 ring-background",
-                      ].join(" ")}
-                    >
-                      <span
-                        className={[
-                          "h-2.5 w-2.5 rounded-full",
-                          getCategoryDotClasses(
-                            form.category,
-                          ),
-                        ].join(" ")}
-                      />
-                    </div>
-
-                    <select
-                      value={form.category}
-                      onChange={(event) =>
-                        setForm(
-                          (current) => ({
-                            ...current,
-                            category:
-                              event.target
-                                .value as EventCategory,
-                          }),
+                  <div
+                    ref={
+                      categoryDropdownRef
+                    }
+                    className="relative"
+                  >
+                    <button
+                      type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded={
+                        categoryDropdownOpen
+                      }
+                      disabled={saving}
+                      onClick={() =>
+                        setCategoryDropdownOpen(
+                          (open) => !open,
                         )
                       }
-                      className="h-10 w-full appearance-none rounded-lg border border-input bg-background pl-10 pr-10 text-sm font-medium text-foreground shadow-sm outline-none transition-all hover:border-blue-500/30 hover:bg-muted/40 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                      className={[
+                        "flex h-10 w-full items-center justify-between rounded-lg border px-3 text-left text-sm font-medium shadow-sm outline-none transition-all",
+                        "bg-background text-foreground",
+                        "border-input hover:border-blue-500/30 hover:bg-muted/40",
+                        "focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20",
+                        categoryDropdownOpen
+                          ? "border-blue-500/50 ring-2 ring-blue-500/20"
+                          : "",
+                      ].join(" ")}
                     >
-                      {EVENT_CATEGORIES.map(
-                        (item) => (
-                          <option
-                            key={item}
-                            value={item}
-                          >
-                            {item}
-                          </option>
-                        ),
-                      )}
-                    </select>
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          className={[
+                            "h-2.5 w-2.5 shrink-0 rounded-full",
+                            getCategoryDotClasses(
+                              form.category,
+                            ),
+                          ].join(" ")}
+                        />
 
-                    <ChevronDown
-                      aria-hidden="true"
-                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors"
-                    />
+                        <span className="truncate">
+                          {form.category}
+                        </span>
+                      </span>
+
+                      <ChevronDown
+                        className={[
+                          "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                          categoryDropdownOpen
+                            ? "rotate-180"
+                            : "",
+                        ].join(" ")}
+                      />
+                    </button>
+
+                    {categoryDropdownOpen && (
+                      <div
+                        role="listbox"
+                        aria-label="Event category"
+                        className="absolute left-0 right-0 top-[calc(100%+6px)] z-[80] overflow-hidden rounded-lg border border-border/80 bg-popover p-1 text-popover-foreground shadow-xl shadow-black/10 ring-1 ring-black/5 dark:shadow-black/30 dark:ring-white/5"
+                      >
+                        {EVENT_CATEGORIES.map(
+                          (category) => {
+                            const selected =
+                              form.category ===
+                              category
+
+                            return (
+                              <button
+                                key={category}
+                                type="button"
+                                role="option"
+                                aria-selected={
+                                  selected
+                                }
+                                onClick={() =>
+                                  selectCategory(
+                                    category,
+                                  )
+                                }
+                                className={[
+                                  "flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition-colors",
+                                  selected
+                                    ? "bg-blue-500/10 text-foreground"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                                ].join(" ")}
+                              >
+                                <span
+                                  className={[
+                                    "h-2.5 w-2.5 shrink-0 rounded-full",
+                                    getCategoryDotClasses(
+                                      category,
+                                    ),
+                                  ].join(" ")}
+                                />
+
+                                <span className="flex-1">
+                                  {category}
+                                </span>
+
+                                {selected && (
+                                  <span className="text-[10px] font-medium text-blue-500">
+                                    Selected
+                                  </span>
+                                )}
+                              </button>
+                            )
+                          },
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <span
                       className={[
                         "h-2 w-2 shrink-0 rounded-full",
@@ -1459,7 +1612,7 @@ export default function Events() {
                       ].join(" ")}
                     />
 
-                    <span className="text-[11px] text-muted-foreground">
+                    <span>
                       {form.category} event
                     </span>
                   </div>
@@ -1496,7 +1649,8 @@ export default function Events() {
                       setForm(
                         (current) => ({
                           ...current,
-                          startTime: event.target.value,
+                          startTime:
+                            event.target.value,
                         }),
                       )
                     }
@@ -1515,7 +1669,8 @@ export default function Events() {
                       setForm(
                         (current) => ({
                           ...current,
-                          endTime: event.target.value,
+                          endTime:
+                            event.target.value,
                         }),
                       )
                     }
@@ -1533,7 +1688,8 @@ export default function Events() {
                       setForm(
                         (current) => ({
                           ...current,
-                          location: event.target.value,
+                          location:
+                            event.target.value,
                         }),
                       )
                     }
@@ -1553,7 +1709,8 @@ export default function Events() {
                       setForm(
                         (current) => ({
                           ...current,
-                          discordUrl: event.target.value,
+                          discordUrl:
+                            event.target.value,
                         }),
                       )
                     }
