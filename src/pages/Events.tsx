@@ -2048,17 +2048,6 @@ export default function Events() {
                         )
                       }
                     />
-
-                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <span
-                        className={[
-                          "h-2 w-2 rounded-full",
-                          getCategoryDotClasses(
-                            form.category,
-                          ),
-                        ].join(" ")}
-                      />
-                    </div>
                   </div>
 
                   <div>
