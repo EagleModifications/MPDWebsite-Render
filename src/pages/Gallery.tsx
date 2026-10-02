@@ -29,7 +29,6 @@ import Footer from "@/components/Footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { getSession, type User } from "@/lib/auth"
 
 type GalleryMediaType = "image" | "video"
 
@@ -395,9 +394,6 @@ function CategorySelect({
 }
 
 export default function Gallery() {
-  const [user, setUser] =
-    useState<User | null>(null)
-
   const [items, setItems] =
     useState<GalleryItem[]>([])
 
@@ -472,11 +468,9 @@ export default function Gallery() {
     async function load() {
       try {
         const [
-          session,
           galleryResponse,
           permissionResponse,
         ] = await Promise.all([
-          getSession(),
           fetch("/api/gallery", {
             credentials: "include",
           }),
@@ -491,8 +485,6 @@ export default function Gallery() {
         if (!active) {
           return
         }
-
-        setUser(session)
 
         const galleryData =
           await readApiResponse(
@@ -1044,7 +1036,10 @@ export default function Gallery() {
             )
           }
 
-          media.push(uploadedMedia)
+          media.push(
+            uploadedMedia as GalleryMedia,
+          )
+
           uploadIndex += 1
           continue
         }
@@ -2368,8 +2363,6 @@ export default function Gallery() {
             </div>
           </div>
         )}
-
-      {!user && !loading ? null : null}
     </div>
   )
 }
