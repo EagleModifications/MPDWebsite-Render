@@ -328,6 +328,37 @@ export default function Gallery() {
   const fileInputRef =
     useRef<HTMLInputElement | null>(null)
 
+  useEffect(() => {
+    const overlayOpen =
+      showModal ||
+      Boolean(viewer) ||
+      Boolean(deleteTarget)
+
+    if (!overlayOpen) return
+
+    const body = document.body
+    const html = document.documentElement
+    const previousBodyOverflow = body.style.overflow
+    const previousHtmlOverflow = html.style.overflow
+    const previousBodyPaddingRight = body.style.paddingRight
+
+    const scrollbarWidth =
+      window.innerWidth - document.documentElement.clientWidth
+
+    body.style.overflow = "hidden"
+    html.style.overflow = "hidden"
+
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`
+    }
+
+    return () => {
+      body.style.overflow = previousBodyOverflow
+      html.style.overflow = previousHtmlOverflow
+      body.style.paddingRight = previousBodyPaddingRight
+    }
+  }, [showModal, viewer, deleteTarget])
+
   const dragDepthRef =
     useRef(0)
 
@@ -1526,7 +1557,7 @@ export default function Gallery() {
 
       {deleteTarget && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] flex items-center justify-center overscroll-contain bg-black/55 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (
               event.currentTarget ===
@@ -1613,7 +1644,7 @@ export default function Gallery() {
 
       {showModal && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-center justify-center overscroll-contain bg-black/50 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (
               event.currentTarget ===
@@ -2008,7 +2039,7 @@ export default function Gallery() {
           viewer.index
         ] && (
           <div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-3 backdrop-blur-sm sm:p-6"
+            className="fixed inset-0 z-[70] flex items-center justify-center overscroll-contain bg-black/85 p-3 backdrop-blur-sm sm:p-6"
             onMouseDown={(event) => {
               if (
                 event.currentTarget ===
