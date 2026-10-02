@@ -58,7 +58,11 @@ type PendingMedia = GalleryMedia & {
   file?: File
 }
 
-type GalleryFilter = "All" | "Images" | "Videos" | "Fleet"
+type GalleryFilter =
+  | "All"
+  | "Images"
+  | "Videos"
+  | "Fleet"
 
 const GALLERY_FILTERS: GalleryFilter[] = [
   "All",
@@ -67,27 +71,51 @@ const GALLERY_FILTERS: GalleryFilter[] = [
   "Fleet",
 ]
 
-function getMediaLabel(type: GalleryMediaType) {
-  return type === "image" ? "Image" : "Video"
+function getMediaLabel(
+  type: GalleryMediaType,
+) {
+  return type === "image"
+    ? "Image"
+    : "Video"
 }
 
-function isImageMedia(media: GalleryMedia) {
+function isImageMedia(
+  media: GalleryMedia,
+) {
   return media.type === "image"
 }
 
-function isVideoMedia(media: GalleryMedia) {
+function isVideoMedia(
+  media: GalleryMedia,
+) {
   return media.type === "video"
 }
 
-function getAspectClass(ratio?: number) {
-  if (!ratio || !Number.isFinite(ratio)) {
+function getAspectClass(
+  ratio?: number,
+) {
+  if (
+    !ratio ||
+    !Number.isFinite(ratio)
+  ) {
     return "aspect-[4/3]"
   }
 
-  if (ratio >= 1.85) return "aspect-[16/8]"
-  if (ratio >= 1.35) return "aspect-[4/3]"
-  if (ratio >= 1.05) return "aspect-square"
-  if (ratio >= 0.8) return "aspect-[4/5]"
+  if (ratio >= 1.85) {
+    return "aspect-[16/8]"
+  }
+
+  if (ratio >= 1.35) {
+    return "aspect-[4/3]"
+  }
+
+  if (ratio >= 1.05) {
+    return "aspect-square"
+  }
+
+  if (ratio >= 0.8) {
+    return "aspect-[4/5]"
+  }
 
   return "aspect-[3/4]"
 }
@@ -99,11 +127,14 @@ function formatDate(value: string) {
     return ""
   }
 
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
+  return date.toLocaleDateString(
+    "en-GB",
+    {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    },
+  )
 }
 
 function makePendingFromMedia(
@@ -112,6 +143,24 @@ function makePendingFromMedia(
   return {
     ...media,
     previewUrl: media.url,
+  }
+}
+
+function getCategoryClasses(
+  category: GalleryCategory,
+) {
+  if (category === "Fleet") {
+    return {
+      badge:
+        "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300",
+      dot: "bg-amber-500",
+    }
+  }
+
+  return {
+    badge:
+      "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300",
+    dot: "bg-blue-500",
   }
 }
 
@@ -125,8 +174,10 @@ export default function Gallery() {
   const [loading, setLoading] =
     useState(true)
 
-  const [canManageGallery, setCanManageGallery] =
-    useState(false)
+  const [
+    canManageGallery,
+    setCanManageGallery,
+  ] = useState(false)
 
   const [filter, setFilter] =
     useState<GalleryFilter>("All")
@@ -150,7 +201,9 @@ export default function Gallery() {
     useState("")
 
   const [category, setCategory] =
-    useState<GalleryCategory>("Community")
+    useState<GalleryCategory>(
+      "Community",
+    )
 
   const [pendingMedia, setPendingMedia] =
     useState<PendingMedia[]>([])
@@ -177,7 +230,9 @@ export default function Gallery() {
     useState<GalleryItem | null>(null)
 
   const fileInputRef =
-    useRef<HTMLInputElement | null>(null)
+    useRef<HTMLInputElement | null>(
+      null,
+    )
 
   const dragDepthRef =
     useRef(0)
@@ -267,7 +322,9 @@ export default function Gallery() {
       }
 
       if (filter === "Fleet") {
-        return item.category === "Fleet"
+        return (
+          item.category === "Fleet"
+        )
       }
 
       return true
@@ -363,7 +420,9 @@ export default function Gallery() {
     setEditingItem(item)
     setTitle(item.title)
     setDescription(item.description)
-    setCategory(item.category ?? "Community")
+    setCategory(
+      item.category ?? "Community",
+    )
     setPendingMedia(
       item.media.map(
         makePendingFromMedia,
@@ -577,8 +636,7 @@ export default function Gallery() {
     setIsDragging(false)
 
     if (
-      event.dataTransfer.files
-        ?.length
+      event.dataTransfer.files?.length
     ) {
       handleFiles(
         event.dataTransfer.files,
@@ -1039,33 +1097,42 @@ export default function Gallery() {
 
               <div className="flex flex-wrap items-center gap-1.5">
                 {GALLERY_FILTERS.map(
-                  (item) => (
+                  (filterItem) => (
                     <button
-                      key={item}
+                      key={filterItem}
                       type="button"
                       onClick={() =>
-                        setFilter(item)
+                        setFilter(
+                          filterItem,
+                        )
                       }
                       className={[
                         "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        filter === item
-                          ? item === "Images"
+                        filter ===
+                        filterItem
+                          ? filterItem ===
+                            "Images"
                             ? "border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-300"
-                            : item === "Videos"
+                            : filterItem ===
+                                "Videos"
                               ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                              : item === "Fleet"
+                              : filterItem ===
+                                  "Fleet"
                                 ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300"
                                 : "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                          : item === "Images"
+                          : filterItem ===
+                              "Images"
                             ? "border-purple-500/20 bg-purple-500/5 text-purple-600/80 hover:bg-purple-500/10 hover:text-purple-700 dark:text-purple-300/80 dark:hover:text-purple-200"
-                            : item === "Videos"
+                            : filterItem ===
+                                "Videos"
                               ? "border-blue-500/20 bg-blue-500/5 text-blue-600/80 hover:bg-blue-500/10 hover:text-blue-700 dark:text-blue-300/80 dark:hover:text-blue-200"
-                              : item === "Fleet"
+                              : filterItem ===
+                                  "Fleet"
                                 ? "border-amber-500/20 bg-amber-500/5 text-amber-600/80 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-300/80 dark:hover:text-amber-200"
                                 : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
                       ].join(" ")}
                     >
-                      {item}
+                      {filterItem}
                     </button>
                   ),
                 )}
@@ -1121,6 +1188,15 @@ export default function Gallery() {
                           item,
                         )
 
+                      const itemCategory =
+                        item.category ??
+                        "Community"
+
+                      const categoryClasses =
+                        getCategoryClasses(
+                          itemCategory,
+                        )
+
                       return (
                         <article
                           key={item.id}
@@ -1156,13 +1232,20 @@ export default function Gallery() {
                                 <div className="mb-1.5 flex items-center gap-2">
                                   <span
                                     className={[
-                        "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        filter === item
-                          ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                          : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                      ].join(" ")}
+                                      "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                                      categoryClasses.badge,
+                                    ].join(" ")}
                                   >
-                                    {item.category ?? "Community"}
+                                    <span
+                                      className={[
+                                        "h-1.5 w-1.5 shrink-0 rounded-full",
+                                        categoryClasses.dot,
+                                      ].join(" ")}
+                                    />
+
+                                    {
+                                      itemCategory
+                                    }
                                   </span>
                                 </div>
 
@@ -1535,45 +1618,49 @@ export default function Gallery() {
                   </label>
 
                   <div className="relative">
+                    <span
+                      className={[
+                        "pointer-events-none absolute left-3 top-1/2 z-10 h-2.5 w-2.5 -translate-y-1/2 rounded-full ring-2 ring-background",
+                        category ===
+                        "Fleet"
+                          ? "bg-amber-500"
+                          : "bg-blue-500",
+                      ].join(" ")}
+                    />
+
                     <select
                       value={category}
-                      onChange={(event) =>
+                      onChange={(
+                        event,
+                      ) =>
                         setCategory(
-                          event.target.value as GalleryCategory,
+                          event.target
+                            .value as GalleryCategory,
                         )
                       }
-                      className="flex h-10 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-10 text-sm font-medium text-foreground shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
+                      className="h-10 w-full appearance-none rounded-lg border border-input bg-background pl-8 pr-10 text-sm font-medium text-foreground shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
                     >
                       <option value="Community">
                         Community
                       </option>
+
                       <option value="Fleet">
                         Fleet
                       </option>
                     </select>
 
-                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center gap-2">
-                      <span
-                        className={[
-                          "h-2.5 w-2.5 rounded-full",
-                          category === "Fleet"
-                            ? "bg-amber-500"
-                            : "bg-blue-500",
-                        ].join(" ")}
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                        clipRule="evenodd"
                       />
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        className="h-4 w-4 text-muted-foreground"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
+                    </svg>
                   </div>
                 </div>
 
@@ -1662,7 +1749,7 @@ export default function Gallery() {
                           event.target.value as GalleryMediaType,
                         )
                       }
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <option value="image">
                         Image
