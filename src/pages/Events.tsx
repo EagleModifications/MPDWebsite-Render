@@ -1017,12 +1017,21 @@ export default function Events() {
 
                                 <span
                                   className={[
-                                    "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                                    "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium",
                                     getCategoryClasses(
                                       event.category,
                                     ),
                                   ].join(" ")}
                                 >
+                                  <span
+                                    className={[
+                                      "h-1.5 w-1.5 rounded-full",
+                                      getCategoryDotClasses(
+                                        event.category,
+                                      ),
+                                    ].join(" ")}
+                                  />
+
                                   {event.category}
                                 </span>
                               </div>
@@ -1204,12 +1213,21 @@ export default function Events() {
 
                             <span
                               className={[
-                                "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                                "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium",
                                 getCategoryClasses(
                                   event.category,
                                 ),
                               ].join(" ")}
                             >
+                              <span
+                                className={[
+                                  "h-1.5 w-1.5 rounded-full",
+                                  getCategoryDotClasses(
+                                    event.category,
+                                  ),
+                                ].join(" ")}
+                              />
+
                               {event.category}
                             </span>
                           </div>
@@ -1382,15 +1400,22 @@ export default function Events() {
                   </label>
 
                   <div className="relative">
-                    <span
+                    <div
                       aria-hidden="true"
                       className={[
-                        "pointer-events-none absolute left-3 top-1/2 z-10 h-2.5 w-2.5 -translate-y-1/2 rounded-full ring-2 ring-background",
-                        getCategoryDotClasses(
-                          form.category,
-                        ),
+                        "pointer-events-none absolute left-3 top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full",
+                        "ring-2 ring-background",
                       ].join(" ")}
-                    />
+                    >
+                      <span
+                        className={[
+                          "h-2.5 w-2.5 rounded-full",
+                          getCategoryDotClasses(
+                            form.category,
+                          ),
+                        ].join(" ")}
+                      />
+                    </div>
 
                     <select
                       value={form.category}
@@ -1404,7 +1429,7 @@ export default function Events() {
                           }),
                         )
                       }
-                      className="h-9 w-full appearance-none rounded-md border border-input bg-background pl-8 pr-9 text-sm shadow-xs outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
+                      className="h-10 w-full appearance-none rounded-lg border border-input bg-background pl-10 pr-10 text-sm font-medium text-foreground shadow-sm outline-none transition-all hover:border-blue-500/30 hover:bg-muted/40 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
                     >
                       {EVENT_CATEGORIES.map(
                         (item) => (
@@ -1418,20 +1443,23 @@ export default function Events() {
                       )}
                     </select>
 
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors"
+                    />
                   </div>
 
-                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <div className="mt-2 flex items-center gap-2">
                     <span
                       className={[
-                        "h-2 w-2 rounded-full",
+                        "h-2 w-2 shrink-0 rounded-full",
                         getCategoryDotClasses(
                           form.category,
                         ),
                       ].join(" ")}
                     />
 
-                    <span>
+                    <span className="text-[11px] text-muted-foreground">
                       {form.category} event
                     </span>
                   </div>
