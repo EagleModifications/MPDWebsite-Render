@@ -171,6 +171,7 @@ function CategorySelect({
   onChange: (value: GalleryCategory) => void
 }) {
   const [open, setOpen] = useState(false)
+
   const containerRef =
     useRef<HTMLDivElement | null>(null)
 
@@ -1258,7 +1259,7 @@ export default function Gallery() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                 <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                   <span className="mr-1 text-xs font-semibold text-muted-foreground">
                     Category
