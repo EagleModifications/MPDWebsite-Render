@@ -1,4 +1,6 @@
 import {
+  createContext,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -7,6 +9,8 @@ import {
   type ReactNode,
 } from "react"
 import {
+  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Edit3,
@@ -72,6 +76,118 @@ const GALLERY_MEDIA_FILTERS: GalleryMediaFilter[] = [
   "Images",
   "Videos",
 ]
+
+type DropdownContextValue = {
+  openDropdown: string | null
+  setOpenDropdown: (value: string | null) => void
+}
+
+const DropdownContext = createContext<DropdownContextValue | null>(null)
+
+function DropdownProvider({ children }: { children: ReactNode }) {
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+
+  return (
+    <DropdownContext.Provider value={{ openDropdown, setOpenDropdown }}>
+      {children}
+    </DropdownContext.Provider>
+  )
+}
+
+function CustomSelect({
+  id,
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  id: string
+  value: string
+  options: readonly string[]
+  onChange: (value: string) => void
+  ariaLabel: string
+}) {
+  const dropdown = useContext(DropdownContext)
+
+  if (!dropdown) {
+    throw new Error("CustomSelect must be used inside DropdownProvider.")
+  }
+
+  const { openDropdown, setOpenDropdown } = dropdown
+  const open = openDropdown === id
+
+  useEffect(() => {
+    if (!open) return
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as HTMLElement
+      if (!target.closest(`[data-custom-select="${id}"]`)) {
+        setOpenDropdown(null)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpenDropdown(null)
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [id, open, setOpenDropdown])
+
+  return (
+    <div className="relative" data-custom-select={id}>
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpenDropdown(open ? null : id)}
+        className={[
+          "flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-all",
+          "hover:border-blue-500/30 hover:bg-muted/40",
+          "focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20",
+          open ? "border-blue-500/50 ring-2 ring-blue-500/20" : "",
+        ].join(" ")}
+      >
+        <span>{value}</span>
+        <ChevronDown className={["h-4 w-4 text-muted-foreground transition-transform", open ? "rotate-180" : ""].join(" ")} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[100] rounded-xl border border-border/80 bg-popover p-1.5 text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5">
+          {options.map((option) => {
+            const selected = option === value
+
+            return (
+              <button
+                key={option}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => {
+                  onChange(option)
+                  setOpenDropdown(null)
+                }}
+                className={[
+                  "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                  selected ? "bg-blue-500/10 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ].join(" ")}
+              >
+                <span>{option}</span>
+                {selected && <Check className="h-4 w-4 text-blue-500" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function getMediaLabel(type: GalleryMediaType) {
   return type === "image" ? "Image" : "Video"
@@ -265,8 +381,7 @@ export default function Gallery() {
     return items.filter((item) => {
       const matchesCategory =
         categoryFilter === "All" ||
-        (item.category ?? "Community") ===
-          categoryFilter
+        (item.category ?? "Community") === categoryFilter
 
       const matchesMedia =
         mediaFilter === "All" ||
@@ -278,11 +393,7 @@ export default function Gallery() {
 
       return matchesCategory && matchesMedia
     })
-  }, [
-    categoryFilter,
-    items,
-    mediaFilter,
-  ])
+  }, [categoryFilter, items, mediaFilter])
 
   const visibleMediaCount = useMemo(() => {
     return filteredItems.reduce(
@@ -1044,77 +1155,41 @@ export default function Gallery() {
                   {visibleMediaCount === 1
                     ? "media item"
                     : "media items"}
-                  {categoryFilter !== "All" ||
-                  mediaFilter !== "All"
-                    ? ` · ${categoryFilter !== "All" ? categoryFilter : "All"} · ${mediaFilter !== "All" ? mediaFilter : "All"}`
-                    : ""}
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2 sm:items-end">
-                <div className="flex flex-wrap items-center justify-end gap-1.5">
-                  <span className="mr-1 text-[11px] font-medium text-muted-foreground">
-                    Category
-                  </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {GALLERY_MEDIA_FILTERS.map((item) => (
+                  <button
+                    key={`media-${item}`}
+                    type="button"
+                    onClick={() => setMediaFilter(item)}
+                    className={[
+                      "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      mediaFilter === item
+                        ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                        : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ].join(" ")}
+                  >
+                    {item}
+                  </button>
+                ))}
 
-                  {GALLERY_CATEGORY_FILTERS.map(
-                    (item) => (
-                      <button
-                        key={`category-${item}`}
-                        type="button"
-                        onClick={() =>
-                          setCategoryFilter(item)
-                        }
-                        className={[
-                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          categoryFilter === item
-                            ? item === "Fleet"
-                              ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300"
-                              : "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                            : item === "Fleet"
-                              ? "border-amber-500/20 bg-amber-500/5 text-amber-600/80 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-300/80 dark:hover:text-amber-200"
-                              : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                        ].join(" ")}
-                      >
-                        {item}
-                      </button>
-                    ),
-                  )}
-                </div>
-
-                <div className="flex flex-wrap items-center justify-end gap-1.5">
-                  <span className="mr-1 text-[11px] font-medium text-muted-foreground">
-                    Media
-                  </span>
-
-                  {GALLERY_MEDIA_FILTERS.map(
-                    (item) => (
-                      <button
-                        key={`media-${item}`}
-                        type="button"
-                        onClick={() =>
-                          setMediaFilter(item)
-                        }
-                        className={[
-                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          mediaFilter === item
-                            ? item === "Images"
-                              ? "border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-300"
-                              : item === "Videos"
-                                ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                                : "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                            : item === "Images"
-                              ? "border-purple-500/20 bg-purple-500/5 text-purple-600/80 hover:bg-purple-500/10 hover:text-purple-700 dark:text-purple-300/80 dark:hover:text-purple-200"
-                              : item === "Videos"
-                                ? "border-blue-500/20 bg-blue-500/5 text-blue-600/80 hover:bg-blue-500/10 hover:text-blue-700 dark:text-blue-300/80 dark:hover:text-blue-200"
-                                : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                        ].join(" ")}
-                      >
-                        {item}
-                      </button>
-                    ),
-                  )}
-                </div>
+                {GALLERY_CATEGORY_FILTERS.map((item) => (
+                  <button
+                    key={`category-${item}`}
+                    type="button"
+                    onClick={() => setCategoryFilter(item)}
+                    className={[
+                      "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      categoryFilter === item
+                        ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                        : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ].join(" ")}
+                  >
+                    {item}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1142,7 +1217,7 @@ export default function Gallery() {
 
                 <p className="mt-1 text-xs text-muted-foreground">
                   There are no gallery items
-                  matching the selected filters.
+                  matching this filter.
                 </p>
 
                 {canManageGallery && (
@@ -1296,23 +1371,24 @@ export default function Gallery() {
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
+                    <span>
+                      Images
+                    </span>
+                  </span>
+
+                  <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                    <span>Community</span>
+                    <span>
+                      Videos
+                    </span>
                   </span>
 
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                    <span>Fleet</span>
-                  </span>
-
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
-                    <span>Images</span>
-                  </span>
-
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                    <span>Videos</span>
+                    <span>
+                      Fleet
+                    </span>
                   </span>
                 </div>
               </div>
@@ -1511,7 +1587,7 @@ export default function Gallery() {
             }
           }}
         >
-          <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
             <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-blue-500">
@@ -1538,9 +1614,10 @@ export default function Gallery() {
               </Button>
             </div>
 
-            <div className="max-h-[78vh] overflow-y-auto px-5 py-5">
-              <div className="grid gap-4">
-                <div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+              <DropdownProvider>
+                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-sm font-medium">
                     Title
                   </label>
@@ -1557,7 +1634,7 @@ export default function Gallery() {
                   />
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-sm font-medium">
                     Description
                   </label>
@@ -1579,22 +1656,15 @@ export default function Gallery() {
                     Category
                   </label>
 
-                  <select
+                  <CustomSelect
+                    id="gallery-category"
                     value={category}
-                    onChange={(event) =>
-                      setCategory(
-                        event.target.value as GalleryCategory,
-                      )
+                    options={["Community", "Fleet"]}
+                    ariaLabel="Gallery category"
+                    onChange={(value) =>
+                      setCategory(value as GalleryCategory)
                     }
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="Community">
-                      Community
-                    </option>
-                    <option value="Fleet">
-                      Fleet
-                    </option>
-                  </select>
+                  />
                 </div>
 
                 <div
@@ -1675,23 +1745,15 @@ export default function Gallery() {
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto]">
-                    <select
-                      value={urlType}
-                      onChange={(event) =>
-                        setUrlType(
-                          event.target.value as GalleryMediaType,
-                        )
+                    <CustomSelect
+                      id="gallery-url-type"
+                      value={urlType === "image" ? "Image" : "Video"}
+                      options={["Image", "Video"]}
+                      ariaLabel="Media type"
+                      onChange={(value) =>
+                        setUrlType(value === "Image" ? "image" : "video")
                       }
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <option value="image">
-                        Image
-                      </option>
-
-                      <option value="video">
-                        Video
-                      </option>
-                    </select>
+                    />
 
                     <Input
                       value={urlInput}
@@ -1851,10 +1913,10 @@ export default function Gallery() {
                     </div>
                   )}
                 </div>
-              </div>
+              </DropdownProvider>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-border/70 px-5 py-4">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border/70 px-5 py-4">
               <Button
                 type="button"
                 variant="outline"
