@@ -656,7 +656,7 @@ export default function Gallery() {
 
   function getVisibleMedia(
     item: GalleryItem,
-  ) {
+  ): GalleryMedia[] {
     if (mediaFilter === "Images") {
       return item.media.filter(
         isImageMedia,
@@ -929,7 +929,9 @@ export default function Gallery() {
     }
   }
 
-  async function uploadPendingFiles() {
+  async function uploadPendingFiles(): Promise<
+    GalleryMedia[]
+  > {
     const files = pendingMedia
       .filter(
         (media) =>
@@ -1036,10 +1038,7 @@ export default function Gallery() {
             )
           }
 
-          media.push(
-            uploadedMedia as GalleryMedia,
-          )
-
+          media.push(uploadedMedia)
           uploadIndex += 1
           continue
         }
@@ -1128,11 +1127,14 @@ export default function Gallery() {
         )
       }
 
+      const savedItem =
+        data.item
+
       if (isEditing) {
         setItems((current) =>
           current.map((item) =>
             item.id === editingItem?.id
-              ? data.item as GalleryItem
+              ? savedItem
               : item,
           ),
         )
@@ -1142,7 +1144,7 @@ export default function Gallery() {
         )
       } else {
         setItems((current) => [
-          data.item as GalleryItem,
+          savedItem,
           ...current,
         ])
 
@@ -1253,11 +1255,18 @@ export default function Gallery() {
     }
   }
 
+  /*
+   * IMPORTANT:
+   * The viewer accepts a GalleryItem first and
+   * GalleryMedia second. This prevents GalleryItem
+   * from accidentally being passed where GalleryMedia
+   * is expected.
+   */
   function openViewer(
     item: GalleryItem,
     media: GalleryMedia,
   ) {
-    const mediaList =
+    const mediaList: GalleryMedia[] =
       getVisibleMedia(item)
 
     const index =
@@ -1266,12 +1275,18 @@ export default function Gallery() {
           entry.id === media.id,
       )
 
+    if (index < 0) {
+      return
+    }
+
+    const viewerItem: GalleryItem = {
+      ...item,
+      media: mediaList,
+    }
+
     setViewer({
-      item: {
-        ...item,
-        media: mediaList,
-      },
-      index: Math.max(0, index),
+      item: viewerItem,
+      index,
     })
   }
 
@@ -1285,11 +1300,18 @@ export default function Gallery() {
         return current
       }
 
+      const mediaCount =
+        current.item.media.length
+
+      if (mediaCount <= 1) {
+        return current
+      }
+
       return {
         ...current,
         index:
           current.index <= 0
-            ? current.item.media.length - 1
+            ? mediaCount - 1
             : current.index - 1,
       }
     })
@@ -1301,11 +1323,18 @@ export default function Gallery() {
         return current
       }
 
+      const mediaCount =
+        current.item.media.length
+
+      if (mediaCount <= 1) {
+        return current
+      }
+
       return {
         ...current,
         index:
           current.index >=
-          current.item.media.length - 1
+          mediaCount - 1
             ? 0
             : current.index + 1,
       }
@@ -1503,9 +1532,7 @@ export default function Gallery() {
                   {filteredItems.map(
                     (item) => {
                       const mediaList =
-                        getVisibleMedia(
-                          item,
-                        )
+                        getVisibleMedia(item)
 
                       const itemCategory =
                         item.category ??
@@ -1751,7 +1778,6 @@ export default function Gallery() {
         <Footer />
       </main>
 
-      {/* DELETE CONFIRMATION MODAL */}
       {deleteTarget && (
         <div
           className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
@@ -1842,7 +1868,6 @@ export default function Gallery() {
         </div>
       )}
 
-      {/* ADD / EDIT MODAL */}
       {showModal && (
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
@@ -2235,7 +2260,6 @@ export default function Gallery() {
         </div>
       )}
 
-      {/* MEDIA VIEWER */}
       {viewer &&
         viewer.item.media[viewer.index] && (
           <div
