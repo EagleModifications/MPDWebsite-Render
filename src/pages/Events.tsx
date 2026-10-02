@@ -1,8 +1,8 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
+  type ChangeEvent,
 } from "react"
 import {
   CalendarDays,
@@ -66,9 +66,7 @@ const EVENT_CATEGORIES: EventCategory[] = [
   "Meetings",
 ]
 
-const CATEGORY_FILTERS: Array<
-  "All" | EventCategory
-> = [
+const CATEGORY_FILTERS: Array<"All" | EventCategory> = [
   "All",
   ...EVENT_CATEGORIES,
 ]
@@ -83,6 +81,18 @@ const WEEKDAYS = [
   "Sunday",
 ]
 
+const HOURS = Array.from(
+  { length: 12 },
+  (_, index) =>
+    String(index + 1).padStart(2, "0"),
+)
+
+const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"]
+
+const PERIODS = ["AM", "PM"] as const
+
+type Period = (typeof PERIODS)[number]
+
 const EMPTY_FORM: EventForm = {
   title: "",
   description: "",
@@ -96,25 +106,16 @@ const EMPTY_FORM: EventForm = {
 
 function formatDateKey(date: Date) {
   const year = date.getFullYear()
-  const month = String(
-    date.getMonth() + 1,
-  ).padStart(2, "0")
-  const day = String(
-    date.getDate(),
-  ).padStart(2, "0")
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
 
   return `${year}-${month}-${day}`
 }
 
 function parseDateKey(value: string) {
-  const [year, month, day] =
-    value.split("-").map(Number)
+  const [year, month, day] = value.split("-").map(Number)
 
-  return new Date(
-    year,
-    month - 1,
-    day,
-  )
+  return new Date(year, month - 1, day)
 }
 
 function formatLongDate(value: string) {
@@ -149,30 +150,19 @@ function getCalendarDays(month: Date) {
     0,
   ).getDate()
 
-  const previousMonthDays =
-    mondayIndex
-
   const totalCells =
     Math.ceil(
-      (previousMonthDays +
-        daysInMonth) /
-        7,
+      (mondayIndex + daysInMonth) / 7,
     ) * 7
 
   const days: Date[] = []
 
-  for (
-    let index = 0;
-    index < totalCells;
-    index += 1
-  ) {
+  for (let index = 0; index < totalCells; index += 1) {
     days.push(
       new Date(
         month.getFullYear(),
         month.getMonth(),
-        1 -
-          previousMonthDays +
-          index,
+        1 - mondayIndex + index,
       ),
     )
   }
@@ -246,61 +236,198 @@ function sortEvents(
   )
 }
 
-function formatTimeLabel(value: string) {
-  if (!value) {
-    return "Select time"
+function parseTime(value: string) {
+  const [hourString, minuteString] =
+    value.split(":")
+
+  const hour = Number(hourString)
+  const minute = minuteString ?? "00"
+
+  const period: Period =
+    hour >= 12 ? "PM" : "AM"
+
+  let displayHour = hour % 12
+
+  if (displayHour === 0) {
+    displayHour = 12
   }
 
-  const [
-    hoursString,
-    minutesString,
-  ] = value.split(":")
-
-  const hours = Number(hoursString)
-  const minutes = Number(minutesString)
-
-  if (
-    Number.isNaN(hours) ||
-    Number.isNaN(minutes)
-  ) {
-    return value
+  return {
+    hour: String(displayHour).padStart(2, "0"),
+    minute,
+    period,
   }
-
-  const period =
-    hours >= 12 ? "PM" : "AM"
-
-  const displayHours =
-    hours % 12 === 0
-      ? 12
-      : hours % 12
-
-  return `${String(displayHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${period}`
 }
 
-function getTimeOptions() {
-  const options: string[] = []
+function buildTime(
+  hour: string,
+  minute: string,
+  period: Period,
+) {
+  let numericHour = Number(hour)
 
-  for (
-    let hour = 0;
-    hour < 24;
-    hour += 1
-  ) {
-    for (
-      let minute = 0;
-      minute < 60;
-      minute += 15
-    ) {
-      options.push(
-        `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
-      )
+  if (period === "AM") {
+    if (numericHour === 12) {
+      numericHour = 0
+    }
+  } else if (numericHour !== 12) {
+    numericHour += 12
+  }
+
+  return `${String(numericHour).padStart(2, "0")}:${minute}`
+}
+
+function getDateParts(value: string) {
+  if (!value) {
+    return {
+      day: "",
+      month: "",
+      year: "",
     }
   }
 
-  return options
+  const [year, month, day] =
+    value.split("-")
+
+  return {
+    day,
+    month,
+    year,
+  }
 }
 
-const TIME_OPTIONS =
-  getTimeOptions()
+function CustomSelect({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  className = "",
+  renderOption,
+}: {
+  value: string
+  options: readonly string[]
+  onChange: (value: string) => void
+  ariaLabel: string
+  className?: string
+  renderOption?: (
+    option: string,
+    selected: boolean,
+  ) => React.ReactNode
+}) {
+  const [open, setOpen] =
+    useState(false)
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    function handlePointerDown(
+      event: MouseEvent,
+    ) {
+      const target =
+        event.target as HTMLElement
+
+      if (
+        !target.closest(
+          "[data-custom-select]",
+        )
+      ) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handlePointerDown,
+    )
+
+    return () =>
+      document.removeEventListener(
+        "mousedown",
+        handlePointerDown,
+      )
+  }, [open])
+
+  return (
+    <div
+      className={[
+        "relative",
+        className,
+      ].join(" ")}
+      data-custom-select
+    >
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        onClick={() =>
+          setOpen((current) => !current)
+        }
+        className={[
+          "flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-all",
+          "hover:border-blue-500/30 hover:bg-muted/40",
+          "focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20",
+          open
+            ? "border-blue-500/50 ring-2 ring-blue-500/20"
+            : "",
+        ].join(" ")}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          {renderOption
+            ? renderOption(value, true)
+            : value}
+        </span>
+
+        <ChevronDown
+          className={[
+            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+            open ? "rotate-180" : "",
+          ].join(" ")}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[100] overflow-hidden rounded-xl border border-border/80 bg-popover p-1.5 text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5">
+          {options.map((option) => {
+            const selected =
+              option === value
+
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => {
+                  onChange(option)
+                  setOpen(false)
+                }}
+                className={[
+                  "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                  selected
+                    ? "bg-blue-500/10 text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ].join(" ")}
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  {renderOption
+                    ? renderOption(
+                        option,
+                        selected,
+                      )
+                    : option}
+                </span>
+
+                {selected && (
+                  <Check className="ml-3 h-4 w-4 shrink-0 text-blue-500" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function CategorySelect({
   value,
@@ -311,146 +438,36 @@ function CategorySelect({
     value: EventCategory,
   ) => void
 }) {
-  const [open, setOpen] =
-    useState(false)
-
-  const ref =
-    useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleOutsideClick(
-      event: MouseEvent,
-    ) {
-      if (
-        ref.current &&
-        !ref.current.contains(
-          event.target as Node,
-        )
-      ) {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener(
-      "mousedown",
-      handleOutsideClick,
-    )
-
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleOutsideClick,
-      )
-    }
-  }, [])
-
-  useEffect(() => {
-  if (!showEventModal) {
-    return
-  }
-
-  const originalOverflow = document.body.style.overflow
-
-  document.body.style.overflow = "hidden"
-
-  return () => {
-    document.body.style.overflow = originalOverflow
-  }
-}, [showEventModal])
-
   return (
-    <div
-      ref={ref}
-      className="relative"
-    >
-      <button
-        type="button"
-        onClick={() =>
-          setOpen(
-            (current) => !current,
-          )
-        }
-        className={[
-          "flex h-9 w-full items-center rounded-md border bg-background px-3 text-sm font-medium shadow-xs outline-none transition-colors",
-          open
-            ? "border-blue-500/50 ring-2 ring-blue-500/20"
-            : "border-input hover:bg-muted/40",
-        ].join(" ")}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span
-          className={[
-            "mr-2.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background",
-            getCategoryDotClasses(
-              value,
-            ),
-          ].join(" ")}
-        />
+    <CustomSelect
+      value={value}
+      options={EVENT_CATEGORIES}
+      ariaLabel="Event category"
+      onChange={(next) =>
+        onChange(
+          next as EventCategory,
+        )
+      }
+      renderOption={(option) => {
+        const category =
+          option as EventCategory
 
-        <span className="flex-1 text-left">
-          {value}
-        </span>
+        return (
+          <>
+            <span
+              className={[
+                "h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background",
+                getCategoryDotClasses(
+                  category,
+                ),
+              ].join(" ")}
+            />
 
-        <ChevronDown
-          className={[
-            "ml-2 h-4 w-4 text-muted-foreground transition-transform",
-            open
-              ? "rotate-180"
-              : "",
-          ].join(" ")}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[80] overflow-hidden rounded-lg border border-border bg-popover p-1 shadow-xl ring-1 ring-black/5 dark:ring-white/5">
-          {EVENT_CATEGORIES.map(
-            (category) => {
-              const selected =
-                value === category
-
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  role="option"
-                  aria-selected={
-                    selected
-                  }
-                  onClick={() => {
-                    onChange(category)
-                    setOpen(false)
-                  }}
-                  className={[
-                    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
-                    selected
-                      ? "bg-blue-500/10 text-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  ].join(" ")}
-                >
-                  <span
-                    className={[
-                      "h-2.5 w-2.5 shrink-0 rounded-full",
-                      getCategoryDotClasses(
-                        category,
-                      ),
-                    ].join(" ")}
-                  />
-
-                  <span className="flex-1">
-                    {category}
-                  </span>
-
-                  {selected && (
-                    <Check className="h-4 w-4 text-blue-500" />
-                  )}
-                </button>
-              )
-            },
-          )}
-        </div>
-      )}
-    </div>
+            <span>{category}</span>
+          </>
+        )
+      }}
+    />
   )
 }
 
@@ -459,121 +476,59 @@ function TimeSelect({
   onChange,
 }: {
   value: string
-  onChange: (
-    value: string,
-  ) => void
+  onChange: (value: string) => void
 }) {
-  const [open, setOpen] =
-    useState(false)
+  const parsed = parseTime(value)
 
-  const ref =
-    useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleOutsideClick(
-      event: MouseEvent,
-    ) {
-      if (
-        ref.current &&
-        !ref.current.contains(
-          event.target as Node,
-        )
-      ) {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener(
-      "mousedown",
-      handleOutsideClick,
+  function updateTime(
+    nextHour = parsed.hour,
+    nextMinute = parsed.minute,
+    nextPeriod = parsed.period,
+  ) {
+    onChange(
+      buildTime(
+        nextHour,
+        nextMinute,
+        nextPeriod,
+      ),
     )
-
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleOutsideClick,
-      )
-    }
-  }, [])
+  }
 
   return (
-    <div
-      ref={ref}
-      className="relative"
-    >
-      <button
-        type="button"
-        onClick={() =>
-          setOpen(
-            (current) => !current,
+    <div className="grid grid-cols-[1fr_1fr_0.9fr] gap-2">
+      <CustomSelect
+        value={parsed.hour}
+        options={HOURS}
+        ariaLabel="Hour"
+        onChange={(next) =>
+          updateTime(next)
+        }
+      />
+
+      <CustomSelect
+        value={parsed.minute}
+        options={MINUTES}
+        ariaLabel="Minute"
+        onChange={(next) =>
+          updateTime(
+            parsed.hour,
+            next,
           )
         }
-        className={[
-          "flex h-9 w-full items-center rounded-md border bg-background px-3 text-sm shadow-xs outline-none transition-colors",
-          open
-            ? "border-blue-500/50 ring-2 ring-blue-500/20"
-            : "border-input hover:bg-muted/40",
-        ].join(" ")}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <Clock3 className="mr-2.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      />
 
-        <span className="flex-1 text-left font-medium">
-          {formatTimeLabel(value)}
-        </span>
-
-        <ChevronDown
-          className={[
-            "ml-2 h-4 w-4 text-muted-foreground transition-transform",
-            open
-              ? "rotate-180"
-              : "",
-          ].join(" ")}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[80] max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-xl ring-1 ring-black/5 dark:ring-white/5">
-          {TIME_OPTIONS.map(
-            (time) => {
-              const selected =
-                value === time
-
-              return (
-                <button
-                  key={time}
-                  type="button"
-                  role="option"
-                  aria-selected={
-                    selected
-                  }
-                  onClick={() => {
-                    onChange(time)
-                    setOpen(false)
-                  }}
-                  className={[
-                    "flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition-colors",
-                    selected
-                      ? "bg-blue-500/10 text-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  ].join(" ")}
-                >
-                  <span className="flex-1">
-                    {formatTimeLabel(
-                      time,
-                    )}
-                  </span>
-
-                  {selected && (
-                    <Check className="h-4 w-4 text-blue-500" />
-                  )}
-                </button>
-              )
-            },
-          )}
-        </div>
-      )}
+      <CustomSelect
+        value={parsed.period}
+        options={PERIODS}
+        ariaLabel="AM or PM"
+        onChange={(next) =>
+          updateTime(
+            parsed.hour,
+            parsed.minute,
+            next as Period,
+          )
+        }
+      />
     </div>
   )
 }
@@ -583,283 +538,106 @@ function DateSelect({
   onChange,
 }: {
   value: string
-  onChange: (
-    value: string,
-  ) => void
+  onChange: (value: string) => void
 }) {
-  const [open, setOpen] =
-    useState(false)
+  const parts = getDateParts(value)
 
-  const [viewMonth, setViewMonth] =
-    useState(() =>
-      value
-        ? getMonthStart(
-            parseDateKey(value),
-          )
-        : getMonthStart(
-            new Date(),
-          ),
-    )
+  const dayOptions = Array.from(
+    { length: 31 },
+    (_, index) =>
+      String(index + 1).padStart(2, "0"),
+  )
 
-  const ref =
-    useRef<HTMLDivElement>(null)
+  const monthOptions = Array.from(
+    { length: 12 },
+    (_, index) =>
+      String(index + 1).padStart(2, "0"),
+  )
 
-  useEffect(() => {
-    function handleOutsideClick(
-      event: MouseEvent,
+  const currentYear =
+    new Date().getFullYear()
+
+  const yearOptions = Array.from(
+    { length: 5 },
+    (_, index) =>
+      String(currentYear + index),
+  )
+
+  function updateDate(
+    day = parts.day,
+    month = parts.month,
+    year = parts.year,
+  ) {
+    if (
+      !day ||
+      !month ||
+      !year
     ) {
-      if (
-        ref.current &&
-        !ref.current.contains(
-          event.target as Node,
-        )
-      ) {
-        setOpen(false)
-      }
+      return
     }
 
-    document.addEventListener(
-      "mousedown",
-      handleOutsideClick,
+    const numericDay = Number(day)
+    const numericMonth = Number(month)
+    const numericYear = Number(year)
+
+    const maxDays = new Date(
+      numericYear,
+      numericMonth,
+      0,
+    ).getDate()
+
+    const safeDay = Math.min(
+      numericDay,
+      maxDays,
     )
 
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleOutsideClick,
-      )
-    }
-  }, [])
-
-  const days =
-    getCalendarDays(viewMonth)
-
-  const selectedDate = value
-    ? parseDateKey(value)
-    : null
-
-  const today = new Date()
+    onChange(
+      `${year}-${month}-${String(
+        safeDay,
+      ).padStart(2, "0")}`,
+    )
+  }
 
   return (
-    <div
-      ref={ref}
-      className="relative"
-    >
-      <button
-        type="button"
-        onClick={() => {
-          if (value) {
-            setViewMonth(
-              getMonthStart(
-                parseDateKey(value),
-              ),
-            )
-          }
+    <div className="grid grid-cols-[0.9fr_1fr_1.25fr] gap-2">
+      <CustomSelect
+        value={parts.day || "01"}
+        options={dayOptions}
+        ariaLabel="Day"
+        onChange={(next) =>
+          updateDate(next)
+        }
+      />
 
-          setOpen(
-            (current) => !current,
+      <CustomSelect
+        value={parts.month || "01"}
+        options={monthOptions}
+        ariaLabel="Month"
+        onChange={(next) =>
+          updateDate(
+            parts.day || "01",
+            next,
+            parts.year ||
+              String(currentYear),
           )
-        }}
-        className={[
-          "flex h-9 w-full items-center rounded-md border bg-background px-3 text-sm shadow-xs outline-none transition-colors",
-          open
-            ? "border-blue-500/50 ring-2 ring-blue-500/20"
-            : "border-input hover:bg-muted/40",
-        ].join(" ")}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-      >
-        <CalendarDays className="mr-2.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        }
+      />
 
-        <span
-          className={[
-            "flex-1 text-left",
-            value
-              ? "font-medium text-foreground"
-              : "text-muted-foreground",
-          ].join(" ")}
-        >
-          {value
-            ? parseDateKey(
-                value,
-              ).toLocaleDateString(
-                "en-GB",
-                {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                },
-              )
-            : "Select date"}
-        </span>
-
-        <ChevronDown
-          className={[
-            "ml-2 h-4 w-4 text-muted-foreground transition-transform",
-            open
-              ? "rotate-180"
-              : "",
-          ].join(" ")}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-[calc(100%+6px)] z-[80] w-[290px] overflow-hidden rounded-xl border border-border bg-popover p-3 shadow-xl ring-1 ring-black/5 dark:ring-white/5">
-          <div className="mb-3 flex items-center justify-between">
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              onClick={() =>
-                setViewMonth(
-                  (month) =>
-                    new Date(
-                      month.getFullYear(),
-                      month.getMonth() - 1,
-                      1,
-                    ),
-                )
-              }
-              aria-label="Previous month"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-
-            <span className="text-sm font-semibold">
-              {viewMonth.toLocaleDateString(
-                "en-GB",
-                {
-                  month: "long",
-                  year: "numeric",
-                },
-              )}
-            </span>
-
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              onClick={() =>
-                setViewMonth(
-                  (month) =>
-                    new Date(
-                      month.getFullYear(),
-                      month.getMonth() + 1,
-                      1,
-                    ),
-                )
-              }
-              aria-label="Next month"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="mb-1 grid grid-cols-7">
-            {[
-              "M",
-              "T",
-              "W",
-              "T",
-              "F",
-              "S",
-              "S",
-            ].map(
-              (
-                day,
-                index,
-              ) => (
-                <div
-                  key={`${day}-${index}`}
-                  className="py-1 text-center text-[10px] font-semibold uppercase text-muted-foreground"
-                >
-                  {day}
-                </div>
-              ),
-            )}
-          </div>
-
-          <div className="grid grid-cols-7 gap-0.5">
-            {days.map((day) => {
-              const dateKey =
-                formatDateKey(day)
-
-              const isCurrentMonth =
-                day.getMonth() ===
-                  viewMonth.getMonth() &&
-                day.getFullYear() ===
-                  viewMonth.getFullYear()
-
-              const isSelected =
-                selectedDate !== null &&
-                isSameDay(
-                  day,
-                  selectedDate,
-                )
-
-              const isToday =
-                isSameDay(
-                  day,
-                  today,
-                )
-
-              return (
-                <button
-                  key={dateKey}
-                  type="button"
-                  onClick={() => {
-                    onChange(dateKey)
-                    setOpen(false)
-                  }}
-                  className={[
-                    "relative flex h-8 items-center justify-center rounded-md text-xs transition-colors",
-                    !isCurrentMonth
-                      ? "text-muted-foreground/35"
-                      : "text-foreground hover:bg-muted",
-                    isSelected
-                      ? "bg-blue-600 text-white hover:bg-blue-600"
-                      : "",
-                    isToday &&
-                    !isSelected
-                      ? "font-bold text-blue-500"
-                      : "",
-                  ].join(" ")}
-                >
-                  {day.getDate()}
-
-                  {isToday &&
-                    !isSelected && (
-                      <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-blue-500" />
-                    )}
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="mt-3 border-t border-border/70 pt-2">
-            <button
-              type="button"
-              className="w-full rounded-md px-2 py-1.5 text-xs font-medium text-blue-500 transition-colors hover:bg-blue-500/10"
-              onClick={() => {
-                const todayKey =
-                  formatDateKey(
-                    today,
-                  )
-
-                onChange(todayKey)
-
-                setViewMonth(
-                  getMonthStart(
-                    today,
-                  ),
-                )
-
-                setOpen(false)
-              }}
-            >
-              Today
-            </button>
-          </div>
-        </div>
-      )}
+      <CustomSelect
+        value={
+          parts.year ||
+          String(currentYear)
+        }
+        options={yearOptions}
+        ariaLabel="Year"
+        onChange={(next) =>
+          updateDate(
+            parts.day || "01",
+            parts.month || "01",
+            next,
+          )
+        }
+      />
     </div>
   )
 }
@@ -980,6 +758,38 @@ export default function Events() {
     }
   }, [])
 
+  /*
+   * Lock the page behind the modal.
+   * The original scroll position is restored
+   * when the modal closes.
+   */
+  useEffect(() => {
+    if (!showEventModal) {
+      document.body.style.overflow = ""
+      document.documentElement.style.overflow = ""
+
+      return
+    }
+
+    const previousBodyOverflow =
+      document.body.style.overflow
+
+    const previousHtmlOverflow =
+      document.documentElement.style.overflow
+
+    document.body.style.overflow = "hidden"
+    document.documentElement.style.overflow =
+      "hidden"
+
+    return () => {
+      document.body.style.overflow =
+        previousBodyOverflow
+
+      document.documentElement.style.overflow =
+        previousHtmlOverflow
+    }
+  }, [showEventModal])
+
   const calendarDays = useMemo(
     () =>
       getCalendarDays(
@@ -1000,10 +810,7 @@ export default function Events() {
           categoryFilter,
       ),
     )
-  }, [
-    categoryFilter,
-    events,
-  ])
+  }, [categoryFilter, events])
 
   const selectedDateEvents = useMemo(() => {
     if (!selectedDate) {
@@ -1035,10 +842,7 @@ export default function Events() {
           event.date >= todayKey,
       )
       .slice(0, 8)
-  }, [
-    filteredEvents,
-    today,
-  ])
+  }, [filteredEvents, today])
 
   function openAddEvent(
     date =
@@ -1144,9 +948,7 @@ export default function Events() {
               "Content-Type":
                 "application/json",
             },
-            body: JSON.stringify(
-              form,
-            ),
+            body: JSON.stringify(form),
           },
         )
 
@@ -1198,7 +1000,9 @@ export default function Events() {
         form.date,
       )
 
-      closeEventModal()
+      setShowEventModal(false)
+      setEditingEvent(null)
+      setForm(EMPTY_FORM)
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -1501,8 +1305,7 @@ export default function Events() {
                           2 && (
                           <div className="px-1 text-[10px] text-muted-foreground">
                             +
-                            {dayEvents.length -
-                              2}{" "}
+                            {dayEvents.length - 2}{" "}
                             more
                           </div>
                         )}
@@ -1520,25 +1323,27 @@ export default function Events() {
                 </span>
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
-                    <span>Activities</span>
-                  </span>
+                  {EVENT_CATEGORIES.map(
+                    (category) => (
+                      <span
+                        key={category}
+                        className="inline-flex items-center gap-1.5"
+                      >
+                        <span
+                          className={[
+                            "h-2 w-2 shrink-0 rounded-full",
+                            getCategoryDotClasses(
+                              category,
+                            ),
+                          ].join(" ")}
+                        />
 
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                    <span>Patrol</span>
-                  </span>
-
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-                    <span>Operations</span>
-                  </span>
-
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                    <span>Meetings</span>
-                  </span>
+                        <span>
+                          {category}
+                        </span>
+                      </span>
+                    ),
+                  )}
                 </div>
               </div>
 
@@ -1673,9 +1478,7 @@ export default function Events() {
                                     getCategoryClasses(
                                       event.category,
                                     ),
-                                  ].join(
-                                    " ",
-                                  )}
+                                  ].join(" ")}
                                 >
                                   {event.category}
                                 </span>
@@ -1690,13 +1493,7 @@ export default function Events() {
                               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                 <span className="inline-flex items-center gap-1.5">
                                   <Clock3 className="h-3.5 w-3.5" />
-                                  {formatTimeLabel(
-                                    event.startTime,
-                                  )}{" "}
-                                  -{" "}
-                                  {formatTimeLabel(
-                                    event.endTime,
-                                  )}
+                                  {event.startTime} - {event.endTime}
                                 </span>
 
                                 {event.location && (
@@ -1721,9 +1518,7 @@ export default function Events() {
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                onClick={(
-                                  eventClick,
-                                ) =>
+                                onClick={(eventClick) =>
                                   eventClick.stopPropagation()
                                 }
                               >
@@ -1823,8 +1618,7 @@ export default function Events() {
               </Button>
             </div>
 
-            {selectedDateEvents.length ===
-            0 ? (
+            {selectedDateEvents.length === 0 ? (
               <div className="px-5 py-10 text-center">
                 <CalendarDays className="mx-auto h-9 w-9 text-muted-foreground" />
 
@@ -1873,9 +1667,7 @@ export default function Events() {
                                 getCategoryClasses(
                                   event.category,
                                 ),
-                              ].join(
-                                " ",
-                              )}
+                              ].join(" ")}
                             >
                               {event.category}
                             </span>
@@ -1928,13 +1720,8 @@ export default function Events() {
                       <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1.5">
                           <Clock3 className="h-3.5 w-3.5" />
-                          {formatTimeLabel(
-                            event.startTime,
-                          )}{" "}
-                          -{" "}
-                          {formatTimeLabel(
-                            event.endTime,
-                          )}
+                          {event.startTime} -{" "}
+                          {event.endTime}
                         </span>
 
                         {event.location && (
@@ -1969,7 +1756,7 @@ export default function Events() {
 
       {showEventModal && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (
               event.currentTarget ===
@@ -1979,8 +1766,8 @@ export default function Events() {
             }
           }}
         >
-          <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-            <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex shrink-0 items-start justify-between border-b border-border/70 px-5 py-4">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-blue-500">
                   Community
@@ -2008,7 +1795,7 @@ export default function Events() {
               </Button>
             </div>
 
-            <div className="max-h-[75vh] overflow-y-auto px-5 py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-sm font-medium">
@@ -2017,11 +1804,15 @@ export default function Events() {
 
                   <Input
                     value={form.title}
-                    onChange={(event) =>
+                    onChange={(
+                      event: ChangeEvent<HTMLInputElement>,
+                    ) =>
                       setForm(
                         (current) => ({
                           ...current,
-                          title: event.target.value,
+                          title:
+                            event.target
+                              .value,
                         }),
                       )
                     }
@@ -2044,7 +1835,8 @@ export default function Events() {
                         (current) => ({
                           ...current,
                           description:
-                            event.target.value,
+                            event.target
+                              .value,
                         }),
                       )
                     }
@@ -2059,7 +1851,9 @@ export default function Events() {
                   </label>
 
                   <CategorySelect
-                    value={form.category}
+                    value={
+                      form.category
+                    }
                     onChange={(
                       category,
                     ) =>
@@ -2083,8 +1877,7 @@ export default function Events() {
                     />
 
                     <span>
-                      {form.category}{" "}
-                      event
+                      {form.category} event
                     </span>
                   </div>
                 </div>
@@ -2127,6 +1920,10 @@ export default function Events() {
                       )
                     }
                   />
+
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Hour · Minute · AM/PM
+                  </p>
                 </div>
 
                 <div>
@@ -2149,6 +1946,10 @@ export default function Events() {
                       )
                     }
                   />
+
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Hour · Minute · AM/PM
+                  </p>
                 </div>
 
                 <div>
@@ -2165,7 +1966,8 @@ export default function Events() {
                         (current) => ({
                           ...current,
                           location:
-                            event.target.value,
+                            event.target
+                              .value,
                         }),
                       )
                     }
@@ -2188,7 +1990,8 @@ export default function Events() {
                         (current) => ({
                           ...current,
                           discordUrl:
-                            event.target.value,
+                            event.target
+                              .value,
                         }),
                       )
                     }
@@ -2198,7 +2001,7 @@ export default function Events() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-border/70 px-5 py-4">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border/70 px-5 py-4">
               <Button
                 type="button"
                 variant="outline"
@@ -2228,9 +2031,7 @@ export default function Events() {
         </div>
       )}
 
-      {!user && !loading
-        ? null
-        : null}
+      {!user && !loading ? null : null}
     </div>
   )
 }
