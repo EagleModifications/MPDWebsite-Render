@@ -5351,17 +5351,56 @@ export function createApp() {
             mediaType?: unknown
           } | undefined) ?? {}
 
+        const storedContentType =
+          typeof file.contentType === "string"
+            ? file.contentType.trim().toLowerCase()
+            : ""
+
+        const metadataContentType =
+          typeof metadata.contentType === "string"
+            ? metadata.contentType.trim().toLowerCase()
+            : ""
+
+        const filename =
+          typeof file.filename === "string"
+            ? file.filename.toLowerCase()
+            : ""
+
+        const extension =
+          filename.includes(".")
+            ? filename.slice(filename.lastIndexOf("."))
+            : ""
+
+        const extensionContentTypes: Record<string, string> = {
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".png": "image/png",
+          ".gif": "image/gif",
+          ".webp": "image/webp",
+          ".avif": "image/avif",
+          ".bmp": "image/bmp",
+          ".svg": "image/svg+xml",
+          ".mp4": "video/mp4",
+          ".webm": "video/webm",
+          ".mov": "video/quicktime",
+          ".m4v": "video/x-m4v",
+          ".avi": "video/x-msvideo",
+        }
+
+        const inferredContentType =
+          extensionContentTypes[extension] ??
+          (metadata.mediaType === "video"
+            ? "video/mp4"
+            : "image/jpeg")
+
         const contentType =
-          typeof file.contentType === "string" &&
-          file.contentType.trim()
-            ? file.contentType.trim()
-            : typeof metadata.contentType === "string" &&
-                metadata.contentType.trim()
-              ? metadata.contentType.trim()
-              : typeof metadata.mediaType === "string" &&
-                  metadata.mediaType === "video"
-                ? "video/mp4"
-                : "image/jpeg"
+          storedContentType &&
+          storedContentType !== "application/octet-stream"
+            ? storedContentType
+            : metadataContentType &&
+                metadataContentType !== "application/octet-stream"
+              ? metadataContentType
+              : inferredContentType
 
         res.setHeader(
           "Content-Type",
