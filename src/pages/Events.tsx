@@ -28,7 +28,6 @@ import Footer from "@/components/Footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { getSession, type User } from "@/lib/auth"
 
 type EventCategory =
   | "Activities"
@@ -599,8 +598,6 @@ function DateSelect({
 export default function Events() {
   const today = useMemo(() => new Date(), [])
 
-  const [user, setUser] = useState<User | null>(null)
-
   const [currentMonth, setCurrentMonth] =
     useState(getMonthStart(today))
 
@@ -632,10 +629,6 @@ export default function Events() {
   const [deletingId, setDeletingId] =
     useState<string | null>(null)
 
-  /* ------------------------------------------------------------------------ */
-  /* Delete confirmation state                                                */
-  /* ------------------------------------------------------------------------ */
-
   const [deleteEventTarget, setDeleteEventTarget] =
     useState<CalendarEvent | null>(null)
 
@@ -649,11 +642,9 @@ export default function Events() {
     async function load() {
       try {
         const [
-          session,
           eventsResponse,
           permissionResponse,
         ] = await Promise.all([
-          getSession(),
           fetch("/api/events", {
             credentials: "include",
           }),
@@ -668,8 +659,6 @@ export default function Events() {
         if (!active) {
           return
         }
-
-        setUser(session)
 
         if (!eventsResponse.ok) {
           throw new Error(
@@ -953,6 +942,8 @@ export default function Events() {
       setEditingEvent(null)
       setForm(EMPTY_FORM)
     } catch (error) {
+      console.error(error)
+
       toast.error(
         error instanceof Error
           ? error.message
@@ -1024,6 +1015,8 @@ export default function Events() {
 
       toast.success("Event deleted.")
     } catch (error) {
+      console.error(error)
+
       toast.error(
         error instanceof Error
           ? error.message
@@ -1953,7 +1946,7 @@ export default function Events() {
           onMouseDown={(event) => {
             if (
               event.currentTarget ===
-              event.target &&
+                event.target &&
               !deletingId
             ) {
               closeDeleteModal()
