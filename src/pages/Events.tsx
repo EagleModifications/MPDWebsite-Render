@@ -2058,10 +2058,6 @@ export default function Events() {
                           ),
                         ].join(" ")}
                       />
-
-                      <span>
-                        {form.category} event
-                      </span>
                     </div>
                   </div>
 
