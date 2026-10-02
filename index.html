@@ -20,13 +20,28 @@
       content="#3b82f6"
     />
 
-    <link
-      rel="icon"
-      type="image/png"
-      href="/logo.png"
+    <meta
+      name="robots"
+      content="index, follow"
     />
 
-    <!-- Open Graph / Discord -->
+    <link
+      rel="canonical"
+      href="https://metropd-calirp.com/"
+    />
+
+    <link
+      rel="icon"
+      href="/logo.png"
+      type="image/png"
+    />
+
+    <!-- Open Graph -->
+    <!--
+      The server rewrites these tags for the exact URL being requested.
+      The og:image is generated dynamically by /api/og — no stored preview
+      PNG is required.
+    -->
     <meta
       property="og:type"
       content="website"
@@ -35,11 +50,6 @@
     <meta
       property="og:url"
       content="https://metropd-calirp.com/"
-    />
-
-    <meta
-      property="og:site_name"
-      content="Metro Police Department"
     />
 
     <meta
@@ -54,12 +64,12 @@
 
     <meta
       property="og:image"
-      content="https://metropd-calirp.com/api/og?v=2"
+      content="https://metropd-calirp.com/api/og?url=https%3A%2F%2Fmetropd-calirp.com%2F"
     />
 
     <meta
       property="og:image:secure_url"
-      content="https://metropd-calirp.com/api/og?v=2"
+      content="https://metropd-calirp.com/api/og?url=https%3A%2F%2Fmetropd-calirp.com%2F"
     />
 
     <meta
@@ -77,12 +87,7 @@
       content="630"
     />
 
-    <meta
-      property="og:image:alt"
-      content="Metro Police Department website preview"
-    />
-
-    <!-- Twitter / X -->
+    <!-- Twitter / Discord-compatible large preview metadata -->
     <meta
       name="twitter:card"
       content="summary_large_image"
@@ -100,12 +105,7 @@
 
     <meta
       name="twitter:image"
-      content="https://metropd-calirp.com/api/og?v=2"
-    />
-
-    <meta
-      name="twitter:image:alt"
-      content="Metro Police Department website preview"
+      content="https://metropd-calirp.com/api/og?url=https%3A%2F%2Fmetropd-calirp.com%2F"
     />
   </head>
 
