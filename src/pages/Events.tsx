@@ -1304,6 +1304,10 @@ export default function Events() {
                 COMMUNITY
               </div>
 
+              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+                Events
+              </h1>
+
               <p className="mt-1 text-sm text-muted-foreground">
                 View upcoming Metro Police
                 Department activities, patrols,
