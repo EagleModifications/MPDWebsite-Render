@@ -1660,17 +1660,6 @@ export default function Events() {
                               <h3 className="truncate text-sm font-semibold sm:text-base">
                                 {event.title}
                               </h3>
-
-                              <span
-                                className={[
-                                  "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                                  getCategoryClasses(
-                                    event.category,
-                                  ),
-                                ].join(" ")}
-                              >
-                                {event.category}
-                              </span>
                             </div>
 
                             {event.description && (
