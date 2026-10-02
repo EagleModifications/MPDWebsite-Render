@@ -574,19 +574,282 @@ function DateSelect({
   value: string
   onChange: (value: string) => void
 }) {
-  return (
-    <div className="relative">
-      <CalendarDays className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+  const dropdown = useContext(DropdownContext)
 
-      <Input
-        type="date"
-        value={value}
-        onChange={(
-          event: ChangeEvent<HTMLInputElement>,
-        ) => onChange(event.target.value)}
-        className="h-10 rounded-lg pl-10 pr-3 font-medium shadow-sm"
+  if (!dropdown) {
+    throw new Error(
+      "DateSelect must be used inside DropdownProvider.",
+    )
+  }
+
+  const {
+    openDropdown,
+    setOpenDropdown,
+  } = dropdown
+
+  const id = "event-date"
+  const open = openDropdown === id
+
+  const initialMonth = value
+    ? getMonthStart(parseDateKey(value))
+    : getMonthStart(new Date())
+
+  const [visibleMonth, setVisibleMonth] =
+    useState(initialMonth)
+
+  useEffect(() => {
+    if (open) {
+      setVisibleMonth(initialMonth)
+    }
+    // The picker intentionally resets to the selected date whenever opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as HTMLElement
+
+      if (
+        !target.closest(
+          `[data-date-select="${id}"]`,
+        )
+      ) {
+        setOpenDropdown(null)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpenDropdown(null)
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handlePointerDown,
+    )
+    document.addEventListener(
+      "keydown",
+      handleKeyDown,
+    )
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handlePointerDown,
+      )
+      document.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      )
+    }
+  }, [id, open, setOpenDropdown])
+
+  const calendarDays = useMemo(
+    () => getCalendarDays(visibleMonth),
+    [visibleMonth],
+  )
+
+  const selectedDay = value
+    ? parseDateKey(value)
+    : null
+
+  const displayValue = value
+    ? parseDateKey(value).toLocaleDateString(
+        "en-GB",
+        {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        },
+      )
+    : "Select date"
+
+  function selectDate(date: Date) {
+    onChange(formatDateKey(date))
+    setOpenDropdown(null)
+  }
+
+  function selectToday() {
+    const today = new Date()
+    onChange(formatDateKey(today))
+    setVisibleMonth(getMonthStart(today))
+    setOpenDropdown(null)
+  }
+
+  return (
+    <div
+      className="relative"
+      data-date-select={id}
+    >
+      <button
+        type="button"
         aria-label="Event date"
-      />
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() =>
+          setOpenDropdown(open ? null : id)
+        }
+        className={[
+          "flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-all",
+          "hover:border-blue-500/30 hover:bg-muted/40",
+          "focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20",
+          open
+            ? "border-blue-500/50 ring-2 ring-blue-500/20"
+            : "",
+        ].join(" ")}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span
+            className={
+              value
+                ? "truncate"
+                : "truncate text-muted-foreground"
+            }
+          >
+            {displayValue}
+          </span>
+        </span>
+
+        <ChevronDown
+          className={[
+            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+            open ? "rotate-180" : "",
+          ].join(" ")}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-[calc(100%+6px)] z-[110] w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border/80 bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5">
+          <div className="flex items-center justify-between border-b border-border/70 px-3 py-3">
+            <button
+              type="button"
+              aria-label="Previous month"
+              onClick={() =>
+                setVisibleMonth(
+                  (month) =>
+                    new Date(
+                      month.getFullYear(),
+                      month.getMonth() - 1,
+                      1,
+                    ),
+                )
+              }
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+
+            <div className="text-sm font-semibold">
+              {visibleMonth.toLocaleDateString(
+                "en-GB",
+                {
+                  month: "long",
+                  year: "numeric",
+                },
+              )}
+            </div>
+
+            <button
+              type="button"
+              aria-label="Next month"
+              onClick={() =>
+                setVisibleMonth(
+                  (month) =>
+                    new Date(
+                      month.getFullYear(),
+                      month.getMonth() + 1,
+                      1,
+                    ),
+                )
+              }
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="px-3 pb-3 pt-2">
+            <div className="mb-1 grid grid-cols-7">
+              {WEEKDAYS.map((day) => (
+                <div
+                  key={day}
+                  className="py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                >
+                  {day.slice(0, 2)}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((day) => {
+                const dateKey = formatDateKey(day)
+                const isCurrentMonth =
+                  day.getMonth() ===
+                    visibleMonth.getMonth() &&
+                  day.getFullYear() ===
+                    visibleMonth.getFullYear()
+
+                const isSelected =
+                  selectedDay !== null &&
+                  isSameDay(day, selectedDay)
+
+                const isToday = isSameDay(
+                  day,
+                  new Date(),
+                )
+
+                return (
+                  <button
+                    key={dateKey}
+                    type="button"
+                    onClick={() => selectDate(day)}
+                    className={[
+                      "relative flex h-9 w-full items-center justify-center rounded-lg text-xs font-medium transition-colors",
+                      isCurrentMonth
+                        ? "text-foreground hover:bg-muted"
+                        : "text-muted-foreground/40 hover:bg-muted/50",
+                      isSelected
+                        ? "bg-blue-600 text-white hover:bg-blue-600"
+                        : "",
+                      !isSelected && isToday
+                        ? "bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                        : "",
+                    ].join(" ")}
+                  >
+                    {day.getDate()}
+
+                    {isToday && !isSelected && (
+                      <span className="absolute bottom-1 h-0.5 w-0.5 rounded-full bg-blue-500" />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
+              <span className="text-[11px] text-muted-foreground">
+                {value
+                  ? displayValue
+                  : "No date selected"}
+              </span>
+
+              <button
+                type="button"
+                onClick={selectToday}
+                className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-blue-500 transition-colors hover:bg-blue-500/10"
+              >
+                Today
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1978,11 +2241,11 @@ export default function Events() {
                     id="delete-event-description"
                     className="mt-1.5 text-sm leading-6 text-muted-foreground"
                   >
-                    Are you sure you want to delete{" "}
+                    This will permanently remove{" "}
                     <span className="font-medium text-foreground">
                       "{deleteEventTarget.title}"
                     </span>
-                    ? This action cannot be undone.
+                    {" "}from the Metro PD events calendar. This action cannot be undone.
                   </p>
                 </div>
 
