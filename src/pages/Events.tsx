@@ -1660,6 +1660,17 @@ export default function Events() {
                               <h3 className="truncate text-sm font-semibold sm:text-base">
                                 {event.title}
                               </h3>
+
+                              <span
+                                className={[
+                                  "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                                  getCategoryClasses(
+                                    event.category,
+                                  ),
+                                ].join(" ")}
+                              >
+                                {event.category}
+                              </span>
                             </div>
 
                             {event.description && (
@@ -2120,11 +2131,12 @@ export default function Events() {
 
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
-                      Location
+                      Location <span className="text-red-500">*</span>
                     </label>
 
                     <Input
                       value={form.location}
+                      required
                       onChange={(event) =>
                         setForm(
                           (current) => ({
@@ -2140,7 +2152,7 @@ export default function Events() {
 
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
-                      Discord URL
+                      Discord URL <span className="text-muted-foreground">(optional)</span>
                     </label>
 
                     <Input
