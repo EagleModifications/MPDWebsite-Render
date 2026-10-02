@@ -463,6 +463,32 @@ function getGalleryMedia(
   return []
 }
 
+const APP_ORIGIN =
+  (process.env.APP_ORIGIN ?? "")
+    .trim()
+    .replace(/\/+$/, "")
+
+function getGalleryPublicMediaUrl(
+  media: GalleryMedia,
+) {
+  if (media.storageId) {
+    const path =
+      `/api/gallery/file/${media.storageId}`
+
+    return APP_ORIGIN
+      ? `${APP_ORIGIN}${path}`
+      : path
+  }
+
+  if (media.url.startsWith("/")) {
+    return APP_ORIGIN
+      ? `${APP_ORIGIN}${media.url}`
+      : media.url
+  }
+
+  return media.url
+}
+
 function serializeGalleryItem(
   item: GalleryDocument,
 ) {
@@ -471,7 +497,15 @@ function serializeGalleryItem(
     title: item.title,
     description: item.description,
     category: item.category ?? "Community",
-    media: getGalleryMedia(item),
+    media: getGalleryMedia(item).map((media) => ({
+      ...media,
+      url: getGalleryPublicMediaUrl(media),
+      thumbnailUrl: media.thumbnailUrl?.startsWith("/")
+        ? APP_ORIGIN
+          ? `${APP_ORIGIN}${media.thumbnailUrl}`
+          : media.thumbnailUrl
+        : media.thumbnailUrl,
+    })),
     createdBy: item.createdBy,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
@@ -553,11 +587,15 @@ async function storeGalleryFile(
   const storageId =
     uploadStream.id.toString()
 
+  const filePath =
+    `/api/gallery/file/${storageId}`
+
   return {
     id: storageId,
     type,
-    url:
-      `/api/gallery/file/${storageId}`,
+    url: APP_ORIGIN
+      ? `${APP_ORIGIN}${filePath}`
+      : filePath,
     thumbnailUrl:
       "",
     source:
