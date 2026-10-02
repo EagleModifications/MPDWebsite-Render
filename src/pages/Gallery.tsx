@@ -1158,38 +1158,56 @@ export default function Gallery() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
-                {GALLERY_MEDIA_FILTERS.map((item) => (
-                  <button
-                    key={`media-${item}`}
-                    type="button"
-                    onClick={() => setMediaFilter(item)}
-                    className={[
-                      "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                      mediaFilter === item
-                        ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                        : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                    ].join(" ")}
-                  >
-                    {item}
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Type:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {GALLERY_MEDIA_FILTERS.map((item) => (
+                      <button
+                        key={`media-${item}`}
+                        type="button"
+                        onClick={() => setMediaFilter(item)}
+                        className={[
+                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                          mediaFilter === item
+                            ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                            : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ].join(" ")}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-                {GALLERY_CATEGORY_FILTERS.map((item) => (
-                  <button
-                    key={`category-${item}`}
-                    type="button"
-                    onClick={() => setCategoryFilter(item)}
-                    className={[
-                      "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                      categoryFilter === item
-                        ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                        : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                    ].join(" ")}
-                  >
-                    {item}
-                  </button>
-                ))}
+                <span className="hidden text-xs text-muted-foreground/50 sm:block">
+                  •
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Category:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {GALLERY_CATEGORY_FILTERS.map((item) => (
+                      <button
+                        key={`category-${item}`}
+                        type="button"
+                        onClick={() => setCategoryFilter(item)}
+                        className={[
+                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                          categoryFilter === item
+                            ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                            : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ].join(" ")}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1590,11 +1608,7 @@ export default function Gallery() {
           <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
             <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-blue-500">
-                  {category}
-                </p>
-
-                <h2 className="mt-1 text-lg font-semibold">
+                <h2 className="text-lg font-semibold">
                   {editingItem
                     ? "Edit Gallery Entry"
                     : "Add Media"}
@@ -1617,9 +1631,9 @@ export default function Gallery() {
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
               <DropdownProvider>
                 <div className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
+                <div>
                   <label className="mb-1.5 block text-sm font-medium">
-                    Title
+                    Title <span className="text-destructive">*</span>
                   </label>
 
                   <Input
@@ -1634,9 +1648,25 @@ export default function Gallery() {
                   />
                 </div>
 
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Category <span className="text-destructive">*</span>
+                  </label>
+
+                  <CustomSelect
+                    id="gallery-category"
+                    value={category}
+                    options={["Community", "Fleet"]}
+                    ariaLabel="Gallery category"
+                    onChange={(value) =>
+                      setCategory(value as GalleryCategory)
+                    }
+                  />
+                </div>
+
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-sm font-medium">
-                    Description
+                    Description <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
                   </label>
 
                   <Textarea
@@ -1651,25 +1681,20 @@ export default function Gallery() {
                   />
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Category
-                  </label>
-
-                  <CustomSelect
-                    id="gallery-category"
-                    value={category}
-                    options={["Community", "Fleet"]}
-                    ariaLabel="Gallery category"
-                    onChange={(value) =>
-                      setCategory(value as GalleryCategory)
-                    }
-                  />
+                <div className="sm:col-span-2">
+                  <div className="mb-2">
+                    <h3 className="text-sm font-semibold">
+                      Upload Media <span className="text-destructive">*</span>
+                    </h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Add one or more images or videos from your computer.
+                    </p>
+                  </div>
                 </div>
 
                 <div
                   className={[
-                    "rounded-xl border border-dashed p-5 transition-colors",
+                    "sm:col-span-2 rounded-xl border border-dashed p-5 transition-colors",
                     isDragging
                       ? "border-blue-500 bg-blue-500/10"
                       : "border-border bg-background/40",
@@ -1732,10 +1757,10 @@ export default function Gallery() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-border bg-background/40 p-4">
+                <div className="sm:col-span-2 rounded-xl border border-border bg-background/40 p-4">
                   <div className="mb-3">
                     <h3 className="text-sm font-semibold">
-                      Add media URL
+                      Add Media URL <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
                     </h3>
 
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -1744,16 +1769,26 @@ export default function Gallery() {
                     </p>
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto]">
-                    <CustomSelect
-                      id="gallery-url-type"
-                      value={urlType === "image" ? "Image" : "Video"}
-                      options={["Image", "Video"]}
-                      ariaLabel="Media type"
-                      onChange={(value) =>
-                        setUrlType(value === "Image" ? "image" : "video")
-                      }
-                    />
+                  <div className="grid gap-3 sm:grid-cols-[120px_1fr_auto]">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                        Type <span className="text-destructive">*</span>
+                      </label>
+                      <CustomSelect
+                        id="gallery-url-type"
+                        value={urlType === "image" ? "Image" : "Video"}
+                        options={["Image", "Video"]}
+                        ariaLabel="Media type"
+                        onChange={(value) =>
+                          setUrlType(value === "Image" ? "image" : "video")
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                        URL <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
+                      </label>
 
                     <Input
                       value={urlInput}
@@ -1762,7 +1797,7 @@ export default function Gallery() {
                           event.target.value,
                         )
                       }
-                      placeholder="https://example.com/image.jpg"
+                      placeholder="https://example.com/image.jpg (Optional)"
                       onKeyDown={(event) => {
                         if (
                           event.key ===
@@ -1774,16 +1809,21 @@ export default function Gallery() {
                       }}
                     />
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={
-                        addExternalUrl
-                      }
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Add URL
-                    </Button>
+                    </div>
+
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                        onClick={
+                          addExternalUrl
+                        }
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Add URL
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="mt-2">
@@ -1796,7 +1836,7 @@ export default function Gallery() {
                           event.target.value,
                         )
                       }
-                      placeholder="Optional video thumbnail URL"
+                      placeholder="Video thumbnail URL (Optional)"
                     />
                   </div>
                 </div>
@@ -1804,7 +1844,7 @@ export default function Gallery() {
                 <div>
                   <div className="mb-2 flex items-center justify-between">
                     <label className="text-sm font-medium">
-                      Media (
+                      Media <span className="text-destructive">*</span> (
                       {
                         pendingMedia.length
                       }
