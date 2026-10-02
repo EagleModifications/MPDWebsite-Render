@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser"
 import multer from "multer"
 import path from "node:path"
 import XLSX from "xlsx"
+import puppeteer from "puppeteer"
 
 import { syncGoogleRosters } from "./googleRosterSync"
 
@@ -3829,6 +3830,83 @@ export function createApp() {
 
   app.use(express.json())
   app.use(cookieParser())
+
+  /*
+   * Discord Open Graph preview.
+   *
+   * Discord requires og:image to resolve to an actual image.
+   * This endpoint generates that image dynamically by opening
+   * the public site URL in Chromium and taking a 1200x630
+   * screenshot. No preview image needs to be uploaded or stored.
+   */
+  app.get("/api/og", async (_req, res) => {
+    const siteUrl =
+      (process.env.OG_SITE_URL ||
+        process.env.APP_ORIGIN ||
+        "https://metropd-calirp.com")
+        .trim()
+        .replace(/\/+$/, "")
+
+    let browser:
+      Awaited<ReturnType<typeof puppeteer.launch>> | null =
+      null
+
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+        ],
+      })
+
+      const page = await browser.newPage()
+
+      await page.setViewport({
+        width: 1200,
+        height: 630,
+        deviceScaleFactor: 1,
+      })
+
+      await page.goto(siteUrl, {
+        waitUntil: "networkidle2",
+        timeout: 30000,
+      })
+
+      const screenshot = await page.screenshot({
+        type: "png",
+        fullPage: false,
+      })
+
+      res.setHeader(
+        "Content-Type",
+        "image/png",
+      )
+
+      res.setHeader(
+        "Cache-Control",
+        "public, max-age=3600, s-maxage=3600",
+      )
+
+      return res.end(screenshot)
+    } catch (error) {
+      console.error(
+        "[og] Failed to generate website preview:",
+        error,
+      )
+
+      return res.status(500).json({
+        success: false,
+        error: "Failed to generate website preview.",
+      })
+    } finally {
+      if (browser) {
+        await browser.close().catch(() => undefined)
+      }
+    }
+  })
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
