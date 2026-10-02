@@ -633,6 +633,13 @@ export default function Events() {
     useState<string | null>(null)
 
   /* ------------------------------------------------------------------------ */
+  /* Delete confirmation state                                                */
+  /* ------------------------------------------------------------------------ */
+
+  const [deleteEventTarget, setDeleteEventTarget] =
+    useState<CalendarEvent | null>(null)
+
+  /* ------------------------------------------------------------------------ */
   /* Load events                                                              */
   /* ------------------------------------------------------------------------ */
 
@@ -707,11 +714,16 @@ export default function Events() {
   }, [])
 
   /* ------------------------------------------------------------------------ */
-  /* Lock page scrolling while event modal is open                            */
+  /* Lock page scrolling while modal is open                                  */
   /* ------------------------------------------------------------------------ */
 
   useEffect(() => {
-    if (!showEventModal) {
+    const modalOpen =
+      showEventModal ||
+      Boolean(selectedDate) ||
+      Boolean(deleteEventTarget)
+
+    if (!modalOpen) {
       return
     }
 
@@ -732,7 +744,11 @@ export default function Events() {
       document.documentElement.style.overflow =
         previousHtmlOverflow
     }
-  }, [showEventModal])
+  }, [
+    showEventModal,
+    selectedDate,
+    deleteEventTarget,
+  ])
 
   /* ------------------------------------------------------------------------ */
   /* Calendar data                                                            */
@@ -771,13 +787,6 @@ export default function Events() {
     )
   }, [categoryFilter, events, selectedDate])
 
-  /*
-   * All upcoming events matching the current filter.
-   *
-   * This intentionally does NOT use slice(0, 8), so the count shown
-   * beside the calendar represents the actual number of upcoming events,
-   * rather than only the number currently displayed in the list.
-   */
   const upcomingEventCount = useMemo(() => {
     const todayKey = formatDateKey(today)
 
@@ -786,10 +795,6 @@ export default function Events() {
     ).length
   }, [filteredEvents, today])
 
-  /*
-   * The upcoming-events section is still limited to the first 8 events
-   * to keep the page compact.
-   */
   const upcomingEvents = useMemo(() => {
     const todayKey = formatDateKey(today)
 
@@ -962,16 +967,30 @@ export default function Events() {
   /* Delete                                                                   */
   /* ------------------------------------------------------------------------ */
 
-  async function deleteEvent(
+  function requestDeleteEvent(
     event: CalendarEvent,
   ) {
-    if (
-      !window.confirm(
-        `Delete "${event.title}"?`,
-      )
-    ) {
+    if (deletingId) {
       return
     }
+
+    setDeleteEventTarget(event)
+  }
+
+  function closeDeleteModal() {
+    if (deletingId) {
+      return
+    }
+
+    setDeleteEventTarget(null)
+  }
+
+  async function confirmDeleteEvent() {
+    if (!deleteEventTarget) {
+      return
+    }
+
+    const event = deleteEventTarget
 
     setDeletingId(event.id)
 
@@ -1000,6 +1019,8 @@ export default function Events() {
           (item) => item.id !== event.id,
         ),
       )
+
+      setDeleteEventTarget(null)
 
       toast.success("Event deleted.")
     } catch (error) {
@@ -1261,7 +1282,6 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* Upcoming event count */}
               <span className="shrink-0 font-medium text-foreground/70">
                 {upcomingEventCount}{" "}
                 {upcomingEventCount === 1
@@ -1466,7 +1486,7 @@ export default function Events() {
                                   event.id
                                 }
                                 onClick={() =>
-                                  void deleteEvent(
+                                  requestDeleteEvent(
                                     event,
                                   )
                                 }
@@ -1617,7 +1637,7 @@ export default function Events() {
                               event.id
                             }
                             onClick={() =>
-                              void deleteEvent(
+                              requestDeleteEvent(
                                 event,
                               )
                             }
@@ -1710,7 +1730,6 @@ export default function Events() {
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
               <DropdownProvider>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {/* Title */}
                   <div className="sm:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium">
                       Title
@@ -1734,7 +1753,6 @@ export default function Events() {
                     />
                   </div>
 
-                  {/* Description */}
                   <div className="sm:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium">
                       Description
@@ -1756,7 +1774,6 @@ export default function Events() {
                     />
                   </div>
 
-                  {/* Category */}
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
                       Category
@@ -1790,7 +1807,6 @@ export default function Events() {
                     </div>
                   </div>
 
-                  {/* Date */}
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
                       Date
@@ -1809,7 +1825,6 @@ export default function Events() {
                     />
                   </div>
 
-                  {/* Start time */}
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
                       Start Time
@@ -1833,7 +1848,6 @@ export default function Events() {
                     </p>
                   </div>
 
-                  {/* End time */}
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
                       End Time
@@ -1857,7 +1871,6 @@ export default function Events() {
                     </p>
                   </div>
 
-                  {/* Location */}
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
                       Location
@@ -1878,7 +1891,6 @@ export default function Events() {
                     />
                   </div>
 
-                  {/* Discord */}
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
                       Discord URL
@@ -1903,7 +1915,6 @@ export default function Events() {
               </DropdownProvider>
             </div>
 
-            {/* Footer */}
             <div className="flex shrink-0 justify-end gap-2 border-t border-border/70 px-5 py-4">
               <Button
                 type="button"
@@ -1926,6 +1937,99 @@ export default function Events() {
                   : editingEvent
                     ? "Save Changes"
                     : "Create Event"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* -------------------------------------------------------------------- */}
+      {/* Delete confirmation modal                                            */}
+      {/* -------------------------------------------------------------------- */}
+
+      {deleteEventTarget && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (
+              event.currentTarget ===
+              event.target &&
+              !deletingId
+            ) {
+              closeDeleteModal()
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-event-title"
+            aria-describedby="delete-event-description"
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+          >
+            <div className="p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <h2
+                    id="delete-event-title"
+                    className="text-base font-semibold"
+                  >
+                    Delete event?
+                  </h2>
+
+                  <p
+                    id="delete-event-description"
+                    className="mt-1.5 text-sm leading-6 text-muted-foreground"
+                  >
+                    Are you sure you want to delete{" "}
+                    <span className="font-medium text-foreground">
+                      "{deleteEventTarget.title}"
+                    </span>
+                    ? This action cannot be undone.
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={closeDeleteModal}
+                  disabled={Boolean(deletingId)}
+                  aria-label="Close delete confirmation"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-5 py-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeDeleteModal}
+                disabled={Boolean(deletingId)}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() =>
+                  void confirmDeleteEvent()
+                }
+                disabled={Boolean(deletingId)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+
+                {deletingId
+                  ? "Deleting..."
+                  : "Delete Event"}
               </Button>
             </div>
           </div>
