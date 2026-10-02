@@ -69,9 +69,10 @@ const EVENT_CATEGORIES: EventCategory[] = [
   "Meetings",
 ]
 
-const CATEGORY_FILTERS: Array<
-  "All" | EventCategory
-> = ["All", ...EVENT_CATEGORIES]
+const CATEGORY_FILTERS: Array<"All" | EventCategory> = [
+  "All",
+  ...EVENT_CATEGORIES,
+]
 
 const WEEKDAYS = [
   "Monday",
@@ -85,14 +86,12 @@ const WEEKDAYS = [
 
 const HOURS = Array.from(
   { length: 12 },
-  (_, index) =>
-    String(index + 1).padStart(2, "0"),
+  (_, index) => String(index + 1).padStart(2, "0"),
 )
 
 const MINUTES = Array.from(
   { length: 60 },
-  (_, index) =>
-    String(index).padStart(2, "0"),
+  (_, index) => String(index).padStart(2, "0"),
 )
 
 const PERIODS = ["AM", "PM"] as const
@@ -116,31 +115,20 @@ const EMPTY_FORM: EventForm = {
 
 function formatDateKey(date: Date) {
   const year = date.getFullYear()
-  const month = String(
-    date.getMonth() + 1,
-  ).padStart(2, "0")
-  const day = String(
-    date.getDate(),
-  ).padStart(2, "0")
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
 
   return `${year}-${month}-${day}`
 }
 
 function parseDateKey(value: string) {
-  const [year, month, day] =
-    value.split("-").map(Number)
+  const [year, month, day] = value.split("-").map(Number)
 
-  return new Date(
-    year,
-    month - 1,
-    day,
-  )
+  return new Date(year, month - 1, day)
 }
 
 function formatLongDate(value: string) {
-  return parseDateKey(
-    value,
-  ).toLocaleDateString("en-GB", {
+  return parseDateKey(value).toLocaleDateString("en-GB", {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -149,18 +137,12 @@ function formatLongDate(value: string) {
 }
 
 function getMonthStart(date: Date) {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    1,
-  )
+  return new Date(date.getFullYear(), date.getMonth(), 1)
 }
 
 function getCalendarDays(month: Date) {
   const firstDay = getMonthStart(month)
-
-  const mondayIndex =
-    (firstDay.getDay() + 6) % 7
+  const mondayIndex = (firstDay.getDay() + 6) % 7
 
   const daysInMonth = new Date(
     month.getFullYear(),
@@ -169,18 +151,11 @@ function getCalendarDays(month: Date) {
   ).getDate()
 
   const totalCells =
-    Math.ceil(
-      (mondayIndex + daysInMonth) /
-        7,
-    ) * 7
+    Math.ceil((mondayIndex + daysInMonth) / 7) * 7
 
   const days: Date[] = []
 
-  for (
-    let index = 0;
-    index < totalCells;
-    index += 1
-  ) {
+  for (let index = 0; index < totalCells; index += 1) {
     days.push(
       new Date(
         month.getFullYear(),
@@ -193,23 +168,15 @@ function getCalendarDays(month: Date) {
   return days
 }
 
-function isSameDay(
-  left: Date,
-  right: Date,
-) {
+function isSameDay(left: Date, right: Date) {
   return (
-    left.getFullYear() ===
-      right.getFullYear() &&
-    left.getMonth() ===
-      right.getMonth() &&
-    left.getDate() ===
-      right.getDate()
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
   )
 }
 
-function getCategoryClasses(
-  category: EventCategory,
-) {
+function getCategoryClasses(category: EventCategory) {
   switch (category) {
     case "Activities":
       return "border-purple-500/20 bg-purple-500/10 text-purple-600 dark:text-purple-300"
@@ -228,9 +195,7 @@ function getCategoryClasses(
   }
 }
 
-function getCategoryDotClasses(
-  category: EventCategory,
-) {
+function getCategoryDotClasses(category: EventCategory) {
   switch (category) {
     case "Activities":
       return "bg-purple-500"
@@ -249,9 +214,7 @@ function getCategoryDotClasses(
   }
 }
 
-function sortEvents(
-  events: CalendarEvent[],
-) {
+function sortEvents(events: CalendarEvent[]) {
   return [...events].sort((a, b) =>
     `${a.date} ${a.startTime}`.localeCompare(
       `${b.date} ${b.startTime}`,
@@ -260,17 +223,12 @@ function sortEvents(
 }
 
 function parseTime(value: string) {
-  const [
-    hourString,
-    minuteString,
-  ] = value.split(":")
+  const [hourString, minuteString] = value.split(":")
 
   const hour = Number(hourString)
-  const minute =
-    minuteString ?? "00"
+  const minute = minuteString ?? "00"
 
-  const period: Period =
-    hour >= 12 ? "PM" : "AM"
+  const period: Period = hour >= 12 ? "PM" : "AM"
 
   let displayHour = hour % 12
 
@@ -279,14 +237,8 @@ function parseTime(value: string) {
   }
 
   return {
-    hour: String(displayHour).padStart(
-      2,
-      "0",
-    ),
-    minute: String(minute).padStart(
-      2,
-      "0",
-    ),
+    hour: String(displayHour).padStart(2, "0"),
+    minute: String(minute).padStart(2, "0"),
     period,
   }
 }
@@ -306,28 +258,22 @@ function buildTime(
     numericHour += 12
   }
 
-  return `${String(
-    numericHour,
-  ).padStart(2, "0")}:${String(
+  return `${String(numericHour).padStart(2, "0")}:${String(
     Number(minute),
   ).padStart(2, "0")}`
 }
 
 /* -------------------------------------------------------------------------- */
-/* Dropdown manager                                                          */
+/* Dropdown manager                                                           */
 /* -------------------------------------------------------------------------- */
 
 type DropdownContextValue = {
   openDropdown: string | null
-  setOpenDropdown: (
-    value: string | null,
-  ) => void
+  setOpenDropdown: (value: string | null) => void
 }
 
 const DropdownContext =
-  createContext<
-    DropdownContextValue | null
-  >(null)
+  createContext<DropdownContextValue | null>(null)
 
 function DropdownProvider({
   children,
@@ -373,8 +319,7 @@ function CustomSelect({
     selected: boolean,
   ) => ReactNode
 }) {
-  const dropdown =
-    useContext(DropdownContext)
+  const dropdown = useContext(DropdownContext)
 
   if (!dropdown) {
     throw new Error(
@@ -394,11 +339,8 @@ function CustomSelect({
       return
     }
 
-    function handlePointerDown(
-      event: MouseEvent,
-    ) {
-      const target =
-        event.target as HTMLElement
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as HTMLElement
 
       if (
         !target.closest(
@@ -409,9 +351,7 @@ function CustomSelect({
       }
     }
 
-    function handleKeyDown(
-      event: KeyboardEvent,
-    ) {
+    function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setOpenDropdown(null)
       }
@@ -438,18 +378,11 @@ function CustomSelect({
         handleKeyDown,
       )
     }
-  }, [
-    id,
-    open,
-    setOpenDropdown,
-  ])
+  }, [id, open, setOpenDropdown])
 
   return (
     <div
-      className={[
-        "relative",
-        className,
-      ].join(" ")}
+      className={["relative", className].join(" ")}
       data-custom-select={id}
     >
       <button
@@ -458,9 +391,7 @@ function CustomSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() =>
-          setOpenDropdown(
-            open ? null : id,
-          )
+          setOpenDropdown(open ? null : id)
         }
         className={[
           "flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-all",
@@ -473,10 +404,7 @@ function CustomSelect({
       >
         <span className="flex min-w-0 items-center gap-2">
           {renderOption
-            ? renderOption(
-                value,
-                true,
-              )
+            ? renderOption(value, true)
             : value}
         </span>
 
@@ -490,48 +418,38 @@ function CustomSelect({
 
       {open && (
         <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[100] max-h-60 overflow-y-auto rounded-xl border border-border/80 bg-popover p-1.5 text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5">
-          {options.map(
-            (option) => {
-              const selected =
-                option === value
+          {options.map((option) => {
+            const selected = option === value
 
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  role="option"
-                  aria-selected={
-                    selected
-                  }
-                  onClick={() => {
-                    onChange(option)
-                    setOpenDropdown(
-                      null,
-                    )
-                  }}
-                  className={[
-                    "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
-                    selected
-                      ? "bg-blue-500/10 text-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  ].join(" ")}
-                >
-                  <span className="flex min-w-0 items-center gap-2.5">
-                    {renderOption
-                      ? renderOption(
-                          option,
-                          selected,
-                        )
-                      : option}
-                  </span>
+            return (
+              <button
+                key={option}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => {
+                  onChange(option)
+                  setOpenDropdown(null)
+                }}
+                className={[
+                  "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                  selected
+                    ? "bg-blue-500/10 text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ].join(" ")}
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  {renderOption
+                    ? renderOption(option, selected)
+                    : option}
+                </span>
 
-                  {selected && (
-                    <Check className="ml-3 h-4 w-4 shrink-0 text-blue-500" />
-                  )}
-                </button>
-              )
-            },
-          )}
+                {selected && (
+                  <Check className="ml-3 h-4 w-4 shrink-0 text-blue-500" />
+                )}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
@@ -547,9 +465,7 @@ function CategorySelect({
   onChange,
 }: {
   value: EventCategory
-  onChange: (
-    value: EventCategory,
-  ) => void
+  onChange: (value: EventCategory) => void
 }) {
   return (
     <CustomSelect
@@ -558,22 +474,17 @@ function CategorySelect({
       options={EVENT_CATEGORIES}
       ariaLabel="Event category"
       onChange={(next) =>
-        onChange(
-          next as EventCategory,
-        )
+        onChange(next as EventCategory)
       }
       renderOption={(option) => {
-        const category =
-          option as EventCategory
+        const category = option as EventCategory
 
         return (
           <>
             <span
               className={[
                 "h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background",
-                getCategoryDotClasses(
-                  category,
-                ),
+                getCategoryDotClasses(category),
               ].join(" ")}
             />
 
@@ -632,10 +543,7 @@ function TimeSelect({
         options={MINUTES}
         ariaLabel="Minute"
         onChange={(next) =>
-          updateTime(
-            parsed.hour,
-            next,
-          )
+          updateTime(parsed.hour, next)
         }
       />
 
@@ -676,11 +584,7 @@ function DateSelect({
         value={value}
         onChange={(
           event: ChangeEvent<HTMLInputElement>,
-        ) =>
-          onChange(
-            event.target.value,
-          )
-        }
+        ) => onChange(event.target.value)}
         className="h-10 rounded-lg pl-10 pr-3 font-medium shadow-sm"
         aria-label="Event date"
       />
@@ -693,32 +597,23 @@ function DateSelect({
 /* -------------------------------------------------------------------------- */
 
 export default function Events() {
-  const today = useMemo(
-    () => new Date(),
-    [],
-  )
+  const today = useMemo(() => new Date(), [])
 
-  const [user, setUser] =
-    useState<User | null>(null)
+  const [user, setUser] = useState<User | null>(null)
 
   const [currentMonth, setCurrentMonth] =
-    useState(
-      getMonthStart(today),
-    )
+    useState(getMonthStart(today))
 
   const [selectedDate, setSelectedDate] =
     useState<string | null>(null)
 
   const [categoryFilter, setCategoryFilter] =
-    useState<
-      "All" | EventCategory
-    >("All")
+    useState<"All" | EventCategory>("All")
 
   const [events, setEvents] =
     useState<CalendarEvent[]>([])
 
-  const [loading, setLoading] =
-    useState(true)
+  const [loading, setLoading] = useState(true)
 
   const [canManageEvents, setCanManageEvents] =
     useState(false)
@@ -732,8 +627,7 @@ export default function Events() {
   const [form, setForm] =
     useState<EventForm>(EMPTY_FORM)
 
-  const [saving, setSaving] =
-    useState(false)
+  const [saving, setSaving] = useState(false)
 
   const [deletingId, setDeletingId] =
     useState<string | null>(null)
@@ -825,12 +719,9 @@ export default function Events() {
       document.body.style.overflow
 
     const previousHtmlOverflow =
-      document.documentElement.style
-        .overflow
+      document.documentElement.style.overflow
 
-    document.body.style.overflow =
-      "hidden"
-
+    document.body.style.overflow = "hidden"
     document.documentElement.style.overflow =
       "hidden"
 
@@ -848,10 +739,7 @@ export default function Events() {
   /* ------------------------------------------------------------------------ */
 
   const calendarDays = useMemo(
-    () =>
-      getCalendarDays(
-        currentMonth,
-      ),
+    () => getCalendarDays(currentMonth),
     [currentMonth],
   )
 
@@ -863,8 +751,7 @@ export default function Events() {
     return sortEvents(
       events.filter(
         (event) =>
-          event.category ===
-          categoryFilter,
+          event.category === categoryFilter,
       ),
     )
   }, [categoryFilter, events])
@@ -879,30 +766,39 @@ export default function Events() {
         (event) =>
           event.date === selectedDate &&
           (categoryFilter === "All" ||
-            event.category ===
-              categoryFilter),
+            event.category === categoryFilter),
       ),
     )
-  }, [
-    categoryFilter,
-    events,
-    selectedDate,
-  ])
+  }, [categoryFilter, events, selectedDate])
 
+  /*
+   * All upcoming events matching the current filter.
+   *
+   * This intentionally does NOT use slice(0, 8), so the count shown
+   * beside the calendar represents the actual number of upcoming events,
+   * rather than only the number currently displayed in the list.
+   */
+  const upcomingEventCount = useMemo(() => {
+    const todayKey = formatDateKey(today)
+
+    return filteredEvents.filter(
+      (event) => event.date >= todayKey,
+    ).length
+  }, [filteredEvents, today])
+
+  /*
+   * The upcoming-events section is still limited to the first 8 events
+   * to keep the page compact.
+   */
   const upcomingEvents = useMemo(() => {
-    const todayKey =
-      formatDateKey(today)
+    const todayKey = formatDateKey(today)
 
     return filteredEvents
       .filter(
-        (event) =>
-          event.date >= todayKey,
+        (event) => event.date >= todayKey,
       )
       .slice(0, 8)
-  }, [
-    filteredEvents,
-    today,
-  ])
+  }, [filteredEvents, today])
 
   /* ------------------------------------------------------------------------ */
   /* Event modal                                                              */
@@ -958,9 +854,7 @@ export default function Events() {
 
   async function saveEvent() {
     if (!form.title.trim()) {
-      toast.error(
-        "Enter an event title.",
-      )
+      toast.error("Enter an event title.")
       return
     }
 
@@ -972,26 +866,18 @@ export default function Events() {
     }
 
     if (!form.date) {
-      toast.error(
-        "Select an event date.",
-      )
+      toast.error("Select an event date.")
       return
     }
 
-    if (
-      !form.startTime ||
-      !form.endTime
-    ) {
+    if (!form.startTime || !form.endTime) {
       toast.error(
         "Select a start and end time.",
       )
       return
     }
 
-    if (
-      form.endTime <
-      form.startTime
-    ) {
+    if (form.endTime < form.startTime) {
       toast.error(
         "End time must be after the start time.",
       )
@@ -1001,29 +887,23 @@ export default function Events() {
     setSaving(true)
 
     try {
-      const response =
-        await fetch(
-          editingEvent
-            ? `/api/events/${editingEvent.id}`
-            : "/api/events",
-          {
-            method:
-              editingEvent
-                ? "PUT"
-                : "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify(form),
+      const response = await fetch(
+        editingEvent
+          ? `/api/events/${editingEvent.id}`
+          : "/api/events",
+        {
+          method: editingEvent ? "PUT" : "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
           },
-        )
+          body: JSON.stringify(form),
+        },
+      )
 
-      const data =
-        await response
-          .json()
-          .catch(() => ({}))
+      const data = await response
+        .json()
+        .catch(() => ({}))
 
       if (!response.ok) {
         throw new Error(
@@ -1041,37 +921,29 @@ export default function Events() {
       if (editingEvent) {
         setEvents((current) =>
           current.map((event) =>
-            event.id ===
-            editingEvent.id
+            event.id === editingEvent.id
               ? data.event
               : event,
           ),
         )
 
-        toast.success(
-          "Event updated.",
-        )
+        toast.success("Event updated.")
       } else {
         setEvents((current) => [
           ...current,
           data.event,
         ])
 
-        toast.success(
-          "Event created.",
-        )
+        toast.success("Event created.")
       }
 
       setCurrentMonth(
         getMonthStart(
-          parseDateKey(
-            form.date,
-          ),
+          parseDateKey(form.date),
         ),
       )
 
       setSelectedDate(form.date)
-
       setShowEventModal(false)
       setEditingEvent(null)
       setForm(EMPTY_FORM)
@@ -1104,19 +976,17 @@ export default function Events() {
     setDeletingId(event.id)
 
     try {
-      const response =
-        await fetch(
-          `/api/events/${event.id}`,
-          {
-            method: "DELETE",
-            credentials: "include",
-          },
-        )
+      const response = await fetch(
+        `/api/events/${event.id}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        },
+      )
 
-      const data =
-        await response
-          .json()
-          .catch(() => ({}))
+      const data = await response
+        .json()
+        .catch(() => ({}))
 
       if (!response.ok) {
         throw new Error(
@@ -1127,14 +997,11 @@ export default function Events() {
 
       setEvents((current) =>
         current.filter(
-          (item) =>
-            item.id !== event.id,
+          (item) => item.id !== event.id,
         ),
       )
 
-      toast.success(
-        "Event deleted.",
-      )
+      toast.success("Event deleted.")
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -1171,9 +1038,7 @@ export default function Events() {
               <Button
                 type="button"
                 className="shrink-0"
-                onClick={() =>
-                  openAddEvent()
-                }
+                onClick={() => openAddEvent()}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Event
@@ -1211,9 +1076,7 @@ export default function Events() {
                   className="h-9 px-3 text-sm"
                   onClick={() =>
                     setCurrentMonth(
-                      getMonthStart(
-                        today,
-                      ),
+                      getMonthStart(today),
                     )
                   }
                 >
@@ -1264,8 +1127,7 @@ export default function Events() {
                       }
                       className={[
                         "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        categoryFilter ===
-                        filter
+                        categoryFilter === filter
                           ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
                           : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
                       ].join(" ")}
@@ -1278,128 +1140,102 @@ export default function Events() {
             </div>
 
             <div className="grid grid-cols-7 border-b border-border/70">
-              {WEEKDAYS.map(
-                (day) => (
-                  <div
-                    key={day}
-                    className="px-1 py-2 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:px-2"
-                  >
-                    {day}
-                  </div>
-                ),
-              )}
+              {WEEKDAYS.map((day) => (
+                <div
+                  key={day}
+                  className="px-1 py-2 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:px-2"
+                >
+                  {day}
+                </div>
+              ))}
             </div>
 
             <div className="grid grid-cols-7">
-              {calendarDays.map(
-                (day) => {
-                  const dateKey =
-                    formatDateKey(
-                      day,
-                    )
+              {calendarDays.map((day) => {
+                const dateKey = formatDateKey(day)
 
-                  const dayEvents =
-                    filteredEvents.filter(
-                      (event) =>
-                        event.date ===
-                        dateKey,
-                    )
+                const dayEvents =
+                  filteredEvents.filter(
+                    (event) =>
+                      event.date === dateKey,
+                  )
 
-                  const isCurrentMonth =
-                    day.getMonth() ===
-                    currentMonth.getMonth()
+                const isCurrentMonth =
+                  day.getMonth() ===
+                  currentMonth.getMonth()
 
-                  const isToday =
-                    isSameDay(
-                      day,
-                      today,
-                    )
+                const isToday = isSameDay(
+                  day,
+                  today,
+                )
 
-                  const isSelected =
-                    selectedDate ===
-                    dateKey
+                const isSelected =
+                  selectedDate === dateKey
 
-                  return (
-                    <button
-                      key={dateKey}
-                      type="button"
-                      onClick={() =>
-                        setSelectedDate(
-                          dateKey,
-                        )
-                      }
+                return (
+                  <button
+                    key={dateKey}
+                    type="button"
+                    onClick={() =>
+                      setSelectedDate(dateKey)
+                    }
+                    className={[
+                      "group relative min-h-[72px] border-r border-b border-border/60 p-1.5 text-left transition-colors last:border-r-0 sm:min-h-[82px] sm:p-2",
+                      isCurrentMonth
+                        ? "bg-background/20 hover:bg-muted/50"
+                        : "bg-muted/20 text-muted-foreground/50 hover:bg-muted/30",
+                      isSelected
+                        ? "bg-blue-500/5 ring-1 ring-inset ring-blue-500/40"
+                        : "",
+                    ].join(" ")}
+                  >
+                    <span
                       className={[
-                        "group relative min-h-[72px] border-r border-b border-border/60 p-1.5 text-left transition-colors last:border-r-0 sm:min-h-[82px] sm:p-2",
-                        isCurrentMonth
-                          ? "bg-background/20 hover:bg-muted/50"
-                          : "bg-muted/20 text-muted-foreground/50 hover:bg-muted/30",
-                        isSelected
-                          ? "bg-blue-500/5 ring-1 ring-inset ring-blue-500/40"
-                          : "",
+                        "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-medium",
+                        isToday
+                          ? "bg-blue-600 text-white"
+                          : isSelected
+                            ? "bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                            : "",
                       ].join(" ")}
                     >
-                      <span
-                        className={[
-                          "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-medium",
-                          isToday
-                            ? "bg-blue-600 text-white"
-                            : isSelected
-                              ? "bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                              : "",
-                        ].join(" ")}
-                      >
-                        {day.getDate()}
-                      </span>
+                      {day.getDate()}
+                    </span>
 
-                      <div className="mt-1 space-y-1">
-                        {dayEvents
-                          .slice(0, 2)
-                          .map(
-                            (event) => (
-                              <div
-                                key={
-                                  event.id
-                                }
-                                className={[
-                                  "truncate rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
-                                  getCategoryClasses(
-                                    event.category,
-                                  ),
-                                ].join(
-                                  " ",
-                                )}
-                                title={
-                                  event.title
-                                }
-                              >
-                                {
-                                  event.title
-                                }
-                              </div>
-                            ),
-                          )}
-
-                        {dayEvents.length >
-                          2 && (
-                          <div className="px-1 text-[10px] text-muted-foreground">
-                            +
-                            {dayEvents.length -
-                              2}{" "}
-                            more
+                    <div className="mt-1 space-y-1">
+                      {dayEvents
+                        .slice(0, 2)
+                        .map((event) => (
+                          <div
+                            key={event.id}
+                            className={[
+                              "truncate rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+                              getCategoryClasses(
+                                event.category,
+                              ),
+                            ].join(" ")}
+                            title={event.title}
+                          >
+                            {event.title}
                           </div>
-                        )}
-                      </div>
-                    </button>
-                  )
-                },
-              )}
+                        ))}
+
+                      {dayEvents.length > 2 && (
+                        <div className="px-1 text-[10px] text-muted-foreground">
+                          +{dayEvents.length - 2}{" "}
+                          more
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
 
             <div className="flex flex-col gap-3 border-t border-border/70 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
                 <span className="shrink-0">
-                  Click a date to view its
-                  events.
+                  Click a date to view its events.
                 </span>
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -1418,20 +1254,19 @@ export default function Events() {
                           ].join(" ")}
                         />
 
-                        <span>
-                          {category}
-                        </span>
+                        <span>{category}</span>
                       </span>
                     ),
                   )}
                 </div>
               </div>
 
+              {/* Upcoming event count */}
               <span className="shrink-0 font-medium text-foreground/70">
-                {filteredEvents.length}{" "}
-                {filteredEvents.length === 1
-                  ? "event"
-                  : "events"}
+                {upcomingEventCount}{" "}
+                {upcomingEventCount === 1
+                  ? "upcoming event"
+                  : "upcoming events"}
               </span>
             </div>
           </section>
@@ -1453,15 +1288,13 @@ export default function Events() {
                 </h2>
 
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  Scheduled events from today
-                  onwards.
+                  Scheduled events from today onwards.
                 </p>
               </div>
 
               {categoryFilter !== "All" && (
                 <span className="text-xs text-muted-foreground">
-                  Filter:{" "}
-                  {categoryFilter}
+                  Filter: {categoryFilter}
                 </span>
               )}
             </div>
@@ -1475,12 +1308,10 @@ export default function Events() {
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Please wait while the
-                  calendar is loaded.
+                  Please wait while the calendar is loaded.
                 </p>
               </div>
-            ) : upcomingEvents.length ===
-              0 ? (
+            ) : upcomingEvents.length === 0 ? (
               <div className="px-4 py-10 text-center">
                 <CalendarDays className="mx-auto h-8 w-8 text-muted-foreground" />
 
@@ -1489,8 +1320,7 @@ export default function Events() {
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  There are no events
-                  matching this filter.
+                  There are no events matching this filter.
                 </p>
 
                 {canManageEvents && (
@@ -1498,9 +1328,7 @@ export default function Events() {
                     type="button"
                     variant="outline"
                     className="mt-4"
-                    onClick={() =>
-                      openAddEvent()
-                    }
+                    onClick={() => openAddEvent()}
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Event
@@ -1510,172 +1338,148 @@ export default function Events() {
             ) : (
               <div className="p-3 sm:p-4">
                 <div className="space-y-2">
-                  {upcomingEvents.map(
-                    (event) => (
-                      <div
-                        key={event.id}
-                        className="rounded-xl border border-border/70 bg-background/60 p-3 transition-colors hover:border-blue-500/40 hover:bg-muted/30 sm:p-4"
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                          <button
-                            type="button"
-                            className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                            onClick={() =>
-                              setSelectedDate(
-                                event.date,
-                              )
-                            }
+                  {upcomingEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="rounded-xl border border-border/70 bg-background/60 p-3 transition-colors hover:border-blue-500/40 hover:bg-muted/30 sm:p-4"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                          onClick={() =>
+                            setSelectedDate(
+                              event.date,
+                            )
+                          }
+                        >
+                          <div
+                            className={[
+                              "flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-lg border",
+                              getCategoryClasses(
+                                event.category,
+                              ),
+                            ].join(" ")}
                           >
-                            <div
-                              className={[
-                                "flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-lg border",
-                                getCategoryClasses(
-                                  event.category,
-                                ),
-                              ].join(
-                                " ",
+                            <span className="text-[9px] font-semibold uppercase opacity-80">
+                              {parseDateKey(
+                                event.date,
+                              ).toLocaleDateString(
+                                "en-GB",
+                                {
+                                  month: "short",
+                                },
                               )}
-                            >
-                              <span className="text-[9px] font-semibold uppercase opacity-80">
-                                {parseDateKey(
-                                  event.date,
-                                ).toLocaleDateString(
-                                  "en-GB",
-                                  {
-                                    month:
-                                      "short",
-                                  },
-                                )}
-                              </span>
+                            </span>
 
-                              <span className="text-lg font-semibold leading-none">
-                                {parseDateKey(
-                                  event.date,
-                                ).getDate()}
-                              </span>
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="truncate text-sm font-semibold sm:text-base">
-                                  {
-                                    event.title
-                                  }
-                                </h3>
-
-                                <span
-                                  className={[
-                                    "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                                    getCategoryClasses(
-                                      event.category,
-                                    ),
-                                  ].join(
-                                    " ",
-                                  )}
-                                >
-                                  {
-                                    event.category
-                                  }
-                                </span>
-                              </div>
-
-                              {event.description && (
-                                <p className="mt-1 line-clamp-1 text-xs text-muted-foreground sm:text-sm">
-                                  {
-                                    event.description
-                                  }
-                                </p>
-                              )}
-
-                              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Clock3 className="h-3.5 w-3.5" />
-                                  {
-                                    event.startTime
-                                  }{" "}
-                                  -{" "}
-                                  {
-                                    event.endTime
-                                  }
-                                </span>
-
-                                {event.location && (
-                                  <span className="inline-flex items-center gap-1.5">
-                                    <MapPin className="h-3.5 w-3.5" />
-
-                                    <span className="truncate">
-                                      {
-                                        event.location
-                                      }
-                                    </span>
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </button>
-
-                          <div className="flex shrink-0 items-center gap-2 sm:pl-2">
-                            {event.discordUrl && (
-                              <a
-                                href={
-                                  event.discordUrl
-                                }
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                onClick={(
-                                  eventClick,
-                                ) =>
-                                  eventClick.stopPropagation()
-                                }
-                              >
-                                Discord
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a>
-                            )}
-
-                            {canManageEvents && (
-                              <>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-9 w-9"
-                                  onClick={() =>
-                                    openEditEvent(
-                                      event,
-                                    )
-                                  }
-                                  aria-label={`Edit ${event.title}`}
-                                >
-                                  <Edit3 className="h-4 w-4" />
-                                </Button>
-
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-9 w-9 text-destructive hover:text-destructive"
-                                  disabled={
-                                    deletingId ===
-                                    event.id
-                                  }
-                                  onClick={() =>
-                                    void deleteEvent(
-                                      event,
-                                    )
-                                  }
-                                  aria-label={`Delete ${event.title}`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
+                            <span className="text-lg font-semibold leading-none">
+                              {parseDateKey(
+                                event.date,
+                              ).getDate()}
+                            </span>
                           </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="truncate text-sm font-semibold sm:text-base">
+                                {event.title}
+                              </h3>
+
+                              <span
+                                className={[
+                                  "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                                  getCategoryClasses(
+                                    event.category,
+                                  ),
+                                ].join(" ")}
+                              >
+                                {event.category}
+                              </span>
+                            </div>
+
+                            {event.description && (
+                              <p className="mt-1 line-clamp-1 text-xs text-muted-foreground sm:text-sm">
+                                {event.description}
+                              </p>
+                            )}
+
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Clock3 className="h-3.5 w-3.5" />
+                                {event.startTime} -{" "}
+                                {event.endTime}
+                              </span>
+
+                              {event.location && (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <MapPin className="h-3.5 w-3.5" />
+
+                                  <span className="truncate">
+                                    {event.location}
+                                  </span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+
+                        <div className="flex shrink-0 items-center gap-2 sm:pl-2">
+                          {event.discordUrl && (
+                            <a
+                              href={event.discordUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              onClick={(eventClick) =>
+                                eventClick.stopPropagation()
+                              }
+                            >
+                              Discord
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+
+                          {canManageEvents && (
+                            <>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-9 w-9"
+                                onClick={() =>
+                                  openEditEvent(
+                                    event,
+                                  )
+                                }
+                                aria-label={`Edit ${event.title}`}
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </Button>
+
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-9 w-9 text-destructive hover:text-destructive"
+                                disabled={
+                                  deletingId ===
+                                  event.id
+                                }
+                                onClick={() =>
+                                  void deleteEvent(
+                                    event,
+                                  )
+                                }
+                                aria-label={`Delete ${event.title}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
-                    ),
-                  )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -1709,9 +1513,7 @@ export default function Events() {
                 </p>
 
                 <h2 className="mt-1 text-lg font-semibold">
-                  {formatLongDate(
-                    selectedDate,
-                  )}
+                  {formatLongDate(selectedDate)}
                 </h2>
               </div>
 
@@ -1729,8 +1531,7 @@ export default function Events() {
               </Button>
             </div>
 
-            {selectedDateEvents.length ===
-            0 ? (
+            {selectedDateEvents.length === 0 ? (
               <div className="px-5 py-10 text-center">
                 <CalendarDays className="mx-auto h-9 w-9 text-muted-foreground" />
 
@@ -1739,8 +1540,7 @@ export default function Events() {
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  There are no events scheduled
-                  for this date.
+                  There are no events scheduled for this date.
                 </p>
 
                 {canManageEvents && (
@@ -1761,117 +1561,102 @@ export default function Events() {
               </div>
             ) : (
               <div className="max-h-[60vh] divide-y divide-border/70 overflow-y-auto">
-                {selectedDateEvents.map(
-                  (event) => (
-                    <div
-                      key={event.id}
-                      className="px-5 py-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold">
-                              {event.title}
-                            </h3>
+                {selectedDateEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="px-5 py-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold">
+                            {event.title}
+                          </h3>
 
-                            <span
-                              className={[
-                                "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                                getCategoryClasses(
-                                  event.category,
-                                ),
-                              ].join(
-                                " ",
-                              )}
-                            >
-                              {
-                                event.category
-                              }
-                            </span>
-                          </div>
-
-                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                            {
-                              event.description
-                            }
-                          </p>
+                          <span
+                            className={[
+                              "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                              getCategoryClasses(
+                                event.category,
+                              ),
+                            ].join(" ")}
+                          >
+                            {event.category}
+                          </span>
                         </div>
 
-                        {canManageEvents && (
-                          <div className="flex shrink-0 items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() =>
-                                openEditEvent(
-                                  event,
-                                )
-                              }
-                              aria-label={`Edit ${event.title}`}
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              disabled={
-                                deletingId ===
-                                event.id
-                              }
-                              onClick={() =>
-                                void deleteEvent(
-                                  event,
-                                )
-                              }
-                              aria-label={`Delete ${event.title}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          {event.description}
+                        </p>
                       </div>
 
-                      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Clock3 className="h-3.5 w-3.5" />
-                          {
-                            event.startTime
-                          }{" "}
-                          -{" "}
-                          {event.endTime}
-                        </span>
-
-                        {event.location && (
-                          <span className="inline-flex items-center gap-1.5">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {
-                              event.location
+                      {canManageEvents && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() =>
+                              openEditEvent(
+                                event,
+                              )
                             }
-                          </span>
-                        )}
-
-                        {event.discordUrl && (
-                          <a
-                            href={
-                              event.discordUrl
-                            }
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 text-blue-500 hover:underline"
+                            aria-label={`Edit ${event.title}`}
                           >
-                            Discord
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        )}
-                      </div>
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            disabled={
+                              deletingId ===
+                              event.id
+                            }
+                            onClick={() =>
+                              void deleteEvent(
+                                event,
+                              )
+                            }
+                            aria-label={`Delete ${event.title}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  ),
-                )}
+
+                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        {event.startTime} -{" "}
+                        {event.endTime}
+                      </span>
+
+                      {event.location && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5" />
+                          {event.location}
+                        </span>
+                      )}
+
+                      {event.discordUrl && (
+                        <a
+                          href={event.discordUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-blue-500 hover:underline"
+                        >
+                          Discord
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -1914,9 +1699,7 @@ export default function Events() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                onClick={
-                  closeEventModal
-                }
+                onClick={closeEventModal}
                 disabled={saving}
                 aria-label="Close"
               >
@@ -1942,8 +1725,7 @@ export default function Events() {
                           (current) => ({
                             ...current,
                             title:
-                              event.target
-                                .value,
+                              event.target.value,
                           }),
                         )
                       }
@@ -1959,16 +1741,13 @@ export default function Events() {
                     </label>
 
                     <Textarea
-                      value={
-                        form.description
-                      }
+                      value={form.description}
                       onChange={(event) =>
                         setForm(
                           (current) => ({
                             ...current,
                             description:
-                              event.target
-                                .value,
+                              event.target.value,
                           }),
                         )
                       }
@@ -1984,12 +1763,8 @@ export default function Events() {
                     </label>
 
                     <CategorySelect
-                      value={
-                        form.category
-                      }
-                      onChange={(
-                        category,
-                      ) =>
+                      value={form.category}
+                      onChange={(category) =>
                         setForm(
                           (current) => ({
                             ...current,
@@ -2042,12 +1817,8 @@ export default function Events() {
 
                     <TimeSelect
                       id="start-time"
-                      value={
-                        form.startTime
-                      }
-                      onChange={(
-                        startTime,
-                      ) =>
+                      value={form.startTime}
+                      onChange={(startTime) =>
                         setForm(
                           (current) => ({
                             ...current,
@@ -2070,12 +1841,8 @@ export default function Events() {
 
                     <TimeSelect
                       id="end-time"
-                      value={
-                        form.endTime
-                      }
-                      onChange={(
-                        endTime,
-                      ) =>
+                      value={form.endTime}
+                      onChange={(endTime) =>
                         setForm(
                           (current) => ({
                             ...current,
@@ -2097,16 +1864,13 @@ export default function Events() {
                     </label>
 
                     <Input
-                      value={
-                        form.location
-                      }
+                      value={form.location}
                       onChange={(event) =>
                         setForm(
                           (current) => ({
                             ...current,
                             location:
-                              event.target
-                                .value,
+                              event.target.value,
                           }),
                         )
                       }
@@ -2122,16 +1886,13 @@ export default function Events() {
 
                     <Input
                       type="url"
-                      value={
-                        form.discordUrl
-                      }
+                      value={form.discordUrl}
                       onChange={(event) =>
                         setForm(
                           (current) => ({
                             ...current,
                             discordUrl:
-                              event.target
-                                .value,
+                              event.target.value,
                           }),
                         )
                       }
@@ -2147,9 +1908,7 @@ export default function Events() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={
-                  closeEventModal
-                }
+                onClick={closeEventModal}
                 disabled={saving}
               >
                 Cancel
@@ -2172,8 +1931,6 @@ export default function Events() {
           </div>
         </div>
       )}
-
-      {!user && !loading ? null : null}
     </div>
   )
 }
