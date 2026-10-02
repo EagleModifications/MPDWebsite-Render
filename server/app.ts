@@ -5411,6 +5411,9 @@ export function createApp() {
             req.body?.description,
           )
 
+        const requestedCategory =
+          req.body?.category
+
         if (
           requestedCategory !== undefined &&
           !isGalleryCategory(
@@ -5431,6 +5434,13 @@ export function createApp() {
               "Gallery title is required",
           })
         }
+
+        const category =
+          isGalleryCategory(
+            requestedCategory,
+          )
+            ? requestedCategory
+            : "Community"
 
         const rawMedia = req.body?.media
 
