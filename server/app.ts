@@ -3839,7 +3839,7 @@ export function createApp() {
    * the public site URL in Chromium and taking a 1200x630
    * screenshot. No preview image needs to be uploaded or stored.
    */
-  app.get("/api/og", async (_req, res) => {
+  app.get("/api/og", async (req, res) => {
     const siteUrl =
       (process.env.OG_SITE_URL ||
         process.env.APP_ORIGIN ||
@@ -3847,22 +3847,28 @@ export function createApp() {
         .trim()
         .replace(/\/+$/, "")
 
-    let browser:
-      Awaited<ReturnType<typeof puppeteer.launch>> | null =
-      null
+    let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
+    let page: Awaited<ReturnType<NonNullable<typeof browser>["newPage"]>> | null = null
 
     try {
+      // Keep the OG renderer independent from the normal browser session.
+      // Discord does not send cookies, so the preview must work as a guest.
       browser = await puppeteer.launch({
         headless: true,
+        executablePath:
+          process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
+          "--disable-software-rasterizer",
+          "--no-zygote",
+          "--single-process",
         ],
       })
 
-      const page = await browser.newPage()
+      page = await browser.newPage()
 
       await page.setViewport({
         width: 1200,
@@ -3870,65 +3876,107 @@ export function createApp() {
         deviceScaleFactor: 1,
       })
 
-      // Log browser-side errors so a failed React render is visible in
-      // Render logs instead of silently producing a blank Discord image.
+      // Make the screenshot deterministic and avoid browser cache holding an
+      // older version of the homepage while Discord is refreshing its preview.
+      await page.setCacheEnabled(false)
+
       page.on("console", (message) => {
-        if (message.type() === "error") {
-          console.error("[og] Browser console error:", message.text())
-        }
+        console.log(`[og:browser] ${message.type()}: ${message.text()}`)
       })
 
       page.on("pageerror", (error) => {
-        console.error("[og] Browser page error:", error)
+        console.error("[og:browser] page error:", error)
       })
 
-      // Add a small query parameter so the screenshot request is clearly
-      // separate from the normal browser visit and is not served from a
-      // stale browser cache.
-      const previewUrl = `${siteUrl}/?og_preview=1`
+      page.on("requestfailed", (request) => {
+        console.warn(
+          `[og:browser] request failed: ${request.url()} ${request.failure()?.errorText || ""}`,
+        )
+      })
 
-      await page.goto(previewUrl, {
+      const previewUrl = `${siteUrl}/?og_preview=${encodeURIComponent(
+        String(Date.now()),
+      )}`
+
+      const response = await page.goto(previewUrl, {
         waitUntil: "domcontentloaded",
         timeout: 30000,
       })
 
-      // The site is a React SPA, so DOMContentLoaded only means the HTML
-      // shell has loaded. Wait until React has actually mounted something
-      // inside #root before taking the screenshot.
-      await page.waitForSelector("#root > *", {
-        timeout: 20000,
+      if (!response || !response.ok()) {
+        throw new Error(
+          `Homepage returned ${response?.status() ?? "no response"}`,
+        )
+      }
+
+      // The homepage is a React SPA. Wait until React has actually mounted
+      // content into #root instead of capturing the empty HTML shell.
+      await page.waitForFunction(
+        () => {
+          const root = document.querySelector("#root")
+          return !!root && root.children.length > 0
+        },
+        { timeout: 20000 },
+      )
+
+      // Allow fonts, images and client-side layout effects to settle.
+      await page.evaluate(async () => {
+        if (document.fonts?.ready) {
+          await document.fonts.ready
+        }
+
+        const images = Array.from(document.images)
+        await Promise.all(
+          images.map((image) => {
+            if (image.complete) return Promise.resolve()
+
+            return new Promise<void>((resolve) => {
+              image.addEventListener("load", () => resolve(), { once: true })
+              image.addEventListener("error", () => resolve(), { once: true })
+            })
+          }),
+        )
       })
 
-      // Allow fonts, images, CSS and client-side layout effects to finish.
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      await new Promise((resolve) => setTimeout(resolve, 1500))
 
       const screenshot = await page.screenshot({
         type: "png",
-        fullPage: false,
+        clip: {
+          x: 0,
+          y: 0,
+          width: 1200,
+          height: 630,
+        },
       })
 
-      res.setHeader(
-        "Content-Type",
-        "image/png",
-      )
-
-      res.setHeader(
-        "Cache-Control",
-        "public, max-age=3600, s-maxage=3600",
-      )
+      res.set({
+        "Content-Type": "image/png",
+        "Content-Length": String(screenshot.length),
+        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
+        "Content-Disposition": "inline; filename=metro-pd-og.png",
+      })
 
       return res.end(screenshot)
     } catch (error) {
-      console.error(
-        "[og] Failed to generate website preview:",
-        error,
-      )
+      console.error("[og] Failed to generate website preview:", error)
 
-      return res.status(500).json({
-        success: false,
-        error: "Failed to generate website preview.",
-      })
+      if (!res.headersSent) {
+        return res.status(500).json({
+          success: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to generate website preview.",
+        })
+      }
+
+      return res.end()
     } finally {
+      if (page) {
+        await page.close().catch(() => undefined)
+      }
+
       if (browser) {
         await browser.close().catch(() => undefined)
       }
