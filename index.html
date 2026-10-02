@@ -5,50 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>Metro Police Department</title>
-    <meta name="description" content="Metro Police Department" />
-    <meta name="theme-color" content="#3b82f6" />
-    <meta name="robots" content="index, follow" />
 
-    <link rel="canonical" href="https://metropd-calirp.com/" />
-    <link rel="icon" href="/logo.png" type="image/png" />
-
-    <!--
-      Discord/Open Graph preview.
-
-      /api/og dynamically opens the URL being shared and returns a fresh
-      1200x630 PNG screenshot. No preview PNG is stored on the server.
-
-      The Express server rewrites these tags for the exact requested route
-      before returning the HTML, so /gallery, /events, etc. can each generate
-      their own live preview image.
-    -->
+    <!-- Discord / Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://metropd-calirp.com/" />
     <meta property="og:title" content="Metro Police Department" />
-    <meta property="og:description" content="Metro Police Department" />
-    <meta
-      property="og:image"
-      content="https://metropd-calirp.com/api/og?url=https%3A%2F%2Fmetropd-calirp.com%2F&amp;v=5"
-    />
-    <meta
-      property="og:image:secure_url"
-      content="https://metropd-calirp.com/api/og?url=https%3A%2F%2Fmetropd-calirp.com%2F&amp;v=5"
-    />
-    <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
 
-    <meta name="twitter:card" content="summary_large_image" />
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Metro Police Department" />
-    <meta name="twitter:description" content="Metro Police Department" />
-    <meta
-      name="twitter:image"
-      content="https://metropd-calirp.com/api/og?url=https%3A%2F%2Fmetropd-calirp.com%2F&amp;v=5"
-    />
+
+    <link rel="icon" type="image/png" href="/logo.png" />
   </head>
 
   <body>
     <div id="root"></div>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
