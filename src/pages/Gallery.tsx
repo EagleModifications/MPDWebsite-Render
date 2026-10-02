@@ -213,17 +213,7 @@ function CustomSelect({
   )
 }
 
-const GALLERY_MEDIA_DOMAIN = "https://mpd.opslinksystems.com"
-
 function getGalleryMediaUrl(media: GalleryMedia) {
-  if (media.storageId) {
-    return `${GALLERY_MEDIA_DOMAIN}/api/gallery/file/${media.storageId}`
-  }
-
-  if (media.url.startsWith("/")) {
-    return `${GALLERY_MEDIA_DOMAIN}${media.url}`
-  }
-
   return media.url
 }
 
