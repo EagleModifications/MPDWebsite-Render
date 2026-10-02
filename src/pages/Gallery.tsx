@@ -213,6 +213,20 @@ function CustomSelect({
   )
 }
 
+const GALLERY_MEDIA_DOMAIN = "https://mpd.opslinksystems.com"
+
+function getGalleryMediaUrl(media: GalleryMedia) {
+  if (media.storageId) {
+    return `${GALLERY_MEDIA_DOMAIN}/api/gallery/file/${media.storageId}`
+  }
+
+  if (media.url.startsWith("/")) {
+    return `${GALLERY_MEDIA_DOMAIN}${media.url}`
+  }
+
+  return media.url
+}
+
 function getMediaLabel(type: GalleryMediaType) {
   return type === "image" ? "Image" : "Video"
 }
@@ -2157,11 +2171,11 @@ export default function Gallery() {
 
               <div className="flex items-center justify-center gap-2 pt-3">
                 <a
-                  href={
+                  href={getGalleryMediaUrl(
                     viewer.item.media[
                       viewer.index
-                    ].url
-                  }
+                    ],
+                  )}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
