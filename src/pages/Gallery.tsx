@@ -155,6 +155,16 @@ function CustomSelect({
         ].join(" ")}
       >
         <span className="flex min-w-0 items-center gap-2">
+          {id === "gallery-category" && value !== "All" && (
+            <span
+              aria-hidden="true"
+              className={
+                value === "Community"
+                  ? "h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"
+                  : "h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+              }
+            />
+          )}
           <span>{value}</span>
         </span>
         <ChevronDown className={["h-4 w-4 text-muted-foreground transition-transform", open ? "rotate-180" : ""].join(" ")} />
@@ -181,6 +191,16 @@ function CustomSelect({
                 ].join(" ")}
               >
                 <span className="flex min-w-0 items-center gap-2">
+                  {id === "gallery-category" && option !== "All" && (
+                    <span
+                      aria-hidden="true"
+                      className={
+                        option === "Community"
+                          ? "h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"
+                          : "h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                      }
+                    />
+                  )}
                   <span>{option}</span>
                 </span>
                 {selected && <Check className="h-4 w-4 text-blue-500" />}
