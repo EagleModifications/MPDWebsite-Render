@@ -60,17 +60,19 @@ type PendingMedia = GalleryMedia & {
   file?: File
 }
 
-type GalleryFilter =
-  | "All"
-  | "Images"
-  | "Videos"
-  | "Fleet"
+type CategoryFilter = "All" | GalleryCategory
+type MediaFilter = "All" | "Images" | "Videos"
 
-const GALLERY_FILTERS: GalleryFilter[] = [
+const CATEGORY_FILTERS: CategoryFilter[] = [
+  "All",
+  "Community",
+  "Fleet",
+]
+
+const MEDIA_FILTERS: MediaFilter[] = [
   "All",
   "Images",
   "Videos",
-  "Fleet",
 ]
 
 const GALLERY_CATEGORIES: GalleryCategory[] = [
@@ -128,14 +130,18 @@ function formatDate(value: string) {
   })
 }
 
-function makePendingFromMedia(media: GalleryMedia): PendingMedia {
+function makePendingFromMedia(
+  media: GalleryMedia,
+): PendingMedia {
   return {
     ...media,
     previewUrl: media.url,
   }
 }
 
-function getCategoryClasses(category: GalleryCategory) {
+function getCategoryClasses(
+  category: GalleryCategory,
+) {
   if (category === "Fleet") {
     return {
       badge:
@@ -165,16 +171,20 @@ function CategorySelect({
   onChange: (value: GalleryCategory) => void
 }) {
   const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement | null>(null)
+  const containerRef =
+    useRef<HTMLDivElement | null>(null)
 
-  const selectedClasses = getCategoryClasses(value)
+  const selectedClasses =
+    getCategoryClasses(value)
 
   useEffect(() => {
     if (!open) {
       return
     }
 
-    function handlePointerDown(event: MouseEvent) {
+    function handlePointerDown(
+      event: MouseEvent,
+    ) {
       if (
         containerRef.current &&
         !containerRef.current.contains(
@@ -185,7 +195,9 @@ function CategorySelect({
       }
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
+    function handleKeyDown(
+      event: KeyboardEvent,
+    ) {
       if (event.key === "Escape") {
         setOpen(false)
       }
@@ -223,7 +235,9 @@ function CategorySelect({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() =>
+          setOpen((current) => !current)
+        }
         className="flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
       >
         <span className="flex min-w-0 items-center gap-2">
@@ -252,44 +266,49 @@ function CategorySelect({
           role="listbox"
           className="absolute left-0 right-0 top-[calc(100%+6px)] z-[80] overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-xl"
         >
-          {GALLERY_CATEGORIES.map((item) => {
-            const classes = getCategoryClasses(item)
-            const selected = item === value
+          {GALLERY_CATEGORIES.map(
+            (item) => {
+              const classes =
+                getCategoryClasses(item)
 
-            return (
-              <button
-                key={item}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                onClick={() => {
-                  onChange(item)
-                  setOpen(false)
-                }}
-                className={[
-                  "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors",
-                  selected
-                    ? classes.badge
-                    : "text-foreground hover:bg-muted",
-                ].join(" ")}
-              >
-                <span className="flex items-center gap-2.5">
-                  <span
-                    className={[
-                      "h-2.5 w-2.5 shrink-0 rounded-full",
-                      classes.dot,
-                    ].join(" ")}
-                  />
+              const selected =
+                item === value
 
-                  <span>{item}</span>
-                </span>
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => {
+                    onChange(item)
+                    setOpen(false)
+                  }}
+                  className={[
+                    "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors",
+                    selected
+                      ? classes.badge
+                      : "text-foreground hover:bg-muted",
+                  ].join(" ")}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span
+                      className={[
+                        "h-2.5 w-2.5 shrink-0 rounded-full",
+                        classes.dot,
+                      ].join(" ")}
+                    />
 
-                {selected && (
-                  <Check className="h-4 w-4 shrink-0" />
-                )}
-              </button>
-            )
-          })}
+                    <span>{item}</span>
+                  </span>
+
+                  {selected && (
+                    <Check className="h-4 w-4 shrink-0" />
+                  )}
+                </button>
+              )
+            },
+          )}
         </div>
       )}
     </div>
@@ -311,8 +330,11 @@ export default function Gallery() {
     setCanManageGallery,
   ] = useState(false)
 
-  const [filter, setFilter] =
-    useState<GalleryFilter>("All")
+  const [categoryFilter, setCategoryFilter] =
+    useState<CategoryFilter>("All")
+
+  const [mediaFilter, setMediaFilter] =
+    useState<MediaFilter>("All")
 
   const [showModal, setShowModal] =
     useState(false)
@@ -444,9 +466,11 @@ export default function Gallery() {
       document.body.style.overflow
 
     const previousDocumentOverflow =
-      document.documentElement.style.overflow
+      document.documentElement.style
+        .overflow
 
     document.body.style.overflow = "hidden"
+
     document.documentElement.style.overflow =
       "hidden"
 
@@ -461,30 +485,40 @@ export default function Gallery() {
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      if (filter === "Images") {
+      const itemCategory =
+        item.category ?? "Community"
+
+      if (
+        categoryFilter !== "All" &&
+        itemCategory !== categoryFilter
+      ) {
+        return false
+      }
+
+      if (mediaFilter === "Images") {
         return item.media.some(
           isImageMedia,
         )
       }
 
-      if (filter === "Videos") {
+      if (mediaFilter === "Videos") {
         return item.media.some(
           isVideoMedia,
         )
       }
 
-      if (filter === "Fleet") {
-        return item.category === "Fleet"
-      }
-
       return true
     })
-  }, [filter, items])
+  }, [
+    categoryFilter,
+    items,
+    mediaFilter,
+  ])
 
   const visibleMediaCount = useMemo(() => {
     return filteredItems.reduce(
       (count, item) => {
-        if (filter === "Images") {
+        if (mediaFilter === "Images") {
           return (
             count +
             item.media.filter(
@@ -493,7 +527,7 @@ export default function Gallery() {
           )
         }
 
-        if (filter === "Videos") {
+        if (mediaFilter === "Videos") {
           return (
             count +
             item.media.filter(
@@ -506,18 +540,18 @@ export default function Gallery() {
       },
       0,
     )
-  }, [filter, filteredItems])
+  }, [filteredItems, mediaFilter])
 
   function getVisibleMedia(
     item: GalleryItem,
   ) {
-    if (filter === "Images") {
+    if (mediaFilter === "Images") {
       return item.media.filter(
         isImageMedia,
       )
     }
 
-    if (filter === "Videos") {
+    if (mediaFilter === "Videos") {
       return item.media.filter(
         isVideoMedia,
       )
@@ -1208,43 +1242,80 @@ export default function Gallery() {
           </div>
 
           <section className="h-auto min-h-0 overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
-            <div className="flex flex-col gap-3 border-b border-border/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-              <div>
-                <h2 className="text-sm font-semibold">
-                  Gallery
-                </h2>
+            <div className="flex flex-col gap-4 border-b border-border/70 p-3 sm:p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold">
+                    Gallery
+                  </h2>
 
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {visibleMediaCount}{" "}
-                  {visibleMediaCount === 1
-                    ? "media item"
-                    : "media items"}
-                </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {visibleMediaCount}{" "}
+                    {visibleMediaCount === 1
+                      ? "media item"
+                      : "media items"}
+                  </p>
+                </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
-                {GALLERY_FILTERS.map(
-                  (filterItem) => (
-                    <button
-                      key={filterItem}
-                      type="button"
-                      onClick={() =>
-                        setFilter(
-                          filterItem,
-                        )
-                      }
-                      className={[
-                        "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        getFilterClasses(
-                          filter ===
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-xs font-semibold text-muted-foreground">
+                    Category
+                  </span>
+
+                  {CATEGORY_FILTERS.map(
+                    (filterItem) => (
+                      <button
+                        key={filterItem}
+                        type="button"
+                        onClick={() =>
+                          setCategoryFilter(
                             filterItem,
-                        ),
-                      ].join(" ")}
-                    >
-                      {filterItem}
-                    </button>
-                  ),
-                )}
+                          )
+                        }
+                        className={[
+                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                          getFilterClasses(
+                            categoryFilter ===
+                              filterItem,
+                          ),
+                        ].join(" ")}
+                      >
+                        {filterItem}
+                      </button>
+                    ),
+                  )}
+                </div>
+
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-xs font-semibold text-muted-foreground">
+                    Media
+                  </span>
+
+                  {MEDIA_FILTERS.map(
+                    (filterItem) => (
+                      <button
+                        key={filterItem}
+                        type="button"
+                        onClick={() =>
+                          setMediaFilter(
+                            filterItem,
+                          )
+                        }
+                        className={[
+                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                          getFilterClasses(
+                            mediaFilter ===
+                              filterItem,
+                          ),
+                        ].join(" ")}
+                      >
+                        {filterItem}
+                      </button>
+                    ),
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1271,7 +1342,7 @@ export default function Gallery() {
 
                 <p className="mt-1 text-xs text-muted-foreground">
                   There are no gallery items
-                  matching this filter.
+                  matching these filters.
                 </p>
 
                 {canManageGallery && (
@@ -1821,7 +1892,7 @@ export default function Gallery() {
                               .value as GalleryMediaType,
                           )
                         }
-                        className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 pr-8 py-1 text-sm shadow-xs outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
+                        className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 py-1 pr-8 text-sm shadow-xs outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
                       >
                         <option value="image">
                           Image
