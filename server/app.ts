@@ -2,6 +2,7 @@ import express from "express"
 import cookieParser from "cookie-parser"
 import multer from "multer"
 import path from "node:path"
+import { readFile } from "node:fs/promises"
 import XLSX from "xlsx"
 import puppeteer from "puppeteer"
 
@@ -3834,10 +3835,16 @@ export function createApp() {
   /*
    * Discord Open Graph preview.
    *
-   * Discord requires og:image to resolve to an actual image.
-   * This endpoint generates that image dynamically by opening
-   * the public site URL in Chromium and taking a 1200x630
-   * screenshot. No preview image needs to be uploaded or stored.
+   * The image is generated dynamically from the URL being previewed.
+   * No PNG needs to be uploaded or stored.
+   *
+   * Examples:
+   *   /api/og
+   *   /api/og?url=https%3A%2F%2Fmetropd-calirp.com%2F
+   *
+   * The default target is the public Metro PD website. For safety, custom
+   * URLs are restricted to the configured public site origin so this endpoint
+   * cannot be used as an arbitrary server-side URL fetcher.
    */
   app.get("/api/og", async (req, res) => {
     const siteUrl =
@@ -3847,24 +3854,76 @@ export function createApp() {
         .trim()
         .replace(/\/+$/, "")
 
+    let allowedOrigin: URL
+
+    try {
+      allowedOrigin = new URL(siteUrl)
+    } catch {
+      return res.status(500).json({
+        success: false,
+        error: "OG_SITE_URL / APP_ORIGIN is not a valid URL.",
+      })
+    }
+
+    const requestedUrl =
+      typeof req.query.url === "string"
+        ? req.query.url.trim()
+        : ""
+
+    let targetUrl: URL
+
+    try {
+      targetUrl = new URL(requestedUrl || siteUrl)
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid preview URL.",
+      })
+    }
+
+    // Only allow pages belonging to this website. This prevents the endpoint
+    // from becoming an SSRF/proxy endpoint while still allowing every public
+    // page on the Metro PD site to have its own generated preview.
+    if (targetUrl.origin !== allowedOrigin.origin) {
+      return res.status(403).json({
+        success: false,
+        error: "Preview URL must belong to the configured site origin.",
+      })
+    }
+
+    // Never allow the renderer to recursively render the OG endpoint itself.
+    if (targetUrl.pathname === "/api/og") {
+      targetUrl = new URL(siteUrl)
+    }
+
+    targetUrl.searchParams.set("og_preview", String(Date.now()))
+
     let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
     let page: Awaited<ReturnType<NonNullable<typeof browser>["newPage"]>> | null = null
 
     try {
-      // Keep the OG renderer independent from the normal browser session.
-      // Discord does not send cookies, so the preview must work as a guest.
+      const executablePath =
+        process.env.PUPPETEER_EXECUTABLE_PATH?.trim() ||
+        puppeteer.executablePath()
+
+      console.log(`[og] Generating preview for ${targetUrl.toString()}`)
+      console.log(`[og] Chromium executable: ${executablePath}`)
+
       browser = await puppeteer.launch({
         headless: true,
-        executablePath:
-          process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        executablePath,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
           "--disable-software-rasterizer",
-          "--no-zygote",
-          "--single-process",
+          "--no-first-run",
+          "--no-default-browser-check",
+          "--disable-background-networking",
+          "--disable-extensions",
+          "--disable-sync",
+          "--disable-translate",
         ],
       })
 
@@ -3876,12 +3935,12 @@ export function createApp() {
         deviceScaleFactor: 1,
       })
 
-      // Make the screenshot deterministic and avoid browser cache holding an
-      // older version of the homepage while Discord is refreshing its preview.
       await page.setCacheEnabled(false)
 
       page.on("console", (message) => {
-        console.log(`[og:browser] ${message.type()}: ${message.text()}`)
+        console.log(
+          `[og:browser] ${message.type()}: ${message.text()}`,
+        )
       })
 
       page.on("pageerror", (error) => {
@@ -3894,51 +3953,52 @@ export function createApp() {
         )
       })
 
-      const previewUrl = `${siteUrl}/?og_preview=${encodeURIComponent(
-        String(Date.now()),
-      )}`
-
-      const response = await page.goto(previewUrl, {
-        waitUntil: "domcontentloaded",
+      const response = await page.goto(targetUrl.toString(), {
+        waitUntil: "networkidle2",
         timeout: 30000,
       })
 
       if (!response || !response.ok()) {
         throw new Error(
-          `Homepage returned ${response?.status() ?? "no response"}`,
+          `Preview page returned HTTP ${response?.status() ?? "no response"}.`,
         )
       }
 
-      // The homepage is a React SPA. Wait until React has actually mounted
-      // content into #root instead of capturing the empty HTML shell.
+      // React/Vite pages can initially contain only the #root shell. Wait for
+      // the application to mount before taking the screenshot.
       await page.waitForFunction(
         () => {
           const root = document.querySelector("#root")
           return !!root && root.children.length > 0
         },
         { timeout: 20000 },
-      )
+      ).catch(() => undefined)
 
-      // Allow fonts, images and client-side layout effects to settle.
       await page.evaluate(async () => {
         if (document.fonts?.ready) {
           await document.fonts.ready
         }
 
         const images = Array.from(document.images)
+
         await Promise.all(
           images.map((image) => {
-            if (image.complete) return Promise.resolve()
+            if (image.complete) {
+              return Promise.resolve()
+            }
 
             return new Promise<void>((resolve) => {
-              image.addEventListener("load", () => resolve(), { once: true })
-              image.addEventListener("error", () => resolve(), { once: true })
+              const finish = () => resolve()
+
+              image.addEventListener("load", finish, { once: true })
+              image.addEventListener("error", finish, { once: true })
             })
           }),
         )
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Give the browser a short moment for final layout/animation settling.
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
       const screenshot = await page.screenshot({
         type: "png",
@@ -3953,21 +4013,25 @@ export function createApp() {
       res.set({
         "Content-Type": "image/png",
         "Content-Length": String(screenshot.length),
-        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
+        "Cache-Control":
+          "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
         "Content-Disposition": "inline; filename=metro-pd-og.png",
+        "X-OG-Generated-From": targetUrl.origin + targetUrl.pathname,
       })
 
       return res.end(screenshot)
     } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to generate website preview."
+
       console.error("[og] Failed to generate website preview:", error)
 
       if (!res.headersSent) {
         return res.status(500).json({
           success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to generate website preview.",
+          error: message,
         })
       }
 
@@ -6213,8 +6277,159 @@ export function createApp() {
 
   // React Router fallback. API routes are excluded so missing API endpoints
   // still return a normal 404 instead of index.html.
-  app.get(/^(?!\/api(?:\/|$)).*/, (_req, res) => {
-    res.sendFile(path.join(clientDist, "index.html"))
+  //
+  // The HTML is adjusted on the server for the exact URL being requested.
+  // This is important for Discord: Discordbot reads the initial HTML response
+  // and does not wait for React to update document metadata in the browser.
+  app.get(/^(?!\/api(?:\/|$)).*/, async (req, res) => {
+    try {
+      const htmlPath = path.join(clientDist, "index.html")
+      let html = await readFile(htmlPath, "utf8")
+
+      const configuredOrigin =
+        (process.env.OG_SITE_URL ||
+          process.env.APP_ORIGIN ||
+          "https://metropd-calirp.com")
+          .trim()
+          .replace(/\/+$/, "")
+
+      const requestHost =
+        req.get("host") ||
+        new URL(configuredOrigin).host
+
+      const protocol =
+        req.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+        (req.secure ? "https" : "http")
+
+      const publicUrl = new URL(
+        req.originalUrl,
+        `${protocol}://${requestHost}`,
+      )
+
+      // Never expose the internal preview flag in canonical/OG URLs.
+      publicUrl.searchParams.delete("og_preview")
+
+      const pageUrl = publicUrl.toString()
+      const ogImageUrl = new URL("/api/og", configuredOrigin)
+      ogImageUrl.searchParams.set("url", pageUrl)
+
+      const escapeHtml = (value: string) =>
+        value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#39;")
+
+      const title = "Metro Police Department"
+      const description =
+        "Metro Police Department"
+
+      const replaceMeta = (
+        pattern: RegExp,
+        replacement: string,
+      ) => {
+        html = html.replace(pattern, replacement)
+      }
+
+      replaceMeta(
+        /<meta\s+property=["']og:type["'][^>]*>/i,
+        `<meta property="og:type" content="website" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+property=["']og:url["'][^>]*>/i,
+        `<meta property="og:url" content="${escapeHtml(pageUrl)}" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+property=["']og:title["'][^>]*>/i,
+        `<meta property="og:title" content="${escapeHtml(title)}" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+property=["']og:description["'][^>]*>/i,
+        `<meta property="og:description" content="${escapeHtml(description)}" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+property=["']og:image["'][^>]*>/i,
+        `<meta property="og:image" content="${escapeHtml(ogImageUrl.toString())}" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+property=["']og:image:secure_url["'][^>]*>/i,
+        `<meta property="og:image:secure_url" content="${escapeHtml(ogImageUrl.toString())}" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+property=["']og:image:type["'][^>]*>/i,
+        `<meta property="og:image:type" content="image/png" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+property=["']og:image:width["'][^>]*>/i,
+        `<meta property="og:image:width" content="1200" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+property=["']og:image:height["'][^>]*>/i,
+        `<meta property="og:image:height" content="630" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+name=["']twitter:card["'][^>]*>/i,
+        `<meta name="twitter:card" content="summary_large_image" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+name=["']twitter:title["'][^>]*>/i,
+        `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+name=["']twitter:description["'][^>]*>/i,
+        `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
+      )
+
+      replaceMeta(
+        /<meta\s+name=["']twitter:image["'][^>]*>/i,
+        `<meta name="twitter:image" content="${escapeHtml(ogImageUrl.toString())}" />`,
+      )
+
+      // If any of the OG tags were missing from the source index.html, add a
+      // complete set immediately before </head> instead of returning invalid
+      // metadata.
+      if (!/<meta\s+property=["']og:image["']/i.test(html)) {
+        const injected = `
+          <meta property="og:type" content="website" />
+          <meta property="og:url" content="${escapeHtml(pageUrl)}" />
+          <meta property="og:title" content="${escapeHtml(title)}" />
+          <meta property="og:description" content="${escapeHtml(description)}" />
+          <meta property="og:image" content="${escapeHtml(ogImageUrl.toString())}" />
+          <meta property="og:image:secure_url" content="${escapeHtml(ogImageUrl.toString())}" />
+          <meta property="og:image:type" content="image/png" />
+          <meta property="og:image:width" content="1200" />
+          <meta property="og:image:height" content="630" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content="${escapeHtml(title)}" />
+          <meta name="twitter:description" content="${escapeHtml(description)}" />
+          <meta name="twitter:image" content="${escapeHtml(ogImageUrl.toString())}" />
+        `
+
+        html = html.replace(/<\/head>/i, `${injected}</head>`)
+      }
+
+      res.set({
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "public, max-age=60, s-maxage=60",
+      })
+
+      return res.send(html)
+    } catch (error) {
+      console.error("Failed to render SPA HTML:", error)
+      return res.sendFile(path.join(clientDist, "index.html"))
+    }
   })
 
   app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
