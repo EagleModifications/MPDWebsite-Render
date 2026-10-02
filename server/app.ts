@@ -5406,10 +5406,11 @@ export function createApp() {
             req.body?.title,
           )
 
+        // Gallery descriptions are optional. Empty/missing descriptions are stored as an empty string.
         const description =
           cleanGalleryString(
             req.body?.description,
-          )
+          ) || ""
 
         const requestedCategory =
           req.body?.category
@@ -5639,10 +5640,11 @@ export function createApp() {
             req.body?.title,
           )
 
+        // Gallery descriptions are optional. Empty/missing descriptions are stored as an empty string.
         const description =
           cleanGalleryString(
             req.body?.description,
-          )
+          ) || ""
 
         if (
           req.body?.category !== undefined &&
