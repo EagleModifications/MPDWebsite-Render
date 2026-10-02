@@ -19,6 +19,8 @@ import Navbar from "@/components/home/Navbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { getSession, type User } from "@/lib/auth"
+import Footer from "@/components/Footer"
 
 type GalleryMediaType = "image" | "video"
 
@@ -41,11 +43,9 @@ type GalleryItem = {
   updatedAt: string
 }
 
-
-type GalleryApiResponse = {
+type GalleryListResponse = {
   success?: boolean
   items?: GalleryItem[]
-  item?: GalleryItem
   error?: string
   message?: string
 }
@@ -53,6 +53,19 @@ type GalleryApiResponse = {
 type GalleryUploadResponse = {
   success?: boolean
   items?: GalleryMedia[]
+  error?: string
+  message?: string
+}
+
+type GallerySaveResponse = {
+  success?: boolean
+  item?: GalleryItem
+  error?: string
+  message?: string
+}
+
+type GalleryDeleteResponse = {
+  success?: boolean
   error?: string
   message?: string
 }
@@ -110,6 +123,7 @@ function makePendingFromMedia(media: GalleryMedia): PendingMedia {
 }
 
 export default function Gallery() {
+  const [user, setUser] = useState<User | null>(null)
   const [items, setItems] = useState<GalleryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [canManageGallery, setCanManageGallery] = useState(false)
@@ -137,14 +151,14 @@ export default function Gallery() {
   const dragDepthRef = useRef(0)
 
   useEffect(() => {
-    document.title = "Gallery | Metro Police Department"
 
     let active = true
 
     async function load() {
       try {
-        const [galleryResponse, permissionResponse] =
+        const [session, galleryResponse, permissionResponse] =
           await Promise.all([
+            getSession(),
             fetch("/api/gallery", {
               credentials: "include",
             }),
@@ -155,12 +169,13 @@ export default function Gallery() {
 
         if (!active) return
 
+        setUser(session)
 
         if (!galleryResponse.ok) {
           throw new Error("Failed to load gallery.")
         }
 
-        const data: GalleryApiResponse = await galleryResponse.json().catch(() => ({}))
+        const data = (await galleryResponse.json()) as GalleryListResponse
         setItems(Array.isArray(data.items) ? data.items : [])
         setCanManageGallery(permissionResponse.ok)
       } catch (error) {
@@ -390,7 +405,7 @@ export default function Gallery() {
     }
   }
 
-  async function uploadPendingFiles(): Promise<GalleryMedia[]> {
+  async function uploadPendingFiles() {
     const files = pendingMedia
       .filter((media) => media.source === "upload" && media.file)
       .map((media) => media.file as File)
@@ -514,7 +529,7 @@ export default function Gallery() {
         },
       )
 
-      const data: GalleryApiResponse = await response.json().catch(() => ({}))
+      const data = (await response.json().catch(() => ({}))) as GallerySaveResponse
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to save gallery.")
@@ -570,7 +585,7 @@ export default function Gallery() {
         credentials: "include",
       })
 
-      const data = await response.json().catch(() => ({}))
+      const data = (await response.json().catch(() => ({}))) as GalleryDeleteResponse
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to delete gallery item.")
@@ -657,9 +672,6 @@ export default function Gallery() {
       <Navbar />
 
       <main className="relative min-h-screen overflow-hidden pt-20">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/2 top-[-220px] h-[420px] w-[700px] -translate-x-1/2 rounded-full bg-blue-600/10 blur-[120px]" />
-        </div>
 
         <div className="relative mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-7">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -897,10 +909,7 @@ export default function Gallery() {
               </div>
             </section>
           )}
-
-          <footer className="py-6 text-center text-xs text-muted-foreground">
-            Metro Police Department · Community Gallery
-          </footer>
+          <Footer />
         </div>
       </main>
 
@@ -1328,6 +1337,7 @@ export default function Gallery() {
         </div>
       )}
 
+      {!user && !loading ? null : null}
     </div>
   )
 }
