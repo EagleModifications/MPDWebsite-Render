@@ -7,6 +7,8 @@ import {
   type ReactNode,
 } from "react"
 import {
+  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Edit3,
@@ -71,33 +73,25 @@ const GALLERY_FILTERS: GalleryFilter[] = [
   "Fleet",
 ]
 
-function getMediaLabel(
-  type: GalleryMediaType,
-) {
-  return type === "image"
-    ? "Image"
-    : "Video"
+const GALLERY_CATEGORIES: GalleryCategory[] = [
+  "Community",
+  "Fleet",
+]
+
+function getMediaLabel(type: GalleryMediaType) {
+  return type === "image" ? "Image" : "Video"
 }
 
-function isImageMedia(
-  media: GalleryMedia,
-) {
+function isImageMedia(media: GalleryMedia) {
   return media.type === "image"
 }
 
-function isVideoMedia(
-  media: GalleryMedia,
-) {
+function isVideoMedia(media: GalleryMedia) {
   return media.type === "video"
 }
 
-function getAspectClass(
-  ratio?: number,
-) {
-  if (
-    !ratio ||
-    !Number.isFinite(ratio)
-  ) {
+function getAspectClass(ratio?: number) {
+  if (!ratio || !Number.isFinite(ratio)) {
     return "aspect-[4/3]"
   }
 
@@ -127,28 +121,21 @@ function formatDate(value: string) {
     return ""
   }
 
-  return date.toLocaleDateString(
-    "en-GB",
-    {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    },
-  )
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
 }
 
-function makePendingFromMedia(
-  media: GalleryMedia,
-): PendingMedia {
+function makePendingFromMedia(media: GalleryMedia): PendingMedia {
   return {
     ...media,
     previewUrl: media.url,
   }
 }
 
-function getCategoryClasses(
-  category: GalleryCategory,
-) {
+function getCategoryClasses(category: GalleryCategory) {
   if (category === "Fleet") {
     return {
       badge:
@@ -162,6 +149,151 @@ function getCategoryClasses(
       "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300",
     dot: "bg-blue-500",
   }
+}
+
+function getFilterClasses(active: boolean) {
+  return active
+    ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+    : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+}
+
+function CategorySelect({
+  value,
+  onChange,
+}: {
+  value: GalleryCategory
+  onChange: (value: GalleryCategory) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+
+  const selectedClasses = getCategoryClasses(value)
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(
+          event.target as Node,
+        )
+      ) {
+        setOpen(false)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handlePointerDown,
+    )
+
+    document.addEventListener(
+      "keydown",
+      handleKeyDown,
+    )
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handlePointerDown,
+      )
+
+      document.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      )
+    }
+  }, [open])
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative"
+    >
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span
+            className={[
+              "h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background",
+              selectedClasses.dot,
+            ].join(" ")}
+          />
+
+          <span className="truncate">
+            {value}
+          </span>
+        </span>
+
+        <ChevronDown
+          className={[
+            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+            open ? "rotate-180" : "",
+          ].join(" ")}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          className="absolute left-0 right-0 top-[calc(100%+6px)] z-[80] overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-xl"
+        >
+          {GALLERY_CATEGORIES.map((item) => {
+            const classes = getCategoryClasses(item)
+            const selected = item === value
+
+            return (
+              <button
+                key={item}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => {
+                  onChange(item)
+                  setOpen(false)
+                }}
+                className={[
+                  "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors",
+                  selected
+                    ? classes.badge
+                    : "text-foreground hover:bg-muted",
+                ].join(" ")}
+              >
+                <span className="flex items-center gap-2.5">
+                  <span
+                    className={[
+                      "h-2.5 w-2.5 shrink-0 rounded-full",
+                      classes.dot,
+                    ].join(" ")}
+                  />
+
+                  <span>{item}</span>
+                </span>
+
+                {selected && (
+                  <Check className="h-4 w-4 shrink-0" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function Gallery() {
@@ -201,9 +333,7 @@ export default function Gallery() {
     useState("")
 
   const [category, setCategory] =
-    useState<GalleryCategory>(
-      "Community",
-    )
+    useState<GalleryCategory>("Community")
 
   const [pendingMedia, setPendingMedia] =
     useState<PendingMedia[]>([])
@@ -230,9 +360,7 @@ export default function Gallery() {
     useState<GalleryItem | null>(null)
 
   const fileInputRef =
-    useRef<HTMLInputElement | null>(
-      null,
-    )
+    useRef<HTMLInputElement | null>(null)
 
   const dragDepthRef =
     useRef(0)
@@ -307,6 +435,30 @@ export default function Gallery() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!showModal) {
+      return
+    }
+
+    const previousBodyOverflow =
+      document.body.style.overflow
+
+    const previousDocumentOverflow =
+      document.documentElement.style.overflow
+
+    document.body.style.overflow = "hidden"
+    document.documentElement.style.overflow =
+      "hidden"
+
+    return () => {
+      document.body.style.overflow =
+        previousBodyOverflow
+
+      document.documentElement.style.overflow =
+        previousDocumentOverflow
+    }
+  }, [showModal])
+
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       if (filter === "Images") {
@@ -322,9 +474,7 @@ export default function Gallery() {
       }
 
       if (filter === "Fleet") {
-        return (
-          item.category === "Fleet"
-        )
+        return item.category === "Fleet"
       }
 
       return true
@@ -429,6 +579,7 @@ export default function Gallery() {
       ),
     )
     setUrlInput("")
+    setUrlType("image")
     setThumbnailInput("")
     setShowModal(true)
   }
@@ -518,16 +669,10 @@ export default function Gallery() {
 
     const next: PendingMedia[] = []
 
-    for (const file of Array.from(
-      files,
-    )) {
+    for (const file of Array.from(files)) {
       if (
-        !file.type.startsWith(
-          "image/",
-        ) &&
-        !file.type.startsWith(
-          "video/",
-        )
+        !file.type.startsWith("image/") &&
+        !file.type.startsWith("video/")
       ) {
         continue
       }
@@ -556,12 +701,10 @@ export default function Gallery() {
       return
     }
 
-    setPendingMedia(
-      (current) => [
-        ...current,
-        ...next,
-      ],
-    )
+    setPendingMedia((current) => [
+      ...current,
+      ...next,
+    ])
   }
 
   function handleDragEnter(
@@ -593,9 +736,7 @@ export default function Gallery() {
         "Files",
       )
     ) {
-      event.dataTransfer.dropEffect =
-        "copy"
-
+      event.dataTransfer.dropEffect = "copy"
       setIsDragging(true)
     }
   }
@@ -619,9 +760,7 @@ export default function Gallery() {
       dragDepthRef.current - 1,
     )
 
-    if (
-      dragDepthRef.current === 0
-    ) {
+    if (dragDepthRef.current === 0) {
       setIsDragging(false)
     }
   }
@@ -635,9 +774,7 @@ export default function Gallery() {
     dragDepthRef.current = 0
     setIsDragging(false)
 
-    if (
-      event.dataTransfer.files?.length
-    ) {
+    if (event.dataTransfer.files?.length) {
       handleFiles(
         event.dataTransfer.files,
       )
@@ -648,8 +785,7 @@ export default function Gallery() {
     const files = pendingMedia
       .filter(
         (media) =>
-          media.source ===
-            "upload" &&
+          media.source === "upload" &&
           media.file,
       )
       .map(
@@ -723,9 +859,7 @@ export default function Gallery() {
       )
     }
 
-    if (
-      !Array.isArray(data.items)
-    ) {
+    if (!Array.isArray(data.items)) {
       throw new Error(
         "Gallery upload returned an invalid response.",
       )
@@ -767,8 +901,7 @@ export default function Gallery() {
 
       let uploadIndex = 0
 
-      const media: GalleryMedia[] =
-        []
+      const media: GalleryMedia[] = []
 
       for (const item of pendingMedia) {
         if (item.file) {
@@ -781,9 +914,7 @@ export default function Gallery() {
             )
           }
 
-          media.push(
-            uploadedMedia,
-          )
+          media.push(uploadedMedia)
           uploadIndex += 1
           continue
         }
@@ -793,11 +924,9 @@ export default function Gallery() {
           type: item.type,
           url: item.url,
           thumbnailUrl:
-            item.thumbnailUrl ||
-            "",
+            item.thumbnailUrl || "",
           source: item.source,
-          storageId:
-            item.storageId,
+          storageId: item.storageId,
         })
       }
 
@@ -846,8 +975,7 @@ export default function Gallery() {
       if (editingItem) {
         setItems((current) =>
           current.map((item) =>
-            item.id ===
-            editingItem.id
+            item.id === editingItem.id
               ? data.item
               : item,
           ),
@@ -987,8 +1115,7 @@ export default function Gallery() {
         ...current,
         index:
           current.index <= 0
-            ? current.item.media
-                .length - 1
+            ? current.item.media.length - 1
             : current.index - 1,
       }
     })
@@ -1108,28 +1235,10 @@ export default function Gallery() {
                       }
                       className={[
                         "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        filter ===
-                        filterItem
-                          ? filterItem ===
-                            "Images"
-                            ? "border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-300"
-                            : filterItem ===
-                                "Videos"
-                              ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                              : filterItem ===
-                                  "Fleet"
-                                ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300"
-                                : "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                          : filterItem ===
-                              "Images"
-                            ? "border-purple-500/20 bg-purple-500/5 text-purple-600/80 hover:bg-purple-500/10 hover:text-purple-700 dark:text-purple-300/80 dark:hover:text-purple-200"
-                            : filterItem ===
-                                "Videos"
-                              ? "border-blue-500/20 bg-blue-500/5 text-blue-600/80 hover:bg-blue-500/10 hover:text-blue-700 dark:text-blue-300/80 dark:hover:text-blue-200"
-                              : filterItem ===
-                                  "Fleet"
-                                ? "border-amber-500/20 bg-amber-500/5 text-amber-600/80 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-300/80 dark:hover:text-amber-200"
-                                : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                        getFilterClasses(
+                          filter ===
+                            filterItem,
+                        ),
                       ].join(" ")}
                     >
                       {filterItem}
@@ -1152,8 +1261,7 @@ export default function Gallery() {
                   is loaded.
                 </p>
               </div>
-            ) : filteredItems.length ===
-              0 ? (
+            ) : filteredItems.length === 0 ? (
               <div className="px-4 py-14 text-center">
                 <ImageIcon className="mx-auto h-9 w-9 text-muted-foreground" />
 
@@ -1243,16 +1351,12 @@ export default function Gallery() {
                                       ].join(" ")}
                                     />
 
-                                    {
-                                      itemCategory
-                                    }
+                                    {itemCategory}
                                   </span>
                                 </div>
 
                                 <h3 className="truncate text-sm font-semibold">
-                                  {
-                                    item.title
-                                  }
+                                  {item.title}
                                 </h3>
 
                                 {item.description && (
@@ -1334,23 +1438,17 @@ export default function Gallery() {
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
-                    <span>
-                      Images
-                    </span>
+                    Images
                   </span>
 
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                    <span>
-                      Videos
-                    </span>
+                    Videos
                   </span>
 
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                    <span>
-                      Fleet
-                    </span>
+                    Fleet
                   </span>
                 </div>
               </div>
@@ -1398,9 +1496,7 @@ export default function Gallery() {
                     <Images className="h-4 w-4" />
                   }
                   label="Entries"
-                  value={String(
-                    items.length,
-                  )}
+                  value={String(items.length)}
                 />
 
                 <ManagementStat
@@ -1410,10 +1506,7 @@ export default function Gallery() {
                   label="Images"
                   value={String(
                     items.reduce(
-                      (
-                        count,
-                        item,
-                      ) =>
+                      (count, item) =>
                         count +
                         item.media.filter(
                           isImageMedia,
@@ -1430,10 +1523,7 @@ export default function Gallery() {
                   label="Videos"
                   value={String(
                     items.reduce(
-                      (
-                        count,
-                        item,
-                      ) =>
+                      (count, item) =>
                         count +
                         item.media.filter(
                           isVideoMedia,
@@ -1501,9 +1591,7 @@ export default function Gallery() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={
-                  closeDeleteDialog
-                }
+                onClick={closeDeleteDialog}
                 disabled={
                   deletingId ===
                   deleteTarget.id
@@ -1543,16 +1631,26 @@ export default function Gallery() {
           onMouseDown={(event) => {
             if (
               event.currentTarget ===
-              event.target
+              event.target &&
+              !saving
             ) {
               closeModal()
             }
           }}
         >
-          <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-            <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex shrink-0 items-start justify-between border-b border-border/70 px-5 py-4">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-blue-500">
+                <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-blue-500">
+                  <span
+                    className={[
+                      "h-2 w-2 rounded-full",
+                      getCategoryClasses(
+                        category,
+                      ).dot,
+                    ].join(" ")}
+                  />
+
                   {category}
                 </p>
 
@@ -1576,7 +1674,7 @@ export default function Gallery() {
               </Button>
             </div>
 
-            <div className="max-h-[78vh] overflow-y-auto px-5 py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
               <div className="grid gap-4">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">
@@ -1617,51 +1715,23 @@ export default function Gallery() {
                     Category
                   </label>
 
-                  <div className="relative">
+                  <CategorySelect
+                    value={category}
+                    onChange={setCategory}
+                  />
+
+                  <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span
                       className={[
-                        "pointer-events-none absolute left-3 top-1/2 z-10 h-2.5 w-2.5 -translate-y-1/2 rounded-full ring-2 ring-background",
-                        category ===
-                        "Fleet"
-                          ? "bg-amber-500"
-                          : "bg-blue-500",
+                        "h-1.5 w-1.5 rounded-full",
+                        getCategoryClasses(
+                          category,
+                        ).dot,
                       ].join(" ")}
                     />
 
-                    <select
-                      value={category}
-                      onChange={(
-                        event,
-                      ) =>
-                        setCategory(
-                          event.target
-                            .value as GalleryCategory,
-                        )
-                      }
-                      className="h-10 w-full appearance-none rounded-lg border border-input bg-background pl-8 pr-10 text-sm font-medium text-foreground shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
-                    >
-                      <option value="Community">
-                        Community
-                      </option>
-
-                      <option value="Fleet">
-                        Fleet
-                      </option>
-                    </select>
-
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
+                    {category} gallery media
+                  </p>
                 </div>
 
                 <div
@@ -1742,23 +1812,28 @@ export default function Gallery() {
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto]">
-                    <select
-                      value={urlType}
-                      onChange={(event) =>
-                        setUrlType(
-                          event.target.value as GalleryMediaType,
-                        )
-                      }
-                      className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <option value="image">
-                        Image
-                      </option>
+                    <div className="relative">
+                      <select
+                        value={urlType}
+                        onChange={(event) =>
+                          setUrlType(
+                            event.target
+                              .value as GalleryMediaType,
+                          )
+                        }
+                        className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 pr-8 py-1 text-sm shadow-xs outline-none transition-colors hover:bg-muted/40 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
+                      >
+                        <option value="image">
+                          Image
+                        </option>
 
-                      <option value="video">
-                        Video
-                      </option>
-                    </select>
+                        <option value="video">
+                          Video
+                        </option>
+                      </select>
+
+                      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    </div>
 
                     <Input
                       value={urlInput}
@@ -1770,8 +1845,7 @@ export default function Gallery() {
                       placeholder="https://example.com/image.jpg"
                       onKeyDown={(event) => {
                         if (
-                          event.key ===
-                          "Enter"
+                          event.key === "Enter"
                         ) {
                           event.preventDefault()
                           addExternalUrl()
@@ -1809,15 +1883,10 @@ export default function Gallery() {
                 <div>
                   <div className="mb-2 flex items-center justify-between">
                     <label className="text-sm font-medium">
-                      Media (
-                      {
-                        pendingMedia.length
-                      }
-                      )
+                      Media ({pendingMedia.length})
                     </label>
 
-                    {pendingMedia.length >
-                      0 && (
+                    {pendingMedia.length > 0 && (
                       <span className="text-xs text-muted-foreground">
                         Files and URLs can be
                         mixed.
@@ -1825,8 +1894,7 @@ export default function Gallery() {
                     )}
                   </div>
 
-                  {pendingMedia.length ===
-                  0 ? (
+                  {pendingMedia.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
                       <FileImage className="mx-auto h-8 w-8 text-muted-foreground" />
 
@@ -1921,7 +1989,7 @@ export default function Gallery() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-border/70 px-5 py-4">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border/70 px-5 py-4">
               <Button
                 type="button"
                 variant="outline"
@@ -1950,9 +2018,7 @@ export default function Gallery() {
       )}
 
       {viewer &&
-        viewer.item.media[
-          viewer.index
-        ] && (
+        viewer.item.media[viewer.index] && (
           <div
             className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-3 backdrop-blur-sm sm:p-6"
             onMouseDown={(event) => {
@@ -1982,9 +2048,7 @@ export default function Gallery() {
                   variant="ghost"
                   size="icon"
                   className="h-9 w-9 text-white hover:bg-white/10 hover:text-white"
-                  onClick={
-                    closeViewer
-                  }
+                  onClick={closeViewer}
                   aria-label="Close viewer"
                 >
                   <X className="h-5 w-5" />
@@ -1992,8 +2056,7 @@ export default function Gallery() {
               </div>
 
               <div className="relative flex min-h-0 flex-1 items-center justify-center">
-                {viewer.item.media
-                  .length > 1 && (
+                {viewer.item.media.length > 1 && (
                   <>
                     <Button
                       type="button"
@@ -2013,9 +2076,7 @@ export default function Gallery() {
                       variant="ghost"
                       size="icon"
                       className="absolute right-1 z-10 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white sm:right-3"
-                      onClick={
-                        showNext
-                      }
+                      onClick={showNext}
                       aria-label="Next media"
                     >
                       <ChevronRight className="h-5 w-5" />
@@ -2032,16 +2093,12 @@ export default function Gallery() {
                         viewer.index
                       ].url
                     }
-                    alt={
-                      viewer.item.title
-                    }
+                    alt={viewer.item.title}
                     className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
                   />
-                ) : viewer.item
-                    .media[
+                ) : viewer.item.media[
                     viewer.index
-                  ]
-                    .thumbnailUrl ? (
+                  ].thumbnailUrl ? (
                   <video
                     src={
                       viewer.item.media[
@@ -2052,8 +2109,7 @@ export default function Gallery() {
                     poster={
                       viewer.item.media[
                         viewer.index
-                      ]
-                        .thumbnailUrl
+                      ].thumbnailUrl
                     }
                     className="max-h-full max-w-full rounded-xl shadow-2xl"
                   />
@@ -2125,10 +2181,7 @@ function GalleryMediaCard({
             const image =
               event.currentTarget
 
-            if (
-              image.naturalHeight >
-              0
-            ) {
+            if (image.naturalHeight > 0) {
               setRatio(
                 image.naturalWidth /
                   image.naturalHeight,
@@ -2145,10 +2198,7 @@ function GalleryMediaCard({
             const image =
               event.currentTarget
 
-            if (
-              image.naturalHeight >
-              0
-            ) {
+            if (image.naturalHeight > 0) {
               setRatio(
                 image.naturalWidth /
                   image.naturalHeight,
@@ -2163,16 +2213,11 @@ function GalleryMediaCard({
           playsInline
           preload="metadata"
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-          onLoadedMetadata={(
-            event,
-          ) => {
+          onLoadedMetadata={(event) => {
             const video =
               event.currentTarget
 
-            if (
-              video.videoHeight >
-              0
-            ) {
+            if (video.videoHeight > 0) {
               setRatio(
                 video.videoWidth /
                   video.videoHeight,
@@ -2192,9 +2237,7 @@ function GalleryMediaCard({
             <Video className="h-3 w-3" />
           )}
 
-          {getMediaLabel(
-            media.type,
-          )}
+          {getMediaLabel(media.type)}
         </span>
 
         <span className="rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
