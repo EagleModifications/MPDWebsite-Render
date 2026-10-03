@@ -21,6 +21,7 @@ type Requirement = {
   rankId: string
   rankName: string
   hours: number
+  timeInRankDays: number
 }
 
 type RequirementsResponse = {
@@ -83,6 +84,7 @@ function createEmptyRequirements(): Record<string, Requirement> {
         rankId: rank.id,
         rankName: rank.name,
         hours: 0,
+        timeInRankDays: 0,
       },
     ]),
   )
@@ -102,6 +104,17 @@ function normalizeRequirements(
         ? Math.max(0, Math.floor(loaded.hours))
         : 0
 
+    const timeInRankDays =
+      typeof loaded?.timeInRankDays === "number" &&
+      Number.isFinite(loaded.timeInRankDays)
+        ? Math.max(
+            0,
+            Math.floor(
+              loaded.timeInRankDays,
+            ),
+          )
+        : 0
+
     /*
      * Never trust rankName from MongoDB.
      *
@@ -116,6 +129,7 @@ function normalizeRequirements(
       rankId: rank.id,
       rankName: rank.name,
       hours,
+      timeInRankDays,
     }
   }
 
@@ -127,6 +141,124 @@ function areRequirementsEqual(
   second: Record<string, Requirement>,
 ) {
   return JSON.stringify(first) === JSON.stringify(second)
+}
+
+function RequirementInput({
+  label,
+  value,
+  onChange,
+  onIncrease,
+  onDecrease,
+  disabled,
+}: {
+  label: string
+  value: number
+  onChange: (value: string) => void
+  onIncrease: () => void
+  onDecrease: () => void
+  disabled: boolean
+}) {
+  return (
+    <div className="w-full min-w-0 lg:w-[190px]">
+      <label
+        className="
+          mb-1.5 block w-full
+          text-center
+          whitespace-nowrap
+          text-xs font-medium
+          text-muted-foreground
+        "
+      >
+        {label}
+      </label>
+
+      <div
+        className="
+          flex h-12 w-full
+          overflow-hidden
+          rounded-lg
+          border border-border
+          bg-background
+        "
+      >
+        <input
+          type="number"
+          min="0"
+          value={value}
+          onChange={(event) =>
+            onChange(event.target.value)
+          }
+          disabled={disabled}
+          className="
+            h-full
+            min-w-0
+            flex-1
+            border-0
+            bg-transparent
+            px-2
+            text-center
+            text-base
+            font-semibold
+            text-foreground
+            outline-none
+            focus:bg-muted/30
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+            [appearance:textfield]
+            [&::-webkit-inner-spin-button]:appearance-none
+            [&::-webkit-outer-spin-button]:appearance-none
+          "
+        />
+
+        <div
+          className="
+            flex w-9 shrink-0
+            flex-col
+            border-l border-border
+          "
+        >
+          <button
+            type="button"
+            onClick={onIncrease}
+            disabled={disabled}
+            className="
+              flex h-1/2
+              items-center justify-center
+              border-b border-border
+              text-muted-foreground
+              transition-colors
+              hover:bg-blue-500/10
+              hover:text-blue-500
+              disabled:cursor-not-allowed
+              disabled:opacity-50
+            "
+            aria-label={`Increase ${label}`}
+          >
+            <ChevronUp className="h-4 w-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onDecrease}
+            disabled={disabled}
+            className="
+              flex h-1/2
+              items-center justify-center
+              text-muted-foreground
+              transition-colors
+              hover:bg-blue-500/10
+              hover:text-blue-500
+              disabled:cursor-not-allowed
+              disabled:opacity-50
+            "
+            aria-label={`Decrease ${label}`}
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function MTF7Requirements() {
@@ -240,9 +372,12 @@ export default function MTF7Requirements() {
     savedRequirements,
   )
 
-  function changeHours(
+  function updateRequirement(
     rankId: string,
-    amount: number,
+    field:
+      | "hours"
+      | "timeInRankDays",
+    value: number,
   ) {
     const rank = rankConfig.find(
       (item) => item.id === rankId,
@@ -255,58 +390,70 @@ export default function MTF7Requirements() {
     setRequirements((current) => ({
       ...current,
       [rankId]: {
+        ...(current[rankId] ?? {
+          rankId: rank.id,
+          rankName: rank.name,
+          hours: 0,
+          timeInRankDays: 0,
+        }),
         rankId: rank.id,
         rankName: rank.name,
-        hours: Math.max(
+        [field]: Math.max(
           0,
-          (current[rankId]?.hours ?? 0) +
-            amount,
+          Math.floor(value),
         ),
       },
     }))
   }
 
-  function setHours(
+  function changeRequirement(
     rankId: string,
+    field:
+      | "hours"
+      | "timeInRankDays",
+    amount: number,
+  ) {
+    const currentValue =
+      requirements[rankId]?.[
+        field
+      ] ?? 0
+
+    updateRequirement(
+      rankId,
+      field,
+      currentValue + amount,
+    )
+  }
+
+  function setRequirement(
+    rankId: string,
+    field:
+      | "hours"
+      | "timeInRankDays",
     value: string,
   ) {
-    const rank = rankConfig.find(
-      (item) => item.id === rankId,
-    )
-
-    if (!rank) {
-      return
-    }
-
     if (value === "") {
-      setRequirements((current) => ({
-        ...current,
-        [rankId]: {
-          rankId: rank.id,
-          rankName: rank.name,
-          hours: 0,
-        },
-      }))
-
+      updateRequirement(
+        rankId,
+        field,
+        0,
+      )
       return
     }
 
-    const parsedHours =
-      Number.parseInt(value, 10)
+    const parsed =
+      Number.parseInt(
+        value,
+        10,
+      )
 
-    const hours =
-      Number.isFinite(parsedHours)
-        ? Math.max(0, parsedHours)
-        : 0
-
-    setRequirements((current) => ({
-      ...current,
-      [rankId]: {
-        rankId: rank.id,
-        rankName: rank.name,
-        hours,
-      },
-    }))
+    updateRequirement(
+      rankId,
+      field,
+      Number.isFinite(parsed)
+        ? parsed
+        : 0,
+    )
   }
 
   async function handleSave() {
@@ -342,8 +489,8 @@ export default function MTF7Requirements() {
       > = {}
 
       for (const rank of rankConfig) {
-        const currentHours =
-          requirements[rank.id]?.hours ?? 0
+        const current =
+          requirements[rank.id]
 
         normalizedRequirements[rank.id] = {
           rankId: rank.id,
@@ -351,7 +498,18 @@ export default function MTF7Requirements() {
           hours: Math.max(
             0,
             Math.floor(
-              Number(currentHours),
+              Number(
+                current?.hours ?? 0,
+              ),
+            ),
+          ),
+          timeInRankDays: Math.max(
+            0,
+            Math.floor(
+              Number(
+                current?.timeInRankDays ??
+                  0,
+              ),
             ),
           ),
         }
@@ -495,7 +653,7 @@ export default function MTF7Requirements() {
 
               <p className="mt-1 text-sm text-muted-foreground">
                 Configure the required promotion hours
-                for each MTF-7 rank.
+                and time in rank for each MTF-7 rank.
               </p>
             </div>
           </div>
@@ -549,12 +707,11 @@ export default function MTF7Requirements() {
 
                   <div>
                     <h2 className="text-base font-semibold">
-                      Required Promotion Hours
+                      MTF-7 Promotion Requirements
                     </h2>
 
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Set the minimum hours required
-                      for each rank.
+                      Set the minimum hours and time in rank required for each rank.
                     </p>
                   </div>
                 </div>
@@ -570,22 +727,21 @@ export default function MTF7Requirements() {
               <div>
                 {rankConfig.map(
                   (rank, index) => {
-                    const hours =
+                    const requirement =
                       requirements[
                         rank.id
-                      ]?.hours ?? 0
+                      ] ?? {
+                        rankId: rank.id,
+                        rankName: rank.name,
+                        hours: 0,
+                        timeInRankDays: 0,
+                      }
 
                     return (
                       <div
                         key={rank.id}
                         className={`
-                          flex
-                          min-h-[78px]
-                          items-center
-                          justify-between
-                          gap-6
-                          px-6
-                          py-4
+                          px-6 py-5
                           transition-colors
                           hover:bg-muted/20
                           ${
@@ -598,147 +754,129 @@ export default function MTF7Requirements() {
                       >
                         <div
                           className="
-                            flex min-w-0
-                            items-center gap-4
+                            flex flex-col gap-5
+                            lg:flex-row
+                            lg:items-center
+                            lg:justify-between
                           "
                         >
                           <div
                             className="
-                              flex h-10 w-10
-                              shrink-0
-                              items-center
-                              justify-center
-                              rounded-lg
-                              border
-                              border-blue-500/20
-                              bg-blue-500/10
+                              flex min-w-0
+                              items-center gap-4
                             "
                           >
-                            <Shield className="h-5 w-5 text-blue-500" />
-                          </div>
-
-                          <div className="min-w-0">
-                            <p
+                            <div
                               className="
-                                text-base
-                                font-semibold
-                                leading-5
+                                flex h-10 w-10
+                                shrink-0
+                                items-center
+                                justify-center
+                                rounded-lg
+                                border
+                                border-blue-500/20
+                                bg-blue-500/10
                               "
                             >
-                              {rank.name}
-                            </p>
+                              <Shield className="h-5 w-5 text-blue-500" />
+                            </div>
 
-                            <p
-                              className="
-                                mt-1 text-sm
-                                text-muted-foreground
-                              "
-                            >
-                              Required hours
-                            </p>
+                            <div className="min-w-0">
+                              <p
+                                className="
+                                  text-base
+                                  font-semibold
+                                  leading-5
+                                "
+                              >
+                                {rank.name}
+                              </p>
+
+                              <p
+                                className="
+                                  mt-1 text-sm
+                                  text-muted-foreground
+                                "
+                              >
+                                Configure promotion requirements
+                              </p>
+                            </div>
                           </div>
-                        </div>
-
-                        <div
-                          className="
-                            flex h-12
-                            shrink-0
-                            overflow-hidden
-                            rounded-lg
-                            border border-border
-                            bg-background
-                          "
-                        >
-                          <input
-                            type="number"
-                            min="0"
-                            value={hours}
-                            onChange={(event) =>
-                              setHours(
-                                rank.id,
-                                event.target.value,
-                              )
-                            }
-                            disabled={isSaving}
-                            className="
-                              h-full
-                              w-16
-                              border-0
-                              bg-transparent
-                              px-2
-                              text-center
-                              text-base
-                              font-semibold
-                              text-foreground
-                              outline-none
-                              focus:bg-muted/30
-                              disabled:cursor-not-allowed
-                              disabled:opacity-60
-                              [appearance:textfield]
-                              [&::-webkit-inner-spin-button]:appearance-none
-                              [&::-webkit-outer-spin-button]:appearance-none
-                            "
-                          />
 
                           <div
                             className="
-                              flex w-9
-                              flex-col
-                              border-l
-                              border-border
+                              grid w-full
+                              grid-cols-1 gap-3
+                              sm:grid-cols-2
+                              lg:w-auto
+                              lg:grid-cols-2
                             "
                           >
-                            <button
-                              type="button"
-                              onClick={() =>
-                                changeHours(
+                            <RequirementInput
+                              label="Promotion Hours"
+                              value={
+                                requirement.hours
+                              }
+                              onChange={(
+                                value,
+                              ) =>
+                                setRequirement(
                                   rank.id,
+                                  "hours",
+                                  value,
+                                )
+                              }
+                              onIncrease={() =>
+                                changeRequirement(
+                                  rank.id,
+                                  "hours",
                                   1,
                                 )
                               }
-                              disabled={isSaving}
-                              className="
-                                flex h-1/2
-                                items-center
-                                justify-center
-                                border-b
-                                border-border
-                                text-muted-foreground
-                                transition-colors
-                                hover:bg-blue-500/10
-                                hover:text-blue-500
-                                disabled:cursor-not-allowed
-                                disabled:opacity-50
-                              "
-                              aria-label={`Increase ${rank.name} hours`}
-                            >
-                              <ChevronUp className="h-4 w-4" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                changeHours(
+                              onDecrease={() =>
+                                changeRequirement(
                                   rank.id,
+                                  "hours",
                                   -1,
                                 )
                               }
-                              disabled={isSaving}
-                              className="
-                                flex h-1/2
-                                items-center
-                                justify-center
-                                text-muted-foreground
-                                transition-colors
-                                hover:bg-blue-500/10
-                                hover:text-blue-500
-                                disabled:cursor-not-allowed
-                                disabled:opacity-50
-                              "
-                              aria-label={`Decrease ${rank.name} hours`}
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </button>
+                              disabled={
+                                isSaving
+                              }
+                            />
+
+                            <RequirementInput
+                              label="Time in Rank (Days)"
+                              value={
+                                requirement.timeInRankDays
+                              }
+                              onChange={(
+                                value,
+                              ) =>
+                                setRequirement(
+                                  rank.id,
+                                  "timeInRankDays",
+                                  value,
+                                )
+                              }
+                              onIncrease={() =>
+                                changeRequirement(
+                                  rank.id,
+                                  "timeInRankDays",
+                                  1,
+                                )
+                              }
+                              onDecrease={() =>
+                                changeRequirement(
+                                  rank.id,
+                                  "timeInRankDays",
+                                  -1,
+                                )
+                              }
+                              disabled={
+                                isSaving
+                              }
+                            />
                           </div>
                         </div>
                       </div>
