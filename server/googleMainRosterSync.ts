@@ -156,6 +156,105 @@ function getGoogleSheetsClient() {
 }
 
 /* ─────────────────────────────────────────────
+   Diagnostics / Google API errors
+───────────────────────────────────────────── */
+
+type GoogleApiErrorShape = {
+  code?: number
+  message?: string
+  errors?: Array<{
+    message?: string
+    domain?: string
+    reason?: string
+  }>
+  response?: {
+    status?: number
+    data?: {
+      error?: {
+        code?: number
+        message?: string
+        status?: string
+        errors?: Array<{
+          message?: string
+          domain?: string
+          reason?: string
+        }>
+      }
+    }
+  }
+}
+
+function describeGoogleError(
+  error: unknown,
+  operation: string,
+): Error {
+  const value = error as GoogleApiErrorShape | undefined
+  const apiError = value?.response?.data?.error
+  const code = apiError?.code ?? value?.code ?? value?.response?.status
+  const message =
+    apiError?.message ??
+    value?.message ??
+    (error instanceof Error ? error.message : "Unknown Google API error")
+  const reason =
+    apiError?.errors?.map((item) => item.reason).filter(Boolean).join(", ") ??
+    value?.errors?.map((item) => item.reason).filter(Boolean).join(", ") ??
+    ""
+
+  const suffix = reason ? ` Reason: ${reason}.` : ""
+
+  return new Error(
+    `[Google Sheets] ${operation} failed${code ? ` (${code})` : ""}: ${message}.${suffix}`,
+  )
+}
+
+async function verifySpreadsheetAccess(
+  sheets: ReturnType<typeof getGoogleSheetsClient>["sheets"],
+  spreadsheetId: string,
+  config: GoogleMainRosterConfig,
+) {
+  let metadata
+
+  try {
+    metadata = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: "spreadsheetId,properties.title,sheets.properties",
+    })
+  } catch (error) {
+    throw describeGoogleError(
+      error,
+      `opening spreadsheet ${spreadsheetId}`,
+    )
+  }
+
+  const availableSheets = (metadata.data.sheets ?? [])
+    .map((sheet) => sheet.properties?.title ?? "")
+    .filter(Boolean)
+
+  const requestedSheets = [
+    config.homeSheet,
+    config.departmentSheet,
+    config.employeeSheet,
+    config.vehicleSheet,
+    config.uniformSheet,
+  ]
+
+  const missingSheets = requestedSheets.filter(
+    (name) => !availableSheets.includes(name),
+  )
+
+  if (missingSheets.length > 0) {
+    throw new Error(
+      `[Google Sheets] Spreadsheet "${metadata.data.properties?.title ?? spreadsheetId}" is accessible, but these configured tabs were not found: ${missingSheets.join(", ")}. Available tabs: ${availableSheets.join(", ")}`,
+    )
+  }
+
+  return {
+    spreadsheetTitle: metadata.data.properties?.title ?? "",
+    availableSheets,
+  }
+}
+
+/* ─────────────────────────────────────────────
    Helpers
 ───────────────────────────────────────────── */
 
@@ -268,22 +367,24 @@ function escapeSheetName(
 ───────────────────────────────────────────── */
 
 async function getSheetValues(
-  sheets: ReturnType<
-    typeof getGoogleSheetsClient
-  >["sheets"],
+  sheets: ReturnType<typeof getGoogleSheetsClient>["sheets"],
   spreadsheetId: string,
   sheetName: string,
 ): Promise<unknown[][]> {
-  const response =
-    await sheets.spreadsheets.values.get({
+  try {
+    const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${escapeSheetName(
-        sheetName,
-      )}'!A:ZZ`,
+      range: `'${escapeSheetName(sheetName)}'!A:ZZ`,
       majorDimension: "ROWS",
     })
 
-  return response.data.values ?? []
+    return response.data.values ?? []
+  } catch (error) {
+    throw describeGoogleError(
+      error,
+      `reading tab "${sheetName}" from spreadsheet ${spreadsheetId}`,
+    )
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -923,42 +1024,43 @@ export async function syncGoogleMainRoster() {
 
   const config = getConfig()
 
-  const { sheets, spreadsheetId } =
-    getGoogleSheetsClient()
+  const { sheets, spreadsheetId } = getGoogleSheetsClient()
 
-  const [
-    homeRows,
-    departmentRows,
-    employeeRows,
-    vehicleRows,
-    uniformRows,
-  ] = await Promise.all([
-    getSheetValues(
-      sheets,
-      spreadsheetId,
-      config.homeSheet,
-    ),
-    getSheetValues(
-      sheets,
-      spreadsheetId,
-      config.departmentSheet,
-    ),
-    getSheetValues(
-      sheets,
-      spreadsheetId,
-      config.employeeSheet,
-    ),
-    getSheetValues(
-      sheets,
-      spreadsheetId,
-      config.vehicleSheet,
-    ),
-    getSheetValues(
-      sheets,
-      spreadsheetId,
-      config.uniformSheet,
-    ),
-  ])
+  const access = await verifySpreadsheetAccess(
+    sheets,
+    spreadsheetId,
+    config,
+  )
+
+  console.log(
+    `[google-main-roster] Connected to "${access.spreadsheetTitle}" (${spreadsheetId}) as ${getRequiredEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL")}`
+  )
+
+  const homeRows = await getSheetValues(
+    sheets,
+    spreadsheetId,
+    config.homeSheet,
+  )
+  const departmentRows = await getSheetValues(
+    sheets,
+    spreadsheetId,
+    config.departmentSheet,
+  )
+  const employeeRows = await getSheetValues(
+    sheets,
+    spreadsheetId,
+    config.employeeSheet,
+  )
+  const vehicleRows = await getSheetValues(
+    sheets,
+    spreadsheetId,
+    config.vehicleSheet,
+  )
+  const uniformRows = await getSheetValues(
+    sheets,
+    spreadsheetId,
+    config.uniformSheet,
+  )
 
   const department = parseDepartment(
     departmentRows,
@@ -1060,53 +1162,58 @@ export async function syncGoogleMainRoster() {
 
 export async function testGoogleMainRosterConnection() {
   const config = getConfig()
+  const { sheets, spreadsheetId } = getGoogleSheetsClient()
+  const access = await verifySpreadsheetAccess(
+    sheets,
+    spreadsheetId,
+    config,
+  )
 
-  const { sheets, spreadsheetId } =
-    getGoogleSheetsClient()
+  const checks: Record<string, { ok: boolean; rows?: number; error?: string }> = {}
+  const entries = [
+    ["home", config.homeSheet],
+    ["department", config.departmentSheet],
+    ["employees", config.employeeSheet],
+    ["vehicles", config.vehicleSheet],
+    ["uniforms", config.uniformSheet],
+  ] as const
 
-  const metadata =
-    await sheets.spreadsheets.get({
-      spreadsheetId,
-      fields:
-        "spreadsheetId,properties.title,sheets.properties",
-    })
-
-  const availableSheets =
-    (metadata.data.sheets ?? [])
-      .map(
-        (sheet) =>
-          sheet.properties?.title ?? "",
+  for (const [key, sheetName] of entries) {
+    try {
+      const rows = await getSheetValues(
+        sheets,
+        spreadsheetId,
+        sheetName,
       )
-      .filter(Boolean)
-
-  const requestedSheets = [
-    config.homeSheet,
-    config.departmentSheet,
-    config.employeeSheet,
-    config.vehicleSheet,
-    config.uniformSheet,
-  ]
-
-  const missingSheets =
-    requestedSheets.filter(
-      (name) =>
-        !availableSheets.includes(name),
-    )
-
-  if (missingSheets.length > 0) {
-    throw new Error(
-      `The Main Roster spreadsheet is missing these tabs: ${missingSheets.join(
-        ", ",
-      )}`,
-    )
+      checks[key] = { ok: true, rows: rows.length }
+    } catch (error) {
+      checks[key] = {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
   }
+
+  const failed = Object.entries(checks).filter(([, result]) => !result.ok)
 
   return {
-    success: true,
+    success: failed.length === 0,
+    serviceAccount: getRequiredEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
     spreadsheetId,
-    spreadsheetTitle:
-      metadata.data.properties?.title ??
-      "",
-    sheets: requestedSheets,
+    spreadsheetTitle: access.spreadsheetTitle,
+    configuredSheets: {
+      home: config.homeSheet,
+      department: config.departmentSheet,
+      employees: config.employeeSheet,
+      vehicles: config.vehicleSheet,
+      uniforms: config.uniformSheet,
+    },
+    availableSheets: access.availableSheets,
+    checks,
+    error:
+      failed.length > 0
+        ? `One or more Main Roster tabs could not be read: ${failed.map(([key]) => key).join(", ")}.`
+        : undefined,
   }
 }
+
