@@ -724,7 +724,9 @@ export default function Gallery() {
     const detectedEmbed = getVideoEmbedUrl(url)
     const detectedDirectType = getDirectMediaType(url)
     const type: GalleryMediaType =
-      detectedEmbed || detectedDirectType || urlType
+      detectedEmbed
+        ? "video"
+        : detectedDirectType || urlType
 
     const thumbnailUrl =
       type === "video"
