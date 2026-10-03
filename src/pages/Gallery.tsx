@@ -77,6 +77,20 @@ const GALLERY_MEDIA_FILTERS: GalleryMediaFilter[] = [
   "Videos",
 ]
 
+const DESCRIPTION_LINE_LENGTH = 35
+const DESCRIPTION_MAX_LINES = 3
+const DESCRIPTION_PREVIEW_LENGTH =
+  DESCRIPTION_LINE_LENGTH * DESCRIPTION_MAX_LINES
+
+function getDescriptionPreview(description: string) {
+  return Array.from({ length: DESCRIPTION_MAX_LINES }, (_, index) =>
+    description.slice(
+      index * DESCRIPTION_LINE_LENGTH,
+      (index + 1) * DESCRIPTION_LINE_LENGTH,
+    ),
+  ).filter(Boolean).join("\n")
+}
+
 type DropdownContextValue = {
   openDropdown: string | null
   setOpenDropdown: (value: string | null) => void
@@ -1395,12 +1409,12 @@ export default function Gallery() {
 
                                 {item.description && (
                                   <div className="mt-1">
-                                    <p className="line-clamp-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
-                                      {item.description}
+                                    <p className="whitespace-pre-wrap text-xs leading-5 text-muted-foreground">
+                                      {getDescriptionPreview(item.description)}
                                     </p>
 
-                                    {(item.description.length > 120 ||
-                                      item.description.split(/\r?\n/).length > 2) && (
+                                    {item.description.length >
+                                      DESCRIPTION_PREVIEW_LENGTH && (
                                       <span className="mt-1 inline-block cursor-pointer rounded px-1 text-[11px] font-medium text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-400 hover:underline">
                                         Show more...
                                       </span>
