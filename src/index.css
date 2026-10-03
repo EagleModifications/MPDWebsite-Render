@@ -232,7 +232,7 @@
   /*
    * Hide the native browser cursor everywhere.
    *
-   * CustomCursor provides the only visible cursor.
+   * CustomCursor provides the visible cursor.
    */
   html,
   body,
@@ -311,7 +311,10 @@
 
   pointer-events: none;
 
-  z-index: 999999;
+  /*
+   * Must always be above notifications.
+   */
+  z-index: 2147483647 !important;
 
   transform: translate(-1px, -1px);
 
@@ -348,22 +351,65 @@ body,
 }
 
 /* =========================================================
-   SONNER
+   NOTIFICATIONS
 ========================================================= */
 
-[data-sonner-toaster] {
-  --toast-close-button-start: auto !important;
-  --toast-close-button-end: 8px !important;
-  --toast-close-button-transform: none !important;
+/*
+ * Sonner notification container.
+ *
+ * Notifications are below the custom cursor.
+ */
+[data-sonner-toaster].notifications-toaster {
+  z-index: 2147483646 !important;
+
+  width: 360px !important;
+
+  overflow: visible !important;
+
+  /*
+   * Keep the default Sonner positioning.
+   */
+  pointer-events: none;
 }
 
-[data-sonner-toast] {
+/*
+ * Allow the actual notification cards to receive
+ * hover/click events.
+ */
+.notifications-toaster [data-sonner-toast] {
+  pointer-events: auto;
+
   position: relative !important;
+
+  width: 100% !important;
+
+  box-sizing: border-box !important;
+
   padding-right: 44px !important;
+
+  /*
+   * Smooth expansion/collapse.
+   */
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease,
+    height 180ms ease,
+    min-height 180ms ease,
+    max-height 180ms ease,
+    padding 180ms ease !important;
+
+  will-change:
+    transform,
+    height;
 }
 
-[data-sonner-toast] [data-close-button],
-[data-sonner-toast][data-styled="true"] [data-close-button] {
+/* =========================================================
+   NOTIFICATION CLOSE BUTTON
+========================================================= */
+
+.notifications-toaster
+  [data-sonner-toast]
+  [data-close-button] {
   position: absolute !important;
 
   top: 8px !important;
@@ -389,11 +435,169 @@ body,
   border-radius: 6px !important;
 }
 
-[data-sonner-toast] [data-close-button]:hover,
-[data-sonner-toast] [data-close-button]:focus,
-[data-sonner-toast] [data-close-button]:active {
+.notifications-toaster
+  [data-sonner-toast]
+  [data-close-button]:hover,
+.notifications-toaster
+  [data-sonner-toast]
+  [data-close-button]:focus,
+.notifications-toaster
+  [data-sonner-toast]
+  [data-close-button]:active {
   transform: none !important;
   translate: none !important;
+}
+
+/* =========================================================
+   COLLAPSED STATE
+========================================================= */
+
+/*
+ * When not hovered:
+ *
+ * - newest toast is completely visible
+ * - older toasts become thin cards behind it
+ * - older toast text is hidden
+ *
+ * This prevents the large empty boxes seen previously.
+ */
+
+.notifications-toaster[data-expanded="false"]
+  [data-sonner-toast]:first-child {
+  height: auto !important;
+  min-height: 56px !important;
+  max-height: none !important;
+
+  padding-top: 16px !important;
+  padding-bottom: 16px !important;
+
+  opacity: 1 !important;
+
+  overflow: visible !important;
+
+  transform: translateY(0) scale(1) !important;
+
+  z-index: 10 !important;
+}
+
+/*
+ * Older notifications are reduced to a small visible
+ * portion of their card.
+ */
+.notifications-toaster[data-expanded="false"]
+  [data-sonner-toast]:not(:first-child) {
+  height: 10px !important;
+  min-height: 10px !important;
+  max-height: 10px !important;
+
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+
+  overflow: hidden !important;
+
+  opacity: 1 !important;
+
+  border-radius: 10px !important;
+}
+
+/*
+ * Hide content inside older notifications.
+ *
+ * Only the newest toast displays its message while
+ * the stack is collapsed.
+ */
+.notifications-toaster[data-expanded="false"]
+  [data-sonner-toast]:not(:first-child)
+  > * {
+  visibility: hidden !important;
+}
+
+/*
+ * Hide close buttons on older collapsed notifications.
+ */
+.notifications-toaster[data-expanded="false"]
+  [data-sonner-toast]:not(:first-child)
+  [data-close-button] {
+  visibility: hidden !important;
+}
+
+/*
+ * Layer the cards behind one another.
+ */
+.notifications-toaster[data-expanded="false"]
+  [data-sonner-toast]:nth-child(2) {
+  transform: translateY(4px) scale(0.985) !important;
+  z-index: 9 !important;
+}
+
+.notifications-toaster[data-expanded="false"]
+  [data-sonner-toast]:nth-child(3) {
+  transform: translateY(8px) scale(0.97) !important;
+  z-index: 8 !important;
+}
+
+.notifications-toaster[data-expanded="false"]
+  [data-sonner-toast]:nth-child(4) {
+  transform: translateY(12px) scale(0.955) !important;
+  z-index: 7 !important;
+}
+
+.notifications-toaster[data-expanded="false"]
+  [data-sonner-toast]:nth-child(5) {
+  transform: translateY(16px) scale(0.94) !important;
+  z-index: 6 !important;
+}
+
+/* =========================================================
+   EXPANDED / HOVERED STATE
+========================================================= */
+
+/*
+ * When the notification area is hovered, Sonner sets
+ * data-expanded="true".
+ *
+ * Restore every toast to its normal size.
+ */
+.notifications-toaster[data-expanded="true"]
+  [data-sonner-toast] {
+  height: auto !important;
+  min-height: 56px !important;
+  max-height: none !important;
+
+  padding-top: 16px !important;
+  padding-bottom: 16px !important;
+
+  transform: none !important;
+  scale: 1 !important;
+
+  opacity: 1 !important;
+
+  overflow: visible !important;
+}
+
+/*
+ * Show all notification content.
+ */
+.notifications-toaster[data-expanded="true"]
+  [data-sonner-toast]
+  > * {
+  visibility: visible !important;
+}
+
+/*
+ * Show all close buttons.
+ */
+.notifications-toaster[data-expanded="true"]
+  [data-sonner-toast]
+  [data-close-button] {
+  visibility: visible !important;
+}
+
+/*
+ * Small gap between expanded notifications.
+ */
+.notifications-toaster[data-expanded="true"] {
+  gap: 8px !important;
 }
 
 /* =========================================================
