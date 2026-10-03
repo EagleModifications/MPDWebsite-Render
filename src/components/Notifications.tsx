@@ -10,29 +10,30 @@ export default function Notifications() {
   return (
     <Toaster
       position="top-right"
+      theme="system"
 
       /*
-       * Maximum number of notifications kept in the stack.
-       */
-      visibleToasts={5}
-
-      /*
-       * IMPORTANT:
+       * Sonner's native behaviour:
        *
-       * false = collapsed by default.
-       *
-       * Sonner automatically expands the stack while
-       * the notification area is hovered.
+       * - collapsed stack normally
+       * - expands when hovered
+       * - collapses again when mouse leaves
        */
       expand={false}
 
       /*
-       * Gap used when the stack is expanded.
+       * Number of notifications Sonner keeps available
+       * in the stack.
+       */
+      visibleToasts={5}
+
+      /*
+       * Normal Sonner spacing when expanded.
        */
       gap={8}
 
       /*
-       * Distance from the viewport.
+       * Position from the viewport.
        */
       offset={{
         top: 24,
@@ -40,24 +41,15 @@ export default function Notifications() {
       }}
 
       /*
-       * Use the current system theme.
-       */
-      theme="system"
-
-      /*
-       * Show close buttons.
+       * Show the normal Sonner close buttons.
        */
       closeButton
 
       /*
-       * Give our toaster a unique class so the CSS below
-       * only affects these notifications.
+       * Keep notifications below the custom cursor.
        */
       className="notifications-toaster"
 
-      /*
-       * Icons.
-       */
       icons={{
         success: (
           <CheckCircle2 className="size-5 shrink-0 text-green-500" />
@@ -76,9 +68,6 @@ export default function Notifications() {
         ),
       }}
 
-      /*
-       * Toast appearance.
-       */
       toastOptions={{
         classNames: {
           toast:
