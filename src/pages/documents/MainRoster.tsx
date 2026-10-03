@@ -107,8 +107,19 @@ export default function MainRoster() {
     [activeTab],
   )
 
+  const ActiveIcon = activeTabData.icon
+
+  /*
+   * IMPORTANT:
+   *
+   * /preview shows the entire Google Sheets viewer,
+   * including the other worksheet tabs at the bottom.
+   *
+   * /pubhtml with single=true displays ONLY the
+   * selected worksheet.
+   */
   const embedUrl = useMemo(() => {
-    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/preview?gid=${activeTabData.gid}`
+    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/pubhtml?gid=${activeTabData.gid}&single=true&widget=false&headers=false`
   }, [activeTabData.gid])
 
   const hasFilters =
@@ -141,33 +152,31 @@ export default function MainRoster() {
   return (
     <DashboardLayout>
       <div className="flex min-h-full min-w-0 flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-6">
-        {/* HEADER */}
 
+        {/* PAGE HEADER */}
         <div className="flex shrink-0 flex-col gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-                <Shield className="h-5 w-5 text-blue-500" />
-              </div>
 
-              <div className="min-w-0">
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                  Main Roster
-                </h1>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
+              <Shield className="h-5 w-5 text-blue-500" />
+            </div>
 
-                <p className="text-sm text-muted-foreground">
-                  View department personnel,
-                  employee, vehicle and uniform
-                  roster information.
-                </p>
-              </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                Main Roster
+              </h1>
+
+              <p className="text-sm text-muted-foreground">
+                View department personnel, employee,
+                vehicle and uniform roster information.
+              </p>
             </div>
           </div>
 
-          {/* TABS */}
-
+          {/* MAIN TABS */}
           <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="inline-flex min-w-full items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1 sm:min-w-0">
+
               {tabs.map((tab) => {
                 const active =
                   activeTab === tab.id
@@ -193,19 +202,20 @@ export default function MainRoster() {
                   </button>
                 )
               })}
+
             </div>
           </div>
         </div>
 
         {/* CONTENT CARD */}
+        <div className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
 
-        <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
           {/* CARD HEADER */}
-
-          <div className="border-b bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-5">
+          <div className="border-b border-border/60 bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-5">
             <div className="flex min-w-0 items-center gap-3">
+
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-                <activeTabData.icon className="h-4 w-4 text-blue-500" />
+                <ActiveIcon className="h-4 w-4 text-blue-500" />
               </div>
 
               <div className="min-w-0">
@@ -217,19 +227,21 @@ export default function MainRoster() {
                   Google Sheets
                 </p>
               </div>
+
             </div>
           </div>
 
           {/* SEARCH / FILTERS */}
-
           {(activeTabData.searchable ||
             activeTabData.filters) && (
-            <div className="border-b bg-card p-3 sm:p-4">
-              <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
-                {/* SEARCH */}
+            <div className="border-b border-border/60 bg-card p-3 sm:p-4">
 
+              <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
+
+                {/* SEARCH */}
                 {activeTabData.searchable && (
                   <div className="relative min-w-0 flex-1">
+
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
                     <input
@@ -241,15 +253,16 @@ export default function MainRoster() {
                         )
                       }
                       placeholder="Search roster..."
-                      className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
+
                   </div>
                 )}
 
                 {/* FILTER */}
-
                 {activeTabData.filters && (
                   <DropdownMenu>
+
                     <DropdownMenuTrigger
                       asChild
                     >
@@ -265,12 +278,9 @@ export default function MainRoster() {
                           Filters
                         </span>
 
-                        {filters.length >
-                          0 && (
+                        {filters.length > 0 && (
                           <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
-                            {
-                              filters.length
-                            }
+                            {filters.length}
                           </span>
                         )}
 
@@ -282,6 +292,7 @@ export default function MainRoster() {
                       align="end"
                       className="w-56"
                     >
+
                       <DropdownMenuItem
                         onSelect={(event) =>
                           event.preventDefault()
@@ -291,16 +302,12 @@ export default function MainRoster() {
                             filters.length ===
                             filterOptions.length
 
-                          if (
-                            allSelected
-                          ) {
+                          if (allSelected) {
                             setFilters([])
                           } else {
                             setFilters(
                               filterOptions.map(
-                                (
-                                  filter,
-                                ) =>
+                                (filter) =>
                                   filter.id,
                               ),
                             )
@@ -335,12 +342,8 @@ export default function MainRoster() {
 
                           return (
                             <DropdownMenuItem
-                              key={
-                                filter.id
-                              }
-                              onSelect={(
-                                event,
-                              ) =>
+                              key={filter.id}
+                              onSelect={(event) =>
                                 event.preventDefault()
                               }
                               onClick={() =>
@@ -351,25 +354,20 @@ export default function MainRoster() {
                               className="gap-2"
                             >
                               <Checkbox
-                                checked={
-                                  checked
-                                }
+                                checked={checked}
                                 tabIndex={-1}
                                 className="pointer-events-none"
                               />
 
                               <span>
-                                {
-                                  filter.label
-                                }
+                                {filter.label}
                               </span>
                             </DropdownMenuItem>
                           )
                         },
                       )}
 
-                      {filters.length >
-                        0 && (
+                      {filters.length > 0 && (
                         <>
                           <div className="my-1 h-px bg-border" />
 
@@ -385,20 +383,18 @@ export default function MainRoster() {
                           </DropdownMenuItem>
                         </>
                       )}
+
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
 
                 {/* CLEAR */}
-
                 {hasFilters && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={
-                      clearFilters
-                    }
+                    onClick={clearFilters}
                     className="gap-2"
                   >
                     <X className="h-4 w-4" />
@@ -406,12 +402,13 @@ export default function MainRoster() {
                     Clear
                   </Button>
                 )}
+
               </div>
 
               {/* ACTIVE FILTERS */}
-
               {filters.length > 0 && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+
                   <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                     <Filter className="h-3.5 w-3.5" />
 
@@ -425,8 +422,7 @@ export default function MainRoster() {
                           (item) =>
                             item.id ===
                             filter,
-                        )?.label ??
-                        filter
+                        )?.label ?? filter
 
                       return (
                         <button
@@ -448,41 +444,27 @@ export default function MainRoster() {
                       )
                     },
                   )}
+
                 </div>
               )}
+
             </div>
           )}
 
           {/* GOOGLE SHEET */}
+          <div className="w-full bg-background">
 
-          <div className="p-0">
-            {embedUrl ? (
-              <div className="w-full overflow-hidden">
-                <iframe
-                  key={`${activeTabData.id}-${activeTabData.gid}`}
-                  src={embedUrl}
-                  title={`${activeTabData.label} Google Sheet`}
-                  className="h-[800px] w-full border-0"
-                  frameBorder="0"
-                  loading="lazy"
-                />
-              </div>
-            ) : (
-              <div className="flex min-h-[400px] flex-col items-center justify-center gap-2 px-6 text-center">
-                <Database className="h-8 w-8 text-muted-foreground" />
+            <iframe
+              key={`${activeTabData.id}-${activeTabData.gid}`}
+              src={embedUrl}
+              title={`${activeTabData.label} Google Sheet`}
+              className="block h-[800px] w-full border-0 bg-background"
+              frameBorder="0"
+              loading="lazy"
+            />
 
-                <p className="font-medium">
-                  Google Sheet not configured
-                </p>
-
-                <p className="max-w-md text-sm text-muted-foreground">
-                  Add the Google Sheet ID and
-                  worksheet GIDs at the top of
-                  MainRoster.tsx.
-                </p>
-              </div>
-            )}
           </div>
+
         </div>
       </div>
     </DashboardLayout>
