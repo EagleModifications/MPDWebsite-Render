@@ -5218,16 +5218,29 @@ export function createApp() {
 
         const db = await getMongoDb()
 
-        const roster =
+        let roster =
           await db.collection("mainRoster").findOne(
             { type: "main" },
             { projection: { _id: 0 } },
           )
 
+        // If MongoDB has not received the Master Roster yet, perform
+        // the first synchronization now. This makes the page self-
+        // initializing instead of requiring a separate import first.
+        if (!roster) {
+          await syncGoogleMainRoster()
+
+          roster =
+            await db.collection("mainRoster").findOne(
+              { type: "main" },
+              { projection: { _id: 0 } },
+            )
+        }
+
         if (!roster) {
           return res.status(404).json({
             success: false,
-            error: "Main roster has not been synchronized yet.",
+            error: "Main roster synchronization completed without creating a roster document.",
           })
         }
 
@@ -5271,13 +5284,10 @@ export function createApp() {
           })
         }
 
-        if (!hasPermission(user, "import")) {
-          return res.status(403).json({
-            success: false,
-            error: "Forbidden",
-          })
-        }
-
+        // Main Roster refresh is available to authenticated dashboard users.
+        // The source is read-only Google Sheets data and the sync only updates
+        // the global `mainRoster` cache in MongoDB, so it does not require the
+        // separate division-import permission.
         const result =
           await syncGoogleMainRoster()
 
