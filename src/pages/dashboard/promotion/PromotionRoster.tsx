@@ -1813,7 +1813,7 @@ export default function PromotionRoster() {
                     </th>
 
                     <th className="w-[6%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Required
+                      Required Hours
                     </th>
 
                     <th className="w-[6%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
