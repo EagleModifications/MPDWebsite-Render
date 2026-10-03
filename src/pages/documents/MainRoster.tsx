@@ -38,8 +38,15 @@ type Tab = {
   filters?: boolean
 }
 
-const SHEET_ID =
-  "1VbCHDEjyzSW_RA3F524B688dsyZJVDWcqogZXDVdy98"
+/*
+ * IMPORTANT:
+ *
+ * This is the PUBLISHED Google Sheets URL.
+ *
+ * Do NOT use the normal spreadsheet ID here.
+ */
+const PUBLISHED_SHEET_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDo_yVusgQRYUpyDhfNnkBrJXPaNXAbSYvfndxC14IcKjVp9-8wDnOCb8_AGCsgRYLNeXyWzgimNuL/pubhtml"
 
 const tabs: Tab[] = [
   {
@@ -78,6 +85,17 @@ const tabs: Tab[] = [
   },
 ]
 
+/*
+ * These are currently UI filters.
+ *
+ * The Google Sheet itself is inside a cross-origin iframe,
+ * so React cannot directly filter its rows.
+ *
+ * If you want these to actually filter the roster data,
+ * the Department Roster and Employee Database need to be
+ * loaded through your Google Sheets API/server endpoint
+ * instead of an iframe.
+ */
 const filterOptions = [
   {
     id: "active",
@@ -110,16 +128,24 @@ export default function MainRoster() {
   const ActiveIcon = activeTabData.icon
 
   /*
-   * IMPORTANT:
+   * Google published-sheet embed.
    *
-   * /preview shows the entire Google Sheets viewer,
-   * including the other worksheet tabs at the bottom.
-   *
-   * /pubhtml with single=true displays ONLY the
-   * selected worksheet.
+   * gid       = selected worksheet
+   * single    = only selected worksheet
+   * widget    = false removes Google sheet tabs
+   * headers   = false removes Google row/column headers
+   * chrome    = false removes Google title/footer UI
    */
   const embedUrl = useMemo(() => {
-    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/pubhtml?gid=${activeTabData.gid}&single=true&widget=false&headers=false`
+    const params = new URLSearchParams({
+      gid: activeTabData.gid,
+      single: "true",
+      widget: "false",
+      headers: "false",
+      chrome: "false",
+    })
+
+    return `${PUBLISHED_SHEET_URL}?${params.toString()}`
   }, [activeTabData.gid])
 
   const hasFilters =
@@ -157,11 +183,13 @@ export default function MainRoster() {
         <div className="flex shrink-0 flex-col gap-4">
 
           <div className="flex items-center gap-3">
+
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
               <Shield className="h-5 w-5 text-blue-500" />
             </div>
 
             <div className="min-w-0">
+
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                 Main Roster
               </h1>
@@ -170,11 +198,13 @@ export default function MainRoster() {
                 View department personnel, employee,
                 vehicle and uniform roster information.
               </p>
+
             </div>
           </div>
 
-          {/* MAIN TABS */}
+          {/* TABS */}
           <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
             <div className="inline-flex min-w-full items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1 sm:min-w-0">
 
               {tabs.map((tab) => {
@@ -212,6 +242,7 @@ export default function MainRoster() {
 
           {/* CARD HEADER */}
           <div className="border-b border-border/60 bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-5">
+
             <div className="flex min-w-0 items-center gap-3">
 
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
@@ -219,6 +250,7 @@ export default function MainRoster() {
               </div>
 
               <div className="min-w-0">
+
                 <h2 className="truncate font-medium">
                   {activeTabData.label}
                 </h2>
@@ -226,6 +258,7 @@ export default function MainRoster() {
                 <p className="truncate text-xs text-muted-foreground">
                   Google Sheets
                 </p>
+
               </div>
 
             </div>
@@ -252,7 +285,12 @@ export default function MainRoster() {
                           event.target.value,
                         )
                       }
-                      placeholder="Search roster..."
+                      placeholder={
+                        activeTabData.id ===
+                        "employees"
+                          ? "Search employees..."
+                          : "Search roster..."
+                      }
                       className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
 
@@ -272,6 +310,7 @@ export default function MainRoster() {
                         size="sm"
                         className="gap-2 xl:min-w-[170px]"
                       >
+
                         <Filter className="h-4 w-4 text-blue-400" />
 
                         <span>
@@ -285,6 +324,7 @@ export default function MainRoster() {
                         )}
 
                         <ChevronDown className="ml-auto h-3.5 w-3.5 opacity-60" />
+
                       </Button>
                     </DropdownMenuTrigger>
 
@@ -315,6 +355,7 @@ export default function MainRoster() {
                         }}
                         className="gap-2"
                       >
+
                         <Checkbox
                           checked={
                             filters.length ===
@@ -329,6 +370,7 @@ export default function MainRoster() {
                         <span className="font-medium">
                           All Filters
                         </span>
+
                       </DropdownMenuItem>
 
                       <div className="my-1 h-px bg-border" />
@@ -353,6 +395,7 @@ export default function MainRoster() {
                               }
                               className="gap-2"
                             >
+
                               <Checkbox
                                 checked={checked}
                                 tabIndex={-1}
@@ -362,6 +405,7 @@ export default function MainRoster() {
                               <span>
                                 {filter.label}
                               </span>
+
                             </DropdownMenuItem>
                           )
                         },
@@ -377,9 +421,11 @@ export default function MainRoster() {
                             }
                             className="gap-2 text-muted-foreground"
                           >
+
                             <X className="h-4 w-4" />
 
                             Clear Filters
+
                           </DropdownMenuItem>
                         </>
                       )}
@@ -397,9 +443,11 @@ export default function MainRoster() {
                     onClick={clearFilters}
                     className="gap-2"
                   >
+
                     <X className="h-4 w-4" />
 
                     Clear
+
                   </Button>
                 )}
 
@@ -410,9 +458,11 @@ export default function MainRoster() {
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
 
                   <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+
                     <Filter className="h-3.5 w-3.5" />
 
                     Active filters:
+
                   </div>
 
                   {filters.map(
@@ -435,11 +485,13 @@ export default function MainRoster() {
                           }
                           className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
                         >
+
                           <Filter className="h-3 w-3" />
 
                           {label}
 
                           <X className="h-3 w-3" />
+
                         </button>
                       )
                     },
@@ -452,7 +504,7 @@ export default function MainRoster() {
           )}
 
           {/* GOOGLE SHEET */}
-          <div className="w-full bg-background">
+          <div className="w-full overflow-hidden bg-background">
 
             <iframe
               key={`${activeTabData.id}-${activeTabData.gid}`}
