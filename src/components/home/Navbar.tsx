@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { NavLink, Link } from "react-router-dom"
 import {
+  ChevronDown,
   LogIn,
   LogOut,
   Menu,
@@ -48,9 +49,50 @@ const navItems: NavItem[] = [
   },
 ]
 
+/*
+ * Documents dropdown items
+ *
+ * Add/remove document pages here.
+ *
+ * Example:
+ * {
+ *   name: "Main Roster",
+ *   href: "/documents/main-roster",
+ *   permission: "view",
+ * }
+ */
+const documentsItems: NavItem[] = [
+  {
+    name: "Main Roster",
+    href: "/documents/mainroster",
+    permission: "documents",
+  },
+  {
+    name: "SWAT Roster",
+    href: "/documents/swatroster",
+    permission: "documents",
+  },
+  {
+    name: "MCD Roster",
+    href: "/documents/mcdroster",
+    permission: "documents",
+  },
+  {
+    name: "TRU Roster",
+    href: "/documents/truroster",
+    permission: "documents",
+  },
+  {
+    name: "FTD Roster",
+    href: "/documents/ftdroster",
+    permission: "documents",
+  },
+]
+
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [documentsOpen, setDocumentsOpen] = useState(false)
 
   useEffect(() => {
     getSession().then(setUser)
@@ -70,7 +112,7 @@ export default function Navbar() {
     }
   }, [])
 
-  const visibleItems = navItems.filter((item) => {
+  const canViewItem = (item: NavItem) => {
     if (item.public) {
       return true
     }
@@ -90,10 +132,18 @@ export default function Navbar() {
     }
 
     return hasPermission(user, item.permission)
-  })
+  }
+
+  const visibleItems = navItems.filter(canViewItem)
+  const visibleDocuments = documentsItems.filter(canViewItem)
+
+  const documentsActive = visibleDocuments.some(
+    (item) => window.location.pathname === item.href,
+  )
 
   const closeMobileMenu = () => {
     setMobileOpen(false)
+    setDocumentsOpen(false)
   }
 
   return (
@@ -140,6 +190,77 @@ export default function Navbar() {
               {item.name}
             </NavLink>
           ))}
+
+          {/* DOCUMENTS DROPDOWN */}
+          {visibleDocuments.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setDocumentsOpen((open) => !open)}
+                className={`
+                  flex items-center gap-1.5
+                  font-medium
+                  transition-colors
+                  ${
+                    documentsActive
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }
+                `}
+                aria-expanded={documentsOpen}
+                aria-haspopup="menu"
+              >
+                <span>Documents</span>
+
+                <ChevronDown
+                  className={`
+                    h-4 w-4
+                    transition-transform duration-200
+                    ${documentsOpen ? "rotate-180" : ""}
+                  `}
+                />
+              </button>
+
+              {documentsOpen && (
+                <div
+                  className="
+                    absolute left-1/2 top-full mt-3
+                    min-w-[190px]
+                    -translate-x-1/2
+                    overflow-hidden
+                    rounded-xl
+                    border border-border
+                    bg-background/95
+                    p-1.5
+                    shadow-xl
+                    backdrop-blur-md
+                  "
+                >
+                  {visibleDocuments.map((item) => (
+                    <NavLink
+                      key={item.href}
+                      to={item.href}
+                      onClick={() => setDocumentsOpen(false)}
+                      className={({ isActive }) =>
+                        `
+                          block rounded-lg px-3 py-2.5
+                          text-sm font-medium
+                          transition-colors
+                          ${
+                            isActive
+                              ? "bg-foreground/10 text-foreground"
+                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                          }
+                        `
+                      }
+                    >
+                      {item.name}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* RIGHT — Desktop */}
@@ -240,6 +361,64 @@ export default function Navbar() {
                 {item.name}
               </NavLink>
             ))}
+
+            {/* MOBILE DOCUMENTS DROPDOWN */}
+            {visibleDocuments.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setDocumentsOpen((open) => !open)}
+                  className={`
+                    flex w-full items-center justify-between
+                    rounded-lg px-4 py-3
+                    text-left text-sm font-medium
+                    transition-colors
+                    ${
+                      documentsActive
+                        ? "bg-foreground/10 text-foreground"
+                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                    }
+                  `}
+                  aria-expanded={documentsOpen}
+                >
+                  <span>Documents</span>
+
+                  <ChevronDown
+                    className={`
+                      h-4 w-4
+                      transition-transform duration-200
+                      ${documentsOpen ? "rotate-180" : ""}
+                    `}
+                  />
+                </button>
+
+                {documentsOpen && (
+                  <div className="ml-3 border-l border-border pl-2">
+                    {visibleDocuments.map((item) => (
+                      <NavLink
+                        key={item.href}
+                        to={item.href}
+                        onClick={closeMobileMenu}
+                        className={({ isActive }) =>
+                          `
+                            block rounded-lg px-4 py-2.5
+                            text-sm font-medium
+                            transition-colors
+                            ${
+                              isActive
+                                ? "bg-foreground/10 text-foreground"
+                                : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                            }
+                          `
+                        }
+                      >
+                        {item.name}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="my-1 h-px bg-border" />
 
