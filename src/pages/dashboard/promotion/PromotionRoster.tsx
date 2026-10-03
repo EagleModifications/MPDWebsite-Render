@@ -254,13 +254,15 @@ export default function PromotionRoster() {
   const [selectedCopied, setSelectedCopied] =
     useState(false)
 
-  /*
-   * Ref is used instead of state so Shift is
-   * captured synchronously before Radix fires
-   * onCheckedChange.
-   */
   const shiftSelectingRef =
     useRef(false)
+
+  /* ─────────────────────────────────────────────
+     Whether this division uses recruitment logs
+  ───────────────────────────────────────────── */
+
+  const showRecruitmentLogs =
+    division === "department"
 
   /* ─────────────────────────────────────────────
      Load Roster
@@ -316,48 +318,61 @@ export default function PromotionRoster() {
                     callsign: cleanValue(
                       member.callsign,
                     ),
+
                     badgeNumber: cleanValue(
                       member.badgeNumber,
                     ),
+
                     name: cleanValue(
                       member.name,
                     ),
+
                     rank: cleanValue(
                       member.rank,
                     ),
+
                     discordId: cleanValue(
                       member.discordId,
                     ),
+
                     timeInDept: cleanValue(
                       member.timeInDept,
                     ),
+
                     timeInRank: cleanValue(
                       member.timeInRank,
                     ),
+
                     requiredHours:
                       Number(
                         member.requiredHours,
                       ) || 0,
+
                     promotionHours:
                       Number(
                         member.promotionHours,
                       ) || 0,
+
                     requiredTimeInRankDays:
                       Number(
                         member.requiredTimeInRankDays,
                       ) || 0,
+
                     requiredTrainingLogs:
                       Number(
                         member.requiredTrainingLogs,
                       ) || 0,
+
                     requiredRecruitmentLogs:
                       Number(
                         member.requiredRecruitmentLogs,
                       ) || 0,
+
                     requiredLogs:
                       Number(
                         member.requiredLogs,
                       ) || 0,
+
                     status:
                       normalizeStatus(
                         member.status,
@@ -766,8 +781,8 @@ export default function PromotionRoster() {
 
       case "full":
         values = selectedMembers.map(
-          (member) =>
-            [
+          (member) => {
+            const details = [
               member.callsign,
               member.badgeNumber,
               member.name,
@@ -776,15 +791,27 @@ export default function PromotionRoster() {
               member.timeInDept,
               member.timeInRank,
               `${member.requiredTimeInRankDays} DAYS`,
-              `${member.requiredLogs} logs`,
               `Trainings: ${member.requiredTrainingLogs}`,
-              `Recruitments/Ridealongs: ${member.requiredRecruitmentLogs}`,
+            ]
+
+            if (showRecruitmentLogs) {
+              details.push(
+                `Recruitments/Ridealongs: ${member.requiredRecruitmentLogs}`,
+              )
+            }
+
+            details.push(
               `${member.requiredHours.toFixed(1)}h`,
               `${member.promotionHours.toFixed(1)}h`,
               getStatusLabel(
                 member.status,
               ),
-            ].join(" — "),
+            )
+
+            return details.join(
+              " — ",
+            )
+          },
         )
         break
     }
@@ -938,7 +965,7 @@ export default function PromotionRoster() {
 
   return (
     <DashboardLayout>
-      <div className="flex min-h-full flex-col gap-4 p-3 sm:gap-6 sm:p-6">
+      <div className="flex min-h-full min-w-0 flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-6">
         {/* HEADER */}
 
         <div className="flex shrink-0 flex-col gap-4">
@@ -948,7 +975,7 @@ export default function PromotionRoster() {
                 <Shield className="h-5 w-5 text-blue-500" />
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                   Promotion Roster
                 </h1>
@@ -1066,7 +1093,7 @@ export default function PromotionRoster() {
         {/* Filters */}
 
         <div className="rounded-xl border bg-card p-3 sm:p-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
             {/* Search */}
 
             <div className="relative min-w-0 flex-1">
@@ -1697,9 +1724,9 @@ export default function PromotionRoster() {
 
         {/* Roster */}
 
-        <div className="overflow-hidden rounded-xl border bg-card">
+        <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
           <div className="flex items-center justify-between border-b px-4 py-3">
-            <div>
+            <div className="min-w-0">
               <h2 className="font-medium">
                 {divisions.find(
                   (item) =>
@@ -1717,7 +1744,7 @@ export default function PromotionRoster() {
             </div>
 
             {selectedIds.length > 0 && (
-              <div className="text-xs text-muted-foreground">
+              <div className="shrink-0 text-xs text-muted-foreground">
                 {selectedIds.length} selected
               </div>
             )}
@@ -1760,102 +1787,373 @@ export default function PromotionRoster() {
             </div>
           ) : (
             <>
+              {/* Desktop roster */}
+
               <div className="hidden w-full min-w-0 overflow-hidden md:block">
-              <table className="w-full table-fixed text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-left">
-                    <th className="w-[3%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3">
-                      <Checkbox
-                        checked={
-                          allVisibleSelected
-                        }
-                        onCheckedChange={
-                          toggleAllVisible
-                        }
-                        aria-label="Select all visible members"
-                      />
-                    </th>
+                <table className="w-full table-fixed text-xs">
+                  <colgroup>
+                    <col className="w-[3%]" />
+                    <col className="w-[6%]" />
+                    <col className="w-[5%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[6%]" />
+                    <col className="w-[6%]" />
+                    <col className="w-[7%]" />
+                  </colgroup>
 
-                    <th className="w-[6%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Callsign
-                    </th>
-
-                    <th className="w-[5%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Badge
-                    </th>
-
-                    <th className="w-[8%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Name
-                    </th>
-
-                    <th className="w-[10%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Rank
-                    </th>
-
-                    <th className="w-[12%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Discord ID
-                    </th>
-
-                    <th className="w-[8%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Time in Dept
-                    </th>
-
-                    <th className="w-[8%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Time in Rank
-                    </th>
-
-                    <th className="w-[11%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Req Time in Rank
-                    </th>
-
-                    <th className="w-[13%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Req Logs
-                    </th>
-
-                    <th className="w-[6%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Req Hours
-                    </th>
-
-                    <th className="w-[6%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Activity
-                    </th>
-
-                    <th className="w-[8%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredMembers.map(
-                    (member) => {
-                      const selected =
-                        selectedIds.includes(
-                          member.discordId,
-                        )
-
-                      const StatusIcon =
-                        getStatusIcon(
-                          member.status,
-                        )
-
-                      return (
-                        <tr
-                          key={
-                            member.discordId ||
-                            `${member.badgeNumber}-${member.callsign}-${member.name}`
+                  <thead>
+                    <tr className="border-b bg-muted/30 text-left">
+                      <th className="overflow-hidden px-2 py-3">
+                        <Checkbox
+                          checked={
+                            allVisibleSelected
                           }
-                          className={`border-b last:border-0 transition-colors hover:bg-muted/20 ${
-                            selected
-                              ? "bg-blue-500/5"
-                              : ""
-                          }`}
-                        >
-                          <td className="min-w-0 overflow-hidden px-2 py-3">
+                          onCheckedChange={
+                            toggleAllVisible
+                          }
+                          aria-label="Select all visible members"
+                        />
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        Callsign
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        Badge
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        Name
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        Rank
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        Discord ID
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        <span className="block truncate">
+                          Time in Dept
+                        </span>
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        <span className="block truncate">
+                          Time in Rank
+                        </span>
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        <span className="block truncate">
+                          Required Time in Rank
+                        </span>
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        Required Logs
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        Req Hours
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        Activity
+                      </th>
+
+                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredMembers.map(
+                      (member) => {
+                        const selected =
+                          selectedIds.includes(
+                            member.discordId,
+                          )
+
+                        const StatusIcon =
+                          getStatusIcon(
+                            member.status,
+                          )
+
+                        return (
+                          <tr
+                            key={
+                              member.discordId ||
+                              `${member.badgeNumber}-${member.callsign}-${member.name}`
+                            }
+                            className={`border-b last:border-0 transition-colors hover:bg-muted/20 ${
+                              selected
+                                ? "bg-blue-500/5"
+                                : ""
+                            }`}
+                          >
+                            {/* Select */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle">
+                              <Checkbox
+                                checked={
+                                  selected
+                                }
+                                disabled={
+                                  !member.discordId
+                                }
+                                aria-label={`Select ${member.name}`}
+                                onPointerDown={(
+                                  event,
+                                ) => {
+                                  shiftSelectingRef.current =
+                                    event.shiftKey
+                                }}
+                                onCheckedChange={() => {
+                                  const shiftKey =
+                                    shiftSelectingRef.current
+
+                                  shiftSelectingRef.current =
+                                    false
+
+                                  handleMemberSelection(
+                                    member,
+                                    shiftKey,
+                                  )
+                                }}
+                              />
+                            </td>
+
+                            {/* Callsign */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle font-medium">
+                              <span className="block truncate">
+                                {member.callsign}
+                              </span>
+                            </td>
+
+                            {/* Badge */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle text-muted-foreground">
+                              <span className="block truncate">
+                                {member.badgeNumber}
+                              </span>
+                            </td>
+
+                            {/* Name */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle">
+                              <span className="block truncate">
+                                {member.name}
+                              </span>
+                            </td>
+
+                            {/* Rank */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle text-muted-foreground">
+                              <span
+                                className="block truncate"
+                                title={
+                                  member.rank
+                                }
+                              >
+                                {member.rank}
+                              </span>
+                            </td>
+
+                            {/* Discord */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger
+                                  asChild
+                                >
+                                  <button
+                                    type="button"
+                                    title={
+                                      member.discordId
+                                    }
+                                    className="block max-w-full truncate rounded-md px-1.5 py-1 font-mono text-[10px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+                                  >
+                                    {
+                                      member.discordId
+                                    }
+                                  </button>
+                                </DropdownMenuTrigger>
+
+                                <DropdownMenuContent align="start">
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      try {
+                                        await navigator.clipboard.writeText(
+                                          member.discordId,
+                                        )
+
+                                        toast.success(
+                                          "Discord ID copied",
+                                          {
+                                            description: `${member.name}'s Discord ID has been copied to your clipboard.`,
+                                          },
+                                        )
+                                      } catch {
+                                        toast.error(
+                                          "Copy failed",
+                                          {
+                                            description:
+                                              "Your browser could not access the clipboard.",
+                                          },
+                                        )
+                                      }
+                                    }}
+                                    className="gap-2"
+                                  >
+                                    <ClipboardList className="h-4 w-4" />
+
+                                    Copy User ID
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </td>
+
+                            {/* Time in Department */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle text-muted-foreground">
+                              <span className="block truncate">
+                                {member.timeInDept ||
+                                  "—"}
+                              </span>
+                            </td>
+
+                            {/* Time in Rank */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle text-muted-foreground">
+                              <span className="block truncate">
+                                {member.timeInRank ||
+                                  "—"}
+                              </span>
+                            </td>
+
+                            {/* Required Time in Rank */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle font-medium">
+                              <span className="block truncate">
+                                {
+                                  member.requiredTimeInRankDays
+                                }{" "}
+                                DAYS
+                              </span>
+                            </td>
+
+                            {/* Required Logs */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle">
+                              <div className="space-y-0.5 text-[11px] leading-4">
+                                <div className="whitespace-nowrap">
+                                  Trainings:{" "}
+                                  {
+                                    member.requiredTrainingLogs
+                                  }
+                                </div>
+
+                                {showRecruitmentLogs && (
+                                  <div className="whitespace-nowrap">
+                                    Recruitments/Ridealongs:{" "}
+                                    {
+                                      member.requiredRecruitmentLogs
+                                    }
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Required Hours */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle font-medium">
+                              <span className="block truncate">
+                                {member.requiredHours.toFixed(
+                                  1,
+                                )}
+                                h
+                              </span>
+                            </td>
+
+                            {/* Activity */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle font-medium">
+                              <span className="block truncate">
+                                {member.promotionHours.toFixed(
+                                  1,
+                                )}
+                                h
+                              </span>
+                            </td>
+
+                            {/* Status */}
+
+                            <td className="overflow-hidden px-2 py-3 align-middle">
+                              <div
+                                className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium ${getStatusClasses(
+                                  member.status,
+                                )}`}
+                              >
+                                <StatusIcon className="h-3 w-3 shrink-0" />
+
+                                <span className="truncate">
+                                  {getStatusLabel(
+                                    member.status,
+                                  )}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      },
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile roster cards */}
+
+              <div className="divide-y md:hidden">
+                {filteredMembers.map(
+                  (member) => {
+                    const selected =
+                      selectedIds.includes(
+                        member.discordId,
+                      )
+
+                    const StatusIcon =
+                      getStatusIcon(
+                        member.status,
+                      )
+
+                    return (
+                      <div
+                        key={
+                          member.discordId ||
+                          `${member.badgeNumber}-${member.callsign}-${member.name}`
+                        }
+                        className={`p-4 transition-colors ${
+                          selected
+                            ? "bg-blue-500/5"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="pt-0.5">
                             <Checkbox
-                              checked={
-                                selected
-                              }
+                              checked={selected}
                               disabled={
                                 !member.discordId
                               }
@@ -1879,331 +2177,215 @@ export default function PromotionRoster() {
                                 )
                               }}
                             />
-                          </td>
+                          </div>
 
-                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 font-medium">
-                            {member.callsign}
-                          </td>
-
-                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 text-muted-foreground">
-                            {member.badgeNumber}
-                          </td>
-
-                          <td className="min-w-0 overflow-hidden px-2 py-3">
-                            {member.name}
-                          </td>
-
-                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 text-muted-foreground">
-                            {member.rank}
-                          </td>
-
-                          <td className="min-w-0 overflow-hidden px-2 py-3">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger
-                                asChild
-                              >
-                                <button
-                                  type="button"
-                                  className="max-w-[180px] truncate rounded-md px-2 py-1 font-mono text-xs text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
-                                >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-foreground">
                                   {
-                                    member.discordId
+                                    member.callsign
                                   }
-                                </button>
-                              </DropdownMenuTrigger>
+                                </p>
 
-                              <DropdownMenuContent align="start">
-                                <DropdownMenuItem
-                                  onClick={async () => {
-                                    try {
-                                      await navigator.clipboard.writeText(
-                                        member.discordId,
-                                      )
+                                <p className="truncate text-sm text-muted-foreground">
+                                  {
+                                    member.name
+                                  }
+                                </p>
+                              </div>
 
-                                      toast.success(
-                                        "Discord ID copied",
-                                        {
-                                          description: `${member.name}'s Discord ID has been copied to your clipboard.`,
-                                        },
-                                      )
-                                    } catch {
-                                      toast.error(
-                                        "Copy failed",
-                                        {
-                                          description:
-                                            "Your browser could not access the clipboard.",
-                                        },
-                                      )
+                              <div
+                                className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium ${getStatusClasses(
+                                  member.status,
+                                )}`}
+                              >
+                                <StatusIcon className="h-3 w-3" />
+
+                                {getStatusLabel(
+                                  member.status,
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                              <div className="min-w-0">
+                                <p className="text-muted-foreground">
+                                  Badge
+                                </p>
+
+                                <p className="mt-0.5 truncate font-medium">
+                                  {
+                                    member.badgeNumber
+                                  }
+                                </p>
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="text-muted-foreground">
+                                  Rank
+                                </p>
+
+                                <p className="mt-0.5 truncate font-medium">
+                                  {
+                                    member.rank
+                                  }
+                                </p>
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="text-muted-foreground">
+                                  Promotion
+                                </p>
+
+                                <p className="mt-0.5 font-medium">
+                                  {member.promotionHours.toFixed(
+                                    1,
+                                  )}
+                                  h
+                                </p>
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="text-muted-foreground">
+                                  Req Hours
+                                </p>
+
+                                <p className="mt-0.5 font-medium">
+                                  {member.requiredHours.toFixed(
+                                    1,
+                                  )}
+                                  h
+                                </p>
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="text-muted-foreground">
+                                  Time in Dept
+                                </p>
+
+                                <p className="mt-0.5 truncate font-medium">
+                                  {
+                                    member.timeInDept ||
+                                    "—"
+                                  }
+                                </p>
+                              </div>
+
+                              {/* Fixed label */}
+
+                              <div className="min-w-0">
+                                <p className="text-muted-foreground">
+                                  Time in Rank
+                                </p>
+
+                                <p className="mt-0.5 truncate font-medium">
+                                  {
+                                    member.timeInRank ||
+                                    "—"
+                                  }
+                                </p>
+                              </div>
+
+                              {/* Required time */}
+
+                              <div className="min-w-0">
+                                <p className="text-muted-foreground">
+                                  Req Time in Rank
+                                </p>
+
+                                <p className="mt-0.5 font-medium">
+                                  {
+                                    member.requiredTimeInRankDays
+                                  }{" "}
+                                  DAYS
+                                </p>
+                              </div>
+
+                              {/* Required logs */}
+
+                              <div className="min-w-0">
+                                <p className="text-muted-foreground">
+                                  Req Logs
+                                </p>
+
+                                <div className="mt-0.5 space-y-0.5 font-medium leading-4">
+                                  <p>
+                                    Trainings:{" "}
+                                    {
+                                      member.requiredTrainingLogs
                                     }
-                                  }}
-                                  className="gap-2"
-                                >
-                                  <ClipboardList className="h-4 w-4" />
+                                  </p>
 
-                                  Copy User ID
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-
-                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 text-muted-foreground">
-                            {member.timeInDept}
-                          </td>
-
-                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 text-muted-foreground">
-                            {member.timeInRank || "—"}
-                          </td>
-
-                          <td className="whitespace-nowrap px-4 py-3">
-                            {member.requiredTimeInRankDays} DAYS
-                          </td>
-
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <div className="font-medium">
-                              Trainings: {member.requiredTrainingLogs}
-                              Recruitments/Ridealongs: {member.requiredRecruitmentLogs}
-                            </div>
-                          </td>
-
-                          <td className="min-w-0 overflow-hidden px-2 py-3">
-                            {member.requiredHours.toFixed(
-                              1,
-                            )}
-                            h
-                          </td>
-
-                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 font-medium">
-                            {member.promotionHours.toFixed(
-                              1,
-                            )}
-                            h
-                          </td>
-
-                          <td className="min-w-0 overflow-hidden px-2 py-3">
-                            <div
-                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusClasses(
-                                member.status,
-                              )}`}
-                            >
-                              <StatusIcon className="h-3.5 w-3.5" />
-
-                              {getStatusLabel(
-                                member.status,
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    },
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile roster cards */}
-            <div className="divide-y md:hidden">
-              {filteredMembers.map((member) => {
-                const selected =
-                  selectedIds.includes(
-                    member.discordId,
-                  )
-
-                const StatusIcon =
-                  getStatusIcon(
-                    member.status,
-                  )
-
-                return (
-                  <div
-                    key={
-                      member.discordId ||
-                      `${member.badgeNumber}-${member.callsign}-${member.name}`
-                    }
-                    className={`p-4 transition-colors ${
-                      selected
-                        ? "bg-blue-500/5"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="pt-0.5">
-                        <Checkbox
-                          checked={selected}
-                          disabled={!member.discordId}
-                          aria-label={`Select ${member.name}`}
-                          onPointerDown={(
-                            event,
-                          ) => {
-                            shiftSelectingRef.current =
-                              event.shiftKey
-                          }}
-                          onCheckedChange={() => {
-                            const shiftKey =
-                              shiftSelectingRef.current
-
-                            shiftSelectingRef.current =
-                              false
-
-                            handleMemberSelection(
-                              member,
-                              shiftKey,
-                            )
-                          }}
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-foreground">
-                              {member.callsign}
-                            </p>
-
-                            <p className="truncate text-sm text-muted-foreground">
-                              {member.name}
-                            </p>
-                          </div>
-
-                          <div
-                            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium ${getStatusClasses(
-                              member.status,
-                            )}`}
-                          >
-                            <StatusIcon className="h-3 w-3" />
-                            {getStatusLabel(
-                              member.status,
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                          <div className="min-w-0">
-                            <p className="text-muted-foreground">
-                              Badge
-                            </p>
-                            <p className="mt-0.5 truncate font-medium">
-                              {member.badgeNumber}
-                            </p>
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="text-muted-foreground">
-                              Rank
-                            </p>
-                            <p className="mt-0.5 truncate font-medium">
-                              {member.rank}
-                            </p>
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="text-muted-foreground">
-                              Promotion
-                            </p>
-                            <p className="mt-0.5 font-medium">
-                              {member.promotionHours.toFixed(1)}h
-                            </p>
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="text-muted-foreground">
-                              Req Hours
-                            </p>
-                            <p className="mt-0.5 font-medium">
-                              {member.requiredHours.toFixed(1)}h
-                            </p>
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="text-muted-foreground">
-                              Time in Dept
-                            </p>
-                            <p className="mt-0.5 truncate font-medium">
-                              {member.timeInDept || "—"}
-                            </p>
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="text-muted-foreground">
-                              Req Time in Rank
-                            </p>
-                            <p className="mt-0.5 truncate font-medium">
-                              {member.timeInRank || "—"}
-                            </p>
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="text-muted-foreground">
-                              Req Time in Rank
-                            </p>
-                            <p className="mt-0.5 font-medium">
-                              {member.requiredTimeInRankDays} DAYS
-                            </p>
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="text-muted-foreground">
-                              Req Logs
-                            </p>
-                            <p className="mt-0.5 font-medium">
-                              Trainings: {member.requiredTrainingLogs}
-                              Recruitments/Ridealongs: {member.requiredRecruitmentLogs}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex min-w-0 items-center gap-2">
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            Discord
-                          </span>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                type="button"
-                                className="min-w-0 max-w-[calc(100%-60px)] truncate rounded-md px-2 py-1 font-mono text-[11px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
-                              >
-                                {member.discordId}
-                              </button>
-                            </DropdownMenuTrigger>
-
-                            <DropdownMenuContent align="start">
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  try {
-                                    await navigator.clipboard.writeText(
-                                      member.discordId,
-                                    )
-
-                                    toast.success(
-                                      "Discord ID copied",
+                                  {showRecruitmentLogs && (
+                                    <p>
+                                      Recruitments/Ridealongs:{" "}
                                       {
-                                        description: `${member.name}'s Discord ID has been copied to your clipboard.`,
-                                      },
-                                    )
-                                  } catch {
-                                    toast.error(
-                                      "Copy failed",
-                                      {
-                                        description:
-                                          "Your browser could not access the clipboard.",
-                                      },
-                                    )
-                                  }
-                                }}
-                                className="gap-2"
-                              >
-                                <ClipboardList className="h-4 w-4" />
-                                Copy User ID
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                        member.requiredRecruitmentLogs
+                                      }
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex min-w-0 items-center gap-2">
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                Discord
+                              </span>
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="min-w-0 max-w-[calc(100%-60px)] truncate rounded-md px-2 py-1 font-mono text-[11px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+                                  >
+                                    {
+                                      member.discordId
+                                    }
+                                  </button>
+                                </DropdownMenuTrigger>
+
+                                <DropdownMenuContent align="start">
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      try {
+                                        await navigator.clipboard.writeText(
+                                          member.discordId,
+                                        )
+
+                                        toast.success(
+                                          "Discord ID copied",
+                                          {
+                                            description: `${member.name}'s Discord ID has been copied to your clipboard.`,
+                                          },
+                                        )
+                                      } catch {
+                                        toast.error(
+                                          "Copy failed",
+                                          {
+                                            description:
+                                              "Your browser could not access the clipboard.",
+                                          },
+                                        )
+                                      }
+                                    }}
+                                    className="gap-2"
+                                  >
+                                    <ClipboardList className="h-4 w-4" />
+
+                                    Copy User ID
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                    )
+                  },
+                )}
+              </div>
             </>
           )}
         </div>
