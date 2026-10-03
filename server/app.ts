@@ -26,14 +26,6 @@ import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
 import { randomUUID } from "node:crypto"
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    files: 20,
-    fileSize: 100 * 1024 * 1024,
-  },
-})
-
 // Gallery uploads use disk-backed temporary storage so large videos are not
 // kept in RAM while they are being copied into MongoDB GridFS.
 const GALLERY_UPLOAD_DIR = path.join(
@@ -654,6 +646,14 @@ function getGalleryFileType(
   }
 
   return null
+}
+
+async function getGalleryBucket() {
+  const db = await getMongoDb()
+
+  return new GridFSBucket(db, {
+    bucketName: "galleryFiles",
+  })
 }
 
 function getGalleryContentType(
