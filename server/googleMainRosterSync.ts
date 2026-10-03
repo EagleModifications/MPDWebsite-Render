@@ -1,7 +1,6 @@
 import { google } from "googleapis"
 
 import { getMongoDb } from "../src/lib/mongodb"
-import { env } from "./config"
 
 /* ─────────────────────────────────────────────
    Types
@@ -82,13 +81,28 @@ export type MainRosterData = {
    Google configuration
 ───────────────────────────────────────────── */
 
+function getRequiredEnv(name: string): string {
+  const value = process.env[name]?.trim()
+
+  if (!value) {
+    throw new Error(`${name} is not configured.`)
+  }
+
+  return value
+}
 
 function getGoogleSheetsClient() {
-  const clientEmail = env.googleServiceAccountEmail
+  const clientEmail = getRequiredEnv(
+    "GOOGLE_SERVICE_ACCOUNT_EMAIL",
+  )
 
-  const privateKey = env.googlePrivateKey
+  const privateKey = getRequiredEnv(
+    "GOOGLE_PRIVATE_KEY",
+  ).replace(/\\n/g, "\n")
 
-  const spreadsheetId = env.googleSheetId
+  const spreadsheetId = getRequiredEnv(
+    "GOOGLE_SHEET_ID",
+  )
 
   const auth = new google.auth.GoogleAuth({
     credentials: {
@@ -193,15 +207,94 @@ function nonEmptyRows(
    Google → raw rows
 ───────────────────────────────────────────── */
 
+function normalizeSheetTitle(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+}
+
+async function resolveSheetNames(
+  sheets: ReturnType<typeof getGoogleSheetsClient>["sheets"],
+  spreadsheetId: string,
+  requestedNames: string[],
+): Promise<Record<string, string>> {
+  const response =
+    await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: "sheets.properties.title",
+    })
+
+  const availableTitles = (
+    response.data.sheets ?? []
+  )
+    .map((sheet) => sheet.properties?.title)
+    .filter((title): title is string =>
+      typeof title === "string" && title.trim() !== "",
+    )
+
+  const resolved: Record<string, string> = {}
+
+  for (const requestedName of requestedNames) {
+    const trimmedRequested = requestedName.trim()
+
+    // Prefer an exact title match first.
+    const exact = availableTitles.find(
+      (title) => title === trimmedRequested,
+    )
+
+    if (exact) {
+      resolved[requestedName] = exact
+      continue
+    }
+
+    // Then tolerate accidental leading/trailing/duplicate spaces and
+    // capitalization differences in the Render environment variable.
+    const normalizedRequested =
+      normalizeSheetTitle(trimmedRequested)
+
+    const normalizedMatches =
+      availableTitles.filter(
+        (title) =>
+          normalizeSheetTitle(title) ===
+          normalizedRequested,
+      )
+
+    if (normalizedMatches.length === 1) {
+      resolved[requestedName] =
+        normalizedMatches[0]
+      continue
+    }
+
+    if (normalizedMatches.length > 1) {
+      throw new Error(
+        `Google Sheet tab \"${trimmedRequested}\" is ambiguous. Matching tabs: ${normalizedMatches.join(
+          ", ",
+        )}.`,
+      )
+    }
+
+    throw new Error(
+      `Google Sheet tab \"${trimmedRequested}\" was not found. Available tabs: ${availableTitles.join(
+        ", ",
+      ) || \"none\"}.`,
+    )
+  }
+
+  return resolved
+}
+
 async function getSheetValues(
   sheets: ReturnType<typeof getGoogleSheetsClient>["sheets"],
   spreadsheetId: string,
   sheetName: string,
 ): Promise<unknown[][]> {
+  // Passing the sheet title by itself asks Sheets for the complete used
+  // range and avoids brittle A1 ranges such as \'Employee Database\'!A:ZZ.
   const response =
     await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${sheetName}'!A:ZZ`,
+      range: sheetName,
       majorDimension: "ROWS",
     })
 
@@ -757,16 +850,57 @@ function parseHome(
 export async function syncGoogleMainRoster() {
   const startedAt = Date.now()
 
-  const {
-    homeSheet,
-    departmentSheet,
-    employeeSheet,
-    vehicleSheet,
-    uniformSheet,
-  } = env.mainRoster
+  const departmentSheet =
+    getRequiredEnv(
+      "GOOGLE_MAIN_ROSTER_DEPARTMENT_SHEET",
+    )
+
+  const employeeSheet =
+    getRequiredEnv(
+      "GOOGLE_MAIN_ROSTER_EMPLOYEE_SHEET",
+    )
+
+  const uniformSheet =
+    getRequiredEnv(
+      "GOOGLE_MAIN_ROSTER_UNIFORM_SHEET",
+    )
+
+  const vehicleSheet =
+    getRequiredEnv(
+      "GOOGLE_MAIN_ROSTER_VEHICLE_SHEET",
+    )
+
+  const homeSheet =
+    getRequiredEnv(
+      "GOOGLE_MAIN_ROSTER_HOME_SHEET",
+    )
 
   const { sheets, spreadsheetId } =
     getGoogleSheetsClient()
+
+  const resolvedSheets =
+    await resolveSheetNames(
+      sheets,
+      spreadsheetId,
+      [
+        departmentSheet,
+        employeeSheet,
+        uniformSheet,
+        vehicleSheet,
+        homeSheet,
+      ],
+    )
+
+  const resolvedDepartmentSheet =
+    resolvedSheets[departmentSheet]
+  const resolvedEmployeeSheet =
+    resolvedSheets[employeeSheet]
+  const resolvedUniformSheet =
+    resolvedSheets[uniformSheet]
+  const resolvedVehicleSheet =
+    resolvedSheets[vehicleSheet]
+  const resolvedHomeSheet =
+    resolvedSheets[homeSheet]
 
   const [
     departmentRows,
@@ -778,52 +912,52 @@ export async function syncGoogleMainRoster() {
     getSheetValues(
       sheets,
       spreadsheetId,
-      departmentSheet,
+      resolvedDepartmentSheet,
     ),
     getSheetValues(
       sheets,
       spreadsheetId,
-      employeeSheet,
+      resolvedEmployeeSheet,
     ),
     getSheetValues(
       sheets,
       spreadsheetId,
-      uniformSheet,
+      resolvedUniformSheet,
     ),
     getSheetValues(
       sheets,
       spreadsheetId,
-      vehicleSheet,
+      resolvedVehicleSheet,
     ),
     getSheetValues(
       sheets,
       spreadsheetId,
-      homeSheet,
+      resolvedHomeSheet,
     ),
   ])
 
   const department =
     parseDepartment(
       departmentRows,
-      departmentSheet,
+      resolvedDepartmentSheet,
     )
 
   const employees =
     parseEmployees(
       employeeRows,
-      employeeSheet,
+      resolvedEmployeeSheet,
     )
 
   const vehicles =
     parseVehicles(
       vehicleRows,
-      vehicleSheet,
+      resolvedVehicleSheet,
     )
 
   const uniforms =
     parseUniforms(
       uniformRows,
-      uniformSheet,
+      resolvedUniformSheet,
     )
 
   const home =
@@ -887,11 +1021,11 @@ export async function syncGoogleMainRoster() {
       uniforms: uniforms.length,
     },
     sheets: {
-      home: homeSheet,
-      department: departmentSheet,
-      employees: employeeSheet,
-      vehicles: vehicleSheet,
-      uniforms: uniformSheet,
+      home: resolvedHomeSheet,
+      department: resolvedDepartmentSheet,
+      employees: resolvedEmployeeSheet,
+      vehicles: resolvedVehicleSheet,
+      uniforms: resolvedUniformSheet,
     },
     updatedAt:
       roster.updatedAt.toISOString(),
