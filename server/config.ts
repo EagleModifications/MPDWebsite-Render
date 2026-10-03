@@ -54,25 +54,28 @@ export const env = {
   // Master Roster Google Sheets
   // ─────────────────────────────────────────────
 
+  // These names are deliberately separate from the existing division
+  // roster import setting above. The Main Roster sync reads these exact
+  // sheet-tab names from the environment and uses safe defaults locally.
   mainRoster: {
     homeSheet:
-      process.env.GOOGLE_SHEET_MAIN_HOME ??
+      process.env.GOOGLE_MAIN_ROSTER_HOME_SHEET ??
       "MPD | Home",
 
     departmentSheet:
-      process.env.GOOGLE_SHEET_MAIN_DEPARTMENT ??
+      process.env.GOOGLE_MAIN_ROSTER_DEPARTMENT_SHEET ??
       "Department Roster",
 
     employeeSheet:
-      process.env.GOOGLE_SHEET_MAIN_EMPLOYEES ??
+      process.env.GOOGLE_MAIN_ROSTER_EMPLOYEE_SHEET ??
       "Employee Database",
 
     vehicleSheet:
-      process.env.GOOGLE_SHEET_MAIN_VEHICLES ??
+      process.env.GOOGLE_MAIN_ROSTER_VEHICLE_SHEET ??
       "Vehicle Roster",
 
     uniformSheet:
-      process.env.GOOGLE_SHEET_MAIN_UNIFORMS ??
+      process.env.GOOGLE_MAIN_ROSTER_UNIFORM_SHEET ??
       "Uniform Roster",
   },
 
