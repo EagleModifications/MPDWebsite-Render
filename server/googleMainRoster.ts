@@ -337,6 +337,15 @@ export async function getMainRosterSheet(
     rawRows.push(rawRow)
   }
 
+  const maxRenderedRows = Math.max(
+    cells.length,
+    1,
+  )
+  const maxRenderedColumns = Math.max(
+    ...cells.map((row) => row.length),
+    1,
+  )
+
   const rowHeights: number[] = []
   const hiddenRows: number[] = []
   for (let i = 0; i < rowData.length; i += 1) {
@@ -359,15 +368,6 @@ export async function getMainRosterSheet(
     startColumn: Number(merge.startColumn ?? 0),
     endColumn: Number(merge.endColumn ?? 0),
   }))
-
-  const maxRenderedRows = Math.max(
-    cells.length,
-    1,
-  )
-  const maxRenderedColumns = Math.max(
-    ...cells.map((row) => row.length),
-    1,
-  )
 
   const paddedCells: MainRosterCell[][] = Array.from(
     { length: maxRenderedRows },
