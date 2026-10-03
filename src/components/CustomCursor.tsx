@@ -45,7 +45,7 @@ export default function CustomCursor() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[99999]"
+      className="pointer-events-none fixed z-[2147483647]"
       style={{
         left: cursor.x,
         top: cursor.y,
