@@ -1864,7 +1864,7 @@ export default function PromotionRoster() {
                       </th>
 
                       <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
-                        Req Hours
+                        Required Hours
                       </th>
 
                       <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
@@ -2248,7 +2248,7 @@ export default function PromotionRoster() {
 
                               <div className="min-w-0">
                                 <p className="text-muted-foreground">
-                                  Req Hours
+                                  Required Hours
                                 </p>
 
                                 <p className="mt-0.5 font-medium">
