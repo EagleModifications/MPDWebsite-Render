@@ -775,7 +775,7 @@ export default function PromotionRoster() {
               member.discordId,
               member.timeInDept,
               member.timeInRank,
-              `${member.requiredTimeInRankDays}d`,
+              `${member.requiredTimeInRankDays} DAYS`,
               `${member.requiredLogs} logs`,
               `${member.requiredTrainingLogs} training`,
               `${member.requiredRecruitmentLogs} recruitment/ridealong`,
@@ -1760,11 +1760,11 @@ export default function PromotionRoster() {
             </div>
           ) : (
             <>
-              <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[1500px] text-sm">
+              <div className="hidden w-full min-w-0 overflow-hidden md:block">
+              <table className="w-full table-fixed text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30 text-left">
-                    <th className="w-12 whitespace-nowrap px-4 py-3">
+                    <th className="w-[3%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3">
                       <Checkbox
                         checked={
                           allVisibleSelected
@@ -1776,51 +1776,51 @@ export default function PromotionRoster() {
                       />
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[6%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Callsign
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[5%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Badge
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[8%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Name
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[10%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Rank
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[12%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Discord ID
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[8%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Time in Dept
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[8%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Time in Rank
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[11%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Required Time in Rank
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[13%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Required Logs
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[6%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Required
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[6%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Activity
                     </th>
 
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
+                    <th className="w-[8%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
                       Status
                     </th>
                   </tr>
@@ -1851,7 +1851,7 @@ export default function PromotionRoster() {
                               : ""
                           }`}
                         >
-                          <td className="px-4 py-3">
+                          <td className="min-w-0 overflow-hidden px-2 py-3">
                             <Checkbox
                               checked={
                                 selected
@@ -1881,23 +1881,23 @@ export default function PromotionRoster() {
                             />
                           </td>
 
-                          <td className="px-4 py-3 font-medium">
+                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 font-medium">
                             {member.callsign}
                           </td>
 
-                          <td className="px-4 py-3 text-muted-foreground">
+                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 text-muted-foreground">
                             {member.badgeNumber}
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="min-w-0 overflow-hidden px-2 py-3">
                             {member.name}
                           </td>
 
-                          <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 text-muted-foreground">
                             {member.rank}
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="min-w-0 overflow-hidden px-2 py-3">
                             <DropdownMenu>
                               <DropdownMenuTrigger
                                 asChild
@@ -1946,42 +1946,42 @@ export default function PromotionRoster() {
                             </DropdownMenu>
                           </td>
 
-                          <td className="px-4 py-3 text-muted-foreground">
+                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 text-muted-foreground">
                             {member.timeInDept}
                           </td>
 
-                          <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 text-muted-foreground">
                             {member.timeInRank || "—"}
                           </td>
 
                           <td className="whitespace-nowrap px-4 py-3">
-                            {member.requiredTimeInRankDays}d
+                            {member.requiredTimeInRankDays} DAYS
                           </td>
 
                           <td className="whitespace-nowrap px-4 py-3">
                             <div className="font-medium">
                               {member.requiredLogs}
                             </div>
-                            <div className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">
+                            <div className="mt-0.5 block max-w-full truncate text-xs text-muted-foreground">
                               {member.requiredTrainingLogs} training · {member.requiredRecruitmentLogs} recruitment/ridealong
                             </div>
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="min-w-0 overflow-hidden px-2 py-3">
                             {member.requiredHours.toFixed(
                               1,
                             )}
                             h
                           </td>
 
-                          <td className="px-4 py-3 font-medium">
+                          <td className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 py-3 font-medium">
                             {member.promotionHours.toFixed(
                               1,
                             )}
                             h
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="min-w-0 overflow-hidden px-2 py-3">
                             <div
                               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusClasses(
                                 member.status,
@@ -2138,7 +2138,7 @@ export default function PromotionRoster() {
                               Required Time in Rank
                             </p>
                             <p className="mt-0.5 font-medium">
-                              {member.requiredTimeInRankDays}d
+                              {member.requiredTimeInRankDays} DAYS
                             </p>
                           </div>
 
