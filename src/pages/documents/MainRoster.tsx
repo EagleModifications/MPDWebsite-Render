@@ -1,524 +1,895 @@
 import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react"
+import {
+  Car,
+  CheckCircle2,
+  ClipboardList,
+  FileSpreadsheet,
+  RefreshCw,
   Search,
   Shield,
-  Users,
-  Car,
   Shirt,
-  Home,
-  Database,
-  ChevronDown,
-  Filter,
-  X,
+  Users,
+  XCircle,
+  type LucideIcon,
 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 
-type TabId =
+type MainRosterPage =
   | "home"
   | "department"
   | "employees"
   | "vehicles"
   | "uniforms"
 
-type Tab = {
-  id: TabId
-  label: string
-  icon: typeof Home
-  gid: string
-  searchable?: boolean
-  filters?: boolean
+type MainRosterDepartmentMember = {
+  section: string
+  callsign: string
+  badgeNumber: string
+  name: string
+  insignia: string
+  rank: string
+  jobDescription: string
+  timeInDept: string
+  timeInRank: string
+  status: string
+  strike1: boolean
+  strike2: boolean
+  discordId: string
+  hoursThisMonth: string
 }
 
-/*
- * IMPORTANT:
- *
- * This is the PUBLISHED Google Sheets URL.
- *
- * Do NOT use the normal spreadsheet ID here.
- */
-const PUBLISHED_SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDo_yVusgQRYUpyDhfNnkBrJXPaNXAbSYvfndxC14IcKjVp9-8wDnOCb8_AGCsgRYLNeXyWzgimNuL/pubhtml"
+type MainRosterEmployee = {
+  sendMessage: string
+  badgeNumber: string
+  name: string
+  discordId: string
+  departmentStatus: string
+  rank: string
+  timezone: string
+  joinDeptDate: string
+  promoDate: string
+  strike1: boolean
+  strike2: boolean
+  callsign: string
+  timeInDept: string
+  terminated: boolean
+  loa: boolean
+  resigned: boolean
+  thisMonthHours: string
+  lastMonthHours: string
+}
 
-const tabs: Tab[] = [
-  {
-    id: "home",
-    label: "Home",
-    icon: Home,
-    gid: "1932029060",
-  },
-  {
-    id: "department",
-    label: "Department Roster",
-    icon: Users,
-    gid: "1093680513",
-    searchable: true,
-    filters: true,
-  },
-  {
-    id: "employees",
-    label: "Employee Database",
-    icon: Database,
-    gid: "1598052317",
-    searchable: true,
-    filters: true,
-  },
-  {
-    id: "vehicles",
-    label: "Vehicle Roster",
-    icon: Car,
-    gid: "1772848021",
-  },
-  {
-    id: "uniforms",
-    label: "Uniform Roster",
-    icon: Shirt,
-    gid: "1693514661",
-  },
+type MainRosterVehicle = {
+  rank: string
+  vehicleName: string
+  spawncode: string
+  requiredExtras: string
+  livery: string
+  windowTint: string
+  turbo: boolean
+  slicktopOptional: boolean
+  unmarkedAllowed: boolean
+}
+
+type MainRosterUniform = {
+  rank: string
+  className: string
+  sharedOutfitCode: string
+}
+
+type MainRosterHome = {
+  headers: string[]
+  rows: string[][]
+}
+
+type MainRosterData = {
+  type: "main"
+  home: MainRosterHome
+  department: MainRosterDepartmentMember[]
+  employees: MainRosterEmployee[]
+  vehicles: MainRosterVehicle[]
+  uniforms: MainRosterUniform[]
+  updatedAt: string | Date
+}
+
+type MainRosterResponse = {
+  success: boolean
+  roster?: MainRosterData
+  error?: string
+}
+
+const pages: {
+  id: MainRosterPage
+  label: string
+  icon: LucideIcon
+}[] = [
+  { id: "home", label: "MPD Home", icon: FileSpreadsheet },
+  { id: "department", label: "Department Roster", icon: Shield },
+  { id: "employees", label: "Employee Data", icon: Users },
+  { id: "vehicles", label: "Vehicle Roster", icon: Car },
+  { id: "uniforms", label: "Uniform Roster", icon: Shirt },
 ]
 
-/*
- * These are currently UI filters.
- *
- * The Google Sheet itself is inside a cross-origin iframe,
- * so React cannot directly filter its rows.
- *
- * If you want these to actually filter the roster data,
- * the Department Roster and Employee Database need to be
- * loaded through your Google Sheets API/server endpoint
- * instead of an iframe.
- */
-const filterOptions = [
-  {
-    id: "active",
-    label: "Active",
-  },
-  {
-    id: "inactive",
-    label: "Inactive",
-  },
-]
+function displayValue(value: unknown): string {
+  if (value === null || value === undefined) return "—"
+
+  const text = String(value).trim()
+
+  if (
+    !text ||
+    text === "-" ||
+    text === "—" ||
+    text.toLowerCase() === "null" ||
+    text.toLowerCase() === "undefined"
+  ) {
+    return "—"
+  }
+
+  return text
+}
+
+function formatUpdatedAt(value: string | Date | undefined): string {
+  if (!value) return "Unknown"
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) return "Unknown"
+
+  return date.toLocaleString()
+}
+
+function statusClasses(status: string): string {
+  const value = status.trim().toLowerCase()
+
+  if (
+    value === "active" ||
+    value === "compliant" ||
+    value === "approved" ||
+    value === "current"
+  ) {
+    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+  }
+
+  if (
+    value === "terminated" ||
+    value === "resigned" ||
+    value === "inactive" ||
+    value === "suspended"
+  ) {
+    return "border-red-500/20 bg-red-500/10 text-red-400"
+  }
+
+  if (value === "loa" || value === "leave") {
+    return "border-amber-500/20 bg-amber-500/10 text-amber-400"
+  }
+
+  return "border-border bg-muted/50 text-muted-foreground"
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const value = status.trim().toLowerCase()
+
+  const Icon =
+    value === "active" ||
+    value === "compliant" ||
+    value === "approved" ||
+    value === "current"
+      ? CheckCircle2
+      : value === "terminated" ||
+          value === "resigned" ||
+          value === "inactive" ||
+          value === "suspended"
+        ? XCircle
+        : null
+
+  return (
+    <span
+      className={[
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
+        statusClasses(status),
+      ].join(" ")}
+    >
+      {Icon && <Icon className="h-3.5 w-3.5" />}
+      {displayValue(status)}
+    </span>
+  )
+}
+
+function BooleanBadge({ value }: { value: boolean }) {
+  return (
+    <span
+      className={[
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
+        value
+          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+          : "border-border bg-muted/50 text-muted-foreground",
+      ].join(" ")}
+    >
+      {value ? "Yes" : "No"}
+    </span>
+  )
+}
 
 export default function MainRoster() {
-  const [activeTab, setActiveTab] =
-    useState<TabId>("home")
+  const [page, setPage] = useState<MainRosterPage>("home")
+  const [roster, setRoster] = useState<MainRosterData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
 
-  const [search, setSearch] =
-    useState("")
+  const loadRoster = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true)
 
-  const [filters, setFilters] =
-    useState<string[]>([])
+    setError(null)
 
-  const activeTabData = useMemo(
-    () =>
-      tabs.find(
-        (tab) => tab.id === activeTab,
-      ) ?? tabs[0],
-    [activeTab],
-  )
+    try {
+      const response = await fetch("/api/main-roster", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+        },
+      })
 
-  const ActiveIcon = activeTabData.icon
+      const data = (await response.json().catch(() => null)) as
+        | MainRosterResponse
+        | null
 
-  /*
-   * Google published-sheet embed.
-   *
-   * gid       = selected worksheet
-   * single    = only selected worksheet
-   * widget    = false removes Google sheet tabs
-   * headers   = false removes Google row/column headers
-   * chrome    = false removes Google title/footer UI
-   */
-  const embedUrl = useMemo(() => {
-    const params = new URLSearchParams({
-      gid: activeTabData.gid,
-      single: "true",
-      widget: "false",
-      headers: "false",
-      chrome: "false",
-    })
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            `Failed to load Main Roster (${response.status}).`,
+        )
+      }
 
-    return `${PUBLISHED_SHEET_URL}?${params.toString()}`
-  }, [activeTabData.gid])
+      if (!data?.success || !data.roster) {
+        throw new Error(
+          data?.error || "Main Roster data was not returned by the server.",
+        )
+      }
 
-  const hasFilters =
-    Boolean(search.trim()) ||
-    filters.length > 0
+      setRoster(data.roster)
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load Main Roster."
 
-  const toggleFilter = (
-    filter: string,
-  ) => {
-    setFilters((current) =>
-      current.includes(filter)
-        ? current.filter(
-            (item) => item !== filter,
-          )
-        : [...current, filter],
+      setRoster(null)
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadRoster()
+  }, [loadRoster])
+
+  const refreshRoster = useCallback(async () => {
+    if (refreshing) return
+
+    setRefreshing(true)
+    setError(null)
+
+    try {
+      toast.info("Synchronizing Main Roster", {
+        description: "Fetching the latest data from Google Sheets.",
+      })
+
+      const response = await fetch("/api/import/google/main-roster", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+        },
+      })
+
+      const data = (await response.json().catch(() => null)) as
+        | { success?: boolean; error?: string }
+        | null
+
+      if (!response.ok || data?.success === false) {
+        throw new Error(
+          data?.error ||
+            `Roster synchronization failed (${response.status}).`,
+        )
+      }
+
+      await loadRoster(false)
+
+      toast.success("Main Roster refreshed", {
+        description: "The latest Google Sheets data has been loaded.",
+      })
+    } catch (refreshError) {
+      const message =
+        refreshError instanceof Error
+          ? refreshError.message
+          : "Failed to refresh the Main Roster."
+
+      setError(message)
+
+      toast.error("Refresh failed", {
+        description: message,
+      })
+    } finally {
+      setRefreshing(false)
+    }
+  }, [loadRoster, refreshing])
+
+  const query = search.trim().toLowerCase()
+
+  const department = useMemo(() => {
+    const rows = roster?.department ?? []
+    if (!query) return rows
+
+    return rows.filter((member) =>
+      [
+        member.section,
+        member.callsign,
+        member.badgeNumber,
+        member.name,
+        member.insignia,
+        member.rank,
+        member.jobDescription,
+        member.status,
+        member.discordId,
+        member.hoursThisMonth,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
     )
-  }
+  }, [roster, query])
 
-  const clearFilters = () => {
-    setSearch("")
-    setFilters([])
-  }
+  const employees = useMemo(() => {
+    const rows = roster?.employees ?? []
+    if (!query) return rows
 
-  const changeTab = (tab: TabId) => {
-    setActiveTab(tab)
-    setSearch("")
-    setFilters([])
-  }
+    return rows.filter((employee) =>
+      [
+        employee.sendMessage,
+        employee.badgeNumber,
+        employee.name,
+        employee.discordId,
+        employee.departmentStatus,
+        employee.rank,
+        employee.timezone,
+        employee.joinDeptDate,
+        employee.promoDate,
+        employee.callsign,
+        employee.timeInDept,
+        employee.thisMonthHours,
+        employee.lastMonthHours,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    )
+  }, [roster, query])
+
+  const vehicles = useMemo(() => {
+    const rows = roster?.vehicles ?? []
+    if (!query) return rows
+
+    return rows.filter((vehicle) =>
+      [
+        vehicle.rank,
+        vehicle.vehicleName,
+        vehicle.spawncode,
+        vehicle.requiredExtras,
+        vehicle.livery,
+        vehicle.windowTint,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    )
+  }, [roster, query])
+
+  const uniforms = useMemo(() => {
+    const rows = roster?.uniforms ?? []
+    if (!query) return rows
+
+    return rows.filter((uniform) =>
+      [
+        uniform.rank,
+        uniform.className,
+        uniform.sharedOutfitCode,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    )
+  }, [roster, query])
+
+  const pageInfo = pages.find((item) => item.id === page) ?? pages[0]
+  const PageIcon = pageInfo.icon
 
   return (
     <DashboardLayout>
-      <div className="flex min-h-full min-w-0 flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-6">
-
-        {/* PAGE HEADER */}
-        <div className="flex shrink-0 flex-col gap-4">
-
-          <div className="flex items-center gap-3">
-
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-              <Shield className="h-5 w-5 text-blue-500" />
+      <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden">
+        <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10">
+              <ClipboardList className="h-5 w-5 text-blue-500" />
             </div>
 
             <div className="min-w-0">
-
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              <h1 className="text-3xl font-bold tracking-tight">
                 Main Roster
               </h1>
-
-              <p className="text-sm text-muted-foreground">
-                View department personnel, employee,
-                vehicle and uniform roster information.
+              <p className="mt-1 text-sm text-muted-foreground">
+                Metro Police Department master roster and operational data.
               </p>
-
             </div>
           </div>
 
-          {/* TABS */}
-          <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-
-            <div className="inline-flex min-w-full items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1 sm:min-w-0">
-
-              {tabs.map((tab) => {
-                const active =
-                  activeTab === tab.id
-
-                const Icon = tab.icon
-
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() =>
-                      changeTab(tab.id)
-                    }
-                    className={
-                      active
-                        ? "inline-flex shrink-0 items-center gap-2 rounded-md bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-500 shadow-sm transition-colors sm:px-4 sm:text-sm"
-                        : "inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground sm:px-4 sm:text-sm"
-                    }
-                  >
-                    <Icon className="h-4 w-4" />
-
-                    {tab.label}
-                  </button>
-                )
-              })}
-
-            </div>
-          </div>
-        </div>
-
-        {/* CONTENT CARD */}
-        <div className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
-
-          {/* CARD HEADER */}
-          <div className="border-b border-border/60 bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-5">
-
-            <div className="flex min-w-0 items-center gap-3">
-
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-                <ActiveIcon className="h-4 w-4 text-blue-500" />
-              </div>
-
-              <div className="min-w-0">
-
-                <h2 className="truncate font-medium">
-                  {activeTabData.label}
-                </h2>
-
-                <p className="truncate text-xs text-muted-foreground">
-                  Google Sheets
-                </p>
-
-              </div>
-
-            </div>
-          </div>
-
-          {/* SEARCH / FILTERS */}
-          {(activeTabData.searchable ||
-            activeTabData.filters) && (
-            <div className="border-b border-border/60 bg-card p-3 sm:p-4">
-
-              <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
-
-                {/* SEARCH */}
-                {activeTabData.searchable && (
-                  <div className="relative min-w-0 flex-1">
-
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
-                    <input
-                      type="text"
-                      value={search}
-                      onChange={(event) =>
-                        setSearch(
-                          event.target.value,
-                        )
-                      }
-                      placeholder={
-                        activeTabData.id ===
-                        "employees"
-                          ? "Search employees..."
-                          : "Search roster..."
-                      }
-                      className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-
-                  </div>
-                )}
-
-                {/* FILTER */}
-                {activeTabData.filters && (
-                  <DropdownMenu>
-
-                    <DropdownMenuTrigger
-                      asChild
-                    >
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 xl:min-w-[170px]"
-                      >
-
-                        <Filter className="h-4 w-4 text-blue-400" />
-
-                        <span>
-                          Filters
-                        </span>
-
-                        {filters.length > 0 && (
-                          <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
-                            {filters.length}
-                          </span>
-                        )}
-
-                        <ChevronDown className="ml-auto h-3.5 w-3.5 opacity-60" />
-
-                      </Button>
-                    </DropdownMenuTrigger>
-
-                    <DropdownMenuContent
-                      align="end"
-                      className="w-56"
-                    >
-
-                      <DropdownMenuItem
-                        onSelect={(event) =>
-                          event.preventDefault()
-                        }
-                        onClick={() => {
-                          const allSelected =
-                            filters.length ===
-                            filterOptions.length
-
-                          if (allSelected) {
-                            setFilters([])
-                          } else {
-                            setFilters(
-                              filterOptions.map(
-                                (filter) =>
-                                  filter.id,
-                              ),
-                            )
-                          }
-                        }}
-                        className="gap-2"
-                      >
-
-                        <Checkbox
-                          checked={
-                            filters.length ===
-                            filterOptions.length
-                          }
-                          tabIndex={-1}
-                          className="pointer-events-none"
-                        />
-
-                        <Filter className="h-4 w-4 text-blue-400" />
-
-                        <span className="font-medium">
-                          All Filters
-                        </span>
-
-                      </DropdownMenuItem>
-
-                      <div className="my-1 h-px bg-border" />
-
-                      {filterOptions.map(
-                        (filter) => {
-                          const checked =
-                            filters.includes(
-                              filter.id,
-                            )
-
-                          return (
-                            <DropdownMenuItem
-                              key={filter.id}
-                              onSelect={(event) =>
-                                event.preventDefault()
-                              }
-                              onClick={() =>
-                                toggleFilter(
-                                  filter.id,
-                                )
-                              }
-                              className="gap-2"
-                            >
-
-                              <Checkbox
-                                checked={checked}
-                                tabIndex={-1}
-                                className="pointer-events-none"
-                              />
-
-                              <span>
-                                {filter.label}
-                              </span>
-
-                            </DropdownMenuItem>
-                          )
-                        },
-                      )}
-
-                      {filters.length > 0 && (
-                        <>
-                          <div className="my-1 h-px bg-border" />
-
-                          <DropdownMenuItem
-                            onClick={
-                              clearFilters
-                            }
-                            className="gap-2 text-muted-foreground"
-                          >
-
-                            <X className="h-4 w-4" />
-
-                            Clear Filters
-
-                          </DropdownMenuItem>
-                        </>
-                      )}
-
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-
-                {/* CLEAR */}
-                {hasFilters && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearFilters}
-                    className="gap-2"
-                  >
-
-                    <X className="h-4 w-4" />
-
-                    Clear
-
-                  </Button>
-                )}
-
-              </div>
-
-              {/* ACTIVE FILTERS */}
-              {filters.length > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-
-                    <Filter className="h-3.5 w-3.5" />
-
-                    Active filters:
-
-                  </div>
-
-                  {filters.map(
-                    (filter) => {
-                      const label =
-                        filterOptions.find(
-                          (item) =>
-                            item.id ===
-                            filter,
-                        )?.label ?? filter
-
-                      return (
-                        <button
-                          key={filter}
-                          type="button"
-                          onClick={() =>
-                            toggleFilter(
-                              filter,
-                            )
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
-                        >
-
-                          <Filter className="h-3 w-3" />
-
-                          {label}
-
-                          <X className="h-3 w-3" />
-
-                        </button>
-                      )
-                    },
-                  )}
-
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* GOOGLE SHEET */}
-          <div className="w-full overflow-hidden bg-background">
-
-            <iframe
-              key={`${activeTabData.id}-${activeTabData.gid}`}
-              src={embedUrl}
-              title={`${activeTabData.label} Google Sheet`}
-              className="block h-[800px] w-full border-0 bg-background"
-              frameBorder="0"
-              loading="lazy"
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void refreshRoster()}
+            disabled={refreshing || loading}
+            className="w-fit gap-2"
+          >
+            <RefreshCw
+              className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
             />
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+        </header>
 
+        <nav className="flex w-full gap-2 overflow-x-auto pb-1">
+          {pages.map((item) => {
+            const Icon = item.icon
+            const active = item.id === page
+
+            return (
+              <Button
+                key={item.id}
+                type="button"
+                variant={active ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setPage(item.id)
+                  setSearch("")
+                }}
+                className="shrink-0 gap-2"
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Button>
+            )
+          })}
+        </nav>
+
+        {roster && (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard label="Department" value={roster.department.length} icon={Shield} />
+            <StatCard label="Employees" value={roster.employees.length} icon={Users} />
+            <StatCard label="Vehicles" value={roster.vehicles.length} icon={Car} />
+            <StatCard label="Uniforms" value={roster.uniforms.length} icon={Shirt} />
+            <StatCard label="Home Rows" value={roster.home.rows.length} icon={FileSpreadsheet} />
+          </div>
+        )}
+
+        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-border p-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
+                <PageIcon className="h-4 w-4 text-blue-500" />
+              </div>
+
+              <div>
+                <h2 className="text-base font-semibold">{pageInfo.label}</h2>
+                <p className="text-xs text-muted-foreground">
+                  Last synchronized: {formatUpdatedAt(roster?.updatedAt)}
+                </p>
+              </div>
+            </div>
+
+            {page !== "home" && (
+              <div className="relative w-full md:w-80">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={`Search ${pageInfo.label.toLowerCase()}...`}
+                  className="pl-9"
+                />
+              </div>
+            )}
           </div>
 
-        </div>
+          {loading ? (
+            <LoadingState />
+          ) : error ? (
+            <ErrorState message={error} onRetry={() => void loadRoster()} />
+          ) : !roster ? (
+            <EmptyState message="The Main Roster has not been synchronized yet." />
+          ) : page === "home" ? (
+            <HomeTable home={roster.home} />
+          ) : page === "department" ? (
+            <DepartmentTable members={department} />
+          ) : page === "employees" ? (
+            <EmployeeTable employees={employees} />
+          ) : page === "vehicles" ? (
+            <VehicleTable vehicles={vehicles} />
+          ) : (
+            <UniformTable uniforms={uniforms} />
+          )}
+        </section>
       </div>
     </DashboardLayout>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string
+  value: number
+  icon: LucideIcon
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p className="mt-1 text-2xl font-bold">{value.toLocaleString()}</p>
+        </div>
+
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
+          <Icon className="h-4 w-4 text-blue-500" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LoadingState() {
+  return (
+    <div className="p-12 text-center">
+      <RefreshCw className="mx-auto h-5 w-5 animate-spin text-blue-500" />
+      <p className="mt-3 text-sm text-muted-foreground">
+        Loading Main Roster...
+      </p>
+    </div>
+  )
+}
+
+function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string
+  onRetry: () => void
+}) {
+  return (
+    <div className="p-10 text-center">
+      <XCircle className="mx-auto h-6 w-6 text-red-500" />
+      <p className="mt-3 text-sm font-semibold">Failed to load Main Roster</p>
+      <p className="mx-auto mt-1 max-w-xl text-xs text-muted-foreground">
+        {message}
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onRetry}
+        className="mt-4"
+      >
+        Try Again
+      </Button>
+    </div>
+  )
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="p-10 text-center">
+      <ClipboardList className="mx-auto h-6 w-6 text-muted-foreground" />
+      <p className="mt-3 text-sm text-muted-foreground">{message}</p>
+    </div>
+  )
+}
+
+function TableShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="w-full overflow-x-auto">
+      <table className="w-full min-w-max text-sm">{children}</table>
+    </div>
+  )
+}
+
+function TableHead({ children }: { children: ReactNode }) {
+  return (
+    <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
+      <tr className="border-b border-border">{children}</tr>
+    </thead>
+  )
+}
+
+function Th({ children }: { children: ReactNode }) {
+  return (
+    <th className="whitespace-nowrap px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {children}
+    </th>
+  )
+}
+
+function Td({
+  children,
+  className = "",
+}: {
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <td
+      className={[
+        "whitespace-nowrap px-4 py-3 text-center align-middle",
+        className,
+      ].join(" ")}
+    >
+      {children}
+    </td>
+  )
+}
+
+function HomeTable({ home }: { home: MainRosterHome }) {
+  if (!home.headers.length || !home.rows.length) {
+    return (
+      <EmptyState message="The MPD | Home sheet does not currently contain any data." />
+    )
+  }
+
+  return (
+    <TableShell>
+      <TableHead>
+        {home.headers.map((header, index) => (
+          <Th key={`${header}-${index}`}>{displayValue(header)}</Th>
+        ))}
+      </TableHead>
+
+      <tbody>
+        {home.rows.map((row, rowIndex) => (
+          <tr
+            key={rowIndex}
+            className="border-b border-border last:border-0 hover:bg-muted/30"
+          >
+            {home.headers.map((_, columnIndex) => (
+              <Td key={`${rowIndex}-${columnIndex}`}>
+                {displayValue(row[columnIndex])}
+              </Td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </TableShell>
+  )
+}
+
+function DepartmentTable({
+  members,
+}: {
+  members: MainRosterDepartmentMember[]
+}) {
+  if (!members.length) {
+    return <EmptyState message="No Department Roster members match your search." />
+  }
+
+  return (
+    <TableShell>
+      <TableHead>
+        <Th>Section</Th>
+        <Th>Callsign</Th>
+        <Th>Badge</Th>
+        <Th>Name</Th>
+        <Th>Insignia</Th>
+        <Th>Rank</Th>
+        <Th>Job Description</Th>
+        <Th>Time In Dept</Th>
+        <Th>Time In Rank</Th>
+        <Th>Status</Th>
+        <Th>Strikes</Th>
+        <Th>Discord ID</Th>
+        <Th>This Month</Th>
+      </TableHead>
+
+      <tbody>
+        {members.map((member, index) => (
+          <tr
+            key={`${member.badgeNumber || member.discordId || member.name}-${index}`}
+            className="border-b border-border last:border-0 hover:bg-muted/30"
+          >
+            <Td>{displayValue(member.section)}</Td>
+            <Td className="font-semibold">{displayValue(member.callsign)}</Td>
+            <Td>{displayValue(member.badgeNumber)}</Td>
+            <Td className="font-medium">{displayValue(member.name)}</Td>
+            <Td>{displayValue(member.insignia)}</Td>
+            <Td>{displayValue(member.rank)}</Td>
+            <Td className="max-w-sm whitespace-normal">
+              {displayValue(member.jobDescription)}
+            </Td>
+            <Td>{displayValue(member.timeInDept)}</Td>
+            <Td>{displayValue(member.timeInRank)}</Td>
+            <Td><StatusBadge status={member.status} /></Td>
+            <Td>
+              <div className="flex justify-center gap-1">
+                <BooleanBadge value={member.strike1} />
+                <BooleanBadge value={member.strike2} />
+              </div>
+            </Td>
+            <Td>{displayValue(member.discordId)}</Td>
+            <Td>{displayValue(member.hoursThisMonth)}</Td>
+          </tr>
+        ))}
+      </tbody>
+    </TableShell>
+  )
+}
+
+function EmployeeTable({
+  employees,
+}: {
+  employees: MainRosterEmployee[]
+}) {
+  if (!employees.length) {
+    return <EmptyState message="No Employee Database records match your search." />
+  }
+
+  return (
+    <TableShell>
+      <TableHead>
+        <Th>Message</Th>
+        <Th>Badge</Th>
+        <Th>Name</Th>
+        <Th>Discord ID</Th>
+        <Th>Department Status</Th>
+        <Th>Rank</Th>
+        <Th>Timezone</Th>
+        <Th>Join Dept</Th>
+        <Th>Promo Date</Th>
+        <Th>Strikes</Th>
+        <Th>Callsign</Th>
+        <Th>Time In Dept</Th>
+        <Th>Terminated</Th>
+        <Th>LOA</Th>
+        <Th>Resigned</Th>
+        <Th>This Month</Th>
+        <Th>Last Month</Th>
+      </TableHead>
+
+      <tbody>
+        {employees.map((employee, index) => (
+          <tr
+            key={`${employee.badgeNumber || employee.discordId || employee.name}-${index}`}
+            className="border-b border-border last:border-0 hover:bg-muted/30"
+          >
+            <Td>{displayValue(employee.sendMessage)}</Td>
+            <Td className="font-semibold">{displayValue(employee.badgeNumber)}</Td>
+            <Td className="font-medium">{displayValue(employee.name)}</Td>
+            <Td>{displayValue(employee.discordId)}</Td>
+            <Td><StatusBadge status={employee.departmentStatus} /></Td>
+            <Td>{displayValue(employee.rank)}</Td>
+            <Td>{displayValue(employee.timezone)}</Td>
+            <Td>{displayValue(employee.joinDeptDate)}</Td>
+            <Td>{displayValue(employee.promoDate)}</Td>
+            <Td>
+              <div className="flex justify-center gap-1">
+                <BooleanBadge value={employee.strike1} />
+                <BooleanBadge value={employee.strike2} />
+              </div>
+            </Td>
+            <Td>{displayValue(employee.callsign)}</Td>
+            <Td>{displayValue(employee.timeInDept)}</Td>
+            <Td><BooleanBadge value={employee.terminated} /></Td>
+            <Td><BooleanBadge value={employee.loa} /></Td>
+            <Td><BooleanBadge value={employee.resigned} /></Td>
+            <Td>{displayValue(employee.thisMonthHours)}</Td>
+            <Td>{displayValue(employee.lastMonthHours)}</Td>
+          </tr>
+        ))}
+      </tbody>
+    </TableShell>
+  )
+}
+
+function VehicleTable({
+  vehicles,
+}: {
+  vehicles: MainRosterVehicle[]
+}) {
+  if (!vehicles.length) {
+    return <EmptyState message="No Vehicle Roster records match your search." />
+  }
+
+  return (
+    <TableShell>
+      <TableHead>
+        <Th>Rank</Th>
+        <Th>Vehicle Name</Th>
+        <Th>Spawncode</Th>
+        <Th>Required Extras</Th>
+        <Th>Livery</Th>
+        <Th>Window Tint</Th>
+        <Th>Turbo</Th>
+        <Th>Slicktop Optional</Th>
+        <Th>Unmarked Allowed</Th>
+      </TableHead>
+
+      <tbody>
+        {vehicles.map((vehicle, index) => (
+          <tr
+            key={`${vehicle.spawncode || vehicle.vehicleName}-${index}`}
+            className="border-b border-border last:border-0 hover:bg-muted/30"
+          >
+            <Td>{displayValue(vehicle.rank)}</Td>
+            <Td className="font-medium">{displayValue(vehicle.vehicleName)}</Td>
+            <Td className="font-mono text-xs">{displayValue(vehicle.spawncode)}</Td>
+            <Td>{displayValue(vehicle.requiredExtras)}</Td>
+            <Td>{displayValue(vehicle.livery)}</Td>
+            <Td>{displayValue(vehicle.windowTint)}</Td>
+            <Td><BooleanBadge value={vehicle.turbo} /></Td>
+            <Td><BooleanBadge value={vehicle.slicktopOptional} /></Td>
+            <Td><BooleanBadge value={vehicle.unmarkedAllowed} /></Td>
+          </tr>
+        ))}
+      </tbody>
+    </TableShell>
+  )
+}
+
+function UniformTable({
+  uniforms,
+}: {
+  uniforms: MainRosterUniform[]
+}) {
+  if (!uniforms.length) {
+    return <EmptyState message="No Uniform Roster records match your search." />
+  }
+
+  return (
+    <TableShell>
+      <TableHead>
+        <Th>Rank</Th>
+        <Th>Class</Th>
+        <Th>Server Outfit Code</Th>
+      </TableHead>
+
+      <tbody>
+        {uniforms.map((uniform, index) => (
+          <tr
+            key={`${uniform.sharedOutfitCode || uniform.className}-${index}`}
+            className="border-b border-border last:border-0 hover:bg-muted/30"
+          >
+            <Td className="font-medium">{displayValue(uniform.rank)}</Td>
+            <Td>{displayValue(uniform.className)}</Td>
+            <Td className="font-mono text-xs">
+              {displayValue(uniform.sharedOutfitCode)}
+            </Td>
+          </tr>
+        ))}
+      </tbody>
+    </TableShell>
   )
 }
