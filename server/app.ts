@@ -143,6 +143,9 @@ type ActivityRequirement = {
   rankId: string
   rankName: string
   hours: number
+  timeInRankDays: number
+  trainingLogs: number
+  recruitmentLogs: number
 }
 
 type ActivityRequirements = {
@@ -158,6 +161,65 @@ type ActivityRequirementsDocument =
     userId: string
     updatedAt?: Date
   }
+
+function getActivityRequirementForRank(
+  rankName: string,
+  rankConfig: RankConfig,
+  requirements: ActivityRequirements,
+): ActivityRequirement {
+  const cleanRankName =
+    String(rankName ?? "")
+      .trim()
+      .toLowerCase()
+
+  const storedRequirement =
+    Object.values(
+      requirements.requirements,
+    ).find(
+      (requirement) =>
+        requirement.rankName
+          .trim()
+          .toLowerCase() ===
+        cleanRankName,
+    )
+
+  if (storedRequirement) {
+    return storedRequirement
+  }
+
+  const configuredRank =
+    rankConfig.ranks.find(
+      (rank) =>
+        rank.name
+          .trim()
+          .toLowerCase() ===
+        cleanRankName,
+    )
+
+  if (configuredRank) {
+    return (
+      requirements.requirements[
+        configuredRank.id
+      ] ?? {
+        rankId: configuredRank.id,
+        rankName: configuredRank.name,
+        hours: 0,
+        timeInRankDays: 0,
+        trainingLogs: 0,
+        recruitmentLogs: 0,
+      }
+    )
+  }
+
+  return {
+    rankId: "",
+    rankName: rankName ?? "",
+    hours: 0,
+    timeInRankDays: 0,
+    trainingLogs: 0,
+    recruitmentLogs: 0,
+  }
+}
 
 /* ─────────────────────────────────────────────
    Promotion Requirements
@@ -681,6 +743,10 @@ type PromotionRosterRow = {
   timeInRank: string
   requiredPoints: number
   promotionPoints: number
+  requiredTimeInRankDays: number
+  requiredTrainingLogs: number
+  requiredRecruitmentLogs: number
+  requiredLogs: number
   status:
     | "compliant"
     | "non-compliant"
@@ -2415,6 +2481,21 @@ async function readActivityRequirements(
         item.hours ?? 0,
       )
 
+    const timeInRankDays =
+      Number(
+        item.timeInRankDays ?? 0,
+      )
+
+    const trainingLogs =
+      Number(
+        item.trainingLogs ?? 0,
+      )
+
+    const recruitmentLogs =
+      Number(
+        item.recruitmentLogs ?? 0,
+      )
+
     requirements[
       cleanRankId
     ] = {
@@ -2428,6 +2509,30 @@ async function readActivityRequirements(
           ? Math.max(
               0,
               Math.floor(hours),
+            )
+          : 0,
+
+      timeInRankDays:
+        Number.isFinite(timeInRankDays)
+          ? Math.max(
+              0,
+              Math.floor(timeInRankDays),
+            )
+          : 0,
+
+      trainingLogs:
+        Number.isFinite(trainingLogs)
+          ? Math.max(
+              0,
+              Math.floor(trainingLogs),
+            )
+          : 0,
+
+      recruitmentLogs:
+        Number.isFinite(recruitmentLogs)
+          ? Math.max(
+              0,
+              Math.floor(recruitmentLogs),
             )
           : 0,
     }
@@ -2517,7 +2622,30 @@ async function writeActivityRequirements(
 
     const hours =
       Number(
-        input.hours ?? 0,
+        input.hours ??
+          existingRequirement?.hours ??
+          0,
+      )
+
+    const timeInRankDays =
+      Number(
+        input.timeInRankDays ??
+          existingRequirement?.timeInRankDays ??
+          0,
+      )
+
+    const trainingLogs =
+      Number(
+        input.trainingLogs ??
+          existingRequirement?.trainingLogs ??
+          0,
+      )
+
+    const recruitmentLogs =
+      Number(
+        input.recruitmentLogs ??
+          existingRequirement?.recruitmentLogs ??
+          0,
       )
 
     normalizedRequirements[
@@ -2533,6 +2661,30 @@ async function writeActivityRequirements(
           ? Math.max(
               0,
               Math.floor(hours),
+            )
+          : 0,
+
+      timeInRankDays:
+        Number.isFinite(timeInRankDays)
+          ? Math.max(
+              0,
+              Math.floor(timeInRankDays),
+            )
+          : 0,
+
+      trainingLogs:
+        Number.isFinite(trainingLogs)
+          ? Math.max(
+              0,
+              Math.floor(trainingLogs),
+            )
+          : 0,
+
+      recruitmentLogs:
+        Number.isFinite(recruitmentLogs)
+          ? Math.max(
+              0,
+              Math.floor(recruitmentLogs),
             )
           : 0,
     }
@@ -3352,19 +3504,37 @@ async function handleActivityRequirementsSave(
           rankName?: unknown
           name?: unknown
           hours?: unknown
+          timeInRankDays?: unknown
+          trainingLogs?: unknown
+          recruitmentLogs?: unknown
         }
 
       const hours =
-        Number(input.hours)
+        Number(input.hours ?? 0)
+
+      const timeInRankDays =
+        Number(input.timeInRankDays ?? 0)
+
+      const trainingLogs =
+        Number(input.trainingLogs ?? 0)
+
+      const recruitmentLogs =
+        Number(input.recruitmentLogs ?? 0)
 
       if (
         !Number.isFinite(hours) ||
-        hours < 0
+        hours < 0 ||
+        !Number.isFinite(timeInRankDays) ||
+        timeInRankDays < 0 ||
+        !Number.isFinite(trainingLogs) ||
+        trainingLogs < 0 ||
+        !Number.isFinite(recruitmentLogs) ||
+        recruitmentLogs < 0
       ) {
         return res.status(400).json({
           success: false,
           message:
-            `Invalid hours for rank: ${rankId}`,
+            `Invalid requirement values for rank: ${rankId}`,
         })
       }
 
@@ -3399,6 +3569,15 @@ async function handleActivityRequirementsSave(
 
         hours:
           Math.floor(hours),
+
+        timeInRankDays:
+          Math.floor(timeInRankDays),
+
+        trainingLogs:
+          Math.floor(trainingLogs),
+
+        recruitmentLogs:
+          Math.floor(recruitmentLogs),
       }
     }
 
@@ -4616,6 +4795,7 @@ export function createApp() {
           promotion,
           rankConfig,
           requirements,
+          activityRequirements,
         ] = await Promise.all([
           readRosterImport(
             userId,
@@ -4632,6 +4812,11 @@ export function createApp() {
           ),
 
           readPromotionRequirements(
+            userId,
+            importDivision,
+          ),
+
+          readActivityRequirements(
             userId,
             importDivision,
           ),
@@ -4674,6 +4859,41 @@ export function createApp() {
                   requirements,
                 )
 
+              const activityRequirement =
+                getActivityRequirementForRank(
+                  member.rank,
+                  rankConfig,
+                  activityRequirements,
+                )
+
+              const requiredTimeInRankDays =
+                Math.max(
+                  0,
+                  Number(
+                    activityRequirement.timeInRankDays ?? 0,
+                  ),
+                )
+
+              const requiredTrainingLogs =
+                Math.max(
+                  0,
+                  Number(
+                    activityRequirement.trainingLogs ?? 0,
+                  ),
+                )
+
+              const requiredRecruitmentLogs =
+                Math.max(
+                  0,
+                  Number(
+                    activityRequirement.recruitmentLogs ?? 0,
+                  ),
+                )
+
+              const requiredLogs =
+                requiredTrainingLogs +
+                requiredRecruitmentLogs
+
               const safePromotionPoints =
                 Number.isFinite(
                   promotionPoints,
@@ -4713,6 +4933,14 @@ export function createApp() {
 
                 promotionPoints:
                   safePromotionPoints,
+
+                requiredTimeInRankDays,
+
+                requiredTrainingLogs,
+
+                requiredRecruitmentLogs,
+
+                requiredLogs,
 
                 status:
                   safePromotionPoints >=
