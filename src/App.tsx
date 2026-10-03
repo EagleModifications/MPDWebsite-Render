@@ -396,15 +396,24 @@ export default function App() {
         position="top-right"
 
         /*
-         * Keep multiple notifications visible instead of
-         * hiding them underneath the newest notification.
+         * Number of notifications that can remain
+         * in the stack.
          */
         visibleToasts={5}
-        expand
-        gap={10}
 
         /*
-         * Keep notifications away from the browser edge.
+         * IMPORTANT:
+         *
+         * Do NOT use `expand` here.
+         *
+         * Without `expand`, Sonner keeps the notifications
+         * collapsed by default and expands the stack when
+         * the mouse hovers over it.
+         */
+        gap={6}
+
+        /*
+         * Distance from the top/right edge of the viewport.
          */
         offset={{
           top: 24,
@@ -412,11 +421,14 @@ export default function App() {
         }}
 
         theme="system"
+
         closeButton
 
         /*
-         * Notifications sit below the custom cursor but
-         * above the rest of the application.
+         * Keep Sonner above the application.
+         *
+         * The custom cursor uses 2147483647, so the cursor
+         * remains above the notifications.
          */
         className="!z-[2147483646]"
 
@@ -424,12 +436,15 @@ export default function App() {
           success: (
             <CheckCircle2 className="size-5 shrink-0 text-green-500" />
           ),
+
           info: (
             <Info className="size-5 shrink-0 text-blue-500" />
           ),
+
           warning: (
             <AlertTriangle className="size-5 shrink-0 text-yellow-500" />
           ),
+
           error: (
             <XCircle className="size-5 shrink-0 text-red-500" />
           ),
