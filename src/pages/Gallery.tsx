@@ -1373,7 +1373,7 @@ export default function Gallery() {
                                     openInfo(item)
                                   }
                                 }}
-                                className="w-full cursor-pointer rounded-lg px-1 py-1 pr-16 text-left outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                className="w-full cursor-pointer rounded-lg px-1 py-1 pr-16 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-500/40"
                                 aria-label={`View information for ${item.title}`}
                               >
                                 <div className="mb-1.5 flex items-center gap-2">
