@@ -777,8 +777,8 @@ export default function PromotionRoster() {
               member.timeInRank,
               `${member.requiredTimeInRankDays} DAYS`,
               `${member.requiredLogs} logs`,
-              `${member.requiredTrainingLogs} training`,
-              `${member.requiredRecruitmentLogs} recruitment/ridealong`,
+              `Trainings: ${member.requiredTrainingLogs}`,
+              `Recruitments/Ridealongs: ${member.requiredRecruitmentLogs}`,
               `${member.requiredHours.toFixed(1)}h`,
               `${member.promotionHours.toFixed(1)}h`,
               getStatusLabel(
@@ -1805,15 +1805,15 @@ export default function PromotionRoster() {
                     </th>
 
                     <th className="w-[11%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Required Time in Rank
+                      Req Time in Rank
                     </th>
 
                     <th className="w-[13%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Required Logs
+                      Req Logs
                     </th>
 
                     <th className="w-[6%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
-                      Required Hours
+                      Req Hours
                     </th>
 
                     <th className="w-[6%] whitespace-nowrap overflow-hidden text-ellipsis px-2 py-3 font-medium text-muted-foreground">
@@ -1960,10 +1960,8 @@ export default function PromotionRoster() {
 
                           <td className="whitespace-nowrap px-4 py-3">
                             <div className="font-medium">
-                              {member.requiredLogs}
-                            </div>
-                            <div className="mt-0.5 block max-w-full truncate text-xs text-muted-foreground">
-                              {member.requiredTrainingLogs} training · {member.requiredRecruitmentLogs} recruitment/ridealong
+                              Trainings: {member.requiredTrainingLogs}
+                              Recruitments/Ridealongs: {member.requiredRecruitmentLogs}
                             </div>
                           </td>
 
@@ -2108,7 +2106,7 @@ export default function PromotionRoster() {
 
                           <div className="min-w-0">
                             <p className="text-muted-foreground">
-                              Required
+                              Req Hours
                             </p>
                             <p className="mt-0.5 font-medium">
                               {member.requiredHours.toFixed(1)}h
@@ -2126,7 +2124,7 @@ export default function PromotionRoster() {
 
                           <div className="min-w-0">
                             <p className="text-muted-foreground">
-                              Time in Rank
+                              Req Time in Rank
                             </p>
                             <p className="mt-0.5 truncate font-medium">
                               {member.timeInRank || "—"}
@@ -2135,7 +2133,7 @@ export default function PromotionRoster() {
 
                           <div className="min-w-0">
                             <p className="text-muted-foreground">
-                              Required TIR
+                              Req Time in Rank
                             </p>
                             <p className="mt-0.5 font-medium">
                               {member.requiredTimeInRankDays} DAYS
@@ -2144,13 +2142,11 @@ export default function PromotionRoster() {
 
                           <div className="min-w-0">
                             <p className="text-muted-foreground">
-                              Required Logs
+                              Req Logs
                             </p>
                             <p className="mt-0.5 font-medium">
-                              {member.requiredLogs}
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-muted-foreground">
-                              {member.requiredTrainingLogs} training · {member.requiredRecruitmentLogs} recruitment/ridealong
+                              Trainings: {member.requiredTrainingLogs}
+                              Recruitments/Ridealongs: {member.requiredRecruitmentLogs}
                             </p>
                           </div>
                         </div>
