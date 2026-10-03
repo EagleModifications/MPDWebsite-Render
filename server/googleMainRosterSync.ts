@@ -154,10 +154,17 @@ function findHeaderRow(
   rows: unknown[][],
   requiredHeaders: string[],
 ): number {
-  const required = requiredHeaders.map(normalizeHeader)
+  const required =
+    requiredHeaders.map(normalizeHeader)
 
-  for (let index = 0; index < rows.length; index += 1) {
-    const headers = (rows[index] ?? []).map(normalizeHeader)
+  for (
+    let index = 0;
+    index < rows.length;
+    index += 1
+  ) {
+    const headers = (
+      rows[index] ?? []
+    ).map(normalizeHeader)
 
     if (
       required.every((header) =>
@@ -175,12 +182,15 @@ function getColumn(
   headers: unknown[],
   alternatives: string[],
 ): number {
-  const normalizedHeaders = headers.map(normalizeHeader)
+  const normalizedHeaders =
+    headers.map(normalizeHeader)
+
   const normalizedAlternatives =
     alternatives.map(normalizeHeader)
 
-  return normalizedHeaders.findIndex((header) =>
-    normalizedAlternatives.includes(header),
+  return normalizedHeaders.findIndex(
+    (header) =>
+      normalizedAlternatives.includes(header),
   )
 }
 
@@ -199,15 +209,19 @@ function nonEmptyRows(
   rows: unknown[][],
 ): unknown[][] {
   return rows.filter((row) =>
-    row.some((value) => clean(value) !== ""),
+    row.some(
+      (value) => clean(value) !== "",
+    ),
   )
 }
 
 /* ─────────────────────────────────────────────
-   Google → raw rows
+   Google → Sheet names
 ───────────────────────────────────────────── */
 
-function normalizeSheetTitle(value: string): string {
+function normalizeSheetTitle(
+  value: string,
+): string {
   return value
     .trim()
     .toLowerCase()
@@ -215,7 +229,9 @@ function normalizeSheetTitle(value: string): string {
 }
 
 async function resolveSheetNames(
-  sheets: ReturnType<typeof getGoogleSheetsClient>["sheets"],
+  sheets: ReturnType<
+    typeof getGoogleSheetsClient
+  >["sheets"],
   spreadsheetId: string,
   requestedNames: string[],
 ): Promise<Record<string, string>> {
@@ -228,69 +244,108 @@ async function resolveSheetNames(
   const availableTitles = (
     response.data.sheets ?? []
   )
-    .map((sheet) => sheet.properties?.title)
-    .filter((title): title is string =>
-      typeof title === "string" && title.trim() !== "",
+    .map(
+      (sheet) =>
+        sheet.properties?.title,
+    )
+    .filter(
+      (
+        title,
+      ): title is string =>
+        typeof title === "string" &&
+        title.trim() !== "",
     )
 
-  const resolved: Record<string, string> = {}
+  const resolved: Record<
+    string,
+    string
+  > = {}
 
   for (const requestedName of requestedNames) {
-    const trimmedRequested = requestedName.trim()
+    const trimmedRequested =
+      requestedName.trim()
 
-    // Prefer an exact title match first.
-    const exact = availableTitles.find(
-      (title) => title === trimmedRequested,
-    )
+    /*
+     * First try an exact match.
+     */
+    const exact =
+      availableTitles.find(
+        (title) =>
+          title === trimmedRequested,
+      )
 
     if (exact) {
       resolved[requestedName] = exact
       continue
     }
 
-    // Then tolerate accidental leading/trailing/duplicate spaces and
-    // capitalization differences in the Render environment variable.
+    /*
+     * Then tolerate:
+     * - capitalisation differences
+     * - leading/trailing spaces
+     * - multiple spaces
+     */
     const normalizedRequested =
-      normalizeSheetTitle(trimmedRequested)
+      normalizeSheetTitle(
+        trimmedRequested,
+      )
 
     const normalizedMatches =
       availableTitles.filter(
         (title) =>
-          normalizeSheetTitle(title) ===
-          normalizedRequested,
+          normalizeSheetTitle(
+            title,
+          ) === normalizedRequested,
       )
 
     if (normalizedMatches.length === 1) {
       resolved[requestedName] =
         normalizedMatches[0]
+
       continue
     }
 
     if (normalizedMatches.length > 1) {
       throw new Error(
-        `Google Sheet tab \"${trimmedRequested}\" is ambiguous. Matching tabs: ${normalizedMatches.join(
+        `Google Sheet tab "${trimmedRequested}" is ambiguous. Matching tabs: ${normalizedMatches.join(
           ", ",
         )}.`,
       )
     }
 
     throw new Error(
-      `Google Sheet tab \"${trimmedRequested}\" was not found. Available tabs: ${availableTitles.join(
-        ", ",
-      ) || \"none\"}.`,
+      `Google Sheet tab "${trimmedRequested}" was not found. Available tabs: ${
+        availableTitles.join(", ") ||
+        "none"
+      }.`,
     )
   }
 
   return resolved
 }
 
+/* ─────────────────────────────────────────────
+   Google → raw rows
+───────────────────────────────────────────── */
+
 async function getSheetValues(
-  sheets: ReturnType<typeof getGoogleSheetsClient>["sheets"],
+  sheets: ReturnType<
+    typeof getGoogleSheetsClient
+  >["sheets"],
   spreadsheetId: string,
   sheetName: string,
 ): Promise<unknown[][]> {
-  // Passing the sheet title by itself asks Sheets for the complete used
-  // range and avoids brittle A1 ranges such as \'Employee Database\'!A:ZZ.
+  /*
+   * Do NOT use:
+   *
+   *   'Employee Database'!A:ZZ
+   *
+   * Some Google Sheets configurations reject that
+   * range even though it looks valid.
+   *
+   * Passing the actual sheet title lets the Sheets API
+   * return the sheet's complete used range.
+   */
   const response =
     await sheets.spreadsheets.values.get({
       spreadsheetId,
@@ -309,13 +364,14 @@ function parseDepartment(
   rows: unknown[][],
   sheetName: string,
 ): MainRosterDepartmentMember[] {
-  const headerIndex = findHeaderRow(rows, [
-    "Callsign",
-    "Badge Number",
-    "Name",
-    "Insignia",
-    "Rank",
-  ])
+  const headerIndex =
+    findHeaderRow(rows, [
+      "Callsign",
+      "Badge Number",
+      "Name",
+      "Insignia",
+      "Rank",
+    ])
 
   if (headerIndex === -1) {
     throw new Error(
@@ -323,7 +379,8 @@ function parseDepartment(
     )
   }
 
-  const headers = rows[headerIndex] ?? []
+  const headers =
+    rows[headerIndex] ?? []
 
   const columns = {
     section: getColumn(headers, [
@@ -331,11 +388,13 @@ function parseDepartment(
       "Division",
       "Department",
     ]),
+
     callsign: getColumn(headers, [
       "Callsign",
       "Call Sign",
       "Callsign Number",
     ]),
+
     badgeNumber: getColumn(headers, [
       "Badge Number",
       "Badge",
@@ -343,23 +402,31 @@ function parseDepartment(
       "Badge #",
       "Badge#",
     ]),
+
     name: getColumn(headers, [
       "Name",
       "Full Name",
       "Officer Name",
     ]),
+
     insignia: getColumn(headers, [
       "Insignia",
     ]),
+
     rank: getColumn(headers, [
       "Rank",
       "Current Rank",
     ]),
-    jobDescription: getColumn(headers, [
-      "Job Description",
-      "Job",
-      "Description",
-    ]),
+
+    jobDescription: getColumn(
+      headers,
+      [
+        "Job Description",
+        "Job",
+        "Description",
+      ],
+    ),
+
     timeInDept: getColumn(headers, [
       "Time In Dept",
       "Time In Department",
@@ -367,77 +434,120 @@ function parseDepartment(
       "Department Time",
       "Dept Time",
     ]),
+
     timeInRank: getColumn(headers, [
       "Time In Rank",
       "TimeInRank",
       "Rank Time",
     ]),
+
     status: getColumn(headers, [
       "Status",
       "Department Status",
     ]),
+
     strike1: getColumn(headers, [
       "Strike 1",
       "Strike1",
       "Strike One",
     ]),
+
     strike2: getColumn(headers, [
       "Strike 2",
       "Strike2",
       "Strike Two",
     ]),
+
     discordId: getColumn(headers, [
       "Discord ID",
       "DiscordID",
       "Discord",
       "Discord Id",
     ]),
-    hoursThisMonth: getColumn(headers, [
-      "Hours This Month",
-      "This Month Hours",
-      "Hours",
-      "Activity Hours",
-    ]),
+
+    hoursThisMonth: getColumn(
+      headers,
+      [
+        "Hours This Month",
+        "This Month Hours",
+        "Hours",
+        "Activity Hours",
+      ],
+    ),
   }
 
   return rows
     .slice(headerIndex + 1)
     .filter((row) =>
-      row.some((value) => clean(value) !== ""),
+      row.some(
+        (value) =>
+          clean(value) !== "",
+      ),
     )
     .map((row) => ({
-      section: getValue(row, columns.section),
-      callsign: getValue(row, columns.callsign),
+      section: getValue(
+        row,
+        columns.section,
+      ),
+
+      callsign: getValue(
+        row,
+        columns.callsign,
+      ),
+
       badgeNumber: getValue(
         row,
         columns.badgeNumber,
       ),
-      name: getValue(row, columns.name),
-      insignia: getValue(row, columns.insignia),
-      rank: getValue(row, columns.rank),
+
+      name: getValue(
+        row,
+        columns.name,
+      ),
+
+      insignia: getValue(
+        row,
+        columns.insignia,
+      ),
+
+      rank: getValue(
+        row,
+        columns.rank,
+      ),
+
       jobDescription: getValue(
         row,
         columns.jobDescription,
       ),
+
       timeInDept: getValue(
         row,
         columns.timeInDept,
       ),
+
       timeInRank: getValue(
         row,
         columns.timeInRank,
       ),
-      status: getValue(row, columns.status),
+
+      status: getValue(
+        row,
+        columns.status,
+      ),
+
       strike1: booleanValue(
         row[columns.strike1],
       ),
+
       strike2: booleanValue(
         row[columns.strike2],
       ),
+
       discordId: getValue(
         row,
         columns.discordId,
       ),
+
       hoursThisMonth: getValue(
         row,
         columns.hoursThisMonth,
@@ -460,13 +570,14 @@ function parseEmployees(
   rows: unknown[][],
   sheetName: string,
 ): MainRosterEmployee[] {
-  const headerIndex = findHeaderRow(rows, [
-    "Badge Number",
-    "Name",
-    "Discord ID",
-    "Department Status",
-    "Rank",
-  ])
+  const headerIndex =
+    findHeaderRow(rows, [
+      "Badge Number",
+      "Name",
+      "Discord ID",
+      "Department Status",
+      "Rank",
+    ])
 
   if (headerIndex === -1) {
     throw new Error(
@@ -474,162 +585,254 @@ function parseEmployees(
     )
   }
 
-  const headers = rows[headerIndex] ?? []
+  const headers =
+    rows[headerIndex] ?? []
 
   const columns = {
-    sendMessage: getColumn(headers, [
-      "Send Message",
-      "Message",
-      "DM",
-    ]),
-    badgeNumber: getColumn(headers, [
-      "Badge Number",
-      "Badge",
-      "BadgeNumber",
-      "Badge #",
-      "Badge#",
-    ]),
+    sendMessage: getColumn(
+      headers,
+      [
+        "Send Message",
+        "Message",
+        "DM",
+      ],
+    ),
+
+    badgeNumber: getColumn(
+      headers,
+      [
+        "Badge Number",
+        "Badge",
+        "BadgeNumber",
+        "Badge #",
+        "Badge#",
+      ],
+    ),
+
     name: getColumn(headers, [
       "Name",
       "Full Name",
       "Employee Name",
     ]),
-    discordId: getColumn(headers, [
-      "Discord ID",
-      "DiscordID",
-      "Discord",
-      "Discord Id",
-    ]),
-    departmentStatus: getColumn(headers, [
-      "Department Status",
-      "Status",
-    ]),
+
+    discordId: getColumn(
+      headers,
+      [
+        "Discord ID",
+        "DiscordID",
+        "Discord",
+        "Discord Id",
+      ],
+    ),
+
+    departmentStatus:
+      getColumn(
+        headers,
+        [
+          "Department Status",
+          "Status",
+        ],
+      ),
+
     rank: getColumn(headers, [
       "Rank",
       "Current Rank",
     ]),
+
     timezone: getColumn(headers, [
       "Timezone",
       "Time Zone",
       "TZ",
     ]),
-    joinDeptDate: getColumn(headers, [
-      "Join Dept Date",
-      "Join Department Date",
-      "Department Join Date",
-      "Join Date",
-    ]),
-    promoDate: getColumn(headers, [
-      "Promo Date",
-      "Promotion Date",
-      "Last Promotion",
-    ]),
-    strike1: getColumn(headers, [
-      "Strike 1",
-      "Strike1",
-      "Strike One",
-    ]),
-    strike2: getColumn(headers, [
-      "Strike 2",
-      "Strike2",
-      "Strike Two",
-    ]),
-    callsign: getColumn(headers, [
-      "Callsign",
-      "Call Sign",
-      "Callsign Number",
-    ]),
-    timeInDept: getColumn(headers, [
-      "Time In Dept",
-      "Time In Department",
-      "TimeInDept",
-      "Department Time",
-    ]),
-    terminated: getColumn(headers, [
-      "Terminated",
-      "Termination",
-    ]),
-    loa: getColumn(headers, [
-      "LOA",
-      "Leave Of Absence",
-      "Leave of Absence",
-    ]),
-    resigned: getColumn(headers, [
-      "Resigned",
-      "Resignation",
-    ]),
-    thisMonthHours: getColumn(headers, [
-      "This Month Hours",
-      "Hours This Month",
-      "Current Month Hours",
-    ]),
-    lastMonthHours: getColumn(headers, [
-      "Last Month Hours",
-      "Previous Month Hours",
-    ]),
+
+    joinDeptDate: getColumn(
+      headers,
+      [
+        "Join Dept Date",
+        "Join Department Date",
+        "Department Join Date",
+        "Join Date",
+      ],
+    ),
+
+    promoDate: getColumn(
+      headers,
+      [
+        "Promo Date",
+        "Promotion Date",
+        "Last Promotion",
+      ],
+    ),
+
+    strike1: getColumn(
+      headers,
+      [
+        "Strike 1",
+        "Strike1",
+        "Strike One",
+      ],
+    ),
+
+    strike2: getColumn(
+      headers,
+      [
+        "Strike 2",
+        "Strike2",
+        "Strike Two",
+      ],
+    ),
+
+    callsign: getColumn(
+      headers,
+      [
+        "Callsign",
+        "Call Sign",
+        "Callsign Number",
+      ],
+    ),
+
+    timeInDept: getColumn(
+      headers,
+      [
+        "Time In Dept",
+        "Time In Department",
+        "TimeInDept",
+        "Department Time",
+      ],
+    ),
+
+    terminated: getColumn(
+      headers,
+      [
+        "Terminated",
+        "Termination",
+      ],
+    ),
+
+    loa: getColumn(
+      headers,
+      [
+        "LOA",
+        "Leave Of Absence",
+        "Leave of Absence",
+      ],
+    ),
+
+    resigned: getColumn(
+      headers,
+      [
+        "Resigned",
+        "Resignation",
+      ],
+    ),
+
+    thisMonthHours: getColumn(
+      headers,
+      [
+        "This Month Hours",
+        "Hours This Month",
+        "Current Month Hours",
+      ],
+    ),
+
+    lastMonthHours: getColumn(
+      headers,
+      [
+        "Last Month Hours",
+        "Previous Month Hours",
+      ],
+    ),
   }
 
   return rows
     .slice(headerIndex + 1)
     .filter((row) =>
-      row.some((value) => clean(value) !== ""),
+      row.some(
+        (value) =>
+          clean(value) !== "",
+      ),
     )
     .map((row) => ({
       sendMessage: getValue(
         row,
         columns.sendMessage,
       ),
+
       badgeNumber: getValue(
         row,
         columns.badgeNumber,
       ),
-      name: getValue(row, columns.name),
+
+      name: getValue(
+        row,
+        columns.name,
+      ),
+
       discordId: getValue(
         row,
         columns.discordId,
       ),
+
       departmentStatus: getValue(
         row,
         columns.departmentStatus,
       ),
-      rank: getValue(row, columns.rank),
+
+      rank: getValue(
+        row,
+        columns.rank,
+      ),
+
       timezone: getValue(
         row,
         columns.timezone,
       ),
+
       joinDeptDate: getValue(
         row,
         columns.joinDeptDate,
       ),
+
       promoDate: getValue(
         row,
         columns.promoDate,
       ),
+
       strike1: booleanValue(
         row[columns.strike1],
       ),
+
       strike2: booleanValue(
         row[columns.strike2],
       ),
+
       callsign: getValue(
         row,
         columns.callsign,
       ),
+
       timeInDept: getValue(
         row,
         columns.timeInDept,
       ),
+
       terminated: booleanValue(
         row[columns.terminated],
       ),
-      loa: booleanValue(row[columns.loa]),
+
+      loa: booleanValue(
+        row[columns.loa],
+      ),
+
       resigned: booleanValue(
         row[columns.resigned],
       ),
+
       thisMonthHours: getValue(
         row,
         columns.thisMonthHours,
       ),
+
       lastMonthHours: getValue(
         row,
         columns.lastMonthHours,
@@ -651,13 +854,14 @@ function parseVehicles(
   rows: unknown[][],
   sheetName: string,
 ): MainRosterVehicle[] {
-  const headerIndex = findHeaderRow(rows, [
-    "Rank",
-    "Vehicle Name",
-    "Spawncode",
-    "Required Extras",
-    "Livery",
-  ])
+  const headerIndex =
+    findHeaderRow(rows, [
+      "Rank",
+      "Vehicle Name",
+      "Spawncode",
+      "Required Extras",
+      "Livery",
+    ])
 
   if (headerIndex === -1) {
     throw new Error(
@@ -665,81 +869,137 @@ function parseVehicles(
     )
   }
 
-  const headers = rows[headerIndex] ?? []
+  const headers =
+    rows[headerIndex] ?? []
 
   const columns = {
-    rank: getColumn(headers, ["Rank"]),
-    vehicleName: getColumn(headers, [
-      "Vehicle Name",
-      "Vehicle",
-      "Name",
+    rank: getColumn(headers, [
+      "Rank",
     ]),
-    spawncode: getColumn(headers, [
-      "Spawncode",
-      "Spawn Code",
-      "Spawn",
-      "Model",
-    ]),
-    requiredExtras: getColumn(headers, [
-      "Required Extras",
-      "Extras",
-      "Required Extra",
-    ]),
+
+    vehicleName: getColumn(
+      headers,
+      [
+        "Vehicle Name",
+        "Vehicle",
+        "Name",
+      ],
+    ),
+
+    spawncode: getColumn(
+      headers,
+      [
+        "Spawncode",
+        "Spawn Code",
+        "Spawn",
+        "Model",
+      ],
+    ),
+
+    requiredExtras: getColumn(
+      headers,
+      [
+        "Required Extras",
+        "Extras",
+        "Required Extra",
+      ],
+    ),
+
     livery: getColumn(headers, [
       "Livery",
       "Livery ID",
     ]),
-    windowTint: getColumn(headers, [
-      "Window Tint",
-      "Tint",
-    ]),
+
+    windowTint: getColumn(
+      headers,
+      [
+        "Window Tint",
+        "Tint",
+      ],
+    ),
+
     turbo: getColumn(headers, [
       "Turbo",
       "Turbo Enabled",
     ]),
-    slicktopOptional: getColumn(headers, [
-      "Slicktop Optional",
-      "Slicktop",
-      "Slicktop Option",
-    ]),
-    unmarkedAllowed: getColumn(headers, [
-      "Unmarked Allowed",
-      "Unmarked",
-      "Unmarked Allowed?",
-    ]),
+
+    slicktopOptional:
+      getColumn(
+        headers,
+        [
+          "Slicktop Optional",
+          "Slicktop",
+          "Slicktop Option",
+        ],
+      ),
+
+    unmarkedAllowed:
+      getColumn(
+        headers,
+        [
+          "Unmarked Allowed",
+          "Unmarked",
+          "Unmarked Allowed?",
+        ],
+      ),
   }
 
   return rows
     .slice(headerIndex + 1)
     .filter((row) =>
-      row.some((value) => clean(value) !== ""),
+      row.some(
+        (value) =>
+          clean(value) !== "",
+      ),
     )
     .map((row) => ({
-      rank: getValue(row, columns.rank),
+      rank: getValue(
+        row,
+        columns.rank,
+      ),
+
       vehicleName: getValue(
         row,
         columns.vehicleName,
       ),
+
       spawncode: getValue(
         row,
         columns.spawncode,
       ),
+
       requiredExtras: getValue(
         row,
         columns.requiredExtras,
       ),
-      livery: getValue(row, columns.livery),
+
+      livery: getValue(
+        row,
+        columns.livery,
+      ),
+
       windowTint: getValue(
         row,
         columns.windowTint,
       ),
-      turbo: booleanValue(row[columns.turbo]),
-      slicktopOptional: booleanValue(
-        row[columns.slicktopOptional],
+
+      turbo: booleanValue(
+        row[columns.turbo],
       ),
-      unmarkedAllowed: booleanValue(
-        row[columns.unmarkedAllowed],
-      ),
+
+      slicktopOptional:
+        booleanValue(
+          row[
+            columns.slicktopOptional
+          ],
+        ),
+
+      unmarkedAllowed:
+        booleanValue(
+          row[
+            columns.unmarkedAllowed
+          ],
+        ),
     }))
     .filter(
       (vehicle) =>
@@ -756,11 +1016,12 @@ function parseUniforms(
   rows: unknown[][],
   sheetName: string,
 ): MainRosterUniform[] {
-  const headerIndex = findHeaderRow(rows, [
-    "Rank",
-    "Class",
-    "Shared Outfit Code",
-  ])
+  const headerIndex =
+    findHeaderRow(rows, [
+      "Rank",
+      "Class",
+      "Shared Outfit Code",
+    ])
 
   if (headerIndex === -1) {
     throw new Error(
@@ -768,37 +1029,58 @@ function parseUniforms(
     )
   }
 
-  const headers = rows[headerIndex] ?? []
+  const headers =
+    rows[headerIndex] ?? []
 
   const columns = {
-    rank: getColumn(headers, ["Rank"]),
-    className: getColumn(headers, [
-      "Class",
-      "Class Name",
-      "Uniform Class",
+    rank: getColumn(headers, [
+      "Rank",
     ]),
-    sharedOutfitCode: getColumn(headers, [
-      "Shared Outfit Code",
-      "Outfit Code",
-      "Shared Code",
-    ]),
+
+    className: getColumn(
+      headers,
+      [
+        "Class",
+        "Class Name",
+        "Uniform Class",
+      ],
+    ),
+
+    sharedOutfitCode:
+      getColumn(
+        headers,
+        [
+          "Shared Outfit Code",
+          "Outfit Code",
+          "Shared Code",
+        ],
+      ),
   }
 
   return rows
     .slice(headerIndex + 1)
     .filter((row) =>
-      row.some((value) => clean(value) !== ""),
+      row.some(
+        (value) =>
+          clean(value) !== "",
+      ),
     )
     .map((row) => ({
-      rank: getValue(row, columns.rank),
+      rank: getValue(
+        row,
+        columns.rank,
+      ),
+
       className: getValue(
         row,
         columns.className,
       ),
-      sharedOutfitCode: getValue(
-        row,
-        columns.sharedOutfitCode,
-      ),
+
+      sharedOutfitCode:
+        getValue(
+          row,
+          columns.sharedOutfitCode,
+        ),
     }))
     .filter(
       (uniform) =>
@@ -815,7 +1097,8 @@ function parseUniforms(
 function parseHome(
   rows: unknown[][],
 ): MainRosterHome {
-  const cleanedRows = nonEmptyRows(rows)
+  const cleanedRows =
+    nonEmptyRows(rows)
 
   if (cleanedRows.length === 0) {
     return {
@@ -824,18 +1107,26 @@ function parseHome(
     }
   }
 
-  const headers = (cleanedRows[0] ?? []).map(clean)
+  const headers =
+    (
+      cleanedRows[0] ?? []
+    ).map(clean)
 
-  const dataRows = cleanedRows
-    .slice(1)
-    .map((row) =>
-      headers.map((_, index) =>
-        clean(row[index]),
-      ),
-    )
-    .filter((row) =>
-      row.some((value) => value !== ""),
-    )
+  const dataRows =
+    cleanedRows
+      .slice(1)
+      .map((row) =>
+        headers.map(
+          (_, index) =>
+            clean(row[index]),
+        ),
+      )
+      .filter((row) =>
+        row.some(
+          (value) =>
+            value !== "",
+        ),
+      )
 
   return {
     headers,
@@ -875,9 +1166,15 @@ export async function syncGoogleMainRoster() {
       "GOOGLE_MAIN_ROSTER_HOME_SHEET",
     )
 
-  const { sheets, spreadsheetId } =
+  const {
+    sheets,
+    spreadsheetId,
+  } =
     getGoogleSheetsClient()
 
+  /*
+   * Resolve the actual Google Sheet tab names first.
+   */
   const resolvedSheets =
     await resolveSheetNames(
       sheets,
@@ -892,16 +1189,33 @@ export async function syncGoogleMainRoster() {
     )
 
   const resolvedDepartmentSheet =
-    resolvedSheets[departmentSheet]
-  const resolvedEmployeeSheet =
-    resolvedSheets[employeeSheet]
-  const resolvedUniformSheet =
-    resolvedSheets[uniformSheet]
-  const resolvedVehicleSheet =
-    resolvedSheets[vehicleSheet]
-  const resolvedHomeSheet =
-    resolvedSheets[homeSheet]
+    resolvedSheets[
+      departmentSheet
+    ]
 
+  const resolvedEmployeeSheet =
+    resolvedSheets[
+      employeeSheet
+    ]
+
+  const resolvedUniformSheet =
+    resolvedSheets[
+      uniformSheet
+    ]
+
+  const resolvedVehicleSheet =
+    resolvedSheets[
+      vehicleSheet
+    ]
+
+  const resolvedHomeSheet =
+    resolvedSheets[
+      homeSheet
+    ]
+
+  /*
+   * Download all five tabs.
+   */
   const [
     departmentRows,
     employeeRows,
@@ -914,21 +1228,25 @@ export async function syncGoogleMainRoster() {
       spreadsheetId,
       resolvedDepartmentSheet,
     ),
+
     getSheetValues(
       sheets,
       spreadsheetId,
       resolvedEmployeeSheet,
     ),
+
     getSheetValues(
       sheets,
       spreadsheetId,
       resolvedUniformSheet,
     ),
+
     getSheetValues(
       sheets,
       spreadsheetId,
       resolvedVehicleSheet,
     ),
+
     getSheetValues(
       sheets,
       spreadsheetId,
@@ -936,6 +1254,9 @@ export async function syncGoogleMainRoster() {
     ),
   ])
 
+  /*
+   * Parse every tab.
+   */
   const department =
     parseDepartment(
       departmentRows,
@@ -964,8 +1285,8 @@ export async function syncGoogleMainRoster() {
     parseHome(homeRows)
 
   /*
-   * Never replace a working Master Roster with
-   * an empty/broken import.
+   * Never replace an existing working Master
+   * Roster with an empty/broken import.
    */
   if (department.length === 0) {
     throw new Error(
@@ -991,6 +1312,9 @@ export async function syncGoogleMainRoster() {
     )
   }
 
+  /*
+   * Build the Master Roster document.
+   */
   const roster: MainRosterData = {
     type: "main",
     home,
@@ -1001,34 +1325,60 @@ export async function syncGoogleMainRoster() {
     updatedAt: new Date(),
   }
 
-  const db = await getMongoDb()
+  /*
+   * Save to MongoDB.
+   */
+  const db =
+    await getMongoDb()
 
-  await db.collection<MainRosterData>(
-    "mainRoster",
-  ).updateOne(
-    { type: "main" },
-    { $set: roster },
-    { upsert: true },
-  )
+  await db
+    .collection<MainRosterData>(
+      "mainRoster",
+    )
+    .updateOne(
+      { type: "main" },
+      {
+        $set: roster,
+      },
+      {
+        upsert: true,
+      },
+    )
 
+  /*
+   * Return useful sync information.
+   */
   return {
     success: true,
+
     counts: {
       home: home.rows.length,
-      department: department.length,
-      employees: employees.length,
-      vehicles: vehicles.length,
-      uniforms: uniforms.length,
+      department:
+        department.length,
+      employees:
+        employees.length,
+      vehicles:
+        vehicles.length,
+      uniforms:
+        uniforms.length,
     },
+
     sheets: {
       home: resolvedHomeSheet,
-      department: resolvedDepartmentSheet,
-      employees: resolvedEmployeeSheet,
-      vehicles: resolvedVehicleSheet,
-      uniforms: resolvedUniformSheet,
+      department:
+        resolvedDepartmentSheet,
+      employees:
+        resolvedEmployeeSheet,
+      vehicles:
+        resolvedVehicleSheet,
+      uniforms:
+        resolvedUniformSheet,
     },
+
     updatedAt:
       roster.updatedAt.toISOString(),
-    duration: Date.now() - startedAt,
+
+    duration:
+      Date.now() - startedAt,
   }
 }
