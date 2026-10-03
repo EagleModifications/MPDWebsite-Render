@@ -1359,8 +1359,23 @@ export default function Gallery() {
                           </div>
 
                           <div className="border-t border-border/70 p-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
+                            <div className="relative">
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => openInfo(item)}
+                                onKeyDown={(event) => {
+                                  if (
+                                    event.key === "Enter" ||
+                                    event.key === " "
+                                  ) {
+                                    event.preventDefault()
+                                    openInfo(item)
+                                  }
+                                }}
+                                className="group/info w-full cursor-pointer rounded-lg px-1 py-1 pr-16 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                aria-label={`View information for ${item.title}`}
+                              >
                                 <div className="mb-1.5 flex items-center gap-2">
                                   <span
                                     className={[
@@ -1374,40 +1389,28 @@ export default function Gallery() {
                                   </span>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    openInfo(item)
-                                  }
-                                  className="block w-full min-w-0 rounded-lg px-1 py-1 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-                                  aria-label={`View information for ${item.title}`}
-                                >
-                                  <h3 className="truncate text-sm font-semibold">
-                                    {item.title}
-                                  </h3>
+                                <h3 className="truncate text-sm font-semibold">
+                                  {item.title}
+                                </h3>
 
-                                  {item.description && (
-                                    <div className="mt-1">
-                                      <p className="line-clamp-3 whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
-                                        {item.description}
-                                      </p>
+                                {item.description && (
+                                  <div className="mt-1">
+                                    <p className="line-clamp-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
+                                      {item.description}
+                                    </p>
 
-                                      {(item.description.length > 160 ||
-                                        item.description.split(/\r?\n/).length > 3) && (
-                                        <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
-                                          Show more...
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                </button>
+                                    {(item.description.length > 120 ||
+                                      item.description.split(/\r?\n/).length > 2) && (
+                                      <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
+                                        Show more...
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
 
-                                <p className="mt-2 text-[10px] text-muted-foreground">
-                                  {
-                                    mediaList.length
-                                  }{" "}
-                                  {mediaList.length ===
-                                  1
+                                <p className="mt-2 truncate whitespace-nowrap text-[10px] text-muted-foreground">
+                                  {mediaList.length}{" "}
+                                  {mediaList.length === 1
                                     ? "item"
                                     : "items"}
                                   {item.createdAt
@@ -1417,16 +1420,22 @@ export default function Gallery() {
                               </div>
 
                               {canManageGallery && (
-                                <div className="flex shrink-0 items-center gap-1">
+                                <div
+                                  className="absolute right-0 top-0 z-10 flex shrink-0 items-center gap-1"
+                                  onClick={(event) =>
+                                    event.stopPropagation()
+                                  }
+                                  onKeyDown={(event) =>
+                                    event.stopPropagation()
+                                  }
+                                >
                                   <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8"
                                     onClick={() =>
-                                      openEdit(
-                                        item,
-                                      )
+                                      openEdit(item)
                                     }
                                     aria-label={`Edit ${item.title}`}
                                   >
@@ -1439,13 +1448,10 @@ export default function Gallery() {
                                     size="icon"
                                     className="h-8 w-8 text-destructive hover:text-destructive"
                                     disabled={
-                                      deletingId ===
-                                      item.id
+                                      deletingId === item.id
                                     }
                                     onClick={() =>
-                                      requestDeleteGallery(
-                                        item,
-                                      )
+                                      requestDeleteGallery(item)
                                     }
                                     aria-label={`Delete ${item.title}`}
                                   >
