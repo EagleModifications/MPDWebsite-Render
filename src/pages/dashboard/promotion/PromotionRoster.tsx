@@ -2135,7 +2135,7 @@ export default function PromotionRoster() {
 
                           <div className="min-w-0">
                             <p className="text-muted-foreground">
-                              Required Time in Rank
+                              Required TIR
                             </p>
                             <p className="mt-0.5 font-medium">
                               {member.requiredTimeInRankDays} DAYS
