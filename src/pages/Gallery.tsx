@@ -296,6 +296,9 @@ export default function Gallery() {
       index: number
     } | null>(null)
 
+  const [infoItem, setInfoItem] =
+    useState<GalleryItem | null>(null)
+
   const [title, setTitle] =
     useState("")
 
@@ -336,6 +339,7 @@ export default function Gallery() {
     const overlayOpen =
       showModal ||
       Boolean(viewer) ||
+      Boolean(infoItem) ||
       Boolean(deleteTarget)
 
     if (!overlayOpen) return
@@ -361,7 +365,7 @@ export default function Gallery() {
       html.style.overflow = previousHtmlOverflow
       body.style.paddingRight = previousBodyPaddingRight
     }
-  }, [showModal, viewer, deleteTarget])
+  }, [showModal, viewer, infoItem, deleteTarget])
 
   const dragDepthRef =
     useRef(0)
@@ -933,8 +937,7 @@ export default function Gallery() {
             },
             body: JSON.stringify({
               title: cleanTitle,
-              description:
-                description.trim(),
+              description,
               category,
               media,
             }),
@@ -1067,6 +1070,14 @@ export default function Gallery() {
     }
   }
 
+  function openInfo(item: GalleryItem) {
+    setInfoItem(item)
+  }
+
+  function closeInfo() {
+    setInfoItem(null)
+  }
+
   function openViewer(
     item: GalleryItem,
     media: GalleryMedia,
@@ -1136,6 +1147,11 @@ export default function Gallery() {
       event: KeyboardEvent,
     ) {
       if (event.key === "Escape") {
+        if (infoItem) {
+          closeInfo()
+          return
+        }
+
         closeViewer()
       }
 
@@ -1159,7 +1175,7 @@ export default function Gallery() {
         handleKeyDown,
       )
     }
-  }, [viewer])
+  }, [infoItem, viewer])
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
@@ -1358,19 +1374,33 @@ export default function Gallery() {
                                   </span>
                                 </div>
 
-                                <h3 className="truncate text-sm font-semibold">
-                                  {
-                                    item.title
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openInfo(item)
                                   }
-                                </h3>
+                                  className="block w-full min-w-0 rounded-lg px-1 py-1 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                  aria-label={`View information for ${item.title}`}
+                                >
+                                  <h3 className="truncate text-sm font-semibold">
+                                    {item.title}
+                                  </h3>
 
-                                {item.description && (
-                                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                                    {
-                                      item.description
-                                    }
-                                  </p>
-                                )}
+                                  {item.description && (
+                                    <div className="mt-1">
+                                      <p className="line-clamp-3 whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
+                                        {item.description}
+                                      </p>
+
+                                      {(item.description.length > 160 ||
+                                        item.description.split(/\r?\n/).length > 3) && (
+                                        <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
+                                          Show more...
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </button>
 
                                 <p className="mt-2 text-[10px] text-muted-foreground">
                                   {
@@ -1558,6 +1588,208 @@ export default function Gallery() {
 
         <Footer />
       </main>
+
+      {infoItem && (
+        <div
+          className="fixed inset-0 z-[75] flex items-center justify-center overscroll-contain bg-black/50 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (
+              event.currentTarget ===
+              event.target
+            ) {
+              closeInfo()
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gallery-info-title"
+            className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+          >
+            <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
+              <div className="min-w-0 pr-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-blue-500">
+                  Gallery
+                </p>
+
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <h2
+                    id="gallery-info-title"
+                    className="min-w-0 text-lg font-semibold"
+                  >
+                    {infoItem.title}
+                  </h2>
+
+                  <span
+                    className={[
+                      "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                      infoItem.category === "Fleet"
+                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                        : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+                    ].join(" ")}
+                  >
+                    {infoItem.category ?? "Community"}
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={closeInfo}
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto overscroll-contain">
+              <div className="px-5 py-5">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Description
+                  </p>
+
+                  {infoItem.description ? (
+                    <div className="mt-2 rounded-xl border border-border/70 bg-background/50 p-4">
+                      <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
+                        {infoItem.description}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      No description provided.
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <ManagementStat
+                    icon={
+                      <Images className="h-4 w-4" />
+                    }
+                    label="Media"
+                    value={`${infoItem.media.length} ${
+                      infoItem.media.length === 1
+                        ? "item"
+                        : "items"
+                    }`}
+                  />
+
+                  <ManagementStat
+                    icon={
+                      <ImageIcon className="h-4 w-4" />
+                    }
+                    label="Images"
+                    value={String(
+                      infoItem.media.filter(
+                        isImageMedia,
+                      ).length,
+                    )}
+                  />
+
+                  <ManagementStat
+                    icon={
+                      <Video className="h-4 w-4" />
+                    }
+                    label="Videos"
+                    value={String(
+                      infoItem.media.filter(
+                        isVideoMedia,
+                      ).length,
+                    )}
+                  />
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
+                  {infoItem.createdAt && (
+                    <span>
+                      Added{" "}
+                      {formatDate(
+                        infoItem.createdAt,
+                      )}
+                    </span>
+                  )}
+
+                  {infoItem.updatedAt &&
+                    infoItem.updatedAt !==
+                      infoItem.createdAt && (
+                      <span>
+                        Updated{" "}
+                        {formatDate(
+                          infoItem.updatedAt,
+                        )}
+                      </span>
+                    )}
+                </div>
+
+                <div className="mt-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Media
+                    </p>
+
+                    <span className="text-xs text-muted-foreground">
+                      Click an item to view it
+                    </span>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {infoItem.media.map(
+                      (media) => (
+                        <div
+                          key={media.id}
+                          className="overflow-hidden rounded-xl border border-border/70 bg-background/50"
+                        >
+                          <GalleryMediaCard
+                            media={media}
+                            title={
+                              infoItem.title
+                            }
+                            onClick={() => {
+                              closeInfo()
+                              openViewer(
+                                infoItem,
+                                media,
+                              )
+                            }}
+                          />
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-5 py-3">
+              {canManageGallery && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    closeInfo()
+                    openEdit(infoItem)
+                  }}
+                >
+                  <Edit3 className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                onClick={closeInfo}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteTarget && (
         <div
