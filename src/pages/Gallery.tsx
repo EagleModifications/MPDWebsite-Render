@@ -1363,29 +1363,13 @@ export default function Gallery() {
                           key={item.id}
                           className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"
                         >
-                          <div className="grid gap-1">
-                            {mediaList.map(
-                              (media) => (
-                                <GalleryMediaCard
-                                  key={
-                                    media.id
-                                  }
-                                  media={
-                                    media
-                                  }
-                                  title={
-                                    item.title
-                                  }
-                                  onClick={() =>
-                                    openViewer(
-                                      item,
-                                      media,
-                                    )
-                                  }
-                                />
-                              ),
-                            )}
-                          </div>
+                          <GalleryMediaGrid
+                            media={mediaList}
+                            title={item.title}
+                            onOpen={(media) =>
+                              openViewer(item, media)
+                            }
+                          />
 
                           <div className="border-t border-border/70 p-3">
                             <div className="relative">
@@ -2455,6 +2439,157 @@ export default function Gallery() {
 
       {!user && !loading ? null : null}
     </div>
+  )
+}
+
+function GalleryMediaGrid({
+  media,
+  title,
+  onOpen,
+}: {
+  media: GalleryMedia[]
+  title: string
+  onOpen: (media: GalleryMedia) => void
+}) {
+  const count = media.length
+
+  if (!count) {
+    return null
+  }
+
+  const visibleMedia = media.slice(0, 3)
+  const remainingCount = Math.max(0, count - 3)
+  const overlayMedia = media[3]
+
+  return (
+    <div
+      className={[
+        "grid gap-1 overflow-hidden bg-muted/20",
+        count === 1
+          ? "grid-cols-1"
+          : "grid-cols-2",
+      ].join(" ")}
+    >
+      {visibleMedia.map((entry, index) => (
+        <GalleryMediaTile
+          key={entry.id}
+          media={entry}
+          title={title}
+          onClick={() => onOpen(entry)}
+          className={
+            count === 3 && index === 2
+              ? "col-span-2"
+              : "col-span-1"
+          }
+        />
+      ))}
+
+      {overlayMedia && (
+        <GalleryMediaTile
+          media={overlayMedia}
+          title={title}
+          onClick={() => onOpen(overlayMedia)}
+          className="col-span-1"
+          overlayCount={remainingCount}
+        />
+      )}
+    </div>
+  )
+}
+
+function GalleryMediaTile({
+  media,
+  title,
+  onClick,
+  className = "",
+  overlayCount = 0,
+}: {
+  media: GalleryMedia
+  title: string
+  onClick: () => void
+  className?: string
+  overlayCount?: number
+}) {
+  return (
+    <button
+      type="button"
+      className={[
+        "group relative block aspect-[4/3] w-full overflow-hidden bg-muted/40 text-left",
+        className,
+      ].join(" ")}
+      onClick={onClick}
+      aria-label={
+        overlayCount > 0
+          ? `View ${title}, plus ${overlayCount} more media items`
+          : `View ${title}`
+      }
+    >
+      {media.type === "image" ? (
+        <img
+          src={media.url}
+          alt={title}
+          className={[
+            "h-full w-full object-cover transition duration-300",
+            overlayCount > 0
+              ? "scale-100 blur-[5px] brightness-75 group-hover:scale-[1.02]"
+              : "group-hover:scale-[1.02]",
+          ].join(" ")}
+        />
+      ) : media.thumbnailUrl ? (
+        <img
+          src={media.thumbnailUrl}
+          alt={title}
+          className={[
+            "h-full w-full object-cover transition duration-300",
+            overlayCount > 0
+              ? "scale-100 blur-[5px] brightness-75 group-hover:scale-[1.02]"
+              : "group-hover:scale-[1.02]",
+          ].join(" ")}
+        />
+      ) : (
+        <video
+          src={media.url}
+          muted
+          playsInline
+          preload="metadata"
+          className={[
+            "h-full w-full object-cover transition duration-300",
+            overlayCount > 0
+              ? "scale-100 blur-[5px] brightness-75 group-hover:scale-[1.02]"
+              : "group-hover:scale-[1.02]",
+          ].join(" ")}
+        />
+      )}
+
+      <div className="pointer-events-none absolute inset-0 bg-black/10 transition-colors group-hover:bg-black/20" />
+
+      {overlayCount > 0 ? (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-white">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm">
+            <Images className="h-4.5 w-4.5" />
+          </span>
+
+          <span className="rounded-md bg-black/60 px-2.5 py-1 text-xs font-semibold backdrop-blur-sm">
+            +{overlayCount} {overlayCount === 1 ? "image/video" : "images/videos"}
+          </span>
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-2 text-white">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
+            {media.type === "image" ? (
+              <ImageIcon className="h-3 w-3" />
+            ) : (
+              <Video className="h-3 w-3" />
+            )}
+            {getMediaLabel(media.type)}
+          </span>
+
+          <span className="rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
+            View
+          </span>
+        </div>
+      )}
+    </button>
   )
 }
 
