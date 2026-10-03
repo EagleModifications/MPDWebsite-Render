@@ -16,6 +16,21 @@ export const env = {
   googleSheetId: required("GOOGLE_SHEET_ID"),
   rosterSheetName: required("GOOGLE_SHEET_ROSTER_IMPORT"),
 
+  mainRosterSheetId: required("GOOGLE_MAINROSTER_SHEET_ID"),
+  mainRosterHomeSheet: required("GOOGLE_MAINROSTER_SHEET_HOME"),
+  mainRosterDepartmentRosterSheet: required(
+    "GOOGLE_MAINROSTER_SHEET_DEPARTMENTROSTER",
+  ),
+  mainRosterEmployeeDataSheet: required(
+    "GOOGLE_MAINROSTER_SHEET_EMPLOYEEDATA",
+  ),
+  mainRosterVehicleRosterSheet: required(
+    "GOOGLE_MAINROSTER_SHEET_VEHICLEROSTER",
+  ),
+  mainRosterUniformRosterSheet: required(
+    "GOOGLE_MAINROSTER_SHEET_UNIFORMROSTER",
+  ),
+
   sessionSecret: required("SESSION_SECRET"),
 
   port: Number(process.env.PORT ?? 3001),
