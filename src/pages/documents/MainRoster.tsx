@@ -4,7 +4,6 @@ import {
   Filter,
   Search,
   Shield,
-  UserRound,
   Users,
   Car,
   Shirt,
