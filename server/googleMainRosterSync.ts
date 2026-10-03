@@ -1,6 +1,7 @@
 import { google } from "googleapis"
 
 import { getMongoDb } from "../src/lib/mongodb"
+import { env } from "./config"
 
 /* ─────────────────────────────────────────────
    Types
@@ -81,28 +82,13 @@ export type MainRosterData = {
    Google configuration
 ───────────────────────────────────────────── */
 
-function getRequiredEnv(name: string): string {
-  const value = process.env[name]?.trim()
-
-  if (!value) {
-    throw new Error(`${name} is not configured.`)
-  }
-
-  return value
-}
 
 function getGoogleSheetsClient() {
-  const clientEmail = getRequiredEnv(
-    "GOOGLE_SERVICE_ACCOUNT_EMAIL",
-  )
+  const clientEmail = env.googleServiceAccountEmail
 
-  const privateKey = getRequiredEnv(
-    "GOOGLE_PRIVATE_KEY",
-  ).replace(/\\n/g, "\n")
+  const privateKey = env.googlePrivateKey
 
-  const spreadsheetId = getRequiredEnv(
-    "GOOGLE_SHEET_ID",
-  )
+  const spreadsheetId = env.googleSheetId
 
   const auth = new google.auth.GoogleAuth({
     credentials: {
@@ -771,30 +757,13 @@ function parseHome(
 export async function syncGoogleMainRoster() {
   const startedAt = Date.now()
 
-  const departmentSheet =
-    getRequiredEnv(
-      "GOOGLE_MAIN_ROSTER_DEPARTMENT_SHEET",
-    )
-
-  const employeeSheet =
-    getRequiredEnv(
-      "GOOGLE_MAIN_ROSTER_EMPLOYEE_SHEET",
-    )
-
-  const uniformSheet =
-    getRequiredEnv(
-      "GOOGLE_MAIN_ROSTER_UNIFORM_SHEET",
-    )
-
-  const vehicleSheet =
-    getRequiredEnv(
-      "GOOGLE_MAIN_ROSTER_VEHICLE_SHEET",
-    )
-
-  const homeSheet =
-    getRequiredEnv(
-      "GOOGLE_MAIN_ROSTER_HOME_SHEET",
-    )
+  const {
+    homeSheet,
+    departmentSheet,
+    employeeSheet,
+    vehicleSheet,
+    uniformSheet,
+  } = env.mainRoster
 
   const { sheets, spreadsheetId } =
     getGoogleSheetsClient()
