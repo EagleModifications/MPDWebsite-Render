@@ -445,6 +445,9 @@ export default function Gallery() {
   const [saving, setSaving] =
     useState(false)
 
+  const [uploadProgress, setUploadProgress] =
+    useState<number | null>(null)
+
   const [deletingId, setDeletingId] =
     useState<string | null>(null)
 
@@ -865,14 +868,10 @@ export default function Gallery() {
     const files = pendingMedia
       .filter(
         (media) =>
-          media.source ===
-            "upload" &&
+          media.source === "upload" &&
           media.file,
       )
-      .map(
-        (media) =>
-          media.file as File,
-      )
+      .map((media) => media.file as File)
 
     if (!files.length) {
       return []
@@ -881,25 +880,50 @@ export default function Gallery() {
     const formData = new FormData()
 
     for (const file of files) {
-      formData.append(
-        "files",
-        file,
-        file.name,
-      )
+      formData.append("files", file, file.name)
     }
 
-    const response =
-      await fetch(
-        "/api/gallery/upload",
-        {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        },
-      )
+    setUploadProgress(0)
 
-    const raw =
-      await response.text()
+    const result = await new Promise<{
+      status: number
+      raw: string
+    }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+
+      xhr.open("POST", "/api/gallery/upload")
+      xhr.withCredentials = true
+      xhr.timeout = 15 * 60 * 1000
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return
+        setUploadProgress(
+          Math.min(100, Math.round((event.loaded / event.total) * 100)),
+        )
+      }
+
+      xhr.onload = () => {
+        setUploadProgress(100)
+        resolve({
+          status: xhr.status,
+          raw: xhr.responseText || "",
+        })
+      }
+
+      xhr.onerror = () => {
+        reject(new Error("Gallery upload failed. Check the server logs and try again."))
+      }
+
+      xhr.ontimeout = () => {
+        reject(new Error("Gallery upload timed out after 15 minutes."))
+      }
+
+      xhr.onabort = () => {
+        reject(new Error("Gallery upload was cancelled."))
+      }
+
+      xhr.send(formData)
+    })
 
     let data: {
       success?: boolean
@@ -908,44 +932,33 @@ export default function Gallery() {
     } = {}
 
     try {
-      data = raw
-        ? JSON.parse(raw)
-        : {}
+      data = result.raw ? JSON.parse(result.raw) : {}
     } catch {
       data = {}
     }
 
-    if (!response.ok) {
-      if (response.status === 404) {
+    if (result.status < 200 || result.status >= 300) {
+      if (result.status === 404) {
         throw new Error(
-          "Gallery upload API is not deployed. Redeploy the updated app.ts backend before uploading files.",
+          "Gallery upload API is not deployed. Make sure the updated app.ts is deployed and the server has been restarted.",
         )
       }
 
-      if (response.status === 401) {
-        throw new Error(
-          "Your session has expired. Sign in again.",
-        )
+      if (result.status === 401) {
+        throw new Error("Your session has expired. Sign in again.")
       }
 
-      if (response.status === 403) {
-        throw new Error(
-          "You do not have permission to upload gallery media.",
-        )
+      if (result.status === 403) {
+        throw new Error("You do not have permission to upload gallery media.")
       }
 
       throw new Error(
-        data.error ||
-          `Gallery upload failed (${response.status}).`,
+        data.error || `Gallery upload failed (${result.status}).`,
       )
     }
 
-    if (
-      !Array.isArray(data.items)
-    ) {
-      throw new Error(
-        "Gallery upload returned an invalid response.",
-      )
+    if (!Array.isArray(data.items)) {
+      throw new Error("Gallery upload returned an invalid response.")
     }
 
     return data.items
@@ -971,6 +984,7 @@ export default function Gallery() {
     }
 
     setSaving(true)
+    setUploadProgress(null)
 
     try {
       const uploaded =
@@ -1089,6 +1103,7 @@ export default function Gallery() {
       )
     } finally {
       setSaving(false)
+      setUploadProgress(null)
     }
   }
 
@@ -2296,9 +2311,11 @@ export default function Gallery() {
                               ) : (
                                 <video
                                   src={media.previewUrl || media.url}
+                                  autoPlay
                                   muted
+                                  loop
                                   playsInline
-                                  preload="metadata"
+                                  preload="auto"
                                   className="h-full w-full object-cover"
                                 />
                               )}
@@ -2366,7 +2383,9 @@ export default function Gallery() {
                 disabled={saving}
               >
                 {saving
-                  ? "Saving..."
+                  ? uploadProgress !== null && uploadProgress < 100
+                    ? `Uploading ${uploadProgress}%...`
+                    : "Saving..."
                   : editingItem
                     ? "Save Changes"
                     : "Create Gallery"}
@@ -2583,9 +2602,11 @@ function GalleryMediaCard({
       ) : (
         <video
           src={media.url}
+          autoPlay
           muted
+          loop
           playsInline
-          preload="metadata"
+          preload="auto"
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           onLoadedMetadata={(event) => {
             const video = event.currentTarget
