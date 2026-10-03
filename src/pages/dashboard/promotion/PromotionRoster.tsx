@@ -2138,7 +2138,7 @@ export default function PromotionRoster() {
                               Required Time in Rank
                             </p>
                             <p className="mt-0.5 font-medium">
-                              {member.requiredTimeInRankDays} days
+                              {member.requiredTimeInRankDays} DAYS
                             </p>
                           </div>
 
