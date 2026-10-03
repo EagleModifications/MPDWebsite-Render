@@ -21,6 +21,7 @@ type Requirement = {
   rankId: string
   rankName: string
   hours: number
+  trainings: number
 }
 
 type RequirementsResponse = {
@@ -111,7 +112,10 @@ const SWAT_RANKS: Rank[] = [
 
 const DIVISION = "swat"
 
-function createEmptyRequirements(): Record<string, Requirement> {
+function createEmptyRequirements(): Record<
+  string,
+  Requirement
+> {
   return Object.fromEntries(
     SWAT_RANKS.map((rank) => [
       rank.id,
@@ -119,39 +123,54 @@ function createEmptyRequirements(): Record<string, Requirement> {
         rankId: rank.id,
         rankName: rank.name,
         hours: 0,
+        trainings: 0,
       },
     ]),
   )
 }
 
 function normalizeRequirements(
-  loadedRequirements: Record<string, Requirement> = {},
+  loadedRequirements: Record<
+    string,
+    Requirement
+  > = {},
 ): Record<string, Requirement> {
-  const normalized = createEmptyRequirements()
+  const normalized =
+    createEmptyRequirements()
 
   for (const rank of SWAT_RANKS) {
-    const loaded = loadedRequirements[rank.id]
+    const loaded =
+      loadedRequirements[rank.id]
 
     const hours =
       typeof loaded?.hours === "number" &&
       Number.isFinite(loaded.hours)
-        ? Math.max(0, Math.floor(loaded.hours))
+        ? Math.max(
+            0,
+            Math.floor(loaded.hours),
+          )
+        : 0
+
+    const trainings =
+      typeof loaded?.trainings === "number" &&
+      Number.isFinite(loaded.trainings)
+        ? Math.max(
+            0,
+            Math.floor(loaded.trainings),
+          )
         : 0
 
     /*
      * Never trust rankName from MongoDB.
      *
-     * MongoDB may contain older records where:
-     *
-     * rankId   = "officer"
-     * rankName = "officer"
-     *
-     * The frontend always uses the hardcoded rank definition.
+     * The frontend always uses the hardcoded
+     * SWAT rank definition.
      */
     normalized[rank.id] = {
       rankId: rank.id,
       rankName: rank.name,
       hours,
+      trainings,
     }
   }
 
@@ -162,7 +181,102 @@ function areRequirementsEqual(
   first: Record<string, Requirement>,
   second: Record<string, Requirement>,
 ) {
-  return JSON.stringify(first) === JSON.stringify(second)
+  return JSON.stringify(first) ===
+    JSON.stringify(second)
+}
+
+function RequirementInput({
+  label,
+  value,
+  onChange,
+  onIncrease,
+  onDecrease,
+  disabled,
+}: {
+  label: string
+  value: number
+  onChange: (value: string) => void
+  onIncrease: () => void
+  onDecrease: () => void
+  disabled: boolean
+}) {
+  return (
+    <div className="min-w-0">
+      <label className="mb-1.5 block whitespace-nowrap text-xs font-medium text-muted-foreground">
+        {label}
+      </label>
+
+      <div className="flex h-11 w-full overflow-hidden rounded-lg border border-border bg-background">
+        <input
+          type="number"
+          min="0"
+          value={value}
+          onChange={(event) =>
+            onChange(event.target.value)
+          }
+          disabled={disabled}
+          className="
+            h-full
+            min-w-0
+            flex-1
+            border-0
+            bg-transparent
+            px-2
+            text-center
+            text-sm
+            font-semibold
+            text-foreground
+            outline-none
+            focus:bg-muted/30
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+            [appearance:textfield]
+            [&::-webkit-inner-spin-button]:appearance-none
+            [&::-webkit-outer-spin-button]:appearance-none
+          "
+        />
+
+        <div className="flex w-8 shrink-0 flex-col border-l border-border">
+          <button
+            type="button"
+            onClick={onIncrease}
+            disabled={disabled}
+            className="
+              flex h-1/2 items-center justify-center
+              border-b border-border
+              text-muted-foreground
+              transition-colors
+              hover:bg-blue-500/10
+              hover:text-blue-500
+              disabled:cursor-not-allowed
+              disabled:opacity-50
+            "
+            aria-label={`Increase ${label}`}
+          >
+            <ChevronUp className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onDecrease}
+            disabled={disabled}
+            className="
+              flex h-1/2 items-center justify-center
+              text-muted-foreground
+              transition-colors
+              hover:bg-blue-500/10
+              hover:text-blue-500
+              disabled:cursor-not-allowed
+              disabled:opacity-50
+            "
+            aria-label={`Decrease ${label}`}
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function SWATRequirements() {
@@ -231,7 +345,8 @@ export default function SWATRequirements() {
 
         const loaded =
           data.requirements &&
-          typeof data.requirements === "object"
+          typeof data.requirements ===
+            "object"
             ? data.requirements
             : {}
 
@@ -251,12 +366,15 @@ export default function SWATRequirements() {
           return
         }
 
-        toast.error("Failed to load requirements", {
-          description:
-            err instanceof Error
-              ? err.message
-              : "An unexpected error occurred while loading requirements.",
-        })
+        toast.error(
+          "Failed to load requirements",
+          {
+            description:
+              err instanceof Error
+                ? err.message
+                : "An unexpected error occurred while loading requirements.",
+          },
+        )
       } finally {
         if (!cancelled) {
           setIsLoading(false)
@@ -271,14 +389,16 @@ export default function SWATRequirements() {
     }
   }, [])
 
-  const hasChanges = !areRequirementsEqual(
-    requirements,
-    savedRequirements,
-  )
+  const hasChanges =
+    !areRequirementsEqual(
+      requirements,
+      savedRequirements,
+    )
 
-  function changeHours(
+  function updateRequirement(
     rankId: string,
-    amount: number,
+    field: "hours" | "trainings",
+    value: number,
   ) {
     const rank = rankConfig.find(
       (item) => item.id === rankId,
@@ -291,19 +411,49 @@ export default function SWATRequirements() {
     setRequirements((current) => ({
       ...current,
       [rankId]: {
+        ...(current[rankId] ??
+          {
+            rankId: rank.id,
+            rankName: rank.name,
+            hours: 0,
+            trainings: 0,
+          }),
         rankId: rank.id,
         rankName: rank.name,
-        hours: Math.max(
+        [field]: Math.max(
           0,
-          (current[rankId]?.hours ?? 0) +
-            amount,
+          Math.floor(value),
         ),
       },
     }))
   }
 
-  function setHours(
+  function changeRequirement(
     rankId: string,
+    field: "hours" | "trainings",
+    amount: number,
+  ) {
+    const rank = rankConfig.find(
+      (item) => item.id === rankId,
+    )
+
+    if (!rank) {
+      return
+    }
+
+    const currentValue =
+      requirements[rankId]?.[field] ?? 0
+
+    updateRequirement(
+      rankId,
+      field,
+      currentValue + amount,
+    )
+  }
+
+  function setRequirement(
+    rankId: string,
+    field: "hours" | "trainings",
     value: string,
   ) {
     const rank = rankConfig.find(
@@ -315,34 +465,24 @@ export default function SWATRequirements() {
     }
 
     if (value === "") {
-      setRequirements((current) => ({
-        ...current,
-        [rankId]: {
-          rankId: rank.id,
-          rankName: rank.name,
-          hours: 0,
-        },
-      }))
-
+      updateRequirement(
+        rankId,
+        field,
+        0,
+      )
       return
     }
 
-    const parsedHours =
+    const parsed =
       Number.parseInt(value, 10)
 
-    const hours =
-      Number.isFinite(parsedHours)
-        ? Math.max(0, parsedHours)
-        : 0
-
-    setRequirements((current) => ({
-      ...current,
-      [rankId]: {
-        rankId: rank.id,
-        rankName: rank.name,
-        hours,
-      },
-    }))
+    updateRequirement(
+      rankId,
+      field,
+      Number.isFinite(parsed)
+        ? parsed
+        : 0,
+    )
   }
 
   async function handleSave() {
@@ -356,21 +496,19 @@ export default function SWATRequirements() {
 
     setIsSaving(true)
 
-    const loadingToast = toast.loading(
-      "Saving requirements...",
-      {
-        description:
-          "Updating SWAT rank requirements.",
-      },
-    )
+    const loadingToast =
+      toast.loading(
+        "Saving requirements...",
+        {
+          description:
+            "Updating SWAT rank requirements.",
+        },
+      )
 
     try {
       /*
-       * Always build the payload from the frontend
-       * rank configuration.
-       *
-       * This prevents old MongoDB rankName values
-       * from being written back into the database.
+       * Always build the payload from the
+       * frontend rank configuration.
        */
       const normalizedRequirements: Record<
         string,
@@ -378,16 +516,28 @@ export default function SWATRequirements() {
       > = {}
 
       for (const rank of rankConfig) {
-        const currentHours =
-          requirements[rank.id]?.hours ?? 0
+        const current =
+          requirements[rank.id]
 
-        normalizedRequirements[rank.id] = {
+        normalizedRequirements[
+          rank.id
+        ] = {
           rankId: rank.id,
           rankName: rank.name,
           hours: Math.max(
             0,
             Math.floor(
-              Number(currentHours),
+              Number(
+                current?.hours ?? 0,
+              ),
+            ),
+          ),
+          trainings: Math.max(
+            0,
+            Math.floor(
+              Number(
+                current?.trainings ?? 0,
+              ),
             ),
           ),
         }
@@ -439,13 +589,10 @@ export default function SWATRequirements() {
         )
       }
 
-      /*
-       * Normalize the response again so the UI never
-       * displays a bad rankName returned from MongoDB.
-       */
       const savedData =
         data.requirements &&
-        typeof data.requirements === "object"
+        typeof data.requirements ===
+          "object"
           ? data.requirements
           : normalizedRequirements
 
@@ -454,7 +601,9 @@ export default function SWATRequirements() {
           savedData,
         )
 
-      setRequirements(normalizedSaved)
+      setRequirements(
+        normalizedSaved,
+      )
 
       setSavedRequirements({
         ...normalizedSaved,
@@ -469,20 +618,26 @@ export default function SWATRequirements() {
         },
       )
     } catch (err) {
-      toast.error("Failed to save requirements", {
-        id: loadingToast,
-        description:
-          err instanceof Error
-            ? err.message
-            : "An unexpected error occurred while saving requirements.",
-      })
+      toast.error(
+        "Failed to save requirements",
+        {
+          id: loadingToast,
+          description:
+            err instanceof Error
+              ? err.message
+              : "An unexpected error occurred while saving requirements.",
+        },
+      )
     } finally {
       setIsSaving(false)
     }
   }
 
   function handleReset() {
-    if (!hasChanges || isSaving) {
+    if (
+      !hasChanges ||
+      isSaving
+    ) {
       return
     }
 
@@ -530,8 +685,9 @@ export default function SWATRequirements() {
               </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Configure the required promotion hours
-                for each SWAT rank.
+                Configure the required promotion
+                hours and trainings for each
+                SWAT rank.
               </p>
             </div>
           </div>
@@ -585,12 +741,13 @@ export default function SWATRequirements() {
 
                   <div>
                     <h2 className="text-base font-semibold">
-                      Required Promotion Hours
+                      SWAT Promotion Requirements
                     </h2>
 
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Set the minimum hours required
-                      for each rank.
+                      Set the minimum hours and
+                      trainings required for each
+                      rank.
                     </p>
                   </div>
                 </div>
@@ -606,27 +763,28 @@ export default function SWATRequirements() {
               <div>
                 {rankConfig.map(
                   (rank, index) => {
-                    const hours =
+                    const requirement =
                       requirements[
                         rank.id
-                      ]?.hours ?? 0
+                      ] ?? {
+                        rankId: rank.id,
+                        rankName: rank.name,
+                        hours: 0,
+                        trainings: 0,
+                      }
 
                     return (
                       <div
                         key={rank.id}
                         className={`
-                          flex
-                          min-h-[78px]
-                          items-center
-                          justify-between
-                          gap-6
                           px-6
-                          py-4
+                          py-5
                           transition-colors
                           hover:bg-muted/20
                           ${
                             index !==
-                            rankConfig.length - 1
+                            rankConfig.length -
+                              1
                               ? "border-b border-border"
                               : ""
                           }
@@ -634,147 +792,132 @@ export default function SWATRequirements() {
                       >
                         <div
                           className="
-                            flex min-w-0
-                            items-center gap-4
+                            flex flex-col
+                            gap-5
+                            lg:flex-row
+                            lg:items-center
+                            lg:justify-between
                           "
                         >
                           <div
                             className="
-                              flex h-10 w-10
-                              shrink-0
-                              items-center
-                              justify-center
-                              rounded-lg
-                              border
-                              border-blue-500/20
-                              bg-blue-500/10
+                              flex min-w-0
+                              items-center gap-4
                             "
                           >
-                            <Shield className="h-5 w-5 text-blue-500" />
-                          </div>
-
-                          <div className="min-w-0">
-                            <p
+                            <div
                               className="
-                                text-base
-                                font-semibold
-                                leading-5
+                                flex h-10 w-10
+                                shrink-0
+                                items-center
+                                justify-center
+                                rounded-lg
+                                border
+                                border-blue-500/20
+                                bg-blue-500/10
                               "
                             >
-                              {rank.name}
-                            </p>
+                              <Shield className="h-5 w-5 text-blue-500" />
+                            </div>
 
-                            <p
-                              className="
-                                mt-1 text-sm
-                                text-muted-foreground
-                              "
-                            >
-                              Required hours
-                            </p>
+                            <div className="min-w-0">
+                              <p
+                                className="
+                                  text-base
+                                  font-semibold
+                                  leading-5
+                                "
+                              >
+                                {rank.name}
+                              </p>
+
+                              <p
+                                className="
+                                  mt-1 text-sm
+                                  text-muted-foreground
+                                "
+                              >
+                                Configure promotion
+                                requirements
+                              </p>
+                            </div>
                           </div>
-                        </div>
-
-                        <div
-                          className="
-                            flex h-12
-                            shrink-0
-                            overflow-hidden
-                            rounded-lg
-                            border border-border
-                            bg-background
-                          "
-                        >
-                          <input
-                            type="number"
-                            min="0"
-                            value={hours}
-                            onChange={(event) =>
-                              setHours(
-                                rank.id,
-                                event.target.value,
-                              )
-                            }
-                            disabled={isSaving}
-                            className="
-                              h-full
-                              w-16
-                              border-0
-                              bg-transparent
-                              px-2
-                              text-center
-                              text-base
-                              font-semibold
-                              text-foreground
-                              outline-none
-                              focus:bg-muted/30
-                              disabled:cursor-not-allowed
-                              disabled:opacity-60
-                              [appearance:textfield]
-                              [&::-webkit-inner-spin-button]:appearance-none
-                              [&::-webkit-outer-spin-button]:appearance-none
-                            "
-                          />
 
                           <div
                             className="
-                              flex w-9
-                              flex-col
-                              border-l
-                              border-border
+                              grid w-full
+                              grid-cols-1
+                              gap-3
+                              sm:grid-cols-2
+                              lg:w-auto
+                              lg:grid-cols-2
                             "
                           >
-                            <button
-                              type="button"
-                              onClick={() =>
-                                changeHours(
+                            <RequirementInput
+                              label="Promotion Hours"
+                              value={
+                                requirement.hours
+                              }
+                              onChange={(
+                                value,
+                              ) =>
+                                setRequirement(
                                   rank.id,
+                                  "hours",
+                                  value,
+                                )
+                              }
+                              onIncrease={() =>
+                                changeRequirement(
+                                  rank.id,
+                                  "hours",
                                   1,
                                 )
                               }
-                              disabled={isSaving}
-                              className="
-                                flex h-1/2
-                                items-center
-                                justify-center
-                                border-b
-                                border-border
-                                text-muted-foreground
-                                transition-colors
-                                hover:bg-blue-500/10
-                                hover:text-blue-500
-                                disabled:cursor-not-allowed
-                                disabled:opacity-50
-                              "
-                              aria-label={`Increase ${rank.name} hours`}
-                            >
-                              <ChevronUp className="h-4 w-4" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                changeHours(
+                              onDecrease={() =>
+                                changeRequirement(
                                   rank.id,
+                                  "hours",
                                   -1,
                                 )
                               }
-                              disabled={isSaving}
-                              className="
-                                flex h-1/2
-                                items-center
-                                justify-center
-                                text-muted-foreground
-                                transition-colors
-                                hover:bg-blue-500/10
-                                hover:text-blue-500
-                                disabled:cursor-not-allowed
-                                disabled:opacity-50
-                              "
-                              aria-label={`Decrease ${rank.name} hours`}
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </button>
+                              disabled={
+                                isSaving
+                              }
+                            />
+
+                            <RequirementInput
+                              label="Trainings"
+                              value={
+                                requirement.trainings
+                              }
+                              onChange={(
+                                value,
+                              ) =>
+                                setRequirement(
+                                  rank.id,
+                                  "trainings",
+                                  value,
+                                )
+                              }
+                              onIncrease={() =>
+                                changeRequirement(
+                                  rank.id,
+                                  "trainings",
+                                  1,
+                                )
+                              }
+                              onDecrease={() =>
+                                changeRequirement(
+                                  rank.id,
+                                  "trainings",
+                                  -1,
+                                )
+                              }
+                              disabled={
+                                isSaving
+                              }
+                            />
                           </div>
                         </div>
                       </div>
@@ -798,7 +941,9 @@ export default function SWATRequirements() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={handleReset}
+                  onClick={
+                    handleReset
+                  }
                   disabled={
                     !hasChanges ||
                     isSaving
