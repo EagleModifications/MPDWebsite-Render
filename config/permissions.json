@@ -47,5 +47,14 @@
   },
   "gallery": {
     "urls": ["/gallery"]
+  },
+  "documents": {
+    "urls": [
+      "/documents/mainroster",
+      "/documents/swatroster",
+      "/documents/mcdroster",
+      "/documents/truroster",
+      "/documents/ftdroster",
+    ]
   }
 }
