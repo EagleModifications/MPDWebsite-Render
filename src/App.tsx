@@ -157,12 +157,6 @@ export default function App() {
   return (
     <BrowserRouter>
       {/* ===================================================
-          CUSTOM CURSOR
-      =================================================== */}
-
-      <CustomCursor />
-
-      {/* ===================================================
           ROUTES
       =================================================== */}
 
@@ -400,8 +394,32 @@ export default function App() {
 
       <Toaster
         position="top-right"
+
+        /*
+         * Keep multiple notifications visible instead of
+         * hiding them underneath the newest notification.
+         */
+        visibleToasts={5}
+        expand
+        gap={10}
+
+        /*
+         * Keep notifications away from the browser edge.
+         */
+        offset={{
+          top: 24,
+          right: 24,
+        }}
+
         theme="system"
         closeButton
+
+        /*
+         * Notifications sit below the custom cursor but
+         * above the rest of the application.
+         */
+        className="!z-[2147483646]"
+
         icons={{
           success: (
             <CheckCircle2 className="size-5 shrink-0 text-green-500" />
@@ -416,17 +434,26 @@ export default function App() {
             <XCircle className="size-5 shrink-0 text-red-500" />
           ),
         }}
+
         toastOptions={{
           classNames: {
             toast:
               "bg-background text-foreground border-border pr-12",
+
             title:
               "text-foreground",
+
             description:
               "text-muted-foreground",
           },
         }}
       />
+
+      {/* ===================================================
+          CUSTOM CURSOR
+      =================================================== */}
+
+      <CustomCursor />
     </BrowserRouter>
   )
 }
