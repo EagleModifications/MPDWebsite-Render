@@ -2,9 +2,9 @@ import { google } from "googleapis"
 
 import { getMongoDb } from "../src/lib/mongodb"
 
-// ─────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Types
+───────────────────────────────────────────── */
 
 export type MainRosterDepartmentMember = {
   section: string
@@ -62,8 +62,14 @@ export type MainRosterUniform = {
   sharedOutfitCode: string
 }
 
+export type MainRosterHome = {
+  headers: string[]
+  rows: string[][]
+}
+
 export type MainRosterData = {
   type: "main"
+  home: MainRosterHome
   department: MainRosterDepartmentMember[]
   employees: MainRosterEmployee[]
   vehicles: MainRosterVehicle[]
@@ -71,157 +77,68 @@ export type MainRosterData = {
   updatedAt: Date
 }
 
-type GoogleConfig = {
-  spreadsheetId: string
-  serviceAccountEmail: string
-  privateKey: string
-  departmentSheet: string
-  employeeSheet: string
-  vehicleSheet: string
-  uniformSheet: string
+/* ─────────────────────────────────────────────
+   Google configuration
+───────────────────────────────────────────── */
+
+function getRequiredEnv(name: string): string {
+  const value = process.env[name]?.trim()
+
+  if (!value) {
+    throw new Error(`${name} is not configured.`)
+  }
+
+  return value
 }
 
-// ─────────────────────────────────────────────
-// Google configuration
-// ─────────────────────────────────────────────
-
-function getGoogleConfig(): GoogleConfig {
-  const spreadsheetId =
-    process.env.GOOGLE_SHEET_ID?.trim() ?? ""
-
-  const serviceAccountEmail =
-    process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim() ?? ""
-
-  const privateKey = (
-    process.env.GOOGLE_PRIVATE_KEY ?? ""
+function getGoogleSheetsClient() {
+  const clientEmail = getRequiredEnv(
+    "GOOGLE_SERVICE_ACCOUNT_EMAIL",
   )
-    .replace(/\\n/g, "\n")
-    .trim()
 
-  const departmentSheet =
-    process.env
-      .GOOGLE_MAIN_ROSTER_DEPARTMENT_SHEET
-      ?.trim() ?? ""
+  const privateKey = getRequiredEnv(
+    "GOOGLE_PRIVATE_KEY",
+  ).replace(/\\n/g, "\n")
 
-  const employeeSheet =
-    process.env
-      .GOOGLE_MAIN_ROSTER_EMPLOYEE_SHEET
-      ?.trim() ?? ""
+  const spreadsheetId = getRequiredEnv(
+    "GOOGLE_SHEET_ID",
+  )
 
-  const vehicleSheet =
-    process.env
-      .GOOGLE_MAIN_ROSTER_VEHICLE_SHEET
-      ?.trim() ?? ""
-
-  const uniformSheet =
-    process.env
-      .GOOGLE_MAIN_ROSTER_UNIFORM_SHEET
-      ?.trim() ?? ""
-
-  if (!spreadsheetId) {
-    throw new Error(
-      "GOOGLE_SHEET_ID is not configured.",
-    )
-  }
-
-  if (!serviceAccountEmail) {
-    throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT_EMAIL is not configured.",
-    )
-  }
-
-  if (!privateKey) {
-    throw new Error(
-      "GOOGLE_PRIVATE_KEY is not configured.",
-    )
-  }
-
-  if (!departmentSheet) {
-    throw new Error(
-      "GOOGLE_MAIN_ROSTER_DEPARTMENT_SHEET is not configured.",
-    )
-  }
-
-  if (!employeeSheet) {
-    throw new Error(
-      "GOOGLE_MAIN_ROSTER_EMPLOYEE_SHEET is not configured.",
-    )
-  }
-
-  if (!vehicleSheet) {
-    throw new Error(
-      "GOOGLE_MAIN_ROSTER_VEHICLE_SHEET is not configured.",
-    )
-  }
-
-  if (!uniformSheet) {
-    throw new Error(
-      "GOOGLE_MAIN_ROSTER_UNIFORM_SHEET is not configured.",
-    )
-  }
-
-  return {
-    spreadsheetId,
-    serviceAccountEmail,
-    privateKey,
-    departmentSheet,
-    employeeSheet,
-    vehicleSheet,
-    uniformSheet,
-  }
-}
-
-// ─────────────────────────────────────────────
-// Google authentication
-// ─────────────────────────────────────────────
-
-function createGoogleAuth() {
-  const config =
-    getGoogleConfig()
-
-  return new google.auth.GoogleAuth({
+  const auth = new google.auth.GoogleAuth({
     credentials: {
-      client_email:
-        config.serviceAccountEmail,
-
-      private_key:
-        config.privateKey,
+      client_email: clientEmail,
+      private_key: privateKey,
     },
-
     scopes: [
       "https://www.googleapis.com/auth/spreadsheets.readonly",
     ],
   })
+
+  return {
+    sheets: google.sheets({
+      version: "v4",
+      auth,
+    }),
+    spreadsheetId,
+  }
 }
 
-// ─────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Helpers
+───────────────────────────────────────────── */
 
-function text(
-  value: unknown,
-): string {
-  return String(
-    value ?? "",
-  ).trim()
+function clean(value: unknown): string {
+  return String(value ?? "").trim()
 }
 
-function normaliseHeader(
-  value: unknown,
-): string {
-  return text(value)
+function normalizeHeader(value: unknown): string {
+  return clean(value)
     .toLowerCase()
-    .replace(
-      /[^a-z0-9]/g,
-      "",
-    )
+    .replace(/[^a-z0-9]/g, "")
 }
 
-function booleanValue(
-  value: unknown,
-): boolean {
-  const valueText =
-    text(value).toLowerCase()
+function booleanValue(value: unknown): boolean {
+  const normalized = clean(value).toLowerCase()
 
   return [
     "true",
@@ -230,947 +147,785 @@ function booleanValue(
     "x",
     "1",
     "checked",
-  ].includes(valueText)
-}
-
-function createHeaderMap(
-  row: string[],
-): Map<string, number> {
-  const headers =
-    new Map<string, number>()
-
-  row.forEach(
-    (
-      value,
-      index,
-    ) => {
-      const key =
-        normaliseHeader(
-          value,
-        )
-
-      if (key) {
-        headers.set(
-          key,
-          index,
-        )
-      }
-    },
-  )
-
-  return headers
-}
-
-function getValue(
-  row: string[],
-  headers: Map<string, number>,
-  header: string,
-): string {
-  const index =
-    headers.get(
-      normaliseHeader(
-        header,
-      ),
-    )
-
-  if (
-    index === undefined
-  ) {
-    return ""
-  }
-
-  return text(
-    row[index],
-  )
+  ].includes(normalized)
 }
 
 function findHeaderRow(
-  rows: string[][],
+  rows: unknown[][],
   requiredHeaders: string[],
 ): number {
-  const required =
-    requiredHeaders.map(
-      normaliseHeader,
-    )
+  const required = requiredHeaders.map(normalizeHeader)
 
-  for (
-    let rowIndex = 0;
-    rowIndex < rows.length;
-    rowIndex++
-  ) {
-    const headers =
-      rows[rowIndex].map(
-        normaliseHeader,
+  for (let index = 0; index < rows.length; index += 1) {
+    const headers = (rows[index] ?? []).map(normalizeHeader)
+
+    if (
+      required.every((header) =>
+        headers.includes(header),
       )
-
-    const found =
-      required.every(
-        (header) =>
-          headers.includes(
-            header,
-          ),
-      )
-
-    if (found) {
-      return rowIndex
+    ) {
+      return index
     }
   }
 
   return -1
 }
 
-async function getSheetRows(
-  sheets: ReturnType<
-    typeof google.sheets
-  >,
+function getColumn(
+  headers: unknown[],
+  alternatives: string[],
+): number {
+  const normalizedHeaders = headers.map(normalizeHeader)
+  const normalizedAlternatives =
+    alternatives.map(normalizeHeader)
+
+  return normalizedHeaders.findIndex((header) =>
+    normalizedAlternatives.includes(header),
+  )
+}
+
+function getValue(
+  row: unknown[],
+  column: number,
+): string {
+  if (column < 0) {
+    return ""
+  }
+
+  return clean(row[column])
+}
+
+function nonEmptyRows(
+  rows: unknown[][],
+): unknown[][] {
+  return rows.filter((row) =>
+    row.some((value) => clean(value) !== ""),
+  )
+}
+
+/* ─────────────────────────────────────────────
+   Google → raw rows
+───────────────────────────────────────────── */
+
+async function getSheetValues(
+  sheets: ReturnType<typeof getGoogleSheetsClient>["sheets"],
+  spreadsheetId: string,
   sheetName: string,
-): Promise<string[][]> {
-  const config =
-    getGoogleConfig()
-
-  try {
-    const response =
-      await sheets.spreadsheets.values.get(
-        {
-          spreadsheetId:
-            config.spreadsheetId,
-
-          range: `'${sheetName}'`,
-        },
-      )
-
-    return (
-      (response.data.values as
-        | string[][]
-        | undefined) ?? []
-    )
-  } catch (error) {
-    throw new Error(
-      `Failed to read Google Sheet "${sheetName}": ${
-        error instanceof Error
-          ? error.message
-          : String(error)
-      }`,
-    )
-  }
-}
-
-// ─────────────────────────────────────────────
-// Department Roster
-// ─────────────────────────────────────────────
-
-function parseDepartmentRoster(
-  rows: string[][],
-): MainRosterDepartmentMember[] {
-  const headerIndex =
-    findHeaderRow(
-      rows,
-      [
-        "Callsign",
-        "Badge Number",
-        "Name",
-        "Insignia",
-        "Rank",
-      ],
-    )
-
-  if (
-    headerIndex === -1
-  ) {
-    throw new Error(
-      "Could not find Department Roster headers.",
-    )
-  }
-
-  const members: MainRosterDepartmentMember[] =
-    []
-
-  let headers =
-    createHeaderMap(
-      rows[headerIndex],
-    )
-
-  let currentSection = ""
-
-  for (
-    let rowIndex =
-      headerIndex + 1;
-    rowIndex < rows.length;
-    rowIndex++
-  ) {
-    const row =
-      rows[rowIndex]
-
-    if (
-      !row ||
-      row.length === 0
-    ) {
-      continue
-    }
-
-    // Google Sheets can repeat
-    // the column header before
-    // each roster section.
-    const firstCell =
-      normaliseHeader(
-        row[0],
-      )
-
-    if (
-      firstCell ===
-      "callsign"
-    ) {
-      headers =
-        createHeaderMap(
-          row,
-        )
-
-      continue
-    }
-
-    const callsign =
-      getValue(
-        row,
-        headers,
-        "Callsign",
-      )
-
-    const badgeNumber =
-      getValue(
-        row,
-        headers,
-        "Badge Number",
-      )
-
-    const name =
-      getValue(
-        row,
-        headers,
-        "Name",
-      )
-
-    const rank =
-      getValue(
-        row,
-        headers,
-        "Rank",
-      )
-
-    // Empty row or section heading.
-    if (
-      !callsign &&
-      !badgeNumber &&
-      !name &&
-      !rank
-    ) {
-      const nonEmptyCells =
-        row
-          .map(text)
-          .filter(Boolean)
-
-      if (
-        nonEmptyCells.length ===
-        1
-      ) {
-        currentSection =
-          nonEmptyCells[0]
-      }
-
-      continue
-    }
-
-    members.push({
-      section:
-        currentSection,
-
-      callsign,
-
-      badgeNumber,
-
-      name,
-
-      insignia:
-        getValue(
-          row,
-          headers,
-          "Insignia",
-        ),
-
-      rank,
-
-      jobDescription:
-        getValue(
-          row,
-          headers,
-          "Job Description",
-        ),
-
-      timeInDept:
-        getValue(
-          row,
-          headers,
-          "Time In Dept",
-        ),
-
-      timeInRank:
-        getValue(
-          row,
-          headers,
-          "Time In Rank",
-        ),
-
-      status:
-        getValue(
-          row,
-          headers,
-          "Status",
-        ),
-
-      strike1:
-        booleanValue(
-          getValue(
-            row,
-            headers,
-            "Strike 1",
-          ),
-        ),
-
-      strike2:
-        booleanValue(
-          getValue(
-            row,
-            headers,
-            "Strike 2",
-          ),
-        ),
-
-      discordId:
-        getValue(
-          row,
-          headers,
-          "Discord ID",
-        ),
-
-      hoursThisMonth:
-        getValue(
-          row,
-          headers,
-          "Hours this month",
-        ),
+): Promise<unknown[][]> {
+  const response =
+    await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${sheetName}'!A:ZZ`,
+      majorDimension: "ROWS",
     })
-  }
 
-  return members
+  return response.data.values ?? []
 }
 
-// ─────────────────────────────────────────────
-// Employee Database
-// ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Department
+───────────────────────────────────────────── */
+
+function parseDepartment(
+  rows: unknown[][],
+  sheetName: string,
+): MainRosterDepartmentMember[] {
+  const headerIndex = findHeaderRow(rows, [
+    "Callsign",
+    "Badge Number",
+    "Name",
+    "Insignia",
+    "Rank",
+  ])
+
+  if (headerIndex === -1) {
+    throw new Error(
+      `Google Sheet "${sheetName}" is missing the required Department Roster columns.`,
+    )
+  }
+
+  const headers = rows[headerIndex] ?? []
+
+  const columns = {
+    section: getColumn(headers, [
+      "Section",
+      "Division",
+      "Department",
+    ]),
+    callsign: getColumn(headers, [
+      "Callsign",
+      "Call Sign",
+      "Callsign Number",
+    ]),
+    badgeNumber: getColumn(headers, [
+      "Badge Number",
+      "Badge",
+      "BadgeNumber",
+      "Badge #",
+      "Badge#",
+    ]),
+    name: getColumn(headers, [
+      "Name",
+      "Full Name",
+      "Officer Name",
+    ]),
+    insignia: getColumn(headers, [
+      "Insignia",
+    ]),
+    rank: getColumn(headers, [
+      "Rank",
+      "Current Rank",
+    ]),
+    jobDescription: getColumn(headers, [
+      "Job Description",
+      "Job",
+      "Description",
+    ]),
+    timeInDept: getColumn(headers, [
+      "Time In Dept",
+      "Time In Department",
+      "TimeInDept",
+      "Department Time",
+      "Dept Time",
+    ]),
+    timeInRank: getColumn(headers, [
+      "Time In Rank",
+      "TimeInRank",
+      "Rank Time",
+    ]),
+    status: getColumn(headers, [
+      "Status",
+      "Department Status",
+    ]),
+    strike1: getColumn(headers, [
+      "Strike 1",
+      "Strike1",
+      "Strike One",
+    ]),
+    strike2: getColumn(headers, [
+      "Strike 2",
+      "Strike2",
+      "Strike Two",
+    ]),
+    discordId: getColumn(headers, [
+      "Discord ID",
+      "DiscordID",
+      "Discord",
+      "Discord Id",
+    ]),
+    hoursThisMonth: getColumn(headers, [
+      "Hours This Month",
+      "This Month Hours",
+      "Hours",
+      "Activity Hours",
+    ]),
+  }
+
+  return rows
+    .slice(headerIndex + 1)
+    .filter((row) =>
+      row.some((value) => clean(value) !== ""),
+    )
+    .map((row) => ({
+      section: getValue(row, columns.section),
+      callsign: getValue(row, columns.callsign),
+      badgeNumber: getValue(
+        row,
+        columns.badgeNumber,
+      ),
+      name: getValue(row, columns.name),
+      insignia: getValue(row, columns.insignia),
+      rank: getValue(row, columns.rank),
+      jobDescription: getValue(
+        row,
+        columns.jobDescription,
+      ),
+      timeInDept: getValue(
+        row,
+        columns.timeInDept,
+      ),
+      timeInRank: getValue(
+        row,
+        columns.timeInRank,
+      ),
+      status: getValue(row, columns.status),
+      strike1: booleanValue(
+        row[columns.strike1],
+      ),
+      strike2: booleanValue(
+        row[columns.strike2],
+      ),
+      discordId: getValue(
+        row,
+        columns.discordId,
+      ),
+      hoursThisMonth: getValue(
+        row,
+        columns.hoursThisMonth,
+      ),
+    }))
+    .filter(
+      (member) =>
+        member.callsign ||
+        member.badgeNumber ||
+        member.name ||
+        member.discordId,
+    )
+}
+
+/* ─────────────────────────────────────────────
+   Employees
+───────────────────────────────────────────── */
 
 function parseEmployees(
-  rows: string[][],
+  rows: unknown[][],
+  sheetName: string,
 ): MainRosterEmployee[] {
-  const headerIndex =
-    findHeaderRow(
-      rows,
-      [
-        "Badge Number",
-        "Name",
-        "Discord ID",
-        "Department Status",
-        "Rank",
-      ],
-    )
+  const headerIndex = findHeaderRow(rows, [
+    "Badge Number",
+    "Name",
+    "Discord ID",
+    "Department Status",
+    "Rank",
+  ])
 
-  if (
-    headerIndex === -1
-  ) {
+  if (headerIndex === -1) {
     throw new Error(
-      "Could not find Employee Database headers.",
+      `Google Sheet "${sheetName}" is missing the required Employee Database columns.`,
     )
   }
 
-  const headers =
-    createHeaderMap(
-      rows[headerIndex],
-    )
+  const headers = rows[headerIndex] ?? []
 
-  const employees: MainRosterEmployee[] =
-    []
-
-  for (
-    let rowIndex =
-      headerIndex + 1;
-    rowIndex < rows.length;
-    rowIndex++
-  ) {
-    const row =
-      rows[rowIndex]
-
-    if (!row) {
-      continue
-    }
-
-    const badgeNumber =
-      getValue(
-        row,
-        headers,
-        "Badge Number",
-      )
-
-    const name =
-      getValue(
-        row,
-        headers,
-        "Name",
-      )
-
-    if (
-      !badgeNumber &&
-      !name
-    ) {
-      continue
-    }
-
-    employees.push({
-      sendMessage:
-        getValue(
-          row,
-          headers,
-          "Send Message",
-        ),
-
-      badgeNumber,
-
-      name,
-
-      discordId:
-        getValue(
-          row,
-          headers,
-          "Discord ID",
-        ),
-
-      departmentStatus:
-        getValue(
-          row,
-          headers,
-          "Department Status",
-        ),
-
-      rank:
-        getValue(
-          row,
-          headers,
-          "Rank",
-        ),
-
-      timezone:
-        getValue(
-          row,
-          headers,
-          "Timezone",
-        ),
-
-      joinDeptDate:
-        getValue(
-          row,
-          headers,
-          "Join Dept Date",
-        ),
-
-      promoDate:
-        getValue(
-          row,
-          headers,
-          "Promo Date",
-        ),
-
-      strike1:
-        booleanValue(
-          getValue(
-            row,
-            headers,
-            "Strike 1",
-          ),
-        ),
-
-      strike2:
-        booleanValue(
-          getValue(
-            row,
-            headers,
-            "Strike 2",
-          ),
-        ),
-
-      callsign:
-        getValue(
-          row,
-          headers,
-          "Callsign",
-        ),
-
-      timeInDept:
-        getValue(
-          row,
-          headers,
-          "Time In Dept",
-        ),
-
-      terminated:
-        booleanValue(
-          getValue(
-            row,
-            headers,
-            "Terminated",
-          ),
-        ),
-
-      loa:
-        booleanValue(
-          getValue(
-            row,
-            headers,
-            "LOA",
-          ),
-        ),
-
-      resigned:
-        booleanValue(
-          getValue(
-            row,
-            headers,
-            "Resigned",
-          ),
-        ),
-
-      thisMonthHours:
-        getValue(
-          row,
-          headers,
-          "This month hours",
-        ),
-
-      lastMonthHours:
-        getValue(
-          row,
-          headers,
-          "Last month hours",
-        ),
-    })
+  const columns = {
+    sendMessage: getColumn(headers, [
+      "Send Message",
+      "Message",
+      "DM",
+    ]),
+    badgeNumber: getColumn(headers, [
+      "Badge Number",
+      "Badge",
+      "BadgeNumber",
+      "Badge #",
+      "Badge#",
+    ]),
+    name: getColumn(headers, [
+      "Name",
+      "Full Name",
+      "Employee Name",
+    ]),
+    discordId: getColumn(headers, [
+      "Discord ID",
+      "DiscordID",
+      "Discord",
+      "Discord Id",
+    ]),
+    departmentStatus: getColumn(headers, [
+      "Department Status",
+      "Status",
+    ]),
+    rank: getColumn(headers, [
+      "Rank",
+      "Current Rank",
+    ]),
+    timezone: getColumn(headers, [
+      "Timezone",
+      "Time Zone",
+      "TZ",
+    ]),
+    joinDeptDate: getColumn(headers, [
+      "Join Dept Date",
+      "Join Department Date",
+      "Department Join Date",
+      "Join Date",
+    ]),
+    promoDate: getColumn(headers, [
+      "Promo Date",
+      "Promotion Date",
+      "Last Promotion",
+    ]),
+    strike1: getColumn(headers, [
+      "Strike 1",
+      "Strike1",
+      "Strike One",
+    ]),
+    strike2: getColumn(headers, [
+      "Strike 2",
+      "Strike2",
+      "Strike Two",
+    ]),
+    callsign: getColumn(headers, [
+      "Callsign",
+      "Call Sign",
+      "Callsign Number",
+    ]),
+    timeInDept: getColumn(headers, [
+      "Time In Dept",
+      "Time In Department",
+      "TimeInDept",
+      "Department Time",
+    ]),
+    terminated: getColumn(headers, [
+      "Terminated",
+      "Termination",
+    ]),
+    loa: getColumn(headers, [
+      "LOA",
+      "Leave Of Absence",
+      "Leave of Absence",
+    ]),
+    resigned: getColumn(headers, [
+      "Resigned",
+      "Resignation",
+    ]),
+    thisMonthHours: getColumn(headers, [
+      "This Month Hours",
+      "Hours This Month",
+      "Current Month Hours",
+    ]),
+    lastMonthHours: getColumn(headers, [
+      "Last Month Hours",
+      "Previous Month Hours",
+    ]),
   }
 
-  return employees
+  return rows
+    .slice(headerIndex + 1)
+    .filter((row) =>
+      row.some((value) => clean(value) !== ""),
+    )
+    .map((row) => ({
+      sendMessage: getValue(
+        row,
+        columns.sendMessage,
+      ),
+      badgeNumber: getValue(
+        row,
+        columns.badgeNumber,
+      ),
+      name: getValue(row, columns.name),
+      discordId: getValue(
+        row,
+        columns.discordId,
+      ),
+      departmentStatus: getValue(
+        row,
+        columns.departmentStatus,
+      ),
+      rank: getValue(row, columns.rank),
+      timezone: getValue(
+        row,
+        columns.timezone,
+      ),
+      joinDeptDate: getValue(
+        row,
+        columns.joinDeptDate,
+      ),
+      promoDate: getValue(
+        row,
+        columns.promoDate,
+      ),
+      strike1: booleanValue(
+        row[columns.strike1],
+      ),
+      strike2: booleanValue(
+        row[columns.strike2],
+      ),
+      callsign: getValue(
+        row,
+        columns.callsign,
+      ),
+      timeInDept: getValue(
+        row,
+        columns.timeInDept,
+      ),
+      terminated: booleanValue(
+        row[columns.terminated],
+      ),
+      loa: booleanValue(row[columns.loa]),
+      resigned: booleanValue(
+        row[columns.resigned],
+      ),
+      thisMonthHours: getValue(
+        row,
+        columns.thisMonthHours,
+      ),
+      lastMonthHours: getValue(
+        row,
+        columns.lastMonthHours,
+      ),
+    }))
+    .filter(
+      (employee) =>
+        employee.badgeNumber ||
+        employee.name ||
+        employee.discordId,
+    )
 }
 
-// ─────────────────────────────────────────────
-// Vehicle Roster
-// ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Vehicles
+───────────────────────────────────────────── */
 
 function parseVehicles(
-  rows: string[][],
+  rows: unknown[][],
+  sheetName: string,
 ): MainRosterVehicle[] {
-  const headerIndex =
-    findHeaderRow(
-      rows,
-      [
-        "Rank",
-        "Vehicle Name",
-        "Spawncode",
-        "Required Extras",
-        "Livery",
-      ],
-    )
+  const headerIndex = findHeaderRow(rows, [
+    "Rank",
+    "Vehicle Name",
+    "Spawncode",
+    "Required Extras",
+    "Livery",
+  ])
 
-  if (
-    headerIndex === -1
-  ) {
+  if (headerIndex === -1) {
     throw new Error(
-      "Could not find Vehicle Roster headers.",
+      `Google Sheet "${sheetName}" is missing the required Vehicle Roster columns.`,
     )
   }
 
-  const headers =
-    createHeaderMap(
-      rows[headerIndex],
-    )
+  const headers = rows[headerIndex] ?? []
 
-  const vehicles: MainRosterVehicle[] =
-    []
-
-  for (
-    let rowIndex =
-      headerIndex + 1;
-    rowIndex < rows.length;
-    rowIndex++
-  ) {
-    const row =
-      rows[rowIndex]
-
-    if (!row) {
-      continue
-    }
-
-    const rank =
-      getValue(
-        row,
-        headers,
-        "Rank",
-      )
-
-    const vehicleName =
-      getValue(
-        row,
-        headers,
-        "Vehicle Name",
-      )
-
-    const spawncode =
-      getValue(
-        row,
-        headers,
-        "Spawncode",
-      )
-
-    if (
-      !vehicleName &&
-      !spawncode
-    ) {
-      continue
-    }
-
-    vehicles.push({
-      rank,
-
-      vehicleName,
-
-      spawncode,
-
-      requiredExtras:
-        getValue(
-          row,
-          headers,
-          "Required Extras",
-        ),
-
-      livery:
-        getValue(
-          row,
-          headers,
-          "Livery",
-        ),
-
-      windowTint:
-        getValue(
-          row,
-          headers,
-          "Window Tint",
-        ),
-
-      turbo:
-        booleanValue(
-          getValue(
-            row,
-            headers,
-            "Turbo",
-          ),
-        ),
-
-      slicktopOptional:
-        booleanValue(
-          getValue(
-            row,
-            headers,
-            "Slicktop Optional",
-          ),
-        ),
-
-      unmarkedAllowed:
-        booleanValue(
-          getValue(
-            row,
-            headers,
-            "Unmarked Allowed",
-          ),
-        ),
-    })
+  const columns = {
+    rank: getColumn(headers, ["Rank"]),
+    vehicleName: getColumn(headers, [
+      "Vehicle Name",
+      "Vehicle",
+      "Name",
+    ]),
+    spawncode: getColumn(headers, [
+      "Spawncode",
+      "Spawn Code",
+      "Spawn",
+      "Model",
+    ]),
+    requiredExtras: getColumn(headers, [
+      "Required Extras",
+      "Extras",
+      "Required Extra",
+    ]),
+    livery: getColumn(headers, [
+      "Livery",
+      "Livery ID",
+    ]),
+    windowTint: getColumn(headers, [
+      "Window Tint",
+      "Tint",
+    ]),
+    turbo: getColumn(headers, [
+      "Turbo",
+      "Turbo Enabled",
+    ]),
+    slicktopOptional: getColumn(headers, [
+      "Slicktop Optional",
+      "Slicktop",
+      "Slicktop Option",
+    ]),
+    unmarkedAllowed: getColumn(headers, [
+      "Unmarked Allowed",
+      "Unmarked",
+      "Unmarked Allowed?",
+    ]),
   }
 
-  return vehicles
+  return rows
+    .slice(headerIndex + 1)
+    .filter((row) =>
+      row.some((value) => clean(value) !== ""),
+    )
+    .map((row) => ({
+      rank: getValue(row, columns.rank),
+      vehicleName: getValue(
+        row,
+        columns.vehicleName,
+      ),
+      spawncode: getValue(
+        row,
+        columns.spawncode,
+      ),
+      requiredExtras: getValue(
+        row,
+        columns.requiredExtras,
+      ),
+      livery: getValue(row, columns.livery),
+      windowTint: getValue(
+        row,
+        columns.windowTint,
+      ),
+      turbo: booleanValue(row[columns.turbo]),
+      slicktopOptional: booleanValue(
+        row[columns.slicktopOptional],
+      ),
+      unmarkedAllowed: booleanValue(
+        row[columns.unmarkedAllowed],
+      ),
+    }))
+    .filter(
+      (vehicle) =>
+        vehicle.vehicleName ||
+        vehicle.spawncode,
+    )
 }
 
-// ─────────────────────────────────────────────
-// Uniform Roster
-// ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Uniforms
+───────────────────────────────────────────── */
 
 function parseUniforms(
-  rows: string[][],
+  rows: unknown[][],
+  sheetName: string,
 ): MainRosterUniform[] {
-  const headerIndex =
-    findHeaderRow(
-      rows,
-      [
-        "Rank",
-        "Class",
-        "Shared Outfit Code",
-      ],
-    )
+  const headerIndex = findHeaderRow(rows, [
+    "Rank",
+    "Class",
+    "Shared Outfit Code",
+  ])
 
-  if (
-    headerIndex === -1
-  ) {
+  if (headerIndex === -1) {
     throw new Error(
-      "Could not find Uniform Roster headers.",
+      `Google Sheet "${sheetName}" is missing the required Uniform Roster columns.`,
     )
   }
 
-  const headers =
-    createHeaderMap(
-      rows[headerIndex],
-    )
+  const headers = rows[headerIndex] ?? []
 
-  const uniforms: MainRosterUniform[] =
-    []
-
-  let currentRank = ""
-
-  for (
-    let rowIndex =
-      headerIndex + 1;
-    rowIndex < rows.length;
-    rowIndex++
-  ) {
-    const row =
-      rows[rowIndex]
-
-    if (!row) {
-      continue
-    }
-
-    const rank =
-      getValue(
-        row,
-        headers,
-        "Rank",
-      )
-
-    const className =
-      getValue(
-        row,
-        headers,
-        "Class",
-      )
-
-    const sharedOutfitCode =
-      getValue(
-        row,
-        headers,
-        "Shared Outfit Code",
-      )
-
-    if (rank) {
-      currentRank = rank
-    }
-
-    if (
-      !className &&
-      !sharedOutfitCode
-    ) {
-      continue
-    }
-
-    uniforms.push({
-      rank:
-        rank ||
-        currentRank,
-
-      className,
-
-      sharedOutfitCode,
-    })
+  const columns = {
+    rank: getColumn(headers, ["Rank"]),
+    className: getColumn(headers, [
+      "Class",
+      "Class Name",
+      "Uniform Class",
+    ]),
+    sharedOutfitCode: getColumn(headers, [
+      "Shared Outfit Code",
+      "Outfit Code",
+      "Shared Code",
+    ]),
   }
 
-  return uniforms
+  return rows
+    .slice(headerIndex + 1)
+    .filter((row) =>
+      row.some((value) => clean(value) !== ""),
+    )
+    .map((row) => ({
+      rank: getValue(row, columns.rank),
+      className: getValue(
+        row,
+        columns.className,
+      ),
+      sharedOutfitCode: getValue(
+        row,
+        columns.sharedOutfitCode,
+      ),
+    }))
+    .filter(
+      (uniform) =>
+        uniform.rank ||
+        uniform.className ||
+        uniform.sharedOutfitCode,
+    )
 }
 
-// ─────────────────────────────────────────────
-// Main Google → MongoDB Sync
-// ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   MPD Home
+───────────────────────────────────────────── */
+
+function parseHome(
+  rows: unknown[][],
+): MainRosterHome {
+  const cleanedRows = nonEmptyRows(rows)
+
+  if (cleanedRows.length === 0) {
+    return {
+      headers: [],
+      rows: [],
+    }
+  }
+
+  const headers = (cleanedRows[0] ?? []).map(clean)
+
+  const dataRows = cleanedRows
+    .slice(1)
+    .map((row) =>
+      headers.map((_, index) =>
+        clean(row[index]),
+      ),
+    )
+    .filter((row) =>
+      row.some((value) => value !== ""),
+    )
+
+  return {
+    headers,
+    rows: dataRows,
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Main sync
+───────────────────────────────────────────── */
 
 export async function syncGoogleMainRoster() {
-  const config =
-    getGoogleConfig()
+  const startedAt = Date.now()
 
-  const auth =
-    createGoogleAuth()
+  const departmentSheet =
+    getRequiredEnv(
+      "GOOGLE_MAIN_ROSTER_DEPARTMENT_SHEET",
+    )
 
-  const sheets =
-    google.sheets({
-      version: "v4",
-      auth,
-    })
+  const employeeSheet =
+    getRequiredEnv(
+      "GOOGLE_MAIN_ROSTER_EMPLOYEE_SHEET",
+    )
 
-  console.log(
-    "[Main Roster] Starting Google Sheets sync...",
-  )
+  const uniformSheet =
+    getRequiredEnv(
+      "GOOGLE_MAIN_ROSTER_UNIFORM_SHEET",
+    )
+
+  const vehicleSheet =
+    getRequiredEnv(
+      "GOOGLE_MAIN_ROSTER_VEHICLE_SHEET",
+    )
+
+  const homeSheet =
+    getRequiredEnv(
+      "GOOGLE_MAIN_ROSTER_HOME_SHEET",
+    )
+
+  const { sheets, spreadsheetId } =
+    getGoogleSheetsClient()
 
   const [
     departmentRows,
     employeeRows,
-    vehicleRows,
     uniformRows,
+    vehicleRows,
+    homeRows,
   ] = await Promise.all([
-    getSheetRows(
+    getSheetValues(
       sheets,
-      config.departmentSheet,
+      spreadsheetId,
+      departmentSheet,
     ),
-
-    getSheetRows(
+    getSheetValues(
       sheets,
-      config.employeeSheet,
+      spreadsheetId,
+      employeeSheet,
     ),
-
-    getSheetRows(
+    getSheetValues(
       sheets,
-      config.vehicleSheet,
+      spreadsheetId,
+      uniformSheet,
     ),
-
-    getSheetRows(
+    getSheetValues(
       sheets,
-      config.uniformSheet,
+      spreadsheetId,
+      vehicleSheet,
+    ),
+    getSheetValues(
+      sheets,
+      spreadsheetId,
+      homeSheet,
     ),
   ])
 
-  console.log(
-    "[Main Roster] Google Sheets data loaded.",
-  )
-
   const department =
-    parseDepartmentRoster(
+    parseDepartment(
       departmentRows,
+      departmentSheet,
     )
 
   const employees =
     parseEmployees(
       employeeRows,
+      employeeSheet,
     )
 
   const vehicles =
     parseVehicles(
       vehicleRows,
+      vehicleSheet,
     )
 
   const uniforms =
     parseUniforms(
       uniformRows,
+      uniformSheet,
     )
 
-  // Never replace valid MongoDB data
-  // with an empty/broken Google Sheet.
-  if (
-    department.length === 0
-  ) {
+  const home =
+    parseHome(homeRows)
+
+  /*
+   * Never replace a working Master Roster with
+   * an empty/broken import.
+   */
+  if (department.length === 0) {
     throw new Error(
-      "Department Roster returned zero members. Existing MongoDB data was not changed.",
+      `Google Sheet "${departmentSheet}" returned no Department Roster rows.`,
     )
   }
 
-  if (
-    employees.length === 0
-  ) {
+  if (employees.length === 0) {
     throw new Error(
-      "Employee Database returned zero employees. Existing MongoDB data was not changed.",
+      `Google Sheet "${employeeSheet}" returned no Employee Database rows.`,
     )
   }
 
-  if (
-    vehicles.length === 0
-  ) {
+  if (vehicles.length === 0) {
     throw new Error(
-      "Vehicle Roster returned zero vehicles. Existing MongoDB data was not changed.",
+      `Google Sheet "${vehicleSheet}" returned no Vehicle Roster rows.`,
     )
   }
 
-  if (
-    uniforms.length === 0
-  ) {
+  if (uniforms.length === 0) {
     throw new Error(
-      "Uniform Roster returned zero uniforms. Existing MongoDB data was not changed.",
+      `Google Sheet "${uniformSheet}" returned no Uniform Roster rows.`,
     )
   }
-
-  const db =
-    await getMongoDb()
-
-  const updatedAt =
-    new Date()
 
   const roster: MainRosterData = {
     type: "main",
-
+    home,
     department,
-
     employees,
-
     vehicles,
-
     uniforms,
-
-    updatedAt,
+    updatedAt: new Date(),
   }
 
-  await db
-    .collection<MainRosterData>(
-      "mainRoster",
-    )
-    .updateOne(
-      {
-        type: "main",
-      },
-      {
-        $set: roster,
-      },
-      {
-        upsert: true,
-      },
-    )
+  const db = await getMongoDb()
 
-  const result = {
-    department:
-      department.length,
-
-    employees:
-      employees.length,
-
-    vehicles:
-      vehicles.length,
-
-    uniforms:
-      uniforms.length,
-
-    updatedAt,
-  }
-
-  console.log(
-    "[Main Roster] Sync completed successfully:",
-    {
-      department:
-        result.department,
-
-      employees:
-        result.employees,
-
-      vehicles:
-        result.vehicles,
-
-      uniforms:
-        result.uniforms,
-
-      updatedAt:
-        result.updatedAt.toISOString(),
-    },
+  await db.collection<MainRosterData>(
+    "mainRoster",
+  ).updateOne(
+    { type: "main" },
+    { $set: roster },
+    { upsert: true },
   )
 
-  return result
+  return {
+    success: true,
+    counts: {
+      home: home.rows.length,
+      department: department.length,
+      employees: employees.length,
+      vehicles: vehicles.length,
+      uniforms: uniforms.length,
+    },
+    sheets: {
+      home: homeSheet,
+      department: departmentSheet,
+      employees: employeeSheet,
+      vehicles: vehicleSheet,
+      uniforms: uniformSheet,
+    },
+    updatedAt:
+      roster.updatedAt.toISOString(),
+    duration: Date.now() - startedAt,
+  }
 }
