@@ -5,7 +5,6 @@ import path from "node:path"
 import XLSX from "xlsx"
 
 import { syncGoogleRosters } from "./googleRosterSync"
-import { syncGoogleMainRoster, type MainRosterData } from "./googleMainRosterSync"
 
 import {
   authenticateDiscordCode,
@@ -4159,99 +4158,6 @@ export function createApp() {
   )
 
   /* ─────────────────────────────────────────
-     Main Roster
-  ───────────────────────────────────────── */
-
-  app.get(
-    "/api/main-roster",
-    async (req, res) => {
-      try {
-        const user = await getRequestUser(req)
-
-        if (!user) {
-          return res.status(401).json({
-            success: false,
-            error: "Not authenticated",
-          })
-        }
-
-        const collection =
-          await getCollection<MainRosterData>(
-            "mainRoster",
-          )
-
-        const roster =
-          await collection.findOne({
-            type: "main",
-          })
-
-        if (!roster) {
-          return res.status(404).json({
-            success: false,
-            error:
-              "The Main Roster has not been synchronized yet.",
-          })
-        }
-
-        return res.json({
-          success: true,
-          roster: {
-            ...roster,
-            updatedAt:
-              roster.updatedAt instanceof Date
-                ? roster.updatedAt.toISOString()
-                : roster.updatedAt,
-          },
-        })
-      } catch (error) {
-        console.error(
-          "GET /api/main-roster failed:",
-          error,
-        )
-
-        return res.status(500).json({
-          success: false,
-          error: "Failed to load Main Roster.",
-        })
-      }
-    },
-  )
-
-  app.post(
-    "/api/import/google/main-roster",
-    async (req, res) => {
-      try {
-        const user = await getRequestUser(req)
-
-        if (!user) {
-          return res.status(401).json({
-            success: false,
-            error: "Not authenticated",
-          })
-        }
-
-        const result =
-          await syncGoogleMainRoster()
-
-        return res.json(result)
-      } catch (error) {
-        console.error(
-          "POST /api/import/google/main-roster failed:",
-          error,
-        )
-
-        return res.status(500).json({
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to synchronize Main Roster.",
-        })
-      }
-    },
-  )
-
-  /* ─────────────────────────────────────────
      Manual Roster Import
   ───────────────────────────────────────── */
 
@@ -6428,33 +6334,6 @@ app.listen(env.port, () => {
   console.log(
     `MPD Dashboard running on port ${env.port}`,
   )
-
-  // Initial Main Roster synchronization.
-  // This is non-blocking so a temporary Google/MongoDB failure
-  // does not prevent Express from starting.
-  void syncGoogleMainRoster().catch((error) => {
-    console.error(
-      "[google-main-roster] Initial sync failed:",
-      error,
-    )
-  })
-
-  // Keep the Main Roster synchronized every 30 minutes while
-  // this Node process is running. Render can suspend the service,
-  // so the startup sync also runs again after a wake-up.
-  const mainRosterSyncInterval = setInterval(
-    () => {
-      void syncGoogleMainRoster().catch((error) => {
-        console.error(
-          "[google-main-roster] Scheduled sync failed:",
-          error,
-        )
-      })
-    },
-    30 * 60 * 1000,
-  )
-
-  mainRosterSyncInterval.unref()
 })
 
 export default app
