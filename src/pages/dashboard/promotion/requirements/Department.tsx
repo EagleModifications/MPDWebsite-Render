@@ -214,18 +214,36 @@ function RequirementInput({
 }) {
   return (
     <div className="min-w-0">
-      <label className="mb-1.5 block truncate text-xs font-medium text-muted-foreground">
+      <label className="mb-1.5 block whitespace-nowrap text-xs font-medium text-muted-foreground">
         {label}
       </label>
 
-      <div className="flex h-11 overflow-hidden rounded-lg border border-border bg-background">
+      <div className="flex h-11 w-full overflow-hidden rounded-lg border border-border bg-background">
         <input
           type="number"
           min="0"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           disabled={disabled}
-          className="h-full min-w-0 flex-1 border-0 bg-transparent px-2 text-center text-sm font-semibold text-foreground outline-none focus:bg-muted/30 disabled:cursor-not-allowed disabled:opacity-60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="
+            h-full
+            min-w-0
+            flex-1
+            border-0
+            bg-transparent
+            px-2
+            text-center
+            text-sm
+            font-semibold
+            text-foreground
+            outline-none
+            focus:bg-muted/30
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+            [appearance:textfield]
+            [&::-webkit-inner-spin-button]:appearance-none
+            [&::-webkit-outer-spin-button]:appearance-none
+          "
         />
 
         <div className="flex w-8 shrink-0 flex-col border-l border-border">
@@ -233,7 +251,16 @@ function RequirementInput({
             type="button"
             onClick={onIncrease}
             disabled={disabled}
-            className="flex h-1/2 items-center justify-center border-b border-border text-muted-foreground transition-colors hover:bg-blue-500/10 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="
+              flex h-1/2 items-center justify-center
+              border-b border-border
+              text-muted-foreground
+              transition-colors
+              hover:bg-blue-500/10
+              hover:text-blue-500
+              disabled:cursor-not-allowed
+              disabled:opacity-50
+            "
             aria-label={`Increase ${label}`}
           >
             <ChevronUp className="h-3.5 w-3.5" />
@@ -243,7 +270,15 @@ function RequirementInput({
             type="button"
             onClick={onDecrease}
             disabled={disabled}
-            className="flex h-1/2 items-center justify-center text-muted-foreground transition-colors hover:bg-blue-500/10 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="
+              flex h-1/2 items-center justify-center
+              text-muted-foreground
+              transition-colors
+              hover:bg-blue-500/10
+              hover:text-blue-500
+              disabled:cursor-not-allowed
+              disabled:opacity-50
+            "
             aria-label={`Decrease ${label}`}
           >
             <ChevronDown className="h-3.5 w-3.5" />
@@ -486,6 +521,7 @@ export default function DepartmentRequirements() {
     }
 
     const parsed = Number.parseInt(value, 10)
+
     const nextValue =
       value === "" || !Number.isFinite(parsed)
         ? 0
@@ -861,63 +897,112 @@ export default function DepartmentRequirements() {
                             <p className="text-base font-semibold leading-5">
                               {rank.name}
                             </p>
+
                             <p className="mt-1 text-sm text-muted-foreground">
                               Configure all promotion requirements for this rank.
                             </p>
                           </div>
                         </div>
 
-                        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-[760px] lg:grid-cols-4">
+                        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
                           <RequirementInput
                             label="Promotion Hours"
                             value={requirement.hours}
-                            onChange={(value) => setHours(rank.id, value)}
-                            onIncrease={() => changeHours(rank.id, 1)}
-                            onDecrease={() => changeHours(rank.id, -1)}
+                            onChange={(value) =>
+                              setHours(rank.id, value)
+                            }
+                            onIncrease={() =>
+                              changeHours(rank.id, 1)
+                            }
+                            onDecrease={() =>
+                              changeHours(rank.id, -1)
+                            }
                             disabled={isSaving}
                           />
 
                           <RequirementInput
                             label="Time in Rank (Days)"
-                            value={requirement.timeInRankDays}
+                            value={
+                              requirement.timeInRankDays
+                            }
                             onChange={(value) =>
-                              setRequirementValue(rank.id, "timeInRankDays", value)
+                              setRequirementValue(
+                                rank.id,
+                                "timeInRankDays",
+                                value,
+                              )
                             }
                             onIncrease={() =>
-                              changeRequirementValue(rank.id, "timeInRankDays", 1)
+                              changeRequirementValue(
+                                rank.id,
+                                "timeInRankDays",
+                                1,
+                              )
                             }
                             onDecrease={() =>
-                              changeRequirementValue(rank.id, "timeInRankDays", -1)
+                              changeRequirementValue(
+                                rank.id,
+                                "timeInRankDays",
+                                -1,
+                              )
                             }
                             disabled={isSaving}
                           />
 
                           <RequirementInput
-                            label="Trainings (FTD)"
-                            value={requirement.trainingLogs}
+                            label="Trainings"
+                            value={
+                              requirement.trainingLogs
+                            }
                             onChange={(value) =>
-                              setRequirementValue(rank.id, "trainingLogs", value)
+                              setRequirementValue(
+                                rank.id,
+                                "trainingLogs",
+                                value,
+                              )
                             }
                             onIncrease={() =>
-                              changeRequirementValue(rank.id, "trainingLogs", 1)
+                              changeRequirementValue(
+                                rank.id,
+                                "trainingLogs",
+                                1,
+                              )
                             }
                             onDecrease={() =>
-                              changeRequirementValue(rank.id, "trainingLogs", -1)
+                              changeRequirementValue(
+                                rank.id,
+                                "trainingLogs",
+                                -1,
+                              )
                             }
                             disabled={isSaving}
                           />
 
                           <RequirementInput
-                            label="Recruitments / Ridealongs (FTD)"
-                            value={requirement.recruitmentLogs}
+                            label="Recruitments / Ridealongs"
+                            value={
+                              requirement.recruitmentLogs
+                            }
                             onChange={(value) =>
-                              setRequirementValue(rank.id, "recruitmentLogs", value)
+                              setRequirementValue(
+                                rank.id,
+                                "recruitmentLogs",
+                                value,
+                              )
                             }
                             onIncrease={() =>
-                              changeRequirementValue(rank.id, "recruitmentLogs", 1)
+                              changeRequirementValue(
+                                rank.id,
+                                "recruitmentLogs",
+                                1,
+                              )
                             }
                             onDecrease={() =>
-                              changeRequirementValue(rank.id, "recruitmentLogs", -1)
+                              changeRequirementValue(
+                                rank.id,
+                                "recruitmentLogs",
+                                -1,
+                              )
                             }
                             disabled={isSaving}
                           />
