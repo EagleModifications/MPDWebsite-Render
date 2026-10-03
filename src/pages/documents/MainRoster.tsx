@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   Filter,
-  Image as ImageIcon,
   RefreshCw,
   Search,
   Shield,
@@ -102,15 +101,6 @@ function findColumn(headers: string[], names: string[]): number {
   }
 
   return -1
-}
-
-function getCell(
-  row: string[],
-  headers: string[],
-  names: string[],
-): string {
-  const index = findColumn(headers, names)
-  return index === -1 ? "" : cleanValue(row[index])
 }
 
 function isImageUrl(value: string): boolean {
@@ -372,58 +362,6 @@ function ErrorState({
         Try Again
       </Button>
     </div>
-  )
-}
-
-function GenericSheetTable({
-  sheet,
-}: {
-  sheet: MainRosterSheet
-}) {
-  if (!sheet.headers.length || !sheet.rows.length) {
-    return (
-      <EmptyState
-        message={`The ${sheet.name} sheet does not currently contain any data.`}
-      />
-    )
-  }
-
-  return (
-    <TableShell>
-      <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
-        <tr className="border-b border-border">
-          {sheet.headers.map((header, index) => (
-            <th
-              key={`${header}-${index}`}
-              className="whitespace-nowrap px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              {displayValue(header)}
-            </th>
-          ))}
-        </tr>
-      </thead>
-
-      <tbody>
-        {sheet.rows.map((row, rowIndex) => (
-          <tr
-            key={rowIndex}
-            className="border-b border-border last:border-0 hover:bg-muted/30"
-          >
-            {sheet.headers.map((header, columnIndex) => (
-              <td
-                key={`${rowIndex}-${columnIndex}`}
-                className="max-w-[360px] whitespace-normal px-4 py-3 text-center align-middle"
-              >
-                <CellValue
-                  header={header}
-                  value={cleanValue(row[columnIndex])}
-                />
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </TableShell>
   )
 }
 
