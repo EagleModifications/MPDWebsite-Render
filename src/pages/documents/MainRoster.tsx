@@ -3,12 +3,12 @@ import {
   useEffect,
   useMemo,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from "react"
 
 import {
   Car,
-  CheckCircle2,
   FileSpreadsheet,
   Filter,
   RefreshCw,
@@ -32,15 +32,88 @@ type SheetKey =
   | "vehicle-roster"
   | "uniform-roster"
 
+type MainRosterColor = {
+  red?: number
+  green?: number
+  blue?: number
+  alpha?: number
+}
+
+type MainRosterBorder = {
+  style?: string
+  color?: MainRosterColor
+}
+
+type MainRosterCellStyle = {
+  backgroundColor?: MainRosterColor
+  textColor?: MainRosterColor
+  fontFamily?: string
+  fontSize?: number
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  strikethrough?: boolean
+  horizontalAlignment?: string
+  verticalAlignment?: string
+  wrapStrategy?: string
+  textDirection?: string
+  padding?: {
+    top?: number
+    right?: number
+    bottom?: number
+    left?: number
+  }
+  borders?: {
+    top?: MainRosterBorder
+    right?: MainRosterBorder
+    bottom?: MainRosterBorder
+    left?: MainRosterBorder
+  }
+  numberFormat?: {
+    type?: string
+    pattern?: string
+  }
+  textRotation?: {
+    angle?: number
+    vertical?: boolean
+  }
+}
+
+type MainRosterCell = {
+  value: string
+  formula?: string
+  hyperlink?: string
+  styleId: number
+}
+
+type MainRosterMerge = {
+  startRow: number
+  endRow: number
+  startColumn: number
+  endColumn: number
+}
+
 type MainRosterSheet = {
-  key: SheetKey
+  key: string
   name: string
   gid: string
   headers: string[]
   rows: string[][]
-  rawRows?: string[][]
+  rawRows: string[][]
   rowCount: number
   columnCount: number
+  sheetRowCount: number
+  sheetColumnCount: number
+  hideGridlines: boolean
+  frozenRowCount: number
+  frozenColumnCount: number
+  rowHeights: number[]
+  columnWidths: number[]
+  hiddenRows: number[]
+  hiddenColumns: number[]
+  merges: MainRosterMerge[]
+  styles: MainRosterCellStyle[]
+  cells: MainRosterCell[][]
 }
 
 type MainRosterResponse = {
@@ -65,24 +138,7 @@ const pages: MainRosterPage[] = [
 
 function cleanValue(value: unknown): string {
   if (value === null || value === undefined) return ""
-
-  const result = String(value).trim()
-
-  if (
-    !result ||
-    result === "-" ||
-    result === "—" ||
-    result.toLowerCase() === "null" ||
-    result.toLowerCase() === "undefined"
-  ) {
-    return ""
-  }
-
-  return result
-}
-
-function displayValue(value: unknown): string {
-  return cleanValue(value) || "—"
+  return String(value).trim()
 }
 
 function normalizeHeader(value: string): string {
@@ -92,225 +148,286 @@ function normalizeHeader(value: string): string {
     .replace(/[^a-z0-9]+/g, "")
 }
 
-function findColumn(headers: string[], names: string[]): number {
-  const normalized = headers.map(normalizeHeader)
+function colorToCss(value?: MainRosterColor): string | undefined {
+  if (!value) return undefined
 
-  for (const name of names) {
-    const index = normalized.indexOf(normalizeHeader(name))
-    if (index !== -1) return index
+  const red = Math.round((value.red ?? 0) * 255)
+  const green = Math.round((value.green ?? 0) * 255)
+  const blue = Math.round((value.blue ?? 0) * 255)
+  const alpha = value.alpha ?? 1
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
+function borderToCss(value?: MainRosterBorder): string | undefined {
+  if (!value || !value.style || value.style === "NONE") return undefined
+
+  const styleMap: Record<string, string> = {
+    SOLID: "solid",
+    SOLID_MEDIUM: "solid",
+    SOLID_THICK: "solid",
+    DASHED: "dashed",
+    DOTTED: "dotted",
+    DOUBLE: "double",
   }
 
+  const cssStyle = styleMap[value.style] ?? "solid"
+  const width =
+    value.style === "SOLID_THICK"
+      ? 3
+      : value.style === "SOLID_MEDIUM"
+        ? 2
+        : 1
+
+  return `${width}px ${cssStyle} ${colorToCss(value.color) ?? "rgba(128,128,128,.35)"}`
+}
+
+function cellStyleToCss(
+  style: MainRosterCellStyle | undefined,
+): CSSProperties {
+  if (!style) return {}
+
+  const css: CSSProperties = {}
+
+  const background = colorToCss(style.backgroundColor)
+  const textColor = colorToCss(style.textColor)
+
+  if (background) css.backgroundColor = background
+  if (textColor) css.color = textColor
+  if (style.fontFamily) css.fontFamily = style.fontFamily
+  if (typeof style.fontSize === "number") css.fontSize = `${style.fontSize}px`
+  if (style.bold) css.fontWeight = 700
+  if (style.italic) css.fontStyle = "italic"
+  if (style.underline) css.textDecoration = "underline"
+  if (style.strikethrough) css.textDecoration = "line-through"
+
+  if (style.horizontalAlignment) {
+    const alignment: Record<string, CSSProperties["textAlign"]> = {
+      LEFT: "left",
+      CENTER: "center",
+      RIGHT: "right",
+    }
+    css.textAlign = alignment[style.horizontalAlignment] ?? "center"
+  }
+
+  if (style.verticalAlignment) {
+    const alignment: Record<string, CSSProperties["verticalAlign"]> = {
+      TOP: "top",
+      MIDDLE: "middle",
+      BOTTOM: "bottom",
+    }
+    css.verticalAlign = alignment[style.verticalAlignment] ?? "middle"
+  }
+
+  if (style.wrapStrategy === "WRAP") css.whiteSpace = "pre-wrap"
+  if (style.wrapStrategy === "CLIP") {
+    css.whiteSpace = "nowrap"
+    css.overflow = "hidden"
+  }
+  if (style.wrapStrategy === "OVERFLOW_CELL") css.whiteSpace = "nowrap"
+
+  if (style.textDirection === "RIGHT_TO_LEFT") css.direction = "rtl"
+
+  if (style.padding) {
+    css.paddingTop = style.padding.top
+    css.paddingRight = style.padding.right
+    css.paddingBottom = style.padding.bottom
+    css.paddingLeft = style.padding.left
+  }
+
+  if (style.borders) {
+    const top = borderToCss(style.borders.top)
+    const right = borderToCss(style.borders.right)
+    const bottom = borderToCss(style.borders.bottom)
+    const left = borderToCss(style.borders.left)
+    if (top) css.borderTop = top
+    if (right) css.borderRight = right
+    if (bottom) css.borderBottom = bottom
+    if (left) css.borderLeft = left
+  }
+
+  if (style.textRotation?.vertical) {
+    css.writingMode = "vertical-rl"
+    css.transform = "rotate(180deg)"
+  } else if (typeof style.textRotation?.angle === "number") {
+    css.transform = `rotate(${style.textRotation.angle}deg)`
+  }
+
+  return css
+}
+
+function findFilterHeaderRow(sheet: MainRosterSheet): number {
+  const rows = sheet.rawRows
+
+  const matches = rows.findIndex((row) => {
+    const normalized = row.map(normalizeHeader)
+    const hasRank = normalized.includes("rank")
+    const hasStatus =
+      normalized.includes("status") ||
+      normalized.includes("departmentstatus") ||
+      normalized.includes("employmentstatus")
+    return hasRank && (hasStatus || normalized.includes("callsign"))
+  })
+
+  if (matches !== -1) return matches
+
+  return rows.findIndex((row) =>
+    row.some((value) => normalizeHeader(value) === "rank"),
+  )
+}
+
+function findColumnInRow(row: string[], aliases: string[]): number {
+  const normalized = row.map(normalizeHeader)
+  for (const alias of aliases) {
+    const index = normalized.indexOf(normalizeHeader(alias))
+    if (index !== -1) return index
+  }
   return -1
 }
 
-function isImageUrl(value: string): boolean {
-  const lower = value.toLowerCase()
+function buildMergeMap(merges: MainRosterMerge[]) {
+  const map = new Map<
+    string,
+    { anchor: boolean; rowSpan: number; colSpan: number }
+  >()
 
-  return (
-    /^https?:\/\//.test(value) &&
-    (
-      /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(lower) ||
-      lower.includes("googleusercontent.com") ||
-      lower.includes("discordapp.com") ||
-      lower.includes("discord.com") ||
-      lower.includes("imgur.com")
-    )
-  )
-}
+  for (const merge of merges) {
+    const rowSpan = Math.max(1, merge.endRow - merge.startRow)
+    const colSpan = Math.max(1, merge.endColumn - merge.startColumn)
 
-function isLikelyUrl(value: string): boolean {
-  return /^https?:\/\//i.test(value)
-}
-
-function statusClasses(status: string): string {
-  const normalized = status.trim().toLowerCase()
-
-  if (
-    normalized === "active" ||
-    normalized === "approved" ||
-    normalized === "current" ||
-    normalized === "compliant"
-  ) {
-    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+    for (let row = merge.startRow; row < merge.endRow; row += 1) {
+      for (
+        let column = merge.startColumn;
+        column < merge.endColumn;
+        column += 1
+      ) {
+        map.set(`${row}:${column}`, {
+          anchor: row === merge.startRow && column === merge.startColumn,
+          rowSpan,
+          colSpan,
+        })
+      }
+    }
   }
 
-  if (
-    normalized === "terminated" ||
-    normalized === "resigned" ||
-    normalized === "inactive" ||
-    normalized === "suspended"
-  ) {
-    return "border-red-500/20 bg-red-500/10 text-red-400"
-  }
-
-  if (normalized === "loa" || normalized === "leave") {
-    return "border-amber-500/20 bg-amber-500/10 text-amber-400"
-  }
-
-  return "border-border bg-muted/50 text-muted-foreground"
+  return map
 }
 
-function StatusBadge({ value }: { value: string }) {
-  const normalized = value.trim().toLowerCase()
-
-  const Icon =
-    normalized === "active" ||
-    normalized === "approved" ||
-    normalized === "current" ||
-    normalized === "compliant"
-      ? CheckCircle2
-      : normalized === "terminated" ||
-          normalized === "resigned" ||
-          normalized === "inactive" ||
-          normalized === "suspended"
-        ? XCircle
-        : null
-
-  return (
-    <span
-      className={[
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
-        statusClasses(value),
-      ].join(" ")}
-    >
-      {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
-      {displayValue(value)}
-    </span>
-  )
-}
-
-function BooleanBadge({ value }: { value: string }) {
-  const normalized = value.trim().toLowerCase()
-  const yes = ["yes", "true", "1", "y"].includes(normalized)
-  const no = ["no", "false", "0", "n"].includes(normalized)
-
-  if (!yes && !no) {
-    return <>{displayValue(value)}</>
-  }
-
-  return (
-    <span
-      className={[
-        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
-        yes
-          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-          : "border-border bg-muted/50 text-muted-foreground",
-      ].join(" ")}
-    >
-      {yes ? "Yes" : "No"}
-    </span>
-  )
-}
-
-function isStatusHeader(header: string): boolean {
-  return [
-    "status",
-    "department status",
-    "employment status",
-    "state",
-  ].includes(header.trim().toLowerCase())
-}
-
-function isBooleanHeader(header: string): boolean {
-  const normalized = header.trim().toLowerCase()
-
-  return (
-    normalized.includes("allowed") ||
-    normalized.includes("optional") ||
-    normalized.includes("turbo") ||
-    normalized.includes("terminated") ||
-    normalized.includes("resigned") ||
-    normalized.includes("loa")
-  )
-}
-
-function isImageHeader(header: string): boolean {
-  const normalized = header.trim().toLowerCase()
-
-  return (
-    normalized.includes("image") ||
-    normalized.includes("photo") ||
-    normalized.includes("picture") ||
-    normalized.includes("avatar") ||
-    normalized.includes("logo") ||
-    normalized.includes("icon")
-  )
-}
-
-function ImageCell({ value }: { value: string }) {
-  const [failed, setFailed] = useState(false)
-
-  if (!isImageUrl(value) || failed) {
-    return <>{displayValue(value)}</>
-  }
-
-  return (
-    <a
-      href={value}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center justify-center"
-      title="Open image"
-    >
-      <img
-        src={value}
-        alt=""
-        loading="lazy"
-        onError={() => setFailed(true)}
-        className="h-10 w-14 rounded-md border border-border object-cover"
-      />
-    </a>
-  )
-}
-
-function CellValue({
-  header,
-  value,
+function CellContent({
+  cell,
 }: {
-  header: string
-  value: string
+  cell: MainRosterCell
 }) {
-  if (isImageHeader(header) && isImageUrl(value)) {
-    return <ImageCell value={value} />
-  }
+  const value = cell.value
 
-  if (isStatusHeader(header) && value) {
-    return <StatusBadge value={value} />
-  }
+  if (!value) return null
 
-  if (isBooleanHeader(header) && value) {
-    return <BooleanBadge value={value} />
-  }
-
-  if (isLikelyUrl(value)) {
+  if (cell.hyperlink) {
     return (
       <a
-        href={value}
+        href={cell.hyperlink}
         target="_blank"
         rel="noreferrer"
-        className="inline-flex max-w-[260px] items-center gap-1.5 truncate text-blue-500 hover:underline"
+        className="underline decoration-current/40 underline-offset-2 hover:opacity-80"
       >
         {value}
       </a>
     )
   }
 
-  return (
-    <span className="whitespace-pre-wrap break-words">
-      {displayValue(value)}
-    </span>
-  )
+  return <>{value}</>
 }
 
-function TableShell({
-  children,
+function GoogleSheetGrid({
+  sheet,
+  visibleRows,
 }: {
-  children: ReactNode
+  sheet: MainRosterSheet
+  visibleRows: Set<number> | null
 }) {
+  const mergeMap = useMemo(() => buildMergeMap(sheet.merges), [sheet.merges])
+
+  const hiddenRows = useMemo(
+    () => new Set(sheet.hiddenRows),
+    [sheet.hiddenRows],
+  )
+  const hiddenColumns = useMemo(
+    () => new Set(sheet.hiddenColumns),
+    [sheet.hiddenColumns],
+  )
+
+  const tableStyle: CSSProperties = {
+    borderCollapse: "collapse",
+    tableLayout: "fixed",
+    width: Math.max(
+      1,
+      sheet.columnWidths.reduce((total, width, index) => {
+        if (hiddenColumns.has(index)) return total
+        return total + (width || 100)
+      }, 0),
+    ),
+  }
+
   return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full min-w-max border-collapse text-sm">
-        {children}
+    <div className="max-h-[calc(100vh-250px)] w-full overflow-auto bg-background">
+      <table style={tableStyle}>
+        <colgroup>
+          {sheet.columnWidths.map((width, columnIndex) => (
+            <col
+              key={columnIndex}
+              style={{
+                width: width || 100,
+                display: hiddenColumns.has(columnIndex) ? "none" : undefined,
+              }}
+            />
+          ))}
+        </colgroup>
+
+        <tbody>
+          {sheet.cells.map((row, rowIndex) => {
+            if (hiddenRows.has(rowIndex)) return null
+            if (visibleRows && !visibleRows.has(rowIndex)) return null
+
+            const rowStyle: CSSProperties = {
+              height: sheet.rowHeights[rowIndex] || 21,
+              display: visibleRows && !visibleRows.has(rowIndex) ? "none" : undefined,
+            }
+
+            return (
+              <tr key={rowIndex} style={rowStyle}>
+                {row.map((cell, columnIndex) => {
+                  if (hiddenColumns.has(columnIndex)) return null
+
+                  const merge = mergeMap.get(`${rowIndex}:${columnIndex}`)
+                  if (merge && !merge.anchor) return null
+
+                  const style = sheet.styles[cell.styleId] ?? sheet.styles[0]
+                  const css = cellStyleToCss(style)
+
+                  if (!sheet.hideGridlines) {
+                    css.borderTop ??= "1px solid rgba(128,128,128,.18)"
+                    css.borderRight ??= "1px solid rgba(128,128,128,.18)"
+                    css.borderBottom ??= "1px solid rgba(128,128,128,.18)"
+                    css.borderLeft ??= "1px solid rgba(128,128,128,.18)"
+                  }
+
+                  return (
+                    <td
+                      key={`${rowIndex}-${columnIndex}`}
+                      rowSpan={merge?.rowSpan}
+                      colSpan={merge?.colSpan}
+                      style={css}
+                    >
+                      <div className="min-h-[1em] w-full">
+                        <CellContent cell={cell} />
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
       </table>
     </div>
   )
@@ -329,9 +446,7 @@ function LoadingState() {
   return (
     <div className="p-12 text-center">
       <RefreshCw className="mx-auto h-6 w-6 animate-spin text-blue-500" />
-      <p className="mt-3 text-sm text-muted-foreground">
-        Loading Google Sheet...
-      </p>
+      <p className="mt-3 text-sm text-muted-foreground">Loading Google Sheet...</p>
     </div>
   )
 }
@@ -346,19 +461,9 @@ function ErrorState({
   return (
     <div className="p-10 text-center">
       <XCircle className="mx-auto h-7 w-7 text-red-500" />
-      <p className="mt-3 text-sm font-semibold">
-        Failed to load Main Roster
-      </p>
-      <p className="mx-auto mt-1 max-w-xl text-xs text-muted-foreground">
-        {message}
-      </p>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={retry}
-        className="mt-4"
-      >
+      <p className="mt-3 text-sm font-semibold">Failed to load Main Roster</p>
+      <p className="mx-auto mt-1 max-w-xl text-xs text-muted-foreground">{message}</p>
+      <Button type="button" variant="outline" size="sm" onClick={retry} className="mt-4">
         Try Again
       </Button>
     </div>
@@ -376,50 +481,33 @@ export default function MainRoster() {
   const [statusFilter, setStatusFilter] = useState("")
   const [rankFilter, setRankFilter] = useState("")
 
-  const pageInfo =
-    pages.find((item) => item.id === page) ?? pages[0]
+  const pageInfo = pages.find((item) => item.id === page) ?? pages[0]
 
   const loadSheet = useCallback(
-    async (
-      selectedPage: SheetKey,
-      showLoading = true,
-    ) => {
+    async (selectedPage: SheetKey, showLoading = true) => {
       if (showLoading) setLoading(true)
-
       setError(null)
 
       try {
-        const response = await fetch(
-          `/api/main-roster/${selectedPage}`,
-          {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-              Accept: "application/json",
-            },
-          },
-        )
+        const response = await fetch(`/api/main-roster/${selectedPage}`, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        })
 
-        const data =
-          (await response.json().catch(() => null)) as
-            | MainRosterResponse
-            | null
+        const data = (await response.json().catch(() => null)) as MainRosterResponse | null
 
         if (!response.ok || !data?.success || !data.sheet) {
           throw new Error(
-            data?.error ||
-              `Failed to load ${pageInfo.label} (${response.status}).`,
+            data?.error || `Failed to load ${pageInfo.label} (${response.status}).`,
           )
         }
 
         setSheet(data.sheet)
       } catch (loadError) {
         const message =
-          loadError instanceof Error
-            ? loadError.message
-            : `Failed to load ${pageInfo.label}.`
-
+          loadError instanceof Error ? loadError.message : `Failed to load ${pageInfo.label}.`
         setSheet(null)
         setError(message)
       } finally {
@@ -438,44 +526,41 @@ export default function MainRoster() {
 
   const refresh = useCallback(async () => {
     if (refreshing) return
-
     setRefreshing(true)
-    setError(null)
 
     try {
       await loadSheet(page, false)
-
       toast.success("Main Roster refreshed", {
         description: `Latest ${pageInfo.label} data loaded from Google Sheets.`,
       })
-    } catch {
-      // loadSheet handles the displayed error state.
     } finally {
       setRefreshing(false)
     }
   }, [loadSheet, page, pageInfo.label, refreshing])
 
-  const statusColumn = useMemo(() => {
-    if (page !== "department-roster" || !sheet) return -1
+  const filterHeaderRow = useMemo(
+    () => (sheet ? findFilterHeaderRow(sheet) : -1),
+    [sheet],
+  )
 
-    return findColumn(sheet.headers, [
+  const filterHeader = useMemo(
+    () => (filterHeaderRow >= 0 && sheet ? sheet.rawRows[filterHeaderRow] ?? [] : []),
+    [filterHeaderRow, sheet],
+  )
+
+  const statusColumn = useMemo(() => {
+    if (page !== "department-roster") return -1
+    return findColumnInRow(filterHeader, [
       "Status",
       "Department Status",
       "Employment Status",
     ])
-  }, [page, sheet])
+  }, [filterHeader, page])
 
   const rankColumn = useMemo(() => {
-    if (
-      !sheet ||
-      (page !== "department-roster" &&
-        page !== "employee-database")
-    ) {
-      return -1
-    }
-
-    return findColumn(sheet.headers, ["Rank"])
-  }, [page, sheet])
+    if (page !== "department-roster" && page !== "employee-database") return -1
+    return findColumnInRow(filterHeader, ["Rank"])
+  }, [filterHeader, page])
 
   const statusOptions = useMemo(() => {
     if (!sheet || statusColumn === -1) return []
@@ -483,8 +568,8 @@ export default function MainRoster() {
     const values: string[] = []
     const seen = new Set<string>()
 
-    for (const row of sheet.rows) {
-      const value = cleanValue(row[statusColumn])
+    for (let rowIndex = filterHeaderRow + 1; rowIndex < sheet.rawRows.length; rowIndex += 1) {
+      const value = cleanValue(sheet.rawRows[rowIndex]?.[statusColumn])
       if (value && !seen.has(value)) {
         seen.add(value)
         values.push(value)
@@ -492,7 +577,7 @@ export default function MainRoster() {
     }
 
     return values
-  }, [sheet, statusColumn])
+  }, [filterHeaderRow, sheet, statusColumn])
 
   const rankOptions = useMemo(() => {
     if (!sheet || rankColumn === -1) return []
@@ -500,8 +585,8 @@ export default function MainRoster() {
     const values: string[] = []
     const seen = new Set<string>()
 
-    for (const row of sheet.rows) {
-      const value = cleanValue(row[rankColumn])
+    for (let rowIndex = filterHeaderRow + 1; rowIndex < sheet.rawRows.length; rowIndex += 1) {
+      const value = cleanValue(sheet.rawRows[rowIndex]?.[rankColumn])
       if (value && !seen.has(value)) {
         seen.add(value)
         values.push(value)
@@ -509,20 +594,30 @@ export default function MainRoster() {
     }
 
     return values
-  }, [sheet, rankColumn])
+  }, [filterHeaderRow, sheet, rankColumn])
 
-  const filteredRows = useMemo(() => {
-    if (!sheet) return []
+  const visibleRows = useMemo(() => {
+    if (!sheet || page === "home" || (!search.trim() && !statusFilter && !rankFilter)) {
+      return null
+    }
 
     const query = search.trim().toLowerCase()
+    const result = new Set<number>()
 
-    return sheet.rows.filter((row) => {
+    for (let rowIndex = 0; rowIndex < sheet.rawRows.length; rowIndex += 1) {
+      if (rowIndex === filterHeaderRow) {
+        result.add(rowIndex)
+        continue
+      }
+
+      const row = sheet.rawRows[rowIndex] ?? []
+
       if (
         statusFilter &&
         statusColumn !== -1 &&
         cleanValue(row[statusColumn]) !== statusFilter
       ) {
-        return false
+        continue
       }
 
       if (
@@ -530,26 +625,24 @@ export default function MainRoster() {
         rankColumn !== -1 &&
         cleanValue(row[rankColumn]) !== rankFilter
       ) {
-        return false
+        continue
       }
 
-      if (!query) return true
+      if (query && !row.some((value) => cleanValue(value).toLowerCase().includes(query))) {
+        continue
+      }
 
-      return row.some((value) =>
-        cleanValue(value).toLowerCase().includes(query),
-      )
-    })
-  }, [
-    rankColumn,
-    rankFilter,
-    search,
-    sheet,
-    statusColumn,
-    statusFilter,
-  ])
+      result.add(rowIndex)
+    }
 
-  const hasFilters =
-    Boolean(search || statusFilter || rankFilter)
+    return result
+  }, [filterHeaderRow, page, rankColumn, rankFilter, search, sheet, statusColumn, statusFilter])
+
+  const filteredCount = visibleRows
+    ? Array.from(visibleRows).filter((rowIndex) => rowIndex !== filterHeaderRow).length
+    : sheet?.rawRows.length ?? 0
+
+  const hasFilters = Boolean(search || statusFilter || rankFilter)
 
   const clearFilters = () => {
     setSearch("")
@@ -560,17 +653,13 @@ export default function MainRoster() {
   return (
     <DashboardLayout>
       <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden">
-        {/* Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10">
               <FileSpreadsheet className="h-5 w-5 text-blue-500" />
             </div>
-
             <div className="min-w-0">
-              <h1 className="text-3xl font-bold tracking-tight">
-                Main Roster
-              </h1>
+              <h1 className="text-3xl font-bold tracking-tight">Main Roster</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Metro Police Department master roster and operational data.
               </p>
@@ -585,17 +674,11 @@ export default function MainRoster() {
             disabled={refreshing || loading}
             className="gap-2 self-start lg:self-auto"
           >
-            <RefreshCw
-              className={[
-                "h-4 w-4",
-                refreshing ? "animate-spin" : "",
-              ].join(" ")}
-            />
+            <RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
             {refreshing ? "Refreshing..." : "Refresh"}
           </Button>
         </div>
 
-        {/* Tabs */}
         <div className="flex w-full gap-2 overflow-x-auto pb-1">
           {pages.map((item) => {
             const Icon = item.icon
@@ -617,93 +700,60 @@ export default function MainRoster() {
           })}
         </div>
 
-        {/* Main card */}
         <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           <div className="flex flex-col gap-4 border-b border-border p-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
                 <pageInfo.icon className="h-4 w-4 text-blue-500" />
               </div>
-
               <div>
-                <h2 className="text-base font-semibold">
-                  {pageInfo.label}
-                </h2>
-
+                <h2 className="text-base font-semibold">{pageInfo.label}</h2>
                 <p className="text-xs text-muted-foreground">
-                  {sheet
-                    ? `${sheet.rowCount.toLocaleString()} rows`
-                    : "Loading..."}
+                  {sheet ? `${sheet.rowCount.toLocaleString()} rows` : "Loading..."}
                 </p>
               </div>
             </div>
 
-            {page !== "home" && (
+            {(page === "department-roster" || page === "employee-database") && (
               <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-                {/* Search only on Department + Employee Database */}
-                {(page === "department-roster" ||
-                  page === "employee-database") && (
-                  <div className="relative w-full lg:w-72">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <div className="relative w-full lg:w-72">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={`Search ${pageInfo.label.toLowerCase()}...`}
+                    className="pl-9"
+                  />
+                </div>
 
-                    <Input
-                      value={search}
-                      onChange={(event) =>
-                        setSearch(event.target.value)
-                      }
-                      placeholder={`Search ${pageInfo.label.toLowerCase()}...`}
-                      className="pl-9"
-                    />
-                  </div>
+                {page === "department-roster" && statusOptions.length > 0 && (
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value)}
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring lg:w-44"
+                  >
+                    <option value="">All Status</option>
+                    {statusOptions.map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
                 )}
 
-                {/* Department Status filter */}
-                {page === "department-roster" &&
-                  statusOptions.length > 0 && (
-                    <select
-                      value={statusFilter}
-                      onChange={(event) =>
-                        setStatusFilter(event.target.value)
-                      }
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring lg:w-44"
-                    >
-                      <option value="">All Status</option>
-                      {statusOptions.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-
-                {/* Rank filter */}
-                {(page === "department-roster" ||
-                  page === "employee-database") &&
-                  rankOptions.length > 0 && (
-                    <select
-                      value={rankFilter}
-                      onChange={(event) =>
-                        setRankFilter(event.target.value)
-                      }
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring lg:w-52"
-                    >
-                      <option value="">All Ranks</option>
-                      {rankOptions.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                {rankOptions.length > 0 && (
+                  <select
+                    value={rankFilter}
+                    onChange={(event) => setRankFilter(event.target.value)}
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring lg:w-52"
+                  >
+                    <option value="">All Ranks</option>
+                    {rankOptions.map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                )}
 
                 {hasFilters && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearFilters}
-                    className="gap-2"
-                  >
+                  <Button type="button" variant="ghost" size="sm" onClick={clearFilters} className="gap-2">
                     <XCircle className="h-4 w-4" />
                     Clear
                   </Button>
@@ -712,105 +762,42 @@ export default function MainRoster() {
             )}
           </div>
 
-          {/* Filter summary */}
-          {page !== "home" && sheet && (
+          {sheet && page !== "home" && (
             <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-5 py-3">
-              {(page === "department-roster" ||
-                page === "employee-database") && (
+              {(page === "department-roster" || page === "employee-database") ? (
                 <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Filter className="h-3.5 w-3.5" />
-                  Showing{" "}
-                  <span className="font-semibold text-foreground">
-                    {filteredRows.length.toLocaleString()}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-semibold text-foreground">
-                    {sheet.rows.length.toLocaleString()}
-                  </span>
+                  {hasFilters ? (
+                    <>Showing <span className="font-semibold text-foreground">{filteredCount.toLocaleString()}</span></>
+                  ) : (
+                    <>Showing all <span className="font-semibold text-foreground">{sheet.rowCount.toLocaleString()}</span></>
+                  )}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  {sheet.rowCount.toLocaleString()} rows
                 </span>
               )}
-
-              {page !== "department-roster" &&
-                page !== "employee-database" && (
-                  <span className="text-xs text-muted-foreground">
-                    {sheet.rows.length.toLocaleString()} rows
-                  </span>
-                )}
             </div>
           )}
 
           {loading ? (
             <LoadingState />
           ) : error ? (
-            <ErrorState
-              message={error}
-              retry={() => void loadSheet(page)}
-            />
+            <ErrorState message={error} retry={() => void loadSheet(page)} />
           ) : !sheet ? (
             <EmptyState message="No sheet data was returned." />
-          ) : sheet.headers.length === 0 ||
-            sheet.rows.length === 0 ? (
-            <EmptyState
-              message={`The ${sheet.name} sheet does not currently contain any data.`}
-            />
+          ) : sheet.cells.length === 0 ? (
+            <EmptyState message={`The ${sheet.name} sheet does not currently contain any data.`} />
           ) : (
-            <TableShell>
-              <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
-                <tr className="border-b border-border">
-                  {sheet.headers.map((header, index) => (
-                    <th
-                      key={`${header}-${index}`}
-                      className="whitespace-nowrap px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                    >
-                      {displayValue(header)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredRows.map((row, rowIndex) => (
-                  <tr
-                    key={rowIndex}
-                    className="border-b border-border last:border-0 hover:bg-muted/30"
-                  >
-                    {sheet.headers.map((header, columnIndex) => (
-                      <td
-                        key={`${rowIndex}-${columnIndex}`}
-                        className="max-w-[360px] whitespace-normal px-4 py-3 text-center align-middle"
-                      >
-                        <CellValue
-                          header={header}
-                          value={cleanValue(row[columnIndex])}
-                        />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-
-                {filteredRows.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={Math.max(sheet.headers.length, 1)}
-                      className="px-6 py-12 text-center text-sm text-muted-foreground"
-                    >
-                      No records match the current filters.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </TableShell>
+            <GoogleSheetGrid sheet={sheet} visibleRows={visibleRows} />
           )}
         </section>
 
         {sheet && (
           <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              Source: {sheet.name}
-            </span>
-            <span>
-              {sheet.columnCount} columns · {sheet.rowCount} rows
-            </span>
+            <span>Source: {sheet.name}</span>
+            <span>{sheet.columnCount} columns · {sheet.rowCount} rows</span>
           </div>
         )}
       </div>
