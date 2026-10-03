@@ -1373,7 +1373,7 @@ export default function Gallery() {
                                     openInfo(item)
                                   }
                                 }}
-                                className="group/info w-full cursor-pointer rounded-lg px-1 py-1 pr-16 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                className="w-full cursor-pointer rounded-lg px-1 py-1 pr-16 text-left outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                                 aria-label={`View information for ${item.title}`}
                               >
                                 <div className="mb-1.5 flex items-center gap-2">
@@ -1401,7 +1401,7 @@ export default function Gallery() {
 
                                     {(item.description.length > 120 ||
                                       item.description.split(/\r?\n/).length > 2) && (
-                                      <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
+                                      <span className="mt-1 inline-block cursor-pointer rounded px-1 text-[11px] font-medium text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-400 hover:underline">
                                         Show more...
                                       </span>
                                     )}
