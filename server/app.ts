@@ -2,10 +2,11 @@ import express from "express"
 import cookieParser from "cookie-parser"
 import multer from "multer"
 import path from "node:path"
+import fs from "node:fs"
+import os from "node:os"
 import XLSX from "xlsx"
 
 import { syncGoogleRosters } from "./googleRosterSync"
-import { registerMainRosterRoutes } from "./googleMainRoster"
 
 import {
   authenticateDiscordCode,
@@ -27,6 +28,33 @@ import { randomUUID } from "node:crypto"
 
 const upload = multer({
   storage: multer.memoryStorage(),
+  limits: {
+    files: 20,
+    fileSize: 100 * 1024 * 1024,
+  },
+})
+
+// Gallery uploads use disk-backed temporary storage so large videos are not
+// kept in RAM while they are being copied into MongoDB GridFS.
+const GALLERY_UPLOAD_DIR = path.join(
+  os.tmpdir(),
+  "mpd-gallery-uploads",
+)
+
+fs.mkdirSync(GALLERY_UPLOAD_DIR, { recursive: true })
+
+const galleryUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => {
+      callback(null, GALLERY_UPLOAD_DIR)
+    },
+    filename: (_req, file, callback) => {
+      callback(
+        null,
+        `${Date.now()}-${randomUUID()}-${path.basename(file.originalname || "gallery-file")}`,
+      )
+    },
+  }),
   limits: {
     files: 20,
     fileSize: 100 * 1024 * 1024,
@@ -577,93 +605,188 @@ function serializeGalleryItem(
 
 function getGalleryFileType(
   mimetype: string,
+  filename = "",
 ): GalleryMediaType | null {
-  if (mimetype.startsWith("image/")) {
+  const normalizedMime =
+    cleanGalleryString(mimetype).toLowerCase()
+
+  if (normalizedMime.startsWith("image/")) {
     return "image"
   }
 
-  if (mimetype.startsWith("video/")) {
+  if (normalizedMime.startsWith("video/")) {
+    return "video"
+  }
+
+  const extension = path.extname(filename).toLowerCase()
+
+  const imageExtensions = new Set([
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".avif",
+    ".bmp",
+    ".svg",
+    ".tif",
+    ".tiff",
+  ])
+
+  const videoExtensions = new Set([
+    ".mp4",
+    ".webm",
+    ".mov",
+    ".m4v",
+    ".avi",
+    ".mkv",
+    ".ogv",
+    ".mpeg",
+    ".mpg",
+  ])
+
+  if (imageExtensions.has(extension)) {
+    return "image"
+  }
+
+  if (videoExtensions.has(extension)) {
     return "video"
   }
 
   return null
 }
 
-async function getGalleryBucket() {
-  const db = await getMongoDb()
-  return new GridFSBucket(db, {
-    bucketName: "galleryFiles",
-  })
+function getGalleryContentType(
+  mimetype: string,
+  filename = "",
+  type?: GalleryMediaType,
+) {
+  const normalizedMime =
+    cleanGalleryString(mimetype).toLowerCase()
+
+  if (
+    normalizedMime &&
+    normalizedMime !== "application/octet-stream"
+  ) {
+    return normalizedMime
+  }
+
+  const extension = path.extname(filename).toLowerCase()
+
+  const extensionContentTypes: Record<string, string> = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".avif": "image/avif",
+    ".bmp": "image/bmp",
+    ".svg": "image/svg+xml",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
+    ".ogv": "video/ogg",
+    ".mpeg": "video/mpeg",
+    ".mpg": "video/mpeg",
+  }
+
+  return (
+    extensionContentTypes[extension] ??
+    (type === "video" ? "video/mp4" : "application/octet-stream")
+  )
+}
+
+async function safeUnlinkGalleryTempFile(
+  filePath: string | undefined,
+) {
+  if (!filePath) return
+
+  try {
+    await fs.promises.unlink(filePath)
+  } catch {
+    // The file may already have been removed.
+  }
 }
 
 async function storeGalleryFile(
   file: Express.Multer.File,
 ) {
-  const type =
-    getGalleryFileType(file.mimetype)
+  const type = getGalleryFileType(
+    file.mimetype,
+    file.originalname,
+  )
 
   if (!type) {
+    await safeUnlinkGalleryTempFile(file.path)
     throw new Error(
-      "Only image and video files are supported",
+      `Unsupported gallery file type: ${file.originalname || "file"}`,
     )
   }
 
-  const bucket =
-    await getGalleryBucket()
+  if (!file.path) {
+    throw new Error("Gallery upload did not create a temporary file.")
+  }
 
+  const bucket = await getGalleryBucket()
   const filename =
     file.originalname?.trim() ||
     `gallery-${Date.now()}`
+  const contentType = getGalleryContentType(
+    file.mimetype,
+    filename,
+    type,
+  )
 
-  const uploadStream =
-    bucket.openUploadStream(
-      filename,
-      {
-        contentType:
-          file.mimetype,
-        metadata: {
-          originalName:
-            filename,
-          mediaType: type,
-        },
+  const uploadStream = bucket.openUploadStream(
+    filename,
+    {
+      contentType,
+      metadata: {
+        originalName: filename,
+        mediaType: type,
+        contentType,
       },
-    )
-
-  await new Promise<void>(
-    (resolve, reject) => {
-      uploadStream.once(
-        "finish",
-        () => resolve(),
-      )
-
-      uploadStream.once(
-        "error",
-        (error) => reject(error),
-      )
-
-      uploadStream.end(
-        file.buffer,
-      )
     },
   )
 
-  const storageId =
-    uploadStream.id.toString()
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const input = fs.createReadStream(file.path)
 
-  const filePath =
-    `/api/gallery/file/${storageId}`
+      input.once("error", reject)
+      uploadStream.once("error", reject)
+      uploadStream.once("finish", () => resolve())
 
-  return {
-    id: storageId,
-    type,
-    url: APP_ORIGIN
-      ? `${APP_ORIGIN}${filePath}`
-      : filePath,
-    thumbnailUrl:
-      "",
-    source:
-      "upload" as const,
-    storageId,
+      input.pipe(uploadStream)
+    })
+
+    const storageId = uploadStream.id.toString()
+    const filePath = `/api/gallery/file/${storageId}`
+
+    return {
+      id: storageId,
+      type,
+      url: APP_ORIGIN
+        ? `${APP_ORIGIN}${filePath}`
+        : filePath,
+      thumbnailUrl: "",
+      source: "upload" as const,
+      storageId,
+    }
+  } catch (error) {
+    if (uploadStream.id) {
+      await deleteGalleryStoredFile(
+        uploadStream.id.toString(),
+      )
+    }
+    throw error
+  } finally {
+    await safeUnlinkGalleryTempFile(file.path)
   }
 }
 
@@ -4010,9 +4133,6 @@ export function createApp() {
   app.use(express.json())
   app.use(cookieParser())
 
-  // Main Roster Google Sheets API
-  registerMainRosterRoutes(app)
-
   app.get("/health", (_req, res) => {
     res.status(200).json({
       ok: true,
@@ -5455,7 +5575,7 @@ export function createApp() {
    */
   app.post(
     "/api/gallery/upload",
-    upload.array("files", 20),
+    galleryUpload.array("files", 20),
     async (req, res) => {
       try {
         const user =
@@ -5541,39 +5661,29 @@ export function createApp() {
     "/api/gallery/file/:id",
     async (req, res) => {
       try {
-        // Public media endpoint: guests need to be able to see
-        // images/videos referenced by the public gallery.
+        // Public media endpoint: guests must be able to render gallery media.
         const id = req.params.id
 
         if (!ObjectId.isValid(id)) {
           return res.status(400).json({
             success: false,
-            error:
-              "Invalid gallery file ID",
+            error: "Invalid gallery file ID",
           })
         }
 
-        const objectId =
-          new ObjectId(id)
-
-        const bucket =
-          await getGalleryBucket()
-
-        const files =
-          await bucket
-            .find({
-              _id: objectId,
-            })
-            .limit(1)
-            .toArray()
+        const objectId = new ObjectId(id)
+        const bucket = await getGalleryBucket()
+        const files = await bucket
+          .find({ _id: objectId })
+          .limit(1)
+          .toArray()
 
         const file = files[0]
 
         if (!file) {
           return res.status(404).json({
             success: false,
-            error:
-              "Gallery file not found",
+            error: "Gallery file not found",
           })
         }
 
@@ -5583,101 +5693,105 @@ export function createApp() {
             mediaType?: unknown
           } | undefined) ?? {}
 
-        const storedContentType =
+        const contentType = getGalleryContentType(
           typeof file.contentType === "string"
-            ? file.contentType.trim().toLowerCase()
-            : ""
-
-        const metadataContentType =
-          typeof metadata.contentType === "string"
-            ? metadata.contentType.trim().toLowerCase()
-            : ""
-
-        const filename =
+            ? file.contentType
+            : "",
           typeof file.filename === "string"
-            ? file.filename.toLowerCase()
-            : ""
-
-        const extension =
-          filename.includes(".")
-            ? filename.slice(filename.lastIndexOf("."))
-            : ""
-
-        const extensionContentTypes: Record<string, string> = {
-          ".jpg": "image/jpeg",
-          ".jpeg": "image/jpeg",
-          ".png": "image/png",
-          ".gif": "image/gif",
-          ".webp": "image/webp",
-          ".avif": "image/avif",
-          ".bmp": "image/bmp",
-          ".svg": "image/svg+xml",
-          ".mp4": "video/mp4",
-          ".webm": "video/webm",
-          ".mov": "video/quicktime",
-          ".m4v": "video/x-m4v",
-          ".avi": "video/x-msvideo",
-        }
-
-        const inferredContentType =
-          extensionContentTypes[extension] ??
-          (metadata.mediaType === "video"
-            ? "video/mp4"
-            : "image/jpeg")
-
-        const contentType =
-          storedContentType &&
-          storedContentType !== "application/octet-stream"
-            ? storedContentType
-            : metadataContentType &&
-                metadataContentType !== "application/octet-stream"
-              ? metadataContentType
-              : inferredContentType
-
-        res.setHeader(
-          "Content-Type",
-          contentType,
+            ? file.filename
+            : "",
+          metadata.mediaType === "video" ? "video" : "image",
         )
 
-        // Tell the browser to render supported images/videos instead of
-        // treating the GridFS response as a downloadable binary file.
-        res.setHeader(
-          "Content-Disposition",
-          "inline",
-        )
+        const totalLength = Number(file.length)
+        const range = req.headers.range
 
-        res.setHeader(
-          "Content-Length",
-          String(file.length),
-        )
-
+        res.setHeader("Content-Type", contentType)
+        res.setHeader("Content-Disposition", "inline")
+        res.setHeader("Accept-Ranges", "bytes")
         res.setHeader(
           "Cache-Control",
           "public, max-age=31536000, immutable",
         )
 
-        const stream =
-          bucket.openDownloadStream(
-            objectId,
-          )
+        if (!range) {
+          res.status(200)
+          res.setHeader("Content-Length", String(totalLength))
 
-        stream.on(
-          "error",
-          (error) => {
-            console.error(
-              "Gallery file stream failed:",
-              error,
-            )
+          const stream = bucket.openDownloadStream(objectId)
+          stream.once("error", (error) => {
+            console.error("Gallery file stream failed:", error)
+            if (!res.headersSent) res.status(500).end()
+            else res.end()
+          })
+          stream.pipe(res)
+          return
+        }
 
-            if (
-              !res.headersSent
-            ) {
-              res.status(500).end()
-            } else {
-              res.end()
-            }
-          },
+        const match = /^bytes=(\d*)-(\d*)$/i.exec(
+          range.trim(),
         )
+
+        if (!match) {
+          res.setHeader("Content-Range", `bytes */${totalLength}`)
+          return res.status(416).end()
+        }
+
+        const requestedStart = match[1]
+          ? Number(match[1])
+          : null
+        const requestedEnd = match[2]
+          ? Number(match[2])
+          : null
+
+        let start: number
+        let end: number
+
+        if (requestedStart === null) {
+          const suffixLength = requestedEnd ?? 0
+
+          if (suffixLength <= 0) {
+            res.setHeader("Content-Range", `bytes */${totalLength}`)
+            return res.status(416).end()
+          }
+
+          start = Math.max(0, totalLength - suffixLength)
+          end = totalLength - 1
+        } else {
+          start = requestedStart
+          end = requestedEnd ?? totalLength - 1
+        }
+
+        if (
+          start < 0 ||
+          start >= totalLength ||
+          end < start
+        ) {
+          res.setHeader("Content-Range", `bytes */${totalLength}`)
+          return res.status(416).end()
+        }
+
+        end = Math.min(end, totalLength - 1)
+
+        const length = end - start + 1
+
+        res.status(206)
+        res.setHeader(
+          "Content-Range",
+          `bytes ${start}-${end}/${totalLength}`,
+        )
+        res.setHeader("Content-Length", String(length))
+
+        const stream = bucket.openDownloadStream(objectId, {
+          start,
+          end: end + 1,
+        })
+
+        stream.once("error", (error) => {
+          console.error("Gallery ranged stream failed:", error)
+          if (!res.headersSent) res.status(500).end()
+          else res.end()
+        })
 
         stream.pipe(res)
         return
@@ -5689,8 +5803,7 @@ export function createApp() {
 
         return res.status(500).json({
           success: false,
-          error:
-            "Failed to load gallery file",
+          error: "Failed to load gallery file",
         })
       }
     },
