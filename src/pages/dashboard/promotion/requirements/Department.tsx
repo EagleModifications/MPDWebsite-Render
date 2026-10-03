@@ -377,18 +377,29 @@ export default function DepartmentRequirements() {
       return
     }
 
-    setRequirements((current) => ({
-      ...current,
-      [rankId]: {
+    setRequirements((current) => {
+      const existing: Requirement = current[rankId] ?? {
         rankId: rank.id,
         rankName: rank.name,
-        hours: Math.max(
-          0,
-          (current[rankId]?.hours ?? 0) +
-            amount,
-        ),
-      },
-    }))
+        hours: 0,
+        timeInRankDays: 0,
+        trainingLogs: 0,
+        recruitmentLogs: 0,
+      }
+
+      return {
+        ...current,
+        [rankId]: {
+          ...existing,
+          rankId: rank.id,
+          rankName: rank.name,
+          hours: Math.max(
+            0,
+            existing.hours + amount,
+          ),
+        },
+      }
+    })
   }
 
   function setHours(
@@ -404,14 +415,26 @@ export default function DepartmentRequirements() {
     }
 
     if (value === "") {
-      setRequirements((current) => ({
-        ...current,
-        [rankId]: {
+      setRequirements((current) => {
+        const existing: Requirement = current[rankId] ?? {
           rankId: rank.id,
           rankName: rank.name,
           hours: 0,
-        },
-      }))
+          timeInRankDays: 0,
+          trainingLogs: 0,
+          recruitmentLogs: 0,
+        }
+
+        return {
+          ...current,
+          [rankId]: {
+            ...existing,
+            rankId: rank.id,
+            rankName: rank.name,
+            hours: 0,
+          },
+        }
+      })
 
       return
     }
@@ -424,14 +447,26 @@ export default function DepartmentRequirements() {
         ? Math.max(0, parsedHours)
         : 0
 
-    setRequirements((current) => ({
-      ...current,
-      [rankId]: {
+    setRequirements((current) => {
+      const existing: Requirement = current[rankId] ?? {
         rankId: rank.id,
         rankName: rank.name,
-        hours,
-      },
-    }))
+        hours: 0,
+        timeInRankDays: 0,
+        trainingLogs: 0,
+        recruitmentLogs: 0,
+      }
+
+      return {
+        ...current,
+        [rankId]: {
+          ...existing,
+          rankId: rank.id,
+          rankName: rank.name,
+          hours,
+        },
+      }
+    })
   }
 
   function setRequirementValue(
