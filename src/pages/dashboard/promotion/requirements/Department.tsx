@@ -238,7 +238,7 @@ function RequirementInput({
   disabled: boolean
 }) {
   return (
-    <div className="w-full min-w-0 lg:w-[166px]">
+    <div className="w-full min-w-0 lg:w-[190px]">
       <label
         className="
           mb-1.5 block w-full
@@ -253,7 +253,7 @@ function RequirementInput({
 
       <div
         className="
-          flex h-11 w-full
+          flex h-12 w-full
           overflow-hidden
           rounded-lg
           border border-border
@@ -276,7 +276,7 @@ function RequirementInput({
             bg-transparent
             px-2
             text-center
-            text-sm
+            text-base
             font-semibold
             text-foreground
             outline-none
@@ -291,7 +291,7 @@ function RequirementInput({
 
         <div
           className="
-            flex w-8 shrink-0
+            flex w-9 shrink-0
             flex-col
             border-l border-border
           "
@@ -313,7 +313,7 @@ function RequirementInput({
             "
             aria-label={`Increase ${label}`}
           >
-            <ChevronUp className="h-3.5 w-3.5" />
+            <ChevronUp className="h-4 w-4" />
           </button>
 
           <button
@@ -332,7 +332,7 @@ function RequirementInput({
             "
             aria-label={`Decrease ${label}`}
           >
-            <ChevronDown className="h-3.5 w-3.5" />
+            <ChevronDown className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -781,7 +781,7 @@ export default function DepartmentRequirements() {
               </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Configure the required promotion hours for each Department rank.
+                Configure the required promotion hours, time in rank, trainings, and recruitments / ridealongs for each Department rank.
               </p>
             </div>
           </div>
@@ -835,7 +835,7 @@ export default function DepartmentRequirements() {
                     </h2>
 
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Configure hours, time in rank, and FTD log requirements for each rank.
+                      Configure hours, time in rank, training, and recruitment / ridealong requirements for each rank.
                     </p>
                   </div>
                 </div>
