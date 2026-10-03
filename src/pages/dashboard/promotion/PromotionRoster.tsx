@@ -775,7 +775,7 @@ export default function PromotionRoster() {
               member.discordId,
               member.timeInDept,
               member.timeInRank,
-              `${member.requiredTimeInRankDays} days`,
+              `${member.requiredTimeInRankDays}d`,
               `${member.requiredLogs} logs`,
               `${member.requiredTrainingLogs} training`,
               `${member.requiredRecruitmentLogs} recruitment/ridealong`,
@@ -1761,10 +1761,10 @@ export default function PromotionRoster() {
           ) : (
             <>
               <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[1100px] text-sm">
+              <table className="w-full min-w-[1500px] text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30 text-left">
-                    <th className="w-12 px-4 py-3">
+                    <th className="w-12 whitespace-nowrap px-4 py-3">
                       <Checkbox
                         checked={
                           allVisibleSelected
@@ -1776,51 +1776,51 @@ export default function PromotionRoster() {
                       />
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Callsign
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Badge
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Name
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Rank
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Discord ID
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Time in Dept
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Time in Rank
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Required Time in Rank
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Required Logs
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Required
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Activity
                     </th>
 
-                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground">
                       Status
                     </th>
                   </tr>
@@ -1893,7 +1893,7 @@ export default function PromotionRoster() {
                             {member.name}
                           </td>
 
-                          <td className="px-4 py-3 text-muted-foreground">
+                          <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                             {member.rank}
                           </td>
 
@@ -1950,15 +1950,15 @@ export default function PromotionRoster() {
                             {member.timeInDept}
                           </td>
 
-                          <td className="px-4 py-3 text-muted-foreground">
+                          <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                             {member.timeInRank || "—"}
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="whitespace-nowrap px-4 py-3">
                             {member.requiredTimeInRankDays}d
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="whitespace-nowrap px-4 py-3">
                             <div className="font-medium">
                               {member.requiredLogs}
                             </div>
@@ -2138,7 +2138,7 @@ export default function PromotionRoster() {
                               Required Time in Rank
                             </p>
                             <p className="mt-0.5 font-medium">
-                              {member.requiredTimeInRankDays} DAYS
+                              {member.requiredTimeInRankDays}d
                             </p>
                           </div>
 
