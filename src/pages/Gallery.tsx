@@ -79,8 +79,6 @@ const GALLERY_MEDIA_FILTERS: GalleryMediaFilter[] = [
 
 const DESCRIPTION_LINE_LENGTH = 35
 const DESCRIPTION_MAX_LINES = 3
-const DESCRIPTION_PREVIEW_LENGTH =
-  DESCRIPTION_LINE_LENGTH * DESCRIPTION_MAX_LINES
 
 function getDescriptionPreview(description: string) {
   const normalized = description.replace(/\r\n/g, "\n")
