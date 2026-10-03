@@ -33,88 +33,25 @@ type RequirementsResponse = {
   error?: string
 }
 
-/*
- * Department rank order.
- *
- * The order here is the official display order used by
- * Department Requirements and should not depend on MongoDB.
- *
- * rankId   = internal identifier
- * rankName = human-readable name
- */
 const Department_RANKS: Rank[] = [
-  {
-    id: "chief-of-police",
-    name: "Chief Of Police",
-  },
-  {
-    id: "deputy-chief-of-police",
-    name: "Deputy Chief Of Police",
-  },
-  {
-    id: "assistant-chief-of-police",
-    name: "Assistant Chief Of Police",
-  },
-  {
-    id: "chief-of-staff",
-    name: "Chief Of Staff",
-  },
-  {
-    id: "colonel",
-    name: "Colonel",
-  },
-  {
-    id: "lieutenant-colonel",
-    name: "Lieutenant Colonel",
-  },
-  {
-    id: "major",
-    name: "Major",
-  },
-  {
-    id: "captain",
-    name: "Captain",
-  },
-  {
-    id: "1st-lieutenant",
-    name: "1st Lieutenant",
-  },
-  {
-    id: "2nd-lieutenant",
-    name: "2nd Lieutenant",
-  },
-  {
-    id: "master-sergeant",
-    name: "Master Sergeant",
-  },
-  {
-    id: "staff-sergeant",
-    name: "Staff Sergeant",
-  },
-  {
-    id: "sergeant",
-    name: "Sergeant",
-  },
-  {
-    id: "corporal",
-    name: "Corporal",
-  },
-  {
-    id: "lance-corporal",
-    name: "Lance Corporal",
-  },
-  {
-    id: "officer-iii",
-    name: "Officer III",
-  },
-  {
-    id: "officer-ii",
-    name: "Officer II",
-  },
-  {
-    id: "officer",
-    name: "Officer",
-  },
+  { id: "chief-of-police", name: "Chief Of Police" },
+  { id: "deputy-chief-of-police", name: "Deputy Chief Of Police" },
+  { id: "assistant-chief-of-police", name: "Assistant Chief Of Police" },
+  { id: "chief-of-staff", name: "Chief Of Staff" },
+  { id: "colonel", name: "Colonel" },
+  { id: "lieutenant-colonel", name: "Lieutenant Colonel" },
+  { id: "major", name: "Major" },
+  { id: "captain", name: "Captain" },
+  { id: "1st-lieutenant", name: "1st Lieutenant" },
+  { id: "2nd-lieutenant", name: "2nd Lieutenant" },
+  { id: "master-sergeant", name: "Master Sergeant" },
+  { id: "staff-sergeant", name: "Staff Sergeant" },
+  { id: "sergeant", name: "Sergeant" },
+  { id: "corporal", name: "Corporal" },
+  { id: "lance-corporal", name: "Lance Corporal" },
+  { id: "officer-iii", name: "Officer III" },
+  { id: "officer-ii", name: "Officer II" },
+  { id: "officer", name: "Officer" },
 ]
 
 const DIVISION = "department"
@@ -143,47 +80,29 @@ function normalizeRequirements(
   for (const rank of Department_RANKS) {
     const loaded = loadedRequirements[rank.id]
 
-    const hours =
-      typeof loaded?.hours === "number" &&
-      Number.isFinite(loaded.hours)
-        ? Math.max(0, Math.floor(loaded.hours))
-        : 0
-
-    const timeInRankDays =
-      typeof loaded?.timeInRankDays === "number" &&
-      Number.isFinite(loaded.timeInRankDays)
-        ? Math.max(0, Math.floor(loaded.timeInRankDays))
-        : 0
-
-    const trainingLogs =
-      typeof loaded?.trainingLogs === "number" &&
-      Number.isFinite(loaded.trainingLogs)
-        ? Math.max(0, Math.floor(loaded.trainingLogs))
-        : 0
-
-    const recruitmentLogs =
-      typeof loaded?.recruitmentLogs === "number" &&
-      Number.isFinite(loaded.recruitmentLogs)
-        ? Math.max(0, Math.floor(loaded.recruitmentLogs))
-        : 0
-
-    /*
-     * Never trust rankName from MongoDB.
-     *
-     * MongoDB may contain older records where:
-     *
-     * rankId   = "officer"
-     * rankName = "officer"
-     *
-     * The frontend always uses the hardcoded rank definition.
-     */
     normalized[rank.id] = {
       rankId: rank.id,
       rankName: rank.name,
-      hours,
-      timeInRankDays,
-      trainingLogs,
-      recruitmentLogs,
+      hours:
+        typeof loaded?.hours === "number" &&
+        Number.isFinite(loaded.hours)
+          ? Math.max(0, Math.floor(loaded.hours))
+          : 0,
+      timeInRankDays:
+        typeof loaded?.timeInRankDays === "number" &&
+        Number.isFinite(loaded.timeInRankDays)
+          ? Math.max(0, Math.floor(loaded.timeInRankDays))
+          : 0,
+      trainingLogs:
+        typeof loaded?.trainingLogs === "number" &&
+        Number.isFinite(loaded.trainingLogs)
+          ? Math.max(0, Math.floor(loaded.trainingLogs))
+          : 0,
+      recruitmentLogs:
+        typeof loaded?.recruitmentLogs === "number" &&
+        Number.isFinite(loaded.recruitmentLogs)
+          ? Math.max(0, Math.floor(loaded.recruitmentLogs))
+          : 0,
     }
   }
 
@@ -200,6 +119,7 @@ function areRequirementsEqual(
 function RequirementInput({
   label,
   value,
+  widthClass,
   onChange,
   onIncrease,
   onDecrease,
@@ -207,13 +127,14 @@ function RequirementInput({
 }: {
   label: string
   value: number
+  widthClass: string
   onChange: (value: string) => void
   onIncrease: () => void
   onDecrease: () => void
   disabled: boolean
 }) {
   return (
-    <div className="min-w-0">
+    <div className={`shrink-0 ${widthClass}`}>
       <label className="mb-1.5 block whitespace-nowrap text-xs font-medium text-muted-foreground">
         {label}
       </label>
@@ -290,10 +211,7 @@ function RequirementInput({
 }
 
 export default function DepartmentRequirements() {
-  const rankConfig = useMemo(
-    () => Department_RANKS,
-    [],
-  )
+  const rankConfig = useMemo(() => Department_RANKS, [])
 
   const [requirements, setRequirements] =
     useState<Record<string, Requirement>>(
@@ -305,11 +223,8 @@ export default function DepartmentRequirements() {
       createEmptyRequirements(),
     )
 
-  const [isLoading, setIsLoading] =
-    useState(true)
-
-  const [isSaving, setIsSaving] =
-    useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -327,17 +242,13 @@ export default function DepartmentRequirements() {
           },
         )
 
-        const responseText =
-          await response.text()
+        const responseText = await response.text()
 
         let data: RequirementsResponse = {}
 
         if (responseText.trim()) {
           try {
-            data =
-              JSON.parse(
-                responseText,
-              ) as RequirementsResponse
+            data = JSON.parse(responseText) as RequirementsResponse
           } catch {
             throw new Error(
               "The requirements API returned an invalid response.",
@@ -359,21 +270,14 @@ export default function DepartmentRequirements() {
             ? data.requirements
             : {}
 
-        const normalized =
-          normalizeRequirements(loaded)
+        const normalized = normalizeRequirements(loaded)
 
-        if (cancelled) {
-          return
-        }
+        if (cancelled) return
 
         setRequirements(normalized)
-        setSavedRequirements({
-          ...normalized,
-        })
+        setSavedRequirements({ ...normalized })
       } catch (err) {
-        if (cancelled) {
-          return
-        }
+        if (cancelled) return
 
         toast.error("Failed to load requirements", {
           description:
@@ -400,132 +304,18 @@ export default function DepartmentRequirements() {
     savedRequirements,
   )
 
-  function changeHours(
-    rankId: string,
-    amount: number,
-  ) {
-    const rank = rankConfig.find(
-      (item) => item.id === rankId,
-    )
-
-    if (!rank) {
-      return
-    }
-
-    setRequirements((current) => {
-      const existing: Requirement = current[rankId] ?? {
-        rankId: rank.id,
-        rankName: rank.name,
-        hours: 0,
-        timeInRankDays: 0,
-        trainingLogs: 0,
-        recruitmentLogs: 0,
-      }
-
-      return {
-        ...current,
-        [rankId]: {
-          ...existing,
-          rankId: rank.id,
-          rankName: rank.name,
-          hours: Math.max(
-            0,
-            existing.hours + amount,
-          ),
-        },
-      }
-    })
-  }
-
-  function setHours(
-    rankId: string,
-    value: string,
-  ) {
-    const rank = rankConfig.find(
-      (item) => item.id === rankId,
-    )
-
-    if (!rank) {
-      return
-    }
-
-    if (value === "") {
-      setRequirements((current) => {
-        const existing: Requirement = current[rankId] ?? {
-          rankId: rank.id,
-          rankName: rank.name,
-          hours: 0,
-          timeInRankDays: 0,
-          trainingLogs: 0,
-          recruitmentLogs: 0,
-        }
-
-        return {
-          ...current,
-          [rankId]: {
-            ...existing,
-            rankId: rank.id,
-            rankName: rank.name,
-            hours: 0,
-          },
-        }
-      })
-
-      return
-    }
-
-    const parsedHours =
-      Number.parseInt(value, 10)
-
-    const hours =
-      Number.isFinite(parsedHours)
-        ? Math.max(0, parsedHours)
-        : 0
-
-    setRequirements((current) => {
-      const existing: Requirement = current[rankId] ?? {
-        rankId: rank.id,
-        rankName: rank.name,
-        hours: 0,
-        timeInRankDays: 0,
-        trainingLogs: 0,
-        recruitmentLogs: 0,
-      }
-
-      return {
-        ...current,
-        [rankId]: {
-          ...existing,
-          rankId: rank.id,
-          rankName: rank.name,
-          hours,
-        },
-      }
-    })
-  }
-
-  function setRequirementValue(
+  function updateRequirement(
     rankId: string,
     field:
+      | "hours"
       | "timeInRankDays"
       | "trainingLogs"
       | "recruitmentLogs",
-    value: string,
+    value: number,
   ) {
-    const rank = rankConfig.find(
-      (item) => item.id === rankId,
-    )
+    const rank = rankConfig.find((item) => item.id === rankId)
 
-    if (!rank) {
-      return
-    }
-
-    const parsed = Number.parseInt(value, 10)
-
-    const nextValue =
-      value === "" || !Number.isFinite(parsed)
-        ? 0
-        : Math.max(0, parsed)
+    if (!rank) return
 
     setRequirements((current) => ({
       ...current,
@@ -540,50 +330,50 @@ export default function DepartmentRequirements() {
         }),
         rankId: rank.id,
         rankName: rank.name,
-        [field]: nextValue,
+        [field]: Math.max(0, Math.floor(value)),
       },
     }))
   }
 
-  function changeRequirementValue(
+  function changeRequirement(
     rankId: string,
     field:
+      | "hours"
       | "timeInRankDays"
       | "trainingLogs"
       | "recruitmentLogs",
     amount: number,
   ) {
-    const rank = rankConfig.find(
-      (item) => item.id === rankId,
-    )
+    const currentValue = requirements[rankId]?.[field] ?? 0
 
-    if (!rank) {
+    updateRequirement(
+      rankId,
+      field,
+      currentValue + amount,
+    )
+  }
+
+  function setRequirement(
+    rankId: string,
+    field:
+      | "hours"
+      | "timeInRankDays"
+      | "trainingLogs"
+      | "recruitmentLogs",
+    value: string,
+  ) {
+    if (value === "") {
+      updateRequirement(rankId, field, 0)
       return
     }
 
-    setRequirements((current) => {
-      const existing = current[rankId] ?? {
-        rankId: rank.id,
-        rankName: rank.name,
-        hours: 0,
-        timeInRankDays: 0,
-        trainingLogs: 0,
-        recruitmentLogs: 0,
-      }
+    const parsed = Number.parseInt(value, 10)
 
-      return {
-        ...current,
-        [rankId]: {
-          ...existing,
-          rankId: rank.id,
-          rankName: rank.name,
-          [field]: Math.max(
-            0,
-            Number(existing[field] ?? 0) + amount,
-          ),
-        },
-      }
-    })
+    updateRequirement(
+      rankId,
+      field,
+      Number.isFinite(parsed) ? parsed : 0,
+    )
   }
 
   async function handleSave() {
@@ -606,30 +396,20 @@ export default function DepartmentRequirements() {
     )
 
     try {
-      /*
-       * Always build the payload from the frontend
-       * rank configuration.
-       *
-       * This prevents old MongoDB rankName values
-       * from being written back into the database.
-       */
       const normalizedRequirements: Record<
         string,
         Requirement
       > = {}
 
       for (const rank of rankConfig) {
-        const current =
-          requirements[rank.id]
+        const current = requirements[rank.id]
 
         normalizedRequirements[rank.id] = {
           rankId: rank.id,
           rankName: rank.name,
           hours: Math.max(
             0,
-            Math.floor(
-              Number(current?.hours ?? 0),
-            ),
+            Math.floor(Number(current?.hours ?? 0)),
           ),
           timeInRankDays: Math.max(
             0,
@@ -657,29 +437,23 @@ export default function DepartmentRequirements() {
         {
           method: "POST",
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
           },
           credentials: "include",
           cache: "no-store",
           body: JSON.stringify({
-            requirements:
-              normalizedRequirements,
+            requirements: normalizedRequirements,
           }),
         },
       )
 
-      const responseText =
-        await response.text()
+      const responseText = await response.text()
 
       let data: RequirementsResponse = {}
 
       if (responseText.trim()) {
         try {
-          data =
-            JSON.parse(
-              responseText,
-            ) as RequirementsResponse
+          data = JSON.parse(responseText) as RequirementsResponse
         } catch {
           throw new Error(
             "The server returned an invalid response.",
@@ -687,10 +461,7 @@ export default function DepartmentRequirements() {
         }
       }
 
-      if (
-        !response.ok ||
-        data.success !== true
-      ) {
+      if (!response.ok || data.success !== true) {
         throw new Error(
           data.message ||
             data.error ||
@@ -698,10 +469,6 @@ export default function DepartmentRequirements() {
         )
       }
 
-      /*
-       * Normalize the response again so the UI never
-       * displays a bad rankName returned from MongoDB.
-       */
       const savedData =
         data.requirements &&
         typeof data.requirements === "object"
@@ -709,15 +476,10 @@ export default function DepartmentRequirements() {
           : normalizedRequirements
 
       const normalizedSaved =
-        normalizeRequirements(
-          savedData,
-        )
+        normalizeRequirements(savedData)
 
       setRequirements(normalizedSaved)
-
-      setSavedRequirements({
-        ...normalizedSaved,
-      })
+      setSavedRequirements({ ...normalizedSaved })
 
       toast.success(
         "Requirements saved successfully",
@@ -741,13 +503,9 @@ export default function DepartmentRequirements() {
   }
 
   function handleReset() {
-    if (!hasChanges || isSaving) {
-      return
-    }
+    if (!hasChanges || isSaving) return
 
-    setRequirements({
-      ...savedRequirements,
-    })
+    setRequirements({ ...savedRequirements })
 
     toast.info("Changes reset", {
       description:
@@ -767,17 +525,12 @@ export default function DepartmentRequirements() {
           [&::-webkit-scrollbar]:hidden
         "
       >
-        {/* Header */}
-
         <div>
           <div className="flex items-center gap-3">
             <div
               className="
-                flex h-11 w-11 shrink-0
-                items-center justify-center
-                rounded-xl border
-                border-blue-500/20
-                bg-blue-500/10
+                flex h-11 w-11 shrink-0 items-center justify-center
+                rounded-xl border border-blue-500/20 bg-blue-500/10
               "
             >
               <Shield className="h-5 w-5 text-blue-500" />
@@ -789,21 +542,17 @@ export default function DepartmentRequirements() {
               </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Configure the required promotion hours
-                for each Department rank.
+                Configure the required promotion hours for each Department rank.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Loading */}
-
         {isLoading ? (
           <div
             className="
-              rounded-xl border border-border
-              bg-card p-10 text-center
-              shadow-sm
+              rounded-xl border border-border bg-card
+              p-10 text-center shadow-sm
             "
           >
             <p className="text-sm text-muted-foreground">
@@ -812,31 +561,23 @@ export default function DepartmentRequirements() {
           </div>
         ) : (
           <>
-            {/* Requirements */}
-
             <section
               className="
-                overflow-hidden
-                rounded-xl border border-border
+                overflow-hidden rounded-xl border border-border
                 bg-card shadow-sm
               "
             >
               <div
                 className="
-                  flex min-h-[66px]
-                  items-center justify-between
-                  border-b border-border
-                  px-6 py-3
+                  flex min-h-[66px] items-center justify-between
+                  border-b border-border px-6 py-3
                 "
               >
                 <div className="flex items-center gap-3">
                   <div
                     className="
-                      flex h-10 w-10 shrink-0
-                      items-center justify-center
-                      rounded-lg
-                      border border-blue-500/20
-                      bg-blue-500/10
+                      flex h-10 w-10 shrink-0 items-center justify-center
+                      rounded-lg border border-blue-500/20 bg-blue-500/10
                     "
                   >
                     <Clock3 className="h-5 w-5 text-blue-500" />
@@ -854,10 +595,7 @@ export default function DepartmentRequirements() {
                 </div>
 
                 <span className="text-sm text-muted-foreground">
-                  {rankConfig.length}{" "}
-                  {rankConfig.length === 1
-                    ? "rank"
-                    : "ranks"}
+                  {rankConfig.length} ranks
                 </span>
               </div>
 
@@ -871,10 +609,7 @@ export default function DepartmentRequirements() {
                     <div
                       key={rank.id}
                       className={`
-                        px-6
-                        py-5
-                        transition-colors
-                        hover:bg-muted/20
+                        px-6 py-5 transition-colors hover:bg-muted/20
                         ${
                           index !== rankConfig.length - 1
                             ? "border-b border-border"
@@ -904,43 +639,61 @@ export default function DepartmentRequirements() {
                           </div>
                         </div>
 
-                        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
+                        <div
+                          className="
+                            grid w-full grid-cols-1 gap-3
+                            sm:grid-cols-2
+                            lg:w-auto lg:grid-cols-4
+                          "
+                        >
                           <RequirementInput
                             label="Promotion Hours"
+                            widthClass="lg:w-[126px]"
                             value={requirement.hours}
                             onChange={(value) =>
-                              setHours(rank.id, value)
+                              setRequirement(
+                                rank.id,
+                                "hours",
+                                value,
+                              )
                             }
                             onIncrease={() =>
-                              changeHours(rank.id, 1)
+                              changeRequirement(
+                                rank.id,
+                                "hours",
+                                1,
+                              )
                             }
                             onDecrease={() =>
-                              changeHours(rank.id, -1)
+                              changeRequirement(
+                                rank.id,
+                                "hours",
+                                -1,
+                              )
                             }
                             disabled={isSaving}
                           />
 
                           <RequirementInput
                             label="Time in Rank (Days)"
-                            value={
-                              requirement.timeInRankDays
-                            }
+                            widthClass="lg:w-[142px]"
+                            value={requirement.timeInRankDays}
                             onChange={(value) =>
-                              setRequirementValue(
+                              setRequirement(
                                 rank.id,
                                 "timeInRankDays",
                                 value,
                               )
                             }
                             onIncrease={() =>
-                              changeRequirementValue(
+                              changeRequirement(
                                 rank.id,
                                 "timeInRankDays",
                                 1,
                               )
                             }
                             onDecrease={() =>
-                              changeRequirementValue(
+                              changeRequirement(
                                 rank.id,
                                 "timeInRankDays",
                                 -1,
@@ -951,25 +704,24 @@ export default function DepartmentRequirements() {
 
                           <RequirementInput
                             label="Trainings"
-                            value={
-                              requirement.trainingLogs
-                            }
+                            widthClass="lg:w-[68px]"
+                            value={requirement.trainingLogs}
                             onChange={(value) =>
-                              setRequirementValue(
+                              setRequirement(
                                 rank.id,
                                 "trainingLogs",
                                 value,
                               )
                             }
                             onIncrease={() =>
-                              changeRequirementValue(
+                              changeRequirement(
                                 rank.id,
                                 "trainingLogs",
                                 1,
                               )
                             }
                             onDecrease={() =>
-                              changeRequirementValue(
+                              changeRequirement(
                                 rank.id,
                                 "trainingLogs",
                                 -1,
@@ -980,25 +732,24 @@ export default function DepartmentRequirements() {
 
                           <RequirementInput
                             label="Recruitments / Ridealongs"
-                            value={
-                              requirement.recruitmentLogs
-                            }
+                            widthClass="lg:w-[166px]"
+                            value={requirement.recruitmentLogs}
                             onChange={(value) =>
-                              setRequirementValue(
+                              setRequirement(
                                 rank.id,
                                 "recruitmentLogs",
                                 value,
                               )
                             }
                             onIncrease={() =>
-                              changeRequirementValue(
+                              changeRequirement(
                                 rank.id,
                                 "recruitmentLogs",
                                 1,
                               )
                             }
                             onDecrease={() =>
-                              changeRequirementValue(
+                              changeRequirement(
                                 rank.id,
                                 "recruitmentLogs",
                                 -1,
@@ -1014,25 +765,13 @@ export default function DepartmentRequirements() {
               </div>
             </section>
 
-            {/* Actions */}
-
-            <div
-              className="
-                flex min-h-11
-                items-center
-                justify-end
-                gap-4
-              "
-            >
+            <div className="flex min-h-11 items-center justify-end gap-4">
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleReset}
-                  disabled={
-                    !hasChanges ||
-                    isSaving
-                  }
+                  disabled={!hasChanges || isSaving}
                   className="h-10 rounded-md px-4"
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />
@@ -1041,20 +780,12 @@ export default function DepartmentRequirements() {
 
                 <Button
                   type="button"
-                  onClick={() =>
-                    void handleSave()
-                  }
-                  disabled={
-                    !hasChanges ||
-                    isSaving
-                  }
+                  onClick={() => void handleSave()}
+                  disabled={!hasChanges || isSaving}
                   className="h-10 rounded-md px-4"
                 >
                   <Save className="mr-2 h-4 w-4" />
-
-                  {isSaving
-                    ? "Saving..."
-                    : "Save Changes"}
+                  {isSaving ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </div>
