@@ -77,35 +77,6 @@ const GALLERY_MEDIA_FILTERS: GalleryMediaFilter[] = [
   "Videos",
 ]
 
-const DESCRIPTION_LINE_LENGTH = 35
-const DESCRIPTION_MAX_LINES = 3
-
-function getDescriptionPreview(description: string) {
-  const normalized = description.replace(/\r\n/g, "\n")
-  const lines = normalized.split("\n")
-  const allPreviewLines: string[] = []
-
-  for (const line of lines) {
-    // Keep every visual line at a maximum of 35 characters.
-    // Existing newlines are also treated as line breaks.
-    if (!line) {
-      allPreviewLines.push("")
-      continue
-    }
-
-    for (let index = 0; index < line.length; index += DESCRIPTION_LINE_LENGTH) {
-      allPreviewLines.push(line.slice(index, index + DESCRIPTION_LINE_LENGTH))
-    }
-  }
-
-  return {
-    preview: allPreviewLines
-      .slice(0, DESCRIPTION_MAX_LINES)
-      .join("\n"),
-    hasMore: allPreviewLines.length > DESCRIPTION_MAX_LINES,
-  }
-}
-
 type DropdownContextValue = {
   openDropdown: string | null
   setOpenDropdown: (value: string | null) => void
@@ -246,50 +217,25 @@ function getGalleryMediaUrl(media: GalleryMedia) {
   return media.url
 }
 
-function normalizeExternalUrl(value: string): string {
-  const trimmed = value.trim()
-
-  if (!trimmed) return ""
-
+function getYouTubeVideoId(value: string) {
   try {
-    const parsed = new URL(trimmed)
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase().replace(/^www\./, "")
 
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return trimmed
+    if (host === "youtu.be") {
+      return url.pathname.slice(1).split("/")[0] || null
     }
 
-    return parsed.toString()
-  } catch {
-    return trimmed
-  }
-}
-
-function getYouTubeVideoId(value: string): string | null {
-  try {
-    const parsed = new URL(value)
-    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "")
-
-    if (hostname === "youtu.be" || hostname.endsWith(".youtu.be")) {
-      const id = parsed.pathname.split("/").filter(Boolean)[0] ?? ""
-      return /^[A-Za-z0-9_-]{6,}$/.test(id) ? id : null
-    }
-
-    if (
-      hostname === "youtube.com" ||
-      hostname === "m.youtube.com" ||
-      hostname === "music.youtube.com"
-    ) {
-      const watchId = parsed.searchParams.get("v")
-
-      if (watchId && /^[A-Za-z0-9_-]{6,}$/.test(watchId)) {
-        return watchId
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      if (url.pathname === "/watch") {
+        return url.searchParams.get("v")
       }
 
-      const pathMatch = parsed.pathname.match(
-        /^\/(?:embed|shorts|live)\/([A-Za-z0-9_-]{6,})/i,
-      )
+      const parts = url.pathname.split("/").filter(Boolean)
 
-      return pathMatch?.[1] ?? null
+      if (["shorts", "embed", "live"].includes(parts[0] ?? "")) {
+        return parts[1] || null
+      }
     }
   } catch {
     return null
@@ -298,68 +244,96 @@ function getYouTubeVideoId(value: string): string | null {
   return null
 }
 
-function getVimeoVideoId(value: string): string | null {
-  try {
-    const parsed = new URL(value)
-    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "")
-
-    if (hostname !== "vimeo.com" && !hostname.endsWith(".vimeo.com")) {
-      return null
-    }
-
-    const matches = parsed.pathname.match(/\/(\d+)(?:$|\/)/)
-    return matches?.[1] ?? null
-  } catch {
-    return null
-  }
-}
-
-function getVideoEmbedUrl(value: string): string | null {
-  const youtubeId = getYouTubeVideoId(value)
-
-  if (youtubeId) {
-    return `https://www.youtube.com/embed/${youtubeId}?rel=0&playsinline=1`
-  }
-
-  const vimeoId = getVimeoVideoId(value)
-
-  if (vimeoId) {
-    return `https://player.vimeo.com/video/${vimeoId}?dnt=1`
-  }
-
-  return null
-}
-
-function getVideoPosterUrl(value: string): string {
-  const youtubeId = getYouTubeVideoId(value)
-  return youtubeId
-    ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`
+function getYouTubeThumbnail(value: string) {
+  const id = getYouTubeVideoId(value)
+  return id
+    ? `https://img.youtube.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`
     : ""
 }
 
-function isEmbeddedVideo(media: GalleryMedia | PendingMedia): boolean {
-  return media.type === "video" && Boolean(getVideoEmbedUrl(media.url))
+function getYouTubeEmbedUrl(value: string) {
+  const id = getYouTubeVideoId(value)
+  return id
+    ? `https://www.youtube.com/embed/${encodeURIComponent(id)}?rel=0&modestbranding=1`
+    : ""
 }
 
-function getMediaUrlKind(value: string): GalleryMediaType | null {
-  if (getVideoEmbedUrl(value)) return "video"
-
+function getVimeoVideoId(value: string) {
   try {
-    const parsed = new URL(value)
-    const path = parsed.pathname.toLowerCase()
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase().replace(/^www\./, "")
 
-    if (/\.(?:jpe?g|png|gif|webp|avif|bmp|svg)(?:$|\?)/i.test(path)) {
+    if (host !== "vimeo.com" && host !== "player.vimeo.com") {
+      return null
+    }
+
+    const parts = url.pathname.split("/").filter(Boolean)
+    const id = parts.find((part) => /^\d+$/.test(part))
+    return id || null
+  } catch {
+    return null
+  }
+}
+
+function getVimeoEmbedUrl(value: string) {
+  const id = getVimeoVideoId(value)
+  return id
+    ? `https://player.vimeo.com/video/${encodeURIComponent(id)}`
+    : ""
+}
+
+function getVideoEmbedUrl(value: string) {
+  return getYouTubeEmbedUrl(value) || getVimeoEmbedUrl(value)
+}
+
+function getDirectMediaType(value: string): GalleryMediaType | null {
+  try {
+    const url = new URL(value)
+    const path = url.pathname.toLowerCase()
+    const extension = path.includes(".")
+      ? path.slice(path.lastIndexOf("."))
+      : ""
+
+    if ([".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".bmp", ".svg", ".tif", ".tiff"].includes(extension)) {
       return "image"
     }
 
-    if (/\.(?:mp4|webm|mov|m4v|avi|mkv|ogv)(?:$|\?)/i.test(path)) {
+    if ([".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv", ".ogv", ".mpeg", ".mpg"].includes(extension)) {
       return "video"
     }
   } catch {
-    // Fall back to the type selected by the user.
+    return null
   }
 
   return null
+}
+
+function getFileMediaType(file: File): GalleryMediaType | null {
+  if (file.type.startsWith("image/")) return "image"
+  if (file.type.startsWith("video/")) return "video"
+
+  const extension = file.name.includes(".")
+    ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
+    : ""
+
+  if ([".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".bmp", ".svg", ".tif", ".tiff"].includes(extension)) {
+    return "image"
+  }
+
+  if ([".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv", ".ogv", ".mpeg", ".mpg"].includes(extension)) {
+    return "video"
+  }
+
+  return null
+}
+
+function isEmbeddableVideo(media: GalleryMedia) {
+  return Boolean(getVideoEmbedUrl(media.url))
+}
+
+function getMediaThumbnail(media: GalleryMedia) {
+  if (media.thumbnailUrl) return media.thumbnailUrl
+  return getYouTubeThumbnail(media.url)
 }
 
 function getMediaLabel(type: GalleryMediaType) {
@@ -729,18 +703,17 @@ export default function Gallery() {
   }
 
   function addExternalUrl() {
-    const rawUrl = urlInput.trim()
+    const url = urlInput.trim()
 
-    if (!rawUrl) {
+    if (!url) {
       toast.error("Enter a media URL.")
       return
     }
 
-    const url = normalizeExternalUrl(rawUrl)
-
     try {
       const parsed = new URL(url)
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+
+      if (!["http:", "https:"].includes(parsed.protocol)) {
         throw new Error("Invalid protocol")
       }
     } catch {
@@ -748,12 +721,15 @@ export default function Gallery() {
       return
     }
 
-    // Automatically correct the selected type for known video hosts and
-    // obvious direct-media URLs. This prevents YouTube/Vimeo URLs from ever
-    // being rendered as a normal <video> source.
-    const detectedType = getMediaUrlKind(url)
-    const type: GalleryMediaType = detectedType ?? urlType
-    const embeddedVideo = type === "video" && Boolean(getVideoEmbedUrl(url))
+    const detectedEmbed = getVideoEmbedUrl(url)
+    const detectedDirectType = getDirectMediaType(url)
+    const type: GalleryMediaType =
+      detectedEmbed || detectedDirectType || urlType
+
+    const thumbnailUrl =
+      type === "video"
+        ? thumbnailInput.trim() || getYouTubeThumbnail(url)
+        : ""
 
     setPendingMedia((current) => [
       ...current,
@@ -761,19 +737,10 @@ export default function Gallery() {
         id: crypto.randomUUID(),
         type,
         url,
-        thumbnailUrl:
-          type === "video"
-            ? thumbnailInput.trim() || getVideoPosterUrl(url)
-            : "",
+        thumbnailUrl,
         source: "url",
       },
     ])
-
-    if (embeddedVideo) {
-      toast.success("Video link added.")
-    } else {
-      toast.success(type === "image" ? "Image URL added." : "Video URL added.")
-    }
 
     setUrlInput("")
     setUrlType("image")
@@ -783,30 +750,14 @@ export default function Gallery() {
   function handleFiles(
     files: FileList | null,
   ) {
-    if (!files?.length) {
-      return
-    }
+    if (!files?.length) return
 
     const next: PendingMedia[] = []
 
-    for (const file of Array.from(
-      files,
-    )) {
-      if (
-        !file.type.startsWith(
-          "image/",
-        ) &&
-        !file.type.startsWith(
-          "video/",
-        )
-      ) {
-        continue
-      }
+    for (const file of Array.from(files)) {
+      const type = getFileMediaType(file)
 
-      const type: GalleryMediaType =
-        file.type.startsWith("video/")
-          ? "video"
-          : "image"
+      if (!type) continue
 
       next.push({
         id: crypto.randomUUID(),
@@ -814,25 +765,17 @@ export default function Gallery() {
         url: "",
         thumbnailUrl: "",
         source: "upload",
-        previewUrl:
-          URL.createObjectURL(file),
+        previewUrl: URL.createObjectURL(file),
         file,
       })
     }
 
     if (!next.length) {
-      toast.error(
-        "Select image or video files.",
-      )
+      toast.error("Select image or video files.")
       return
     }
 
-    setPendingMedia(
-      (current) => [
-        ...current,
-        ...next,
-      ],
-    )
+    setPendingMedia((current) => [...current, ...next])
   }
 
   function handleDragEnter(
@@ -1480,13 +1423,29 @@ export default function Gallery() {
                           key={item.id}
                           className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"
                         >
-                          <GalleryMediaGrid
-                            media={mediaList}
-                            title={item.title}
-                            onOpen={(media) =>
-                              openViewer(item, media)
-                            }
-                          />
+                          <div className="grid gap-1">
+                            {mediaList.map(
+                              (media) => (
+                                <GalleryMediaCard
+                                  key={
+                                    media.id
+                                  }
+                                  media={
+                                    media
+                                  }
+                                  title={
+                                    item.title
+                                  }
+                                  onClick={() =>
+                                    openViewer(
+                                      item,
+                                      media,
+                                    )
+                                  }
+                                />
+                              ),
+                            )}
+                          </div>
 
                           <div className="border-t border-border/70 p-3">
                             <div className="relative">
@@ -1503,7 +1462,7 @@ export default function Gallery() {
                                     openInfo(item)
                                   }
                                 }}
-                                className="w-full cursor-pointer rounded-lg px-1 py-1 pr-16 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                className="group/info w-full cursor-pointer rounded-lg px-1 py-1 pr-16 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-500/40"
                                 aria-label={`View information for ${item.title}`}
                               >
                                 <div className="mb-1.5 flex items-center gap-2">
@@ -1525,24 +1484,16 @@ export default function Gallery() {
 
                                 {item.description && (
                                   <div className="mt-1">
-                                    {(() => {
-                                      const descriptionPreview =
-                                        getDescriptionPreview(item.description)
+                                    <p className="line-clamp-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
+                                      {item.description}
+                                    </p>
 
-                                      return (
-                                        <>
-                                          <p className="whitespace-pre text-xs leading-5 text-muted-foreground">
-                                            {descriptionPreview.preview}
-                                          </p>
-
-                                          {descriptionPreview.hasMore && (
-                                            <span className="mt-1 inline-block cursor-pointer rounded px-1 text-[11px] font-medium text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-400 hover:underline">
-                                              Show more...
-                                            </span>
-                                          )}
-                                        </>
-                                      )
-                                    })()}
+                                    {(item.description.length > 120 ||
+                                      item.description.split(/\r?\n/).length > 2) && (
+                                      <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
+                                        Show more...
+                                      </span>
+                                    )}
                                   </div>
                                 )}
 
@@ -2311,46 +2262,38 @@ export default function Gallery() {
                             className="group relative overflow-hidden rounded-lg border border-border bg-muted"
                           >
                             <div className="aspect-square">
-                              {media.type ===
-                              "image" ? (
+                              {media.type === "image" ? (
                                 <img
-                                  src={
-                                    media.previewUrl ||
-                                    media.url
-                                  }
+                                  src={media.previewUrl || media.url}
                                   alt=""
                                   className="h-full w-full object-cover"
                                 />
-                              ) : media.thumbnailUrl ? (
-                                <img
-                                  src={
-                                    media.thumbnailUrl
-                                  }
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : isEmbeddedVideo(
-                                  media,
-                                ) ? (
-                                <div className="relative h-full w-full overflow-hidden bg-black">
-                                  <iframe
-                                    src={
-                                      getVideoEmbedUrl(
-                                        media.url,
-                                      ) ?? undefined
-                                    }
-                                    title="Video preview"
-                                    className="pointer-events-none h-full w-full border-0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                    allowFullScreen
+                              ) : getMediaThumbnail(media) ? (
+                                <div className="relative h-full w-full">
+                                  <img
+                                    src={getMediaThumbnail(media)}
+                                    alt=""
+                                    className="h-full w-full object-cover"
                                   />
+                                  {isEmbeddableVideo(media) && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                                      <span className="rounded-full bg-black/65 px-3 py-1.5 text-xs font-semibold text-white">
+                                        ▶ Video
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
+                              ) : isEmbeddableVideo(media) ? (
+                                <iframe
+                                  src={getVideoEmbedUrl(media.url)}
+                                  title="Video preview"
+                                  className="pointer-events-none h-full w-full border-0 object-cover"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                  allowFullScreen
+                                />
                               ) : (
                                 <video
-                                  src={
-                                    media.previewUrl ||
-                                    media.url
-                                  }
+                                  src={media.previewUrl || media.url}
                                   muted
                                   playsInline
                                   preload="metadata"
@@ -2505,58 +2448,46 @@ export default function Gallery() {
                   </>
                 )}
 
-                {viewer.item.media[
-                  viewer.index
-                ].type === "image" ? (
-                  <img
-                    src={
-                      viewer.item.media[
-                        viewer.index
-                      ].url
-                    }
-                    alt={
-                      viewer.item.title
-                    }
-                    className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
-                  />
-                ) : getVideoEmbedUrl(
-                    viewer.item.media[
-                      viewer.index
-                    ].url,
-                  ) ? (
-                  <iframe
-                    src={
-                      getVideoEmbedUrl(
-                        viewer.item.media[
-                          viewer.index
-                        ].url,
-                      ) ?? undefined
-                    }
-                    title={
-                      viewer.item.title
-                    }
-                    className="h-full min-h-[280px] w-full max-w-5xl rounded-xl border-0 shadow-2xl"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
-                ) : (
-                  <video
-                    src={
-                      viewer.item.media[
-                        viewer.index
-                      ].url
-                    }
-                    controls
-                    poster={
-                      viewer.item.media[
-                        viewer.index
-                      ].thumbnailUrl ||
-                      undefined
-                    }
-                    playsInline
-                    className="max-h-full max-w-full rounded-xl shadow-2xl"
-                  />
-                )}
+                {(() => {
+                  const currentMedia = viewer.item.media[viewer.index]
+                  const embedUrl = getVideoEmbedUrl(currentMedia.url)
+                  const thumbnail = getMediaThumbnail(currentMedia)
+
+                  if (currentMedia.type === "image") {
+                    return (
+                      <img
+                        src={currentMedia.url}
+                        alt={viewer.item.title}
+                        className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
+                      />
+                    )
+                  }
+
+                  if (embedUrl) {
+                    return (
+                      <div className="relative aspect-video w-full max-w-5xl overflow-hidden rounded-xl bg-black shadow-2xl">
+                        <iframe
+                          src={embedUrl}
+                          title={viewer.item.title}
+                          className="h-full w-full border-0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <video
+                      src={currentMedia.url}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      poster={thumbnail || undefined}
+                      className="max-h-full max-w-full rounded-xl shadow-2xl"
+                    />
+                  )
+                })()}
               </div>
 
               <div className="flex items-center justify-center gap-2 pt-3">
@@ -2583,172 +2514,6 @@ export default function Gallery() {
   )
 }
 
-function GalleryMediaGrid({
-  media,
-  title,
-  onOpen,
-}: {
-  media: GalleryMedia[]
-  title: string
-  onOpen: (media: GalleryMedia) => void
-}) {
-  const count = media.length
-
-  if (!count) {
-    return null
-  }
-
-  const visibleMedia = media.slice(0, 3)
-  const remainingCount = Math.max(0, count - 3)
-  const overlayMedia = media[3]
-
-  return (
-    <div
-      className={[
-        "grid gap-1 overflow-hidden bg-muted/20",
-        count === 1
-          ? "grid-cols-1"
-          : "grid-cols-2",
-      ].join(" ")}
-    >
-      {visibleMedia.map((entry, index) => (
-        <GalleryMediaTile
-          key={entry.id}
-          media={entry}
-          title={title}
-          onClick={() => onOpen(entry)}
-          className={
-            count === 3 && index === 2
-              ? "col-span-2"
-              : "col-span-1"
-          }
-        />
-      ))}
-
-      {overlayMedia && (
-        <GalleryMediaTile
-          media={overlayMedia}
-          title={title}
-          onClick={() => onOpen(overlayMedia)}
-          className="col-span-1"
-          overlayCount={remainingCount}
-        />
-      )}
-    </div>
-  )
-}
-
-function GalleryMediaTile({
-  media,
-  title,
-  onClick,
-  className = "",
-  overlayCount = 0,
-}: {
-  media: GalleryMedia
-  title: string
-  onClick: () => void
-  className?: string
-  overlayCount?: number
-}) {
-  return (
-    <button
-      type="button"
-      className={[
-        "group relative block aspect-[4/3] w-full overflow-hidden bg-muted/40 text-left",
-        className,
-      ].join(" ")}
-      onClick={onClick}
-      aria-label={
-        overlayCount > 0
-          ? `View ${title}, plus ${overlayCount} more media items`
-          : `View ${title}`
-      }
-    >
-      {media.type === "image" ? (
-        <img
-          src={media.url}
-          alt={title}
-          className={[
-            "h-full w-full object-cover transition duration-300",
-            overlayCount > 0
-              ? "scale-100 blur-[5px] brightness-75 group-hover:scale-[1.02]"
-              : "group-hover:scale-[1.02]",
-          ].join(" ")}
-        />
-      ) : media.thumbnailUrl ? (
-        <img
-          src={media.thumbnailUrl}
-          alt={title}
-          className={[
-            "h-full w-full object-cover transition duration-300",
-            overlayCount > 0
-              ? "scale-100 blur-[5px] brightness-75 group-hover:scale-[1.02]"
-              : "group-hover:scale-[1.02]",
-          ].join(" ")}
-        />
-      ) : getVideoEmbedUrl(media.url) ? (
-        <div className="relative h-full w-full overflow-hidden bg-black">
-          <iframe
-            src={getVideoEmbedUrl(media.url) ?? undefined}
-            title={title}
-            className={[
-              "pointer-events-none h-full w-full border-0 transition duration-300",
-              overlayCount > 0
-                ? "scale-100 blur-[5px] brightness-75"
-                : "",
-            ].join(" ")}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
-        </div>
-      ) : (
-        <video
-          src={media.url}
-          muted
-          playsInline
-          preload="metadata"
-          className={[
-            "h-full w-full object-cover transition duration-300",
-            overlayCount > 0
-              ? "scale-100 blur-[5px] brightness-75 group-hover:scale-[1.02]"
-              : "group-hover:scale-[1.02]",
-          ].join(" ")}
-        />
-      )}
-
-      <div className="pointer-events-none absolute inset-0 bg-black/10 transition-colors group-hover:bg-black/20" />
-
-      {overlayCount > 0 ? (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-white">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm">
-            <Images className="h-4.5 w-4.5" />
-          </span>
-
-          <span className="rounded-md bg-black/60 px-2.5 py-1 text-xs font-semibold backdrop-blur-sm">
-            +{overlayCount} {overlayCount === 1 ? "image/video" : "images/videos"}
-          </span>
-        </div>
-      ) : (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-2 text-white">
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
-            {media.type === "image" ? (
-              <ImageIcon className="h-3 w-3" />
-            ) : (
-              <Video className="h-3 w-3" />
-            )}
-            {getMediaLabel(media.type)}
-          </span>
-
-          <span className="rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
-            View
-          </span>
-        </div>
-      )}
-    </button>
-  )
-}
-
 function GalleryMediaCard({
   media,
   title,
@@ -2761,33 +2526,14 @@ function GalleryMediaCard({
   const [ratio, setRatio] =
     useState<number | undefined>()
 
-  const embedUrl =
-    getVideoEmbedUrl(media.url)
-
-  const handleKeyDown = (
-    event: React.KeyboardEvent<HTMLDivElement>,
-  ) => {
-    if (
-      event.key === "Enter" ||
-      event.key === " "
-    ) {
-      event.preventDefault()
-      onClick()
-    }
-  }
-
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       className={[
-        "group relative block w-full overflow-hidden bg-muted/40 text-left outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50",
-        getAspectClass(
-          embedUrl ? 16 / 9 : ratio,
-        ),
+        "group relative block w-full overflow-hidden bg-muted/40 text-left",
+        getAspectClass(ratio),
       ].join(" ")}
       onClick={onClick}
-      onKeyDown={handleKeyDown}
       aria-label={`View ${title}`}
     >
       {media.type === "image" ? (
@@ -2796,36 +2542,42 @@ function GalleryMediaCard({
           alt={title}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           onLoad={(event) => {
-            const image =
-              event.currentTarget
-
-            if (
-              image.naturalHeight >
-              0
-            ) {
-              setRatio(
-                image.naturalWidth /
-                  image.naturalHeight,
-              )
+            const image = event.currentTarget
+            if (image.naturalHeight > 0) {
+              setRatio(image.naturalWidth / image.naturalHeight)
             }
           }}
         />
-      ) : media.thumbnailUrl ? (
-        <img
-          src={media.thumbnailUrl}
-          alt={title}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-        />
-      ) : embedUrl ? (
-        <div className="relative h-full w-full overflow-hidden bg-black">
-          <iframe
-            src={embedUrl}
-            title={title}
-            className="pointer-events-none h-full w-full border-0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
+      ) : getMediaThumbnail(media) ? (
+        <div className="relative h-full w-full">
+          <img
+            src={getMediaThumbnail(media)}
+            alt={title}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+            onLoad={(event) => {
+              const image = event.currentTarget
+              if (image.naturalHeight > 0) {
+                setRatio(image.naturalWidth / image.naturalHeight)
+              }
+            }}
           />
+          {isEmbeddableVideo(media) && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="rounded-full bg-black/65 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                ▶ Video
+              </span>
+            </div>
+          )}
         </div>
+      ) : isEmbeddableVideo(media) ? (
+        <iframe
+          src={getVideoEmbedUrl(media.url)}
+          title={title}
+          tabIndex={-1}
+          className="pointer-events-none h-full w-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
       ) : (
         <video
           src={media.url}
@@ -2833,20 +2585,10 @@ function GalleryMediaCard({
           playsInline
           preload="metadata"
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-          onLoadedMetadata={(
-            event,
-          ) => {
-            const video =
-              event.currentTarget
-
-            if (
-              video.videoHeight >
-              0
-            ) {
-              setRatio(
-                video.videoWidth /
-                  video.videoHeight,
-              )
+          onLoadedMetadata={(event) => {
+            const video = event.currentTarget
+            if (video.videoHeight > 0) {
+              setRatio(video.videoWidth / video.videoHeight)
             }
           }}
         />
@@ -2871,7 +2613,7 @@ function GalleryMediaCard({
           View
         </span>
       </div>
-    </div>
+    </button>
   )
 }
 
