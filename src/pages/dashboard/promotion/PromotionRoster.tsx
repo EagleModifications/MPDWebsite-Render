@@ -1725,7 +1725,7 @@ export default function PromotionRoster() {
         {/* Roster */}
 
         <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
-          <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="sticky top-0 z-20 flex items-center justify-between border-b bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
             <div className="min-w-0">
               <h2 className="font-medium">
                 {divisions.find(
@@ -1808,70 +1808,72 @@ export default function PromotionRoster() {
                   </colgroup>
 
                   <thead>
-                    <tr className="border-b bg-muted/30 text-left">
-                      <th className="overflow-hidden px-2 py-3">
-                        <Checkbox
-                          checked={
-                            allVisibleSelected
-                          }
-                          onCheckedChange={
-                            toggleAllVisible
-                          }
-                          aria-label="Select all visible members"
-                        />
+                    <tr className="border-b bg-muted/30 text-center">
+                      <th className="overflow-hidden px-2 py-3 text-center">
+                        <div className="flex justify-center">
+                          <Checkbox
+                            checked={
+                              allVisibleSelected
+                            }
+                            onCheckedChange={
+                              toggleAllVisible
+                            }
+                            aria-label="Select all visible members"
+                          />
+                        </div>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         Callsign
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         Badge
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         Name
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         Rank
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         Discord ID
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         <span className="block truncate">
                           Time in Dept
                         </span>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         <span className="block truncate">
                           Time in Rank
                         </span>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         <span className="block truncate">
                           Required Time in Rank
                         </span>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         Required Logs
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         Required Hours
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         Activity
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 font-medium text-muted-foreground">
+                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
                         Status
                       </th>
                     </tr>
@@ -1904,39 +1906,41 @@ export default function PromotionRoster() {
                           >
                             {/* Select */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle">
-                              <Checkbox
-                                checked={
-                                  selected
-                                }
-                                disabled={
-                                  !member.discordId
-                                }
-                                aria-label={`Select ${member.name}`}
-                                onPointerDown={(
-                                  event,
-                                ) => {
-                                  shiftSelectingRef.current =
-                                    event.shiftKey
-                                }}
-                                onCheckedChange={() => {
-                                  const shiftKey =
-                                    shiftSelectingRef.current
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle">
+                              <div className="flex justify-center">
+                                <Checkbox
+                                  checked={
+                                    selected
+                                  }
+                                  disabled={
+                                    !member.discordId
+                                  }
+                                  aria-label={`Select ${member.name}`}
+                                  onPointerDown={(
+                                    event,
+                                  ) => {
+                                    shiftSelectingRef.current =
+                                      event.shiftKey
+                                  }}
+                                  onCheckedChange={() => {
+                                    const shiftKey =
+                                      shiftSelectingRef.current
 
-                                  shiftSelectingRef.current =
-                                    false
+                                    shiftSelectingRef.current =
+                                      false
 
-                                  handleMemberSelection(
-                                    member,
-                                    shiftKey,
-                                  )
-                                }}
-                              />
+                                    handleMemberSelection(
+                                      member,
+                                      shiftKey,
+                                    )
+                                  }}
+                                />
+                              </div>
                             </td>
 
                             {/* Callsign */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle font-medium">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle font-medium">
                               <span className="block truncate">
                                 {member.callsign}
                               </span>
@@ -1944,7 +1948,7 @@ export default function PromotionRoster() {
 
                             {/* Badge */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle text-muted-foreground">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle text-muted-foreground">
                               <span className="block truncate">
                                 {member.badgeNumber}
                               </span>
@@ -1952,7 +1956,7 @@ export default function PromotionRoster() {
 
                             {/* Name */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle">
                               <span className="block truncate">
                                 {member.name}
                               </span>
@@ -1960,7 +1964,7 @@ export default function PromotionRoster() {
 
                             {/* Rank */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle text-muted-foreground">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle text-muted-foreground">
                               <span
                                 className="block truncate"
                                 title={
@@ -1973,7 +1977,7 @@ export default function PromotionRoster() {
 
                             {/* Discord */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle">
                               <DropdownMenu>
                                 <DropdownMenuTrigger
                                   asChild
@@ -1983,7 +1987,7 @@ export default function PromotionRoster() {
                                     title={
                                       member.discordId
                                     }
-                                    className="block max-w-full truncate rounded-md px-1.5 py-1 font-mono text-[10px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+                                    className="mx-auto block max-w-full truncate rounded-md px-1.5 py-1 font-mono text-[10px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
                                   >
                                     {
                                       member.discordId
@@ -2027,7 +2031,7 @@ export default function PromotionRoster() {
 
                             {/* Time in Department */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle text-muted-foreground">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle text-muted-foreground">
                               <span className="block truncate">
                                 {member.timeInDept ||
                                   "—"}
@@ -2036,7 +2040,7 @@ export default function PromotionRoster() {
 
                             {/* Time in Rank */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle text-muted-foreground">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle text-muted-foreground">
                               <span className="block truncate">
                                 {member.timeInRank ||
                                   "—"}
@@ -2045,7 +2049,7 @@ export default function PromotionRoster() {
 
                             {/* Required Time in Rank */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle font-medium">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle font-medium">
                               <span className="block truncate">
                                 {
                                   member.requiredTimeInRankDays
@@ -2056,7 +2060,7 @@ export default function PromotionRoster() {
 
                             {/* Required Logs */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle">
                               <div className="space-y-0.5 text-[11px] leading-4">
                                 <div className="whitespace-nowrap">
                                   Trainings:{" "}
@@ -2078,7 +2082,7 @@ export default function PromotionRoster() {
 
                             {/* Required Hours */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle font-medium">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle font-medium">
                               <span className="block truncate">
                                 {member.requiredHours.toFixed(
                                   1,
@@ -2089,7 +2093,7 @@ export default function PromotionRoster() {
 
                             {/* Activity */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle font-medium">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle font-medium">
                               <span className="block truncate">
                                 {member.promotionHours.toFixed(
                                   1,
@@ -2100,9 +2104,9 @@ export default function PromotionRoster() {
 
                             {/* Status */}
 
-                            <td className="overflow-hidden px-2 py-3 align-middle">
+                            <td className="overflow-hidden px-2 py-3 text-center align-middle">
                               <div
-                                className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium ${getStatusClasses(
+                                className={`mx-auto inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium ${getStatusClasses(
                                   member.status,
                                 )}`}
                               >
