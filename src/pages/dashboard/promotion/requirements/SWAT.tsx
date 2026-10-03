@@ -21,6 +21,7 @@ type Requirement = {
   rankId: string
   rankName: string
   hours: number
+  timeInRankDays: number
   trainings: number
 }
 
@@ -111,6 +112,7 @@ function createEmptyRequirements(): Record<
         rankId: rank.id,
         rankName: rank.name,
         hours: 0,
+        timeInRankDays: 0,
         trainings: 0,
       },
     ]),
@@ -139,6 +141,20 @@ function normalizeRequirements(
           )
         : 0
 
+    const timeInRankDays =
+      typeof loaded?.timeInRankDays ===
+        "number" &&
+      Number.isFinite(
+        loaded.timeInRankDays,
+      )
+        ? Math.max(
+            0,
+            Math.floor(
+              loaded.timeInRankDays,
+            ),
+          )
+        : 0
+
     const trainings =
       typeof loaded?.trainings ===
         "number" &&
@@ -157,6 +173,7 @@ function normalizeRequirements(
       rankId: rank.id,
       rankName: rank.name,
       hours,
+      timeInRankDays,
       trainings,
     }
   }
@@ -196,7 +213,7 @@ function RequirementInput({
   disabled: boolean
 }) {
   return (
-    <div className="w-full min-w-0 lg:w-[126px]">
+    <div className="w-full min-w-0 lg:w-[190px]">
       <label
         className="
           mb-1.5 block w-full
@@ -211,7 +228,7 @@ function RequirementInput({
 
       <div
         className="
-          flex h-11 w-full
+          flex h-12 w-full
           overflow-hidden
           rounded-lg
           border border-border
@@ -234,7 +251,7 @@ function RequirementInput({
             bg-transparent
             px-2
             text-center
-            text-sm
+            text-base
             font-semibold
             text-foreground
             outline-none
@@ -249,7 +266,7 @@ function RequirementInput({
 
         <div
           className="
-            flex w-8 shrink-0
+            flex w-9 shrink-0
             flex-col
             border-l border-border
           "
@@ -271,7 +288,7 @@ function RequirementInput({
             "
             aria-label={`Increase ${label}`}
           >
-            <ChevronUp className="h-3.5 w-3.5" />
+            <ChevronUp className="h-4 w-4" />
           </button>
 
           <button
@@ -290,7 +307,7 @@ function RequirementInput({
             "
             aria-label={`Decrease ${label}`}
           >
-            <ChevronDown className="h-3.5 w-3.5" />
+            <ChevronDown className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -426,6 +443,7 @@ export default function SWATRequirements() {
     rankId: string,
     field:
       | "hours"
+      | "timeInRankDays"
       | "trainings",
     value: number,
   ) {
@@ -447,6 +465,7 @@ export default function SWATRequirements() {
             rankId: rank.id,
             rankName: rank.name,
             hours: 0,
+            timeInRankDays: 0,
             trainings: 0,
           }),
           rankId: rank.id,
@@ -464,6 +483,7 @@ export default function SWATRequirements() {
     rankId: string,
     field:
       | "hours"
+      | "timeInRankDays"
       | "trainings",
     amount: number,
   ) {
@@ -483,6 +503,7 @@ export default function SWATRequirements() {
     rankId: string,
     field:
       | "hours"
+      | "timeInRankDays"
       | "trainings",
     value: string,
   ) {
@@ -553,6 +574,16 @@ export default function SWATRequirements() {
               ),
             ),
           ),
+          timeInRankDays:
+            Math.max(
+              0,
+              Math.floor(
+                Number(
+                  current?.timeInRankDays ??
+                    0,
+                ),
+              ),
+            ),
           trainings:
             Math.max(
               0,
@@ -711,7 +742,7 @@ export default function SWATRequirements() {
               </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Configure the required promotion hours and trainings for each SWAT rank.
+                Configure the required promotion hours, time in rank, and trainings for each SWAT rank.
               </p>
             </div>
           </div>
@@ -765,7 +796,7 @@ export default function SWATRequirements() {
                     </h2>
 
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Set the minimum hours and trainings required for each rank.
+                      Set the minimum hours, time in rank, and trainings required for each rank.
                     </p>
                   </div>
                 </div>
@@ -788,6 +819,7 @@ export default function SWATRequirements() {
                         rankId: rank.id,
                         rankName: rank.name,
                         hours: 0,
+                        timeInRankDays: 0,
                         trainings: 0,
                       }
 
@@ -853,7 +885,7 @@ export default function SWATRequirements() {
                               grid-cols-1 gap-3
                               sm:grid-cols-2
                               lg:w-auto
-                              lg:grid-cols-2
+                              lg:grid-cols-3
                             "
                           >
                             <RequirementInput
@@ -881,6 +913,39 @@ export default function SWATRequirements() {
                                 changeRequirement(
                                   rank.id,
                                   "hours",
+                                  -1,
+                                )
+                              }
+                              disabled={
+                                isSaving
+                              }
+                            />
+
+                            <RequirementInput
+                              label="Time in Rank (Days)"
+                              value={
+                                requirement.timeInRankDays
+                              }
+                              onChange={(
+                                value,
+                              ) =>
+                                setRequirement(
+                                  rank.id,
+                                  "timeInRankDays",
+                                  value,
+                                )
+                              }
+                              onIncrease={() =>
+                                changeRequirement(
+                                  rank.id,
+                                  "timeInRankDays",
+                                  1,
+                                )
+                              }
+                              onDecrease={() =>
+                                changeRequirement(
+                                  rank.id,
+                                  "timeInRankDays",
                                   -1,
                                 )
                               }
