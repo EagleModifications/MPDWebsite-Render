@@ -6,14 +6,7 @@ import {
   Routes,
 } from "react-router-dom"
 
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Info,
-  XCircle,
-} from "lucide-react"
-
-import { Toaster } from "@/components/ui/sonner"
+import Notifications from "@/components/Notifications"
 import CustomCursor from "@/components/CustomCursor"
 
 import Home from "@/pages/Home"
@@ -23,8 +16,6 @@ import Verifying from "@/pages/Verifying"
 import NotFound from "@/pages/NotFound"
 import Events from "@/pages/Events"
 import Gallery from "@/pages/Gallery"
-
-import MainRoster from "@/pages/documents/MainRoster"
 
 import Dashboard from "@/pages/dashboard/Dashboard"
 
@@ -195,11 +186,6 @@ export default function App() {
         <Route
           path="/gallery"
           element={<Gallery />}
-        />
-
-        <Route
-          path="/documents/mainroster"
-          element={<MainRoster />}
         />
 
         {/* =================================================
@@ -399,77 +385,7 @@ export default function App() {
           GLOBAL NOTIFICATIONS
       =================================================== */}
 
-      <Toaster
-        position="top-right"
-
-        /*
-         * Number of notifications that can remain
-         * in the stack.
-         */
-        visibleToasts={5}
-
-        /*
-         * IMPORTANT:
-         *
-         * Do NOT use `expand` here.
-         *
-         * Without `expand`, Sonner keeps the notifications
-         * collapsed by default and expands the stack when
-         * the mouse hovers over it.
-         */
-        gap={6}
-
-        /*
-         * Distance from the top/right edge of the viewport.
-         */
-        offset={{
-          top: 24,
-          right: 24,
-        }}
-
-        theme="system"
-
-        closeButton
-
-        /*
-         * Keep Sonner above the application.
-         *
-         * The custom cursor uses 2147483647, so the cursor
-         * remains above the notifications.
-         */
-        className="!z-[2147483646]"
-
-        icons={{
-          success: (
-            <CheckCircle2 className="size-5 shrink-0 text-green-500" />
-          ),
-
-          info: (
-            <Info className="size-5 shrink-0 text-blue-500" />
-          ),
-
-          warning: (
-            <AlertTriangle className="size-5 shrink-0 text-yellow-500" />
-          ),
-
-          error: (
-            <XCircle className="size-5 shrink-0 text-red-500" />
-          ),
-        }}
-
-        toastOptions={{
-          classNames: {
-            toast:
-              "bg-background text-foreground border-border pr-12",
-
-            title:
-              "text-foreground",
-
-            description:
-              "text-muted-foreground",
-          },
-        }}
-      />
+      <Notifications />
 
       {/* ===================================================
           CUSTOM CURSOR
