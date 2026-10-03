@@ -54,6 +54,10 @@ type PromotionRosterMember = {
   timeInRank: string
   requiredHours: number
   promotionHours: number
+  requiredTimeInRankDays: number
+  requiredTrainingLogs: number
+  requiredRecruitmentLogs: number
+  requiredLogs: number
   status: Status
 }
 
@@ -337,6 +341,22 @@ export default function PromotionRoster() {
                     promotionHours:
                       Number(
                         member.promotionHours,
+                      ) || 0,
+                    requiredTimeInRankDays:
+                      Number(
+                        member.requiredTimeInRankDays,
+                      ) || 0,
+                    requiredTrainingLogs:
+                      Number(
+                        member.requiredTrainingLogs,
+                      ) || 0,
+                    requiredRecruitmentLogs:
+                      Number(
+                        member.requiredRecruitmentLogs,
+                      ) || 0,
+                    requiredLogs:
+                      Number(
+                        member.requiredLogs,
                       ) || 0,
                     status:
                       normalizeStatus(
@@ -755,6 +775,10 @@ export default function PromotionRoster() {
               member.discordId,
               member.timeInDept,
               member.timeInRank,
+              `${member.requiredTimeInRankDays} days`,
+              `${member.requiredLogs} logs`,
+              `${member.requiredTrainingLogs} training`,
+              `${member.requiredRecruitmentLogs} recruitment/ridealong`,
               `${member.requiredHours.toFixed(1)}h`,
               `${member.promotionHours.toFixed(1)}h`,
               getStatusLabel(
@@ -1781,6 +1805,14 @@ export default function PromotionRoster() {
                     </th>
 
                     <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Required Time in Rank
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Required Logs
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
                       Required
                     </th>
 
@@ -1919,7 +1951,20 @@ export default function PromotionRoster() {
                           </td>
 
                           <td className="px-4 py-3 text-muted-foreground">
-                            {member.timeInRank}
+                            {member.timeInRank || "—"}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {member.requiredTimeInRankDays}d
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div className="font-medium">
+                              {member.requiredLogs}
+                            </div>
+                            <div className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">
+                              {member.requiredTrainingLogs} training · {member.requiredRecruitmentLogs} recruitment/ridealong
+                            </div>
                           </td>
 
                           <td className="px-4 py-3">
@@ -2085,6 +2130,27 @@ export default function PromotionRoster() {
                             </p>
                             <p className="mt-0.5 truncate font-medium">
                               {member.timeInRank || "—"}
+                            </p>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-muted-foreground">
+                              Required Time in Rank
+                            </p>
+                            <p className="mt-0.5 font-medium">
+                              {member.requiredTimeInRankDays} days
+                            </p>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-muted-foreground">
+                              Required Logs
+                            </p>
+                            <p className="mt-0.5 font-medium">
+                              {member.requiredLogs}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                              {member.requiredTrainingLogs} training · {member.requiredRecruitmentLogs} recruitment/ridealong
                             </p>
                           </div>
                         </div>
