@@ -13,7 +13,6 @@ export default function CustomCursor() {
     })
 
   useEffect(() => {
-    // Do not use the custom cursor on touch devices.
     if (
       window.matchMedia("(pointer: coarse)").matches
     ) {
@@ -45,17 +44,17 @@ export default function CustomCursor() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[2147483647]"
+      className="custom-cursor pointer-events-none fixed"
       style={{
         left: cursor.x,
         top: cursor.y,
-        width: "16px",
-        height: "20px",
+        width: "20px",
+        height: "24px",
       }}
     >
       <svg
-        width="16"
-        height="20"
+        width="20"
+        height="24"
         viewBox="0 0 16 20"
         xmlns="http://www.w3.org/2000/svg"
         className="block"
