@@ -5,7 +5,6 @@ import path from "node:path"
 import XLSX from "xlsx"
 
 import { syncGoogleRosters } from "./googleRosterSync"
-import { syncGoogleMainRoster } from "./googleMainRosterSync"
 
 import {
   authenticateDiscordCode,
@@ -5188,134 +5187,6 @@ export function createApp() {
     },
   )
 
-
-  /* ─────────────────────────────────────────
-     Main Roster
-  ───────────────────────────────────────── */
-
-  // The Master Roster is global rather than user-scoped.
-  // It is synchronized from the dedicated Google Sheet tabs
-  // and stored in the `mainRoster` MongoDB collection.
-
-  app.get(
-    "/api/main-roster",
-    async (req, res) => {
-      res.setHeader(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate, proxy-revalidate",
-      )
-
-      try {
-        const user =
-          await getRequestUser(req)
-
-        if (!user) {
-          return res.status(401).json({
-            success: false,
-            error: "Unauthorized",
-          })
-        }
-
-        const db = await getMongoDb()
-
-        let roster =
-          await db.collection("mainRoster").findOne(
-            { type: "main" },
-            { projection: { _id: 0 } },
-          )
-
-        // If MongoDB has not received the Master Roster yet, perform
-        // the first synchronization now. This makes the page self-
-        // initializing instead of requiring a separate import first.
-        if (!roster) {
-          await syncGoogleMainRoster()
-
-          roster =
-            await db.collection("mainRoster").findOne(
-              { type: "main" },
-              { projection: { _id: 0 } },
-            )
-        }
-
-        if (!roster) {
-          return res.status(404).json({
-            success: false,
-            error: "Main roster synchronization completed without creating a roster document.",
-          })
-        }
-
-        return res.json({
-          success: true,
-          roster,
-        })
-      } catch (error) {
-        console.error(
-          "GET /api/main-roster failed:",
-          error,
-        )
-
-        return res.status(500).json({
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to load main roster.",
-        })
-      }
-    },
-  )
-
-  app.post(
-    "/api/import/google/main-roster",
-    async (req, res) => {
-      res.setHeader(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate, proxy-revalidate",
-      )
-
-      try {
-        const user =
-          await getRequestUser(req)
-
-        if (!user) {
-          return res.status(401).json({
-            success: false,
-            error: "Unauthorized",
-          })
-        }
-
-        // Main Roster refresh is available to authenticated dashboard users.
-        // The source is read-only Google Sheets data and the sync only updates
-        // the global `mainRoster` cache in MongoDB, so it does not require the
-        // separate division-import permission.
-        const result =
-          await syncGoogleMainRoster()
-
-        return res.status(200).json({
-          success: true,
-          updated: true,
-          message:
-            "Master Roster synchronized successfully.",
-          ...result,
-        })
-      } catch (error) {
-        console.error(
-          "[google-main-roster] Manual sync failed:",
-          error,
-        )
-
-        return res.status(500).json({
-          success: false,
-          updated: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Master Roster sync failed.",
-        })
-      }
-    },
-  )
-
   /* ─────────────────────────────────────────
      Events
   ───────────────────────────────────────── */
@@ -6463,37 +6334,6 @@ app.listen(env.port, () => {
   console.log(
     `MPD Dashboard running on port ${env.port}`,
   )
-
-  // Run the Master Roster sync once when the server starts.
-  // This is intentionally non-blocking so a temporary Google/MongoDB
-  // problem does not prevent Express from starting.
-  void syncGoogleMainRoster().catch((error) => {
-    console.error(
-      "[google-main-roster] Initial sync failed:",
-      error,
-    )
-  })
-
-  // Keep the Master Roster synchronized every 30 minutes while the
-  // Node process is running. Render/free hosting may suspend the
-  // process, so the startup sync above also handles the next wake-up.
-  const mainRosterSyncInterval =
-    setInterval(
-      () => {
-        void syncGoogleMainRoster().catch(
-          (error) => {
-            console.error(
-              "[google-main-roster] Scheduled sync failed:",
-              error,
-            )
-          },
-        )
-      },
-      30 * 60 * 1000,
-    )
-
-  // Do not keep the Node process alive solely because of this timer.
-  mainRosterSyncInterval.unref()
 })
 
 export default app
