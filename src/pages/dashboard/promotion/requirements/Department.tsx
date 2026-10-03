@@ -33,8 +33,8 @@ type RequirementsResponse = {
 /*
  * Department rank order.
  *
- * The order here is the official display order used by
- * Department Requirements and should not depend on MongoDB.
+ * This is the official display order for
+ * Department Requirements.
  *
  * rankId   = internal identifier
  * rankName = human-readable name
@@ -116,7 +116,26 @@ const Department_RANKS: Rank[] = [
 
 const DIVISION = "department"
 
-function createEmptyRequirements(): Record<string, Requirement> {
+/*
+ * Department Requirements use the Activity Requirements
+ * API because this page stores required promotion hours.
+ *
+ * Activity:
+ *   /api/requirements/activity/:division
+ *
+ * Promotion:
+ *   /api/requirements/promotion/:division
+ *
+ * This page uses Activity Requirements and therefore
+ * sends/receives `hours`.
+ */
+const REQUIREMENTS_ENDPOINT =
+  `/api/requirements/activity/${DIVISION}`
+
+function createEmptyRequirements(): Record<
+  string,
+  Requirement
+> {
   return Object.fromEntries(
     Department_RANKS.map((rank) => [
       rank.id,
@@ -130,28 +149,32 @@ function createEmptyRequirements(): Record<string, Requirement> {
 }
 
 function normalizeRequirements(
-  loadedRequirements: Record<string, Requirement> = {},
+  loadedRequirements: Record<
+    string,
+    Requirement
+  > = {},
 ): Record<string, Requirement> {
-  const normalized = createEmptyRequirements()
+  const normalized =
+    createEmptyRequirements()
 
   for (const rank of Department_RANKS) {
-    const loaded = loadedRequirements[rank.id]
+    const loaded =
+      loadedRequirements[rank.id]
 
     const hours =
       typeof loaded?.hours === "number" &&
       Number.isFinite(loaded.hours)
-        ? Math.max(0, Math.floor(loaded.hours))
+        ? Math.max(
+            0,
+            Math.floor(loaded.hours),
+          )
         : 0
 
     /*
      * Never trust rankName from MongoDB.
      *
-     * MongoDB may contain older records where:
-     *
-     * rankId   = "officer"
-     * rankName = "officer"
-     *
-     * The frontend always uses the hardcoded rank definition.
+     * The frontend rank configuration is the
+     * source of truth for the displayed name.
      */
     normalized[rank.id] = {
       rankId: rank.id,
@@ -167,7 +190,10 @@ function areRequirementsEqual(
   first: Record<string, Requirement>,
   second: Record<string, Requirement>,
 ) {
-  return JSON.stringify(first) === JSON.stringify(second)
+  return (
+    JSON.stringify(first) ===
+    JSON.stringify(second)
+  )
 }
 
 export default function DepartmentRequirements() {
@@ -176,15 +202,19 @@ export default function DepartmentRequirements() {
     [],
   )
 
-  const [requirements, setRequirements] =
-    useState<Record<string, Requirement>>(
-      createEmptyRequirements(),
-    )
+  const [
+    requirements,
+    setRequirements,
+  ] = useState<
+    Record<string, Requirement>
+  >(createEmptyRequirements())
 
-  const [savedRequirements, setSavedRequirements] =
-    useState<Record<string, Requirement>>(
-      createEmptyRequirements(),
-    )
+  const [
+    savedRequirements,
+    setSavedRequirements,
+  ] = useState<
+    Record<string, Requirement>
+  >(createEmptyRequirements())
 
   const [isLoading, setIsLoading] =
     useState(true)
@@ -192,6 +222,9 @@ export default function DepartmentRequirements() {
   const [isSaving, setIsSaving] =
     useState(false)
 
+  /*
+   * Load Department Activity Requirements.
+   */
   useEffect(() => {
     let cancelled = false
 
@@ -200,7 +233,7 @@ export default function DepartmentRequirements() {
         setIsLoading(true)
 
         const response = await fetch(
-          `/api/requirements/promotion/${DIVISION}`,
+          REQUIREMENTS_ENDPOINT,
           {
             method: "GET",
             cache: "no-store",
@@ -236,18 +269,22 @@ export default function DepartmentRequirements() {
 
         const loaded =
           data.requirements &&
-          typeof data.requirements === "object"
+          typeof data.requirements ===
+            "object"
             ? data.requirements
             : {}
 
         const normalized =
-          normalizeRequirements(loaded)
+          normalizeRequirements(
+            loaded,
+          )
 
         if (cancelled) {
           return
         }
 
         setRequirements(normalized)
+
         setSavedRequirements({
           ...normalized,
         })
@@ -256,12 +293,15 @@ export default function DepartmentRequirements() {
           return
         }
 
-        toast.error("Failed to load requirements", {
-          description:
-            err instanceof Error
-              ? err.message
-              : "An unexpected error occurred while loading requirements.",
-        })
+        toast.error(
+          "Failed to load requirements",
+          {
+            description:
+              err instanceof Error
+                ? err.message
+                : "An unexpected error occurred while loading requirements.",
+          },
+        )
       } finally {
         if (!cancelled) {
           setIsLoading(false)
@@ -276,18 +316,20 @@ export default function DepartmentRequirements() {
     }
   }, [])
 
-  const hasChanges = !areRequirementsEqual(
-    requirements,
-    savedRequirements,
-  )
+  const hasChanges =
+    !areRequirementsEqual(
+      requirements,
+      savedRequirements,
+    )
 
   function changeHours(
     rankId: string,
     amount: number,
   ) {
-    const rank = rankConfig.find(
-      (item) => item.id === rankId,
-    )
+    const rank =
+      rankConfig.find(
+        (item) => item.id === rankId,
+      )
 
     if (!rank) {
       return
@@ -300,8 +342,8 @@ export default function DepartmentRequirements() {
         rankName: rank.name,
         hours: Math.max(
           0,
-          (current[rankId]?.hours ?? 0) +
-            amount,
+          (current[rankId]?.hours ??
+            0) + amount,
         ),
       },
     }))
@@ -311,9 +353,10 @@ export default function DepartmentRequirements() {
     rankId: string,
     value: string,
   ) {
-    const rank = rankConfig.find(
-      (item) => item.id === rankId,
-    )
+    const rank =
+      rankConfig.find(
+        (item) => item.id === rankId,
+      )
 
     if (!rank) {
       return
@@ -361,21 +404,26 @@ export default function DepartmentRequirements() {
 
     setIsSaving(true)
 
-    const loadingToast = toast.loading(
-      "Saving requirements...",
-      {
-        description:
-          "Updating Department rank requirements.",
-      },
-    )
+    const loadingToast =
+      toast.loading(
+        "Saving requirements...",
+        {
+          description:
+            "Updating Department rank requirements.",
+        },
+      )
 
     try {
       /*
-       * Always build the payload from the frontend
-       * rank configuration.
+       * Always build the payload from the
+       * frontend rank configuration.
        *
-       * This prevents old MongoDB rankName values
-       * from being written back into the database.
+       * This guarantees:
+       * - rankId is correct
+       * - rankName is correct
+       * - hours is numeric
+       * - old MongoDB rankName values cannot
+       *   overwrite the current rank names
        */
       const normalizedRequirements: Record<
         string,
@@ -384,9 +432,12 @@ export default function DepartmentRequirements() {
 
       for (const rank of rankConfig) {
         const currentHours =
-          requirements[rank.id]?.hours ?? 0
+          requirements[rank.id]?.hours ??
+          0
 
-        normalizedRequirements[rank.id] = {
+        normalizedRequirements[
+          rank.id
+        ] = {
           rankId: rank.id,
           rankName: rank.name,
           hours: Math.max(
@@ -398,8 +449,20 @@ export default function DepartmentRequirements() {
         }
       }
 
+      /*
+       * IMPORTANT:
+       *
+       * Department Requirements are Activity
+       * Requirements, so this must use:
+       *
+       * /api/requirements/activity/department
+       *
+       * NOT:
+       *
+       * /api/requirements/promotion/department
+       */
       const response = await fetch(
-        `/api/requirements/promotion/${DIVISION}`,
+        REQUIREMENTS_ENDPOINT,
         {
           method: "POST",
           headers: {
@@ -445,12 +508,14 @@ export default function DepartmentRequirements() {
       }
 
       /*
-       * Normalize the response again so the UI never
-       * displays a bad rankName returned from MongoDB.
+       * Normalize the response again so the UI
+       * never displays invalid rank names or
+       * invalid hour values.
        */
       const savedData =
         data.requirements &&
-        typeof data.requirements === "object"
+        typeof data.requirements ===
+          "object"
           ? data.requirements
           : normalizedRequirements
 
@@ -459,7 +524,9 @@ export default function DepartmentRequirements() {
           savedData,
         )
 
-      setRequirements(normalizedSaved)
+      setRequirements(
+        normalizedSaved,
+      )
 
       setSavedRequirements({
         ...normalizedSaved,
@@ -474,20 +541,26 @@ export default function DepartmentRequirements() {
         },
       )
     } catch (err) {
-      toast.error("Failed to save requirements", {
-        id: loadingToast,
-        description:
-          err instanceof Error
-            ? err.message
-            : "An unexpected error occurred while saving requirements.",
-      })
+      toast.error(
+        "Failed to save requirements",
+        {
+          id: loadingToast,
+          description:
+            err instanceof Error
+              ? err.message
+              : "An unexpected error occurred while saving requirements.",
+        },
+      )
     } finally {
       setIsSaving(false)
     }
   }
 
   function handleReset() {
-    if (!hasChanges || isSaving) {
+    if (
+      !hasChanges ||
+      isSaving
+    ) {
       return
     }
 
@@ -535,8 +608,8 @@ export default function DepartmentRequirements() {
               </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Configure the required promotion hours
-                for each Department rank.
+                Configure the required promotion
+                hours for each Department rank.
               </p>
             </div>
           </div>
