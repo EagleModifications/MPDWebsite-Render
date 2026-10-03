@@ -35,6 +35,14 @@ const GALLERY_UPLOAD_DIR = path.join(
 
 fs.mkdirSync(GALLERY_UPLOAD_DIR, { recursive: true })
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    files: 20,
+    fileSize: 100 * 1024 * 1024,
+  },
+})
+
 const galleryUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, callback) => {
