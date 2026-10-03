@@ -83,12 +83,26 @@ const DESCRIPTION_PREVIEW_LENGTH =
   DESCRIPTION_LINE_LENGTH * DESCRIPTION_MAX_LINES
 
 function getDescriptionPreview(description: string) {
-  return Array.from({ length: DESCRIPTION_MAX_LINES }, (_, index) =>
-    description.slice(
-      index * DESCRIPTION_LINE_LENGTH,
-      (index + 1) * DESCRIPTION_LINE_LENGTH,
-    ),
-  ).filter(Boolean).join("\n")
+  const normalized = description.replace(/\r\n/g, "\n")
+  const lines = normalized.split("\n")
+  const previewLines: string[] = []
+
+  for (const line of lines) {
+    if (!line) {
+      previewLines.push("")
+      if (previewLines.length >= DESCRIPTION_MAX_LINES) break
+      continue
+    }
+
+    for (let index = 0; index < line.length; index += DESCRIPTION_LINE_LENGTH) {
+      previewLines.push(line.slice(index, index + DESCRIPTION_LINE_LENGTH))
+      if (previewLines.length >= DESCRIPTION_MAX_LINES) break
+    }
+
+    if (previewLines.length >= DESCRIPTION_MAX_LINES) break
+  }
+
+  return previewLines.join("\n")
 }
 
 type DropdownContextValue = {
@@ -1409,7 +1423,7 @@ export default function Gallery() {
 
                                 {item.description && (
                                   <div className="mt-1">
-                                    <p className="whitespace-pre-wrap text-xs leading-5 text-muted-foreground">
+                                    <p className="whitespace-pre text-xs leading-5 text-muted-foreground">
                                       {getDescriptionPreview(item.description)}
                                     </p>
 
