@@ -286,29 +286,29 @@ function findHeaderRow(
   rows: unknown[][],
   requiredHeaders: string[],
 ): number {
-  const required = requiredHeaders.map(
-    normalizeHeader,
-  )
+  const required = requiredHeaders.map(normalizeHeader)
 
-  for (
-    let index = 0;
-    index < rows.length;
-    index += 1
-  ) {
-    const headers = (
-      rows[index] ?? []
-    ).map(normalizeHeader)
+  let bestIndex = -1
+  let bestMatches = 0
 
-    if (
-      required.every((header) =>
-        headers.includes(header),
-      )
-    ) {
-      return index
+  for (let index = 0; index < rows.length; index += 1) {
+    const headers = (rows[index] ?? []).map(normalizeHeader)
+    const matches = required.filter((header) => headers.includes(header)).length
+
+    if (matches === required.length) return index
+
+    if (matches > bestMatches) {
+      bestMatches = matches
+      bestIndex = index
     }
   }
 
-  return -1
+  // Some Google Sheets use slightly different header wording or have
+  // decorative/merged cells in the header row. Returning a strong partial
+  // match lets the individual parser handle optional columns gracefully.
+  return bestMatches >= Math.max(2, Math.ceil(required.length * 0.5))
+    ? bestIndex
+    : -1
 }
 
 function getColumn(
@@ -606,7 +606,7 @@ function parseEmployees(
 
   if (headerIndex === -1) {
     throw new Error(
-      `Google Sheet "${sheetName}" is missing the required Employee Database columns.`,
+      `Google Sheet "${sheetName}" could not locate the Employee Database header row. Expected columns include Badge Number, Name, Discord ID, Department Status, and Rank.`,
     )
   }
 
