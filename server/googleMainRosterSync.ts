@@ -78,53 +78,20 @@ export type MainRosterData = {
 }
 
 /* ─────────────────────────────────────────────
-   Configuration
+   Google configuration
 ───────────────────────────────────────────── */
 
-type MainRosterSheetConfig = {
-  id:
-    | "home"
-    | "department"
-    | "employees"
-    | "vehicles"
-    | "uniforms"
-  label: string
-  env: string
+type GoogleMainRosterConfig = {
+  spreadsheetId: string
+  homeSheet: string
+  departmentSheet: string
+  employeeSheet: string
+  vehicleSheet: string
+  uniformSheet: string
 }
 
-const mainRosterSheets: MainRosterSheetConfig[] = [
-  {
-    id: "home",
-    label: "MPD | Home",
-    env: "GOOGLE_MAINROSTER_SHEET_HOME",
-  },
-  {
-    id: "department",
-    label: "Department Roster",
-    env: "GOOGLE_MAINROSTER_SHEET_DEPARTMENTROSTER",
-  },
-  {
-    id: "employees",
-    label: "Employee Data",
-    env: "GOOGLE_MAINROSTER_SHEET_EMPLOYEEDATA",
-  },
-  {
-    id: "vehicles",
-    label: "Vehicle Roster",
-    env: "GOOGLE_MAINROSTER_SHEET_VEHICLEROSTER",
-  },
-  {
-    id: "uniforms",
-    label: "Uniform Roster",
-    env: "GOOGLE_MAINROSTER_SHEET_UNIFORMROSTER",
-  },
-]
-
-function getRequiredEnv(
-  name: string,
-): string {
-  const value =
-    process.env[name]?.trim() ?? ""
+function getRequiredEnv(name: string): string {
+  const value = process.env[name]?.trim()
 
   if (!value) {
     throw new Error(
@@ -135,53 +102,56 @@ function getRequiredEnv(
   return value
 }
 
-/* ─────────────────────────────────────────────
-   Google Sheets Client
-───────────────────────────────────────────── */
+function getConfig(): GoogleMainRosterConfig {
+  return {
+    spreadsheetId: getRequiredEnv(
+      "GOOGLE_MAINROSTER_SHEET_ID",
+    ),
+    homeSheet: getRequiredEnv(
+      "GOOGLE_MAINROSTER_SHEET_HOME",
+    ),
+    departmentSheet: getRequiredEnv(
+      "GOOGLE_MAINROSTER_SHEET_DEPARTMENTROSTER",
+    ),
+    employeeSheet: getRequiredEnv(
+      "GOOGLE_MAINROSTER_SHEET_EMPLOYEEDATA",
+    ),
+    vehicleSheet: getRequiredEnv(
+      "GOOGLE_MAINROSTER_SHEET_VEHICLEROSTER",
+    ),
+    uniformSheet: getRequiredEnv(
+      "GOOGLE_MAINROSTER_SHEET_UNIFORMROSTER",
+    ),
+  }
+}
 
 function getGoogleSheetsClient() {
-  const clientEmail =
-    getRequiredEnv(
-      "GOOGLE_SERVICE_ACCOUNT_EMAIL",
-    )
+  const clientEmail = getRequiredEnv(
+    "GOOGLE_SERVICE_ACCOUNT_EMAIL",
+  )
 
-  const privateKey =
-    getRequiredEnv(
-      "GOOGLE_PRIVATE_KEY",
-    ).replace(/\\n/g, "\n")
+  const privateKey = getRequiredEnv(
+    "GOOGLE_PRIVATE_KEY",
+  ).replace(/\\n/g, "\n")
 
-  /*
-   * IMPORTANT:
-   *
-   * This is deliberately NOT GOOGLE_SHEET_ID.
-   *
-   * googleRosterSync.ts uses GOOGLE_SHEET_ID
-   * for the existing roster system.
-   *
-   * Main Roster has its own spreadsheet.
-   */
-  const spreadsheetId =
-    getRequiredEnv(
-      "GOOGLE_MAINROSTER_SHEET_ID",
-    )
+  const config = getConfig()
 
-  const auth =
-    new google.auth.GoogleAuth({
-      credentials: {
-        client_email: clientEmail,
-        private_key: privateKey,
-      },
-      scopes: [
-        "https://www.googleapis.com/auth/spreadsheets.readonly",
-      ],
-    })
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: clientEmail,
+      private_key: privateKey,
+    },
+    scopes: [
+      "https://www.googleapis.com/auth/spreadsheets.readonly",
+    ],
+  })
 
   return {
     sheets: google.sheets({
       version: "v4",
       auth,
     }),
-    spreadsheetId,
+    spreadsheetId: config.spreadsheetId,
   }
 }
 
@@ -189,30 +159,18 @@ function getGoogleSheetsClient() {
    Helpers
 ───────────────────────────────────────────── */
 
-function clean(
-  value: unknown,
-): string {
-  return String(
-    value ?? "",
-  ).trim()
+function clean(value: unknown): string {
+  return String(value ?? "").trim()
 }
 
-function normalizeHeader(
-  value: unknown,
-): string {
+function normalizeHeader(value: unknown): string {
   return clean(value)
     .toLowerCase()
-    .replace(
-      /[^a-z0-9]/g,
-      "",
-    )
+    .replace(/[^a-z0-9]/g, "")
 }
 
-function booleanValue(
-  value: unknown,
-): boolean {
-  const normalized =
-    clean(value).toLowerCase()
+function booleanValue(value: unknown): boolean {
+  const normalized = clean(value).toLowerCase()
 
   return [
     "true",
@@ -221,6 +179,7 @@ function booleanValue(
     "x",
     "1",
     "checked",
+    "on",
   ].includes(normalized)
 }
 
@@ -228,25 +187,22 @@ function findHeaderRow(
   rows: unknown[][],
   requiredHeaders: string[],
 ): number {
-  const required =
-    requiredHeaders.map(
-      normalizeHeader,
-    )
+  const required = requiredHeaders.map(
+    normalizeHeader,
+  )
 
   for (
     let index = 0;
     index < rows.length;
     index += 1
   ) {
-    const headers =
-      (rows[index] ?? []).map(
-        normalizeHeader,
-      )
+    const headers = (
+      rows[index] ?? []
+    ).map(normalizeHeader)
 
     if (
-      required.every(
-        (header) =>
-          headers.includes(header),
+      required.every((header) =>
+        headers.includes(header),
       )
     ) {
       return index
@@ -261,14 +217,10 @@ function getColumn(
   alternatives: string[],
 ): number {
   const normalizedHeaders =
-    headers.map(
-      normalizeHeader,
-    )
+    headers.map(normalizeHeader)
 
   const normalizedAlternatives =
-    alternatives.map(
-      normalizeHeader,
-    )
+    alternatives.map(normalizeHeader)
 
   return normalizedHeaders.findIndex(
     (header) =>
@@ -286,34 +238,33 @@ function getValue(
     return ""
   }
 
-  return clean(
-    row[column],
+  return clean(row[column])
+}
+
+function hasValue(row: unknown[]): boolean {
+  return row.some(
+    (value) => clean(value) !== "",
   )
 }
 
 function nonEmptyRows(
   rows: unknown[][],
 ): unknown[][] {
-  return rows.filter(
-    (row) =>
-      row.some(
-        (value) =>
-          clean(value) !== "",
-      ),
-  )
+  return rows.filter(hasValue)
+}
+
+function isDiscordId(value: string): boolean {
+  return /^\d{17,20}$/.test(value)
 }
 
 function escapeSheetName(
   sheetName: string,
 ): string {
-  return sheetName.replace(
-    /'/g,
-    "''",
-  )
+  return sheetName.replace(/'/g, "''")
 }
 
 /* ─────────────────────────────────────────────
-   Google → Raw Values
+   Google → raw rows
 ───────────────────────────────────────────── */
 
 async function getSheetValues(
@@ -323,33 +274,16 @@ async function getSheetValues(
   spreadsheetId: string,
   sheetName: string,
 ): Promise<unknown[][]> {
-  const escapedSheetName =
-    escapeSheetName(
-      sheetName,
-    )
+  const response =
+    await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${escapeSheetName(
+        sheetName,
+      )}'!A:ZZ`,
+      majorDimension: "ROWS",
+    })
 
-  try {
-    const response =
-      await sheets.spreadsheets.values.get(
-        {
-          spreadsheetId,
-          range: `'${escapedSheetName}'!A:ZZ`,
-          majorDimension: "ROWS",
-        },
-      )
-
-    return (
-      response.data.values ?? []
-    )
-  } catch (error) {
-    throw new Error(
-      `Failed to read Google Sheet "${sheetName}": ${
-        error instanceof Error
-          ? error.message
-          : String(error)
-      }`,
-    )
-  }
+  return response.data.values ?? []
 }
 
 /* ─────────────────────────────────────────────
@@ -360,17 +294,13 @@ function parseDepartment(
   rows: unknown[][],
   sheetName: string,
 ): MainRosterDepartmentMember[] {
-  const headerIndex =
-    findHeaderRow(
-      rows,
-      [
-        "Callsign",
-        "Badge Number",
-        "Name",
-        "Insignia",
-        "Rank",
-      ],
-    )
+  const headerIndex = findHeaderRow(rows, [
+    "Callsign",
+    "Badge Number",
+    "Name",
+    "Insignia",
+    "Rank",
+  ])
 
   if (headerIndex === -1) {
     throw new Error(
@@ -378,304 +308,180 @@ function parseDepartment(
     )
   }
 
-  const headers =
-    rows[headerIndex] ?? []
+  const headers = rows[headerIndex] ?? []
 
   const columns = {
-    section: getColumn(
-      headers,
-      [
-        "Section",
-        "Division",
-        "Department",
-      ],
-    ),
-
-    callsign: getColumn(
-      headers,
-      [
-        "Callsign",
-        "Call Sign",
-        "Callsign Number",
-      ],
-    ),
-
-    badgeNumber: getColumn(
-      headers,
-      [
-        "Badge Number",
-        "Badge",
-        "BadgeNumber",
-        "Badge #",
-        "Badge#",
-      ],
-    ),
-
-    name: getColumn(
-      headers,
-      [
-        "Name",
-        "Full Name",
-        "Officer Name",
-      ],
-    ),
-
-    insignia: getColumn(
-      headers,
-      [
-        "Insignia",
-      ],
-    ),
-
-    rank: getColumn(
-      headers,
-      [
-        "Rank",
-        "Current Rank",
-      ],
-    ),
-
-    jobDescription: getColumn(
-      headers,
-      [
-        "Job Description",
-        "Job",
-        "Description",
-      ],
-    ),
-
-    timeInDept: getColumn(
-      headers,
-      [
-        "Time In Dept",
-        "Time In Department",
-        "TimeInDept",
-        "Department Time",
-        "Dept Time",
-      ],
-    ),
-
-    timeInRank: getColumn(
-      headers,
-      [
-        "Time In Rank",
-        "TimeInRank",
-        "Rank Time",
-      ],
-    ),
-
-    status: getColumn(
-      headers,
-      [
-        "Status",
-        "Department Status",
-      ],
-    ),
-
-    strike1: getColumn(
-      headers,
-      [
-        "Strike 1",
-        "Strike1",
-        "Strike One",
-      ],
-    ),
-
-    strike2: getColumn(
-      headers,
-      [
-        "Strike 2",
-        "Strike2",
-        "Strike Two",
-      ],
-    ),
-
-    discordId: getColumn(
-      headers,
-      [
-        "Discord ID",
-        "DiscordID",
-        "Discord",
-        "Discord Id",
-      ],
-    ),
-
-    hoursThisMonth: getColumn(
-      headers,
-      [
-        "Hours This Month",
-        "This Month Hours",
-        "Hours",
-        "Activity Hours",
-      ],
-    ),
+    section: getColumn(headers, [
+      "Section",
+      "Division",
+      "Department",
+    ]),
+    callsign: getColumn(headers, [
+      "Callsign",
+      "Call Sign",
+      "Callsign Number",
+    ]),
+    badgeNumber: getColumn(headers, [
+      "Badge Number",
+      "Badge",
+      "BadgeNumber",
+      "Badge #",
+      "Badge#",
+    ]),
+    name: getColumn(headers, [
+      "Name",
+      "Full Name",
+      "Officer Name",
+    ]),
+    insignia: getColumn(headers, [
+      "Insignia",
+    ]),
+    rank: getColumn(headers, [
+      "Rank",
+      "Current Rank",
+    ]),
+    jobDescription: getColumn(headers, [
+      "Job Description",
+      "Job",
+      "Description",
+    ]),
+    timeInDept: getColumn(headers, [
+      "Time In Dept",
+      "Time In Department",
+      "TimeInDept",
+      "Department Time",
+      "Dept Time",
+    ]),
+    timeInRank: getColumn(headers, [
+      "Time In Rank",
+      "TimeInRank",
+      "Rank Time",
+    ]),
+    status: getColumn(headers, [
+      "Status",
+      "Department Status",
+    ]),
+    strike1: getColumn(headers, [
+      "Strike 1",
+      "Strike1",
+      "Strike One",
+    ]),
+    strike2: getColumn(headers, [
+      "Strike 2",
+      "Strike2",
+      "Strike Two",
+    ]),
+    discordId: getColumn(headers, [
+      "Discord ID",
+      "DiscordID",
+      "Discord",
+      "Discord Id",
+    ]),
+    hoursThisMonth: getColumn(headers, [
+      "Hours This Month",
+      "This Month Hours",
+      "Hours",
+      "Activity Hours",
+    ]),
   }
+
+  let currentSection = ""
+  let currentRank = ""
 
   const members: MainRosterDepartmentMember[] = []
 
-  let currentSection = ""
-
   for (
-    let index = headerIndex + 1;
-    index < rows.length;
-    index += 1
+    const row of rows.slice(headerIndex + 1)
   ) {
-    const row =
-      rows[index] ?? []
-
-    if (
-      !row.some(
-        (value) =>
-          clean(value) !== "",
-      )
-    ) {
+    if (!hasValue(row)) {
       continue
     }
+
+    const sectionValue =
+      getValue(row, columns.section)
 
     const callsign =
-      getValue(
-        row,
-        columns.callsign,
-      )
+      getValue(row, columns.callsign)
 
     const badgeNumber =
-      getValue(
-        row,
-        columns.badgeNumber,
-      )
+      getValue(row, columns.badgeNumber)
 
     const name =
-      getValue(
-        row,
-        columns.name,
-      )
+      getValue(row, columns.name)
 
-    const rank =
-      getValue(
-        row,
-        columns.rank,
-      )
+    const rankValue =
+      getValue(row, columns.rank)
 
     /*
-     * Department Roster contains merged
-     * section rows such as:
-     *
-     * High Command
-     * Trial High Command
-     * Low Command
-     * Supervisors
-     *
-     * Google Sheets returns those as rows
-     * with very little data.
-     *
-     * Treat those as section markers rather
-     * than actual personnel.
+     * Google Sheets merged cells only return the value
+     * on the first row of a merged block. Carry the
+     * section/rank forward for the following rows.
      */
-    const meaningfulValues =
-      row.filter(
-        (value) =>
-          clean(value) !== "",
-      )
+    if (sectionValue) {
+      currentSection = sectionValue
+    }
 
-    if (
-      !callsign &&
-      !badgeNumber &&
-      !name &&
-      !rank &&
-      meaningfulValues.length > 0
-    ) {
-      currentSection =
-        clean(
-          meaningfulValues[0],
-        )
+    if (rankValue) {
+      currentRank = rankValue
+    }
 
+    const hasOfficerIdentity =
+      callsign ||
+      badgeNumber ||
+      name ||
+      getValue(row, columns.discordId)
+
+    /*
+     * Rows such as "High Command", "Supervisors",
+     * "Patrol", etc. are group/section rows rather
+     * than actual officers.
+     */
+    if (!hasOfficerIdentity) {
       continue
     }
 
-    const section =
-      getValue(
+    const discordId =
+      getValue(row, columns.discordId)
+
+    members.push({
+      section: currentSection,
+      callsign,
+      badgeNumber,
+      name,
+      insignia: getValue(
         row,
-        columns.section,
-      ) ||
-      currentSection
-
-    const member: MainRosterDepartmentMember =
-      {
-        section,
-
-        callsign,
-
-        badgeNumber,
-
-        name,
-
-        insignia:
-          getValue(
-            row,
-            columns.insignia,
-          ),
-
-        rank,
-
-        jobDescription:
-          getValue(
-            row,
-            columns.jobDescription,
-          ),
-
-        timeInDept:
-          getValue(
-            row,
-            columns.timeInDept,
-          ),
-
-        timeInRank:
-          getValue(
-            row,
-            columns.timeInRank,
-          ),
-
-        status:
-          getValue(
-            row,
-            columns.status,
-          ),
-
-        strike1:
-          booleanValue(
-            row[
-              columns.strike1
-            ],
-          ),
-
-        strike2:
-          booleanValue(
-            row[
-              columns.strike2
-            ],
-          ),
-
-        discordId:
-          getValue(
-            row,
-            columns.discordId,
-          ),
-
-        hoursThisMonth:
-          getValue(
-            row,
-            columns.hoursThisMonth,
-          ),
-      }
-
-    if (
-      member.callsign ||
-      member.badgeNumber ||
-      member.name ||
-      member.discordId
-    ) {
-      members.push(member)
-    }
+        columns.insignia,
+      ),
+      rank:
+        rankValue || currentRank,
+      jobDescription: getValue(
+        row,
+        columns.jobDescription,
+      ),
+      timeInDept: getValue(
+        row,
+        columns.timeInDept,
+      ),
+      timeInRank: getValue(
+        row,
+        columns.timeInRank,
+      ),
+      status: getValue(
+        row,
+        columns.status,
+      ),
+      strike1: booleanValue(
+        row[columns.strike1],
+      ),
+      strike2: booleanValue(
+        row[columns.strike2],
+      ),
+      discordId,
+      hoursThisMonth: getValue(
+        row,
+        columns.hoursThisMonth,
+      ),
+    })
   }
 
   return members
@@ -689,17 +495,13 @@ function parseEmployees(
   rows: unknown[][],
   sheetName: string,
 ): MainRosterEmployee[] {
-  const headerIndex =
-    findHeaderRow(
-      rows,
-      [
-        "Badge Number",
-        "Name",
-        "Discord ID",
-        "Department Status",
-        "Rank",
-      ],
-    )
+  const headerIndex = findHeaderRow(rows, [
+    "Badge Number",
+    "Name",
+    "Discord ID",
+    "Department Status",
+    "Rank",
+  ])
 
   if (headerIndex === -1) {
     throw new Error(
@@ -707,302 +509,168 @@ function parseEmployees(
     )
   }
 
-  const headers =
-    rows[headerIndex] ?? []
+  const headers = rows[headerIndex] ?? []
 
   const columns = {
-    sendMessage: getColumn(
-      headers,
-      [
-        "Message User",
-        "Send Message",
-        "Message",
-        "DM",
-      ],
-    ),
-
-    badgeNumber: getColumn(
-      headers,
-      [
-        "Badge Number",
-        "Badge",
-        "BadgeNumber",
-        "Badge #",
-        "Badge#",
-      ],
-    ),
-
-    name: getColumn(
-      headers,
-      [
-        "Name",
-        "Full Name",
-        "Employee Name",
-      ],
-    ),
-
-    discordId: getColumn(
-      headers,
-      [
-        "Discord ID",
-        "DiscordID",
-        "Discord",
-        "Discord Id",
-      ],
-    ),
-
-    departmentStatus:
-      getColumn(
-        headers,
-        [
-          "Department Status",
-          "Status",
-        ],
-      ),
-
-    rank: getColumn(
-      headers,
-      [
-        "Rank",
-        "Current Rank",
-      ],
-    ),
-
-    timezone: getColumn(
-      headers,
-      [
-        "Timezone",
-        "Time Zone",
-        "TZ",
-      ],
-    ),
-
-    joinDeptDate:
-      getColumn(
-        headers,
-        [
-          "Join Dept Date",
-          "Join Department Date",
-          "Department Join Date",
-          "Join Date",
-        ],
-      ),
-
-    promoDate: getColumn(
-      headers,
-      [
-        "Promo Date",
-        "Promotion Date",
-        "Last Promotion",
-      ],
-    ),
-
-    strike1: getColumn(
-      headers,
-      [
-        "Strike 1",
-        "Strike1",
-        "Strike One",
-      ],
-    ),
-
-    strike2: getColumn(
-      headers,
-      [
-        "Strike 2",
-        "Strike2",
-        "Strike Two",
-      ],
-    ),
-
-    callsign: getColumn(
-      headers,
-      [
-        "Callsign",
-        "Call Sign",
-        "Callsign Number",
-      ],
-    ),
-
-    timeInDept: getColumn(
-      headers,
-      [
-        "Time In Dept",
-        "Time In Department",
-        "TimeInDept",
-        "Department Time",
-      ],
-    ),
-
-    terminated: getColumn(
-      headers,
-      [
-        "Terminated",
-        "Termination",
-      ],
-    ),
-
-    loa: getColumn(
-      headers,
-      [
-        "LOA",
-        "Leave Of Absence",
-        "Leave of Absence",
-      ],
-    ),
-
-    resigned: getColumn(
-      headers,
-      [
-        "Resigned",
-        "Resignation",
-      ],
-    ),
-
-    thisMonthHours:
-      getColumn(
-        headers,
-        [
-          "This Month Hours",
-          "Hours This Month",
-          "Current Month Hours",
-        ],
-      ),
-
-    lastMonthHours:
-      getColumn(
-        headers,
-        [
-          "Last Month Hours",
-          "Previous Month Hours",
-        ],
-      ),
+    sendMessage: getColumn(headers, [
+      "Message User",
+      "Send Message",
+      "Message",
+      "DM",
+    ]),
+    badgeNumber: getColumn(headers, [
+      "Badge Number",
+      "Badge",
+      "BadgeNumber",
+      "Badge #",
+      "Badge#",
+    ]),
+    name: getColumn(headers, [
+      "Name",
+      "Full Name",
+      "Employee Name",
+    ]),
+    discordId: getColumn(headers, [
+      "Discord ID",
+      "DiscordID",
+      "Discord",
+      "Discord Id",
+    ]),
+    departmentStatus: getColumn(headers, [
+      "Department Status",
+      "Status",
+    ]),
+    rank: getColumn(headers, [
+      "Rank",
+      "Current Rank",
+    ]),
+    timezone: getColumn(headers, [
+      "Timezone",
+      "Time Zone",
+      "TZ",
+    ]),
+    joinDeptDate: getColumn(headers, [
+      "Join Dept Date",
+      "Join Department Date",
+      "Department Join Date",
+      "Join Date",
+    ]),
+    promoDate: getColumn(headers, [
+      "Promo Date",
+      "Promotion Date",
+      "Last Promotion",
+    ]),
+    strike1: getColumn(headers, [
+      "Strike 1",
+      "Strike1",
+      "Strike One",
+    ]),
+    strike2: getColumn(headers, [
+      "Strike 2",
+      "Strike2",
+      "Strike Two",
+    ]),
+    callsign: getColumn(headers, [
+      "Callsign",
+      "Call Sign",
+      "Callsign Number",
+    ]),
+    timeInDept: getColumn(headers, [
+      "Time In Dept",
+      "Time In Department",
+      "TimeInDept",
+      "Department Time",
+    ]),
+    terminated: getColumn(headers, [
+      "Terminated",
+      "Termination",
+    ]),
+    loa: getColumn(headers, [
+      "LOA",
+      "Leave Of Absence",
+      "Leave of Absence",
+    ]),
+    resigned: getColumn(headers, [
+      "Resigned",
+      "Resignation",
+    ]),
+    thisMonthHours: getColumn(headers, [
+      "This Month Hours",
+      "Hours This Month",
+      "Current Month Hours",
+    ]),
+    lastMonthHours: getColumn(headers, [
+      "Last Month Hours",
+      "Previous Month Hours",
+    ]),
   }
 
   return rows
     .slice(headerIndex + 1)
-    .filter((row) =>
-      row.some(
-        (value) =>
-          clean(value) !== "",
+    .filter(hasValue)
+    .map((row) => ({
+      sendMessage: getValue(
+        row,
+        columns.sendMessage,
       ),
-    )
-    .map(
-      (row) => ({
-        sendMessage:
-          getValue(
-            row,
-            columns.sendMessage,
-          ),
-
-        badgeNumber:
-          getValue(
-            row,
-            columns.badgeNumber,
-          ),
-
-        name:
-          getValue(
-            row,
-            columns.name,
-          ),
-
-        discordId:
-          getValue(
-            row,
-            columns.discordId,
-          ),
-
-        departmentStatus:
-          getValue(
-            row,
-            columns.departmentStatus,
-          ),
-
-        rank:
-          getValue(
-            row,
-            columns.rank,
-          ),
-
-        timezone:
-          getValue(
-            row,
-            columns.timezone,
-          ),
-
-        joinDeptDate:
-          getValue(
-            row,
-            columns.joinDeptDate,
-          ),
-
-        promoDate:
-          getValue(
-            row,
-            columns.promoDate,
-          ),
-
-        strike1:
-          booleanValue(
-            row[
-              columns.strike1
-            ],
-          ),
-
-        strike2:
-          booleanValue(
-            row[
-              columns.strike2
-            ],
-          ),
-
-        callsign:
-          getValue(
-            row,
-            columns.callsign,
-          ),
-
-        timeInDept:
-          getValue(
-            row,
-            columns.timeInDept,
-          ),
-
-        terminated:
-          booleanValue(
-            row[
-              columns.terminated
-            ],
-          ),
-
-        loa:
-          booleanValue(
-            row[
-              columns.loa
-            ],
-          ),
-
-        resigned:
-          booleanValue(
-            row[
-              columns.resigned
-            ],
-          ),
-
-        thisMonthHours:
-          getValue(
-            row,
-            columns.thisMonthHours,
-          ),
-
-        lastMonthHours:
-          getValue(
-            row,
-            columns.lastMonthHours,
-          ),
-      }),
-    )
+      badgeNumber: getValue(
+        row,
+        columns.badgeNumber,
+      ),
+      name: getValue(row, columns.name),
+      discordId: getValue(
+        row,
+        columns.discordId,
+      ),
+      departmentStatus: getValue(
+        row,
+        columns.departmentStatus,
+      ),
+      rank: getValue(row, columns.rank),
+      timezone: getValue(
+        row,
+        columns.timezone,
+      ),
+      joinDeptDate: getValue(
+        row,
+        columns.joinDeptDate,
+      ),
+      promoDate: getValue(
+        row,
+        columns.promoDate,
+      ),
+      strike1: booleanValue(
+        row[columns.strike1],
+      ),
+      strike2: booleanValue(
+        row[columns.strike2],
+      ),
+      callsign: getValue(
+        row,
+        columns.callsign,
+      ),
+      timeInDept: getValue(
+        row,
+        columns.timeInDept,
+      ),
+      terminated: booleanValue(
+        row[columns.terminated],
+      ),
+      loa: booleanValue(
+        row[columns.loa],
+      ),
+      resigned: booleanValue(
+        row[columns.resigned],
+      ),
+      thisMonthHours: getValue(
+        row,
+        columns.thisMonthHours,
+      ),
+      lastMonthHours: getValue(
+        row,
+        columns.lastMonthHours,
+      ),
+    }))
     .filter(
       (employee) =>
         employee.badgeNumber ||
@@ -1019,17 +687,13 @@ function parseVehicles(
   rows: unknown[][],
   sheetName: string,
 ): MainRosterVehicle[] {
-  const headerIndex =
-    findHeaderRow(
-      rows,
-      [
-        "Rank",
-        "Vehicle Name",
-        "Spawncode",
-        "Required Extras",
-        "Livery",
-      ],
-    )
+  const headerIndex = findHeaderRow(rows, [
+    "Rank",
+    "Vehicle Name",
+    "Spawncode",
+    "Required Extras",
+    "Livery",
+  ])
 
   if (headerIndex === -1) {
     throw new Error(
@@ -1037,203 +701,101 @@ function parseVehicles(
     )
   }
 
-  const headers =
-    rows[headerIndex] ?? []
+  const headers = rows[headerIndex] ?? []
 
   const columns = {
-    rank: getColumn(
-      headers,
-      [
-        "Rank",
-      ],
-    ),
-
-    vehicleName:
-      getColumn(
-        headers,
-        [
-          "Vehicle Name",
-          "Vehicle",
-          "Name",
-        ],
-      ),
-
-    spawncode:
-      getColumn(
-        headers,
-        [
-          "Spawncode",
-          "Spawn Code",
-          "Spawn",
-          "Model",
-        ],
-      ),
-
-    requiredExtras:
-      getColumn(
-        headers,
-        [
-          "Required Extras",
-          "Extras",
-          "Required Extra",
-        ],
-      ),
-
-    livery:
-      getColumn(
-        headers,
-        [
-          "Livery",
-          "Livery ID",
-        ],
-      ),
-
-    windowTint:
-      getColumn(
-        headers,
-        [
-          "Window Tint",
-          "Tint",
-        ],
-      ),
-
-    turbo:
-      getColumn(
-        headers,
-        [
-          "Turbo",
-          "Turbo Enabled",
-        ],
-      ),
-
-    slicktopOptional:
-      getColumn(
-        headers,
-        [
-          "Slicktop Optional",
-          "Slicktop",
-          "Slicktop Option",
-        ],
-      ),
-
-    unmarkedAllowed:
-      getColumn(
-        headers,
-        [
-          "Unmarked Allowed",
-          "Unmarked",
-          "Unmarked Allowed?",
-        ],
-      ),
+    rank: getColumn(headers, ["Rank"]),
+    vehicleName: getColumn(headers, [
+      "Vehicle Name",
+      "Vehicle",
+      "Name",
+    ]),
+    spawncode: getColumn(headers, [
+      "Spawncode",
+      "Spawn Code",
+      "Spawn",
+      "Model",
+    ]),
+    requiredExtras: getColumn(headers, [
+      "Required Extras",
+      "Extras",
+      "Required Extra",
+    ]),
+    livery: getColumn(headers, [
+      "Livery",
+      "Livery ID",
+    ]),
+    windowTint: getColumn(headers, [
+      "Window Tint",
+      "Tint",
+    ]),
+    turbo: getColumn(headers, [
+      "Turbo",
+      "Turbo Enabled",
+    ]),
+    slicktopOptional: getColumn(headers, [
+      "Slicktop Optional",
+      "Slicktop",
+      "Slicktop Option",
+    ]),
+    unmarkedAllowed: getColumn(headers, [
+      "Unmarked Allowed",
+      "Unmarked",
+      "Unmarked Allowed?",
+    ]),
   }
-
-  const vehicles: MainRosterVehicle[] = []
 
   let currentRank = ""
 
-  for (
-    let index = headerIndex + 1;
-    index < rows.length;
-    index += 1
-  ) {
-    const row =
-      rows[index] ?? []
+  return rows
+    .slice(headerIndex + 1)
+    .filter(hasValue)
+    .map((row) => {
+      const rankValue =
+        getValue(row, columns.rank)
 
-    if (
-      !row.some(
-        (value) =>
-          clean(value) !== "",
-      )
-    ) {
-      continue
-    }
-
-    const rank =
-      getValue(
-        row,
-        columns.rank,
-      )
-
-    /*
-     * Rank cells in the Google Sheet
-     * are vertically merged.
-     *
-     * Only the first row in a group
-     * contains the rank value.
-     *
-     * Carry it forward.
-     */
-    if (rank) {
-      currentRank = rank
-    }
-
-    const vehicle: MainRosterVehicle =
-      {
-        rank:
-          rank ||
-          currentRank,
-
-        vehicleName:
-          getValue(
-            row,
-            columns.vehicleName,
-          ),
-
-        spawncode:
-          getValue(
-            row,
-            columns.spawncode,
-          ),
-
-        requiredExtras:
-          getValue(
-            row,
-            columns.requiredExtras,
-          ),
-
-        livery:
-          getValue(
-            row,
-            columns.livery,
-          ),
-
-        windowTint:
-          getValue(
-            row,
-            columns.windowTint,
-          ),
-
-        turbo:
-          booleanValue(
-            row[
-              columns.turbo
-            ],
-          ),
-
-        slicktopOptional:
-          booleanValue(
-            row[
-              columns.slicktopOptional
-            ],
-          ),
-
-        unmarkedAllowed:
-          booleanValue(
-            row[
-              columns.unmarkedAllowed
-            ],
-          ),
+      if (rankValue) {
+        currentRank = rankValue
       }
 
-    if (
-      vehicle.vehicleName ||
-      vehicle.spawncode
-    ) {
-      vehicles.push(vehicle)
-    }
-  }
-
-  return vehicles
+      return {
+        rank: rankValue || currentRank,
+        vehicleName: getValue(
+          row,
+          columns.vehicleName,
+        ),
+        spawncode: getValue(
+          row,
+          columns.spawncode,
+        ),
+        requiredExtras: getValue(
+          row,
+          columns.requiredExtras,
+        ),
+        livery: getValue(
+          row,
+          columns.livery,
+        ),
+        windowTint: getValue(
+          row,
+          columns.windowTint,
+        ),
+        turbo: booleanValue(
+          row[columns.turbo],
+        ),
+        slicktopOptional: booleanValue(
+          row[columns.slicktopOptional],
+        ),
+        unmarkedAllowed: booleanValue(
+          row[columns.unmarkedAllowed],
+        ),
+      }
+    })
+    .filter(
+      (vehicle) =>
+        vehicle.vehicleName ||
+        vehicle.spawncode,
+    )
 }
 
 /* ─────────────────────────────────────────────
@@ -1244,15 +806,11 @@ function parseUniforms(
   rows: unknown[][],
   sheetName: string,
 ): MainRosterUniform[] {
-  const headerIndex =
-    findHeaderRow(
-      rows,
-      [
-        "Rank",
-        "Class",
-        "Shared Outfit Code",
-      ],
-    )
+  const headerIndex = findHeaderRow(rows, [
+    "Rank",
+    "Class",
+    "Server Outfit Code",
+  ])
 
   if (headerIndex === -1) {
     throw new Error(
@@ -1260,113 +818,66 @@ function parseUniforms(
     )
   }
 
-  const headers =
-    rows[headerIndex] ?? []
+  const headers = rows[headerIndex] ?? []
 
   const columns = {
-    rank: getColumn(
-      headers,
-      [
-        "Rank",
-      ],
-    ),
-
-    className:
-      getColumn(
-        headers,
-        [
-          "Class",
-          "Class Name",
-          "Uniform Class",
-        ],
-      ),
-
-    sharedOutfitCode:
-      getColumn(
-        headers,
-        [
-          "Shared Outfit Code",
-          "Outfit Code",
-          "Shared Code",
-        ],
-      ),
+    rank: getColumn(headers, ["Rank"]),
+    className: getColumn(headers, [
+      "Class",
+      "Class Name",
+      "Uniform Class",
+    ]),
+    sharedOutfitCode: getColumn(headers, [
+      "Server Outfit Code",
+      "Shared Outfit Code",
+      "Outfit Code",
+      "Shared Code",
+    ]),
   }
-
-  const uniforms: MainRosterUniform[] = []
 
   let currentRank = ""
 
-  for (
-    let index = headerIndex + 1;
-    index < rows.length;
-    index += 1
-  ) {
-    const row =
-      rows[index] ?? []
+  return rows
+    .slice(headerIndex + 1)
+    .filter(hasValue)
+    .map((row) => {
+      const rankValue =
+        getValue(row, columns.rank)
 
-    if (
-      !row.some(
-        (value) =>
-          clean(value) !== "",
-      )
-    ) {
-      continue
-    }
-
-    const rank =
-      getValue(
-        row,
-        columns.rank,
-      )
-
-    if (rank) {
-      currentRank = rank
-    }
-
-    const uniform: MainRosterUniform =
-      {
-        rank:
-          rank ||
-          currentRank,
-
-        className:
-          getValue(
-            row,
-            columns.className,
-          ),
-
-        sharedOutfitCode:
-          getValue(
-            row,
-            columns.sharedOutfitCode,
-          ),
+      if (rankValue) {
+        currentRank = rankValue
       }
 
-    if (
-      uniform.rank ||
-      uniform.className ||
-      uniform.sharedOutfitCode
-    ) {
-      uniforms.push(uniform)
-    }
-  }
-
-  return uniforms
+      return {
+        rank: rankValue || currentRank,
+        className: getValue(
+          row,
+          columns.className,
+        ),
+        sharedOutfitCode: getValue(
+          row,
+          columns.sharedOutfitCode,
+        ),
+      }
+    })
+    .filter(
+      (uniform) =>
+        uniform.rank ||
+        uniform.className ||
+        uniform.sharedOutfitCode,
+    )
 }
 
 /* ─────────────────────────────────────────────
-   MPD | Home
+   MPD Home
 ───────────────────────────────────────────── */
 
 function parseHome(
   rows: unknown[][],
 ): MainRosterHome {
-  const cleanedRows =
-    nonEmptyRows(rows)
+  const cleanedRows = nonEmptyRows(rows)
 
-  if (
-    cleanedRows.length === 0
-  ) {
+  if (cleanedRows.length === 0) {
     return {
       headers: [],
       rows: [],
@@ -1374,136 +885,47 @@ function parseHome(
   }
 
   /*
-   * The MPD | Home sheet is a designed
-   * dashboard rather than a conventional
-   * database table.
-   *
-   * We therefore preserve its values
-   * instead of trying to interpret every
-   * cell as a database field.
-   *
-   * The frontend can display this as
-   * available tabular data.
+   * The Home sheet is a formatted dashboard rather
+   * than a normal database table. Preserve its raw
+   * non-empty grid instead of trying to invent
+   * semantic columns.
    */
+  const width = Math.max(
+    ...cleanedRows.map(
+      (row) => row.length,
+    ),
+  )
 
-  const maxColumns =
-    cleanedRows.reduce(
-      (
-        maximum,
-        row,
-      ) =>
-        Math.max(
-          maximum,
-          row.length,
-        ),
-      0,
-    )
+  const headers = Array.from(
+    { length: width },
+    (_, index) => `Column ${index + 1}`,
+  )
 
-  const headers =
-    Array.from(
-      {
-        length:
-          maxColumns,
-      },
-      (_, index) =>
-        `Column ${index + 1}`,
-    )
-
-  const normalizedRows =
-    cleanedRows.map(
-      (row) =>
-        Array.from(
-          {
-            length:
-              maxColumns,
-          },
-          (_, index) =>
-            clean(
-              row[index],
-            ),
-        ),
-    )
+  const dataRows = cleanedRows.map(
+    (row) =>
+      headers.map((_, index) =>
+        clean(row[index]),
+      ),
+  )
 
   return {
     headers,
-    rows:
-      normalizedRows,
+    rows: dataRows,
   }
 }
 
 /* ─────────────────────────────────────────────
-   Validate Main Roster Configuration
-───────────────────────────────────────────── */
-
-export function validateGoogleMainRosterConfig() {
-  const spreadsheetId =
-    getRequiredEnv(
-      "GOOGLE_MAINROSTER_SHEET_ID",
-    )
-
-  const sheets: Record<
-    string,
-    string
-  > = {}
-
-  for (
-    const sheet of mainRosterSheets
-  ) {
-    sheets[sheet.id] =
-      getRequiredEnv(
-        sheet.env,
-      )
-  }
-
-  getRequiredEnv(
-    "GOOGLE_SERVICE_ACCOUNT_EMAIL",
-  )
-
-  getRequiredEnv(
-    "GOOGLE_PRIVATE_KEY",
-  )
-
-  return {
-    spreadsheetId,
-    sheets,
-  }
-}
-
-/* ─────────────────────────────────────────────
-   Main Google → MongoDB Sync
+   Main sync
 ───────────────────────────────────────────── */
 
 export async function syncGoogleMainRoster() {
-  const startedAt =
-    Date.now()
+  const startedAt = Date.now()
 
-  const config =
-    validateGoogleMainRosterConfig()
+  const config = getConfig()
 
-  const {
-    sheets,
-    spreadsheetId,
-  } =
+  const { sheets, spreadsheetId } =
     getGoogleSheetsClient()
 
-  const homeSheet =
-    config.sheets.home
-
-  const departmentSheet =
-    config.sheets.department
-
-  const employeeSheet =
-    config.sheets.employees
-
-  const vehicleSheet =
-    config.sheets.vehicles
-
-  const uniformSheet =
-    config.sheets.uniforms
-
-  /*
-   * Fetch every tab in parallel.
-   */
   const [
     homeRows,
     departmentRows,
@@ -1514,283 +936,177 @@ export async function syncGoogleMainRoster() {
     getSheetValues(
       sheets,
       spreadsheetId,
-      homeSheet,
+      config.homeSheet,
     ),
-
     getSheetValues(
       sheets,
       spreadsheetId,
-      departmentSheet,
+      config.departmentSheet,
     ),
-
     getSheetValues(
       sheets,
       spreadsheetId,
-      employeeSheet,
+      config.employeeSheet,
     ),
-
     getSheetValues(
       sheets,
       spreadsheetId,
-      vehicleSheet,
+      config.vehicleSheet,
     ),
-
     getSheetValues(
       sheets,
       spreadsheetId,
-      uniformSheet,
+      config.uniformSheet,
     ),
   ])
 
-  /*
-   * Parse the individual sheets.
-   */
-  const home =
-    parseHome(
-      homeRows,
-    )
+  const department = parseDepartment(
+    departmentRows,
+    config.departmentSheet,
+  )
 
-  const department =
-    parseDepartment(
-      departmentRows,
-      departmentSheet,
-    )
+  const employees = parseEmployees(
+    employeeRows,
+    config.employeeSheet,
+  )
 
-  const employees =
-    parseEmployees(
-      employeeRows,
-      employeeSheet,
-    )
+  const vehicles = parseVehicles(
+    vehicleRows,
+    config.vehicleSheet,
+  )
 
-  const vehicles =
-    parseVehicles(
-      vehicleRows,
-      vehicleSheet,
-    )
+  const uniforms = parseUniforms(
+    uniformRows,
+    config.uniformSheet,
+  )
 
-  const uniforms =
-    parseUniforms(
-      uniformRows,
-      uniformSheet,
-    )
+  const home = parseHome(homeRows)
 
   /*
-   * Safety checks.
-   *
-   * Never overwrite a working Master Roster
-   * with an empty/broken Google import.
+   * Never replace a working Main Roster with
+   * an empty/broken import.
    */
-  if (
-    department.length === 0
-  ) {
+  if (department.length === 0) {
     throw new Error(
-      `Google Sheet "${departmentSheet}" returned no Department Roster members.`,
+      `Google Sheet "${config.departmentSheet}" returned no Department Roster rows.`,
     )
   }
 
-  if (
-    employees.length === 0
-  ) {
+  if (employees.length === 0) {
     throw new Error(
-      `Google Sheet "${employeeSheet}" returned no Employee Data records.`,
+      `Google Sheet "${config.employeeSheet}" returned no Employee Database rows.`,
     )
   }
 
-  if (
-    vehicles.length === 0
-  ) {
+  if (vehicles.length === 0) {
     throw new Error(
-      `Google Sheet "${vehicleSheet}" returned no Vehicle Roster records.`,
+      `Google Sheet "${config.vehicleSheet}" returned no Vehicle Roster rows.`,
     )
   }
 
-  if (
-    uniforms.length === 0
-  ) {
+  if (uniforms.length === 0) {
     throw new Error(
-      `Google Sheet "${uniformSheet}" returned no Uniform Roster records.`,
+      `Google Sheet "${config.uniformSheet}" returned no Uniform Roster rows.`,
     )
   }
 
-  /*
-   * Build the complete Master Roster.
-   */
-  const roster: MainRosterData =
-    {
-      type: "main",
+  const roster: MainRosterData = {
+    type: "main",
+    home,
+    department,
+    employees,
+    vehicles,
+    uniforms,
+    updatedAt: new Date(),
+  }
 
-      home,
-
-      department,
-
-      employees,
-
-      vehicles,
-
-      uniforms,
-
-      updatedAt:
-        new Date(),
-    }
-
-  /*
-   * Save one global Master Roster.
-   *
-   * There is deliberately no userId.
-   */
-  const db =
-    await getMongoDb()
+  const db = await getMongoDb()
 
   await db
     .collection<MainRosterData>(
       "mainRoster",
     )
     .updateOne(
+      { type: "main" },
       {
-        type: "main",
-      },
-      {
-        $set:
-          roster,
+        $set: roster,
       },
       {
         upsert: true,
       },
     )
 
-  const duration =
-    Date.now() -
-    startedAt
-
   return {
     success: true,
-
     counts: {
-      home:
-        home.rows.length,
-
-      department:
-        department.length,
-
-      employees:
-        employees.length,
-
-      vehicles:
-        vehicles.length,
-
-      uniforms:
-        uniforms.length,
+      home: home.rows.length,
+      department: department.length,
+      employees: employees.length,
+      vehicles: vehicles.length,
+      uniforms: uniforms.length,
     },
-
     sheets: {
-      home:
-        homeSheet,
-
-      department:
-        departmentSheet,
-
-      employees:
-        employeeSheet,
-
-      vehicles:
-        vehicleSheet,
-
-      uniforms:
-        uniformSheet,
+      home: config.homeSheet,
+      department: config.departmentSheet,
+      employees: config.employeeSheet,
+      vehicles: config.vehicleSheet,
+      uniforms: config.uniformSheet,
     },
-
-    spreadsheetId,
-
     updatedAt:
       roster.updatedAt.toISOString(),
-
-    duration,
+    duration: Date.now() - startedAt,
   }
 }
 
-/* ─────────────────────────────────────────────
-   Test Google Main Roster Connection
-───────────────────────────────────────────── */
-
 export async function testGoogleMainRosterConnection() {
-  const config =
-    validateGoogleMainRosterConfig()
+  const config = getConfig()
 
-  const {
-    sheets,
-    spreadsheetId,
-  } =
+  const { sheets, spreadsheetId } =
     getGoogleSheetsClient()
 
-  const results: Record<
-    string,
-    {
-      sheet: string
-      rows: number
-      headers: unknown[]
-    }
-  > = {}
+  const metadata =
+    await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields:
+        "spreadsheetId,properties.title,sheets.properties",
+    })
 
-  for (
-    const sheet of mainRosterSheets
-  ) {
-    const sheetName =
-      config.sheets[
-        sheet.id
-      ]
-
-    const rows =
-      await getSheetValues(
-        sheets,
-        spreadsheetId,
-        sheetName,
+  const availableSheets =
+    (metadata.data.sheets ?? [])
+      .map(
+        (sheet) =>
+          sheet.properties?.title ?? "",
       )
+      .filter(Boolean)
 
-    results[sheet.id] = {
-      sheet:
-        sheetName,
+  const requestedSheets = [
+    config.homeSheet,
+    config.departmentSheet,
+    config.employeeSheet,
+    config.vehicleSheet,
+    config.uniformSheet,
+  ]
 
-      rows:
-        rows.length,
+  const missingSheets =
+    requestedSheets.filter(
+      (name) =>
+        !availableSheets.includes(name),
+    )
 
-      headers:
-        rows[0] ?? [],
-    }
+  if (missingSheets.length > 0) {
+    throw new Error(
+      `The Main Roster spreadsheet is missing these tabs: ${missingSheets.join(
+        ", ",
+      )}`,
+    )
   }
 
   return {
     success: true,
-
     spreadsheetId,
-
-    sheets:
-      results,
+    spreadsheetTitle:
+      metadata.data.properties?.title ??
+      "",
+    sheets: requestedSheets,
   }
-}
-
-/* ─────────────────────────────────────────────
-   Get Stored Main Roster
-───────────────────────────────────────────── */
-
-export async function getGoogleMainRoster() {
-  const db =
-    await getMongoDb()
-
-  const roster =
-    await db
-      .collection<MainRosterData>(
-        "mainRoster",
-      )
-      .findOne(
-        {
-          type: "main",
-        },
-        {
-          projection: {
-            _id: 0,
-          },
-        },
-      )
-
-  return roster
 }
