@@ -246,6 +246,122 @@ function getGalleryMediaUrl(media: GalleryMedia) {
   return media.url
 }
 
+function normalizeExternalUrl(value: string): string {
+  const trimmed = value.trim()
+
+  if (!trimmed) return ""
+
+  try {
+    const parsed = new URL(trimmed)
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return trimmed
+    }
+
+    return parsed.toString()
+  } catch {
+    return trimmed
+  }
+}
+
+function getYouTubeVideoId(value: string): string | null {
+  try {
+    const parsed = new URL(value)
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "")
+
+    if (hostname === "youtu.be" || hostname.endsWith(".youtu.be")) {
+      const id = parsed.pathname.split("/").filter(Boolean)[0] ?? ""
+      return /^[A-Za-z0-9_-]{6,}$/.test(id) ? id : null
+    }
+
+    if (
+      hostname === "youtube.com" ||
+      hostname === "m.youtube.com" ||
+      hostname === "music.youtube.com"
+    ) {
+      const watchId = parsed.searchParams.get("v")
+
+      if (watchId && /^[A-Za-z0-9_-]{6,}$/.test(watchId)) {
+        return watchId
+      }
+
+      const pathMatch = parsed.pathname.match(
+        /^\/(?:embed|shorts|live)\/([A-Za-z0-9_-]{6,})/i,
+      )
+
+      return pathMatch?.[1] ?? null
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+function getVimeoVideoId(value: string): string | null {
+  try {
+    const parsed = new URL(value)
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "")
+
+    if (hostname !== "vimeo.com" && !hostname.endsWith(".vimeo.com")) {
+      return null
+    }
+
+    const matches = parsed.pathname.match(/\/(\d+)(?:$|\/)/)
+    return matches?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+function getVideoEmbedUrl(value: string): string | null {
+  const youtubeId = getYouTubeVideoId(value)
+
+  if (youtubeId) {
+    return `https://www.youtube.com/embed/${youtubeId}?rel=0&playsinline=1`
+  }
+
+  const vimeoId = getVimeoVideoId(value)
+
+  if (vimeoId) {
+    return `https://player.vimeo.com/video/${vimeoId}?dnt=1`
+  }
+
+  return null
+}
+
+function getVideoPosterUrl(value: string): string {
+  const youtubeId = getYouTubeVideoId(value)
+  return youtubeId
+    ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`
+    : ""
+}
+
+function isEmbeddedVideo(media: GalleryMedia | PendingMedia): boolean {
+  return media.type === "video" && Boolean(getVideoEmbedUrl(media.url))
+}
+
+function getMediaUrlKind(value: string): GalleryMediaType | null {
+  if (getVideoEmbedUrl(value)) return "video"
+
+  try {
+    const parsed = new URL(value)
+    const path = parsed.pathname.toLowerCase()
+
+    if (/\.(?:jpe?g|png|gif|webp|avif|bmp|svg)(?:$|\?)/i.test(path)) {
+      return "image"
+    }
+
+    if (/\.(?:mp4|webm|mov|m4v|avi|mkv|ogv)(?:$|\?)/i.test(path)) {
+      return "video"
+    }
+  } catch {
+    // Fall back to the type selected by the user.
+  }
+
+  return null
+}
+
 function getMediaLabel(type: GalleryMediaType) {
   return type === "image" ? "Image" : "Video"
 }
@@ -613,36 +729,31 @@ export default function Gallery() {
   }
 
   function addExternalUrl() {
-    const url = urlInput.trim()
+    const rawUrl = urlInput.trim()
 
-    if (!url) {
-      toast.error(
-        "Enter a media URL.",
-      )
+    if (!rawUrl) {
+      toast.error("Enter a media URL.")
       return
     }
+
+    const url = normalizeExternalUrl(rawUrl)
 
     try {
       const parsed = new URL(url)
-
-      if (
-        !["http:", "https:"].includes(
-          parsed.protocol,
-        )
-      ) {
-        throw new Error(
-          "Invalid protocol",
-        )
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error("Invalid protocol")
       }
     } catch {
-      toast.error(
-        "Enter a valid HTTP or HTTPS URL.",
-      )
+      toast.error("Enter a valid HTTP or HTTPS URL.")
       return
     }
 
-    const type: GalleryMediaType =
-      urlType
+    // Automatically correct the selected type for known video hosts and
+    // obvious direct-media URLs. This prevents YouTube/Vimeo URLs from ever
+    // being rendered as a normal <video> source.
+    const detectedType = getMediaUrlKind(url)
+    const type: GalleryMediaType = detectedType ?? urlType
+    const embeddedVideo = type === "video" && Boolean(getVideoEmbedUrl(url))
 
     setPendingMedia((current) => [
       ...current,
@@ -652,11 +763,17 @@ export default function Gallery() {
         url,
         thumbnailUrl:
           type === "video"
-            ? thumbnailInput.trim()
+            ? thumbnailInput.trim() || getVideoPosterUrl(url)
             : "",
         source: "url",
       },
     ])
+
+    if (embeddedVideo) {
+      toast.success("Video link added.")
+    } else {
+      toast.success(type === "image" ? "Image URL added." : "Video URL added.")
+    }
 
     setUrlInput("")
     setUrlType("image")
@@ -2212,6 +2329,22 @@ export default function Gallery() {
                                   alt=""
                                   className="h-full w-full object-cover"
                                 />
+                              ) : isEmbeddedVideo(
+                                  media,
+                                ) ? (
+                                <div className="relative h-full w-full overflow-hidden bg-black">
+                                  <iframe
+                                    src={
+                                      getVideoEmbedUrl(
+                                        media.url,
+                                      ) ?? undefined
+                                    }
+                                    title="Video preview"
+                                    className="pointer-events-none h-full w-full border-0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowFullScreen
+                                  />
+                                </div>
                               ) : (
                                 <video
                                   src={
@@ -2219,6 +2352,7 @@ export default function Gallery() {
                                     media.url
                                   }
                                   muted
+                                  playsInline
                                   preload="metadata"
                                   className="h-full w-full object-cover"
                                 />
@@ -2385,11 +2519,27 @@ export default function Gallery() {
                     }
                     className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
                   />
-                ) : viewer.item
-                    .media[
-                    viewer.index
-                  ]
-                    .thumbnailUrl ? (
+                ) : getVideoEmbedUrl(
+                    viewer.item.media[
+                      viewer.index
+                    ].url,
+                  ) ? (
+                  <iframe
+                    src={
+                      getVideoEmbedUrl(
+                        viewer.item.media[
+                          viewer.index
+                        ].url,
+                      ) ?? undefined
+                    }
+                    title={
+                      viewer.item.title
+                    }
+                    className="h-full min-h-[280px] w-full max-w-5xl rounded-xl border-0 shadow-2xl"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                ) : (
                   <video
                     src={
                       viewer.item.media[
@@ -2400,19 +2550,10 @@ export default function Gallery() {
                     poster={
                       viewer.item.media[
                         viewer.index
-                      ]
-                        .thumbnailUrl
+                      ].thumbnailUrl ||
+                      undefined
                     }
-                    className="max-h-full max-w-full rounded-xl shadow-2xl"
-                  />
-                ) : (
-                  <video
-                    src={
-                      viewer.item.media[
-                        viewer.index
-                      ].url
-                    }
-                    controls
+                    playsInline
                     className="max-h-full max-w-full rounded-xl shadow-2xl"
                   />
                 )}
@@ -2546,6 +2687,21 @@ function GalleryMediaTile({
               : "group-hover:scale-[1.02]",
           ].join(" ")}
         />
+      ) : getVideoEmbedUrl(media.url) ? (
+        <div className="relative h-full w-full overflow-hidden bg-black">
+          <iframe
+            src={getVideoEmbedUrl(media.url) ?? undefined}
+            title={title}
+            className={[
+              "pointer-events-none h-full w-full border-0 transition duration-300",
+              overlayCount > 0
+                ? "scale-100 blur-[5px] brightness-75"
+                : "",
+            ].join(" ")}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
       ) : (
         <video
           src={media.url}
@@ -2605,14 +2761,33 @@ function GalleryMediaCard({
   const [ratio, setRatio] =
     useState<number | undefined>()
 
+  const embedUrl =
+    getVideoEmbedUrl(media.url)
+
+  const handleKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    if (
+      event.key === "Enter" ||
+      event.key === " "
+    ) {
+      event.preventDefault()
+      onClick()
+    }
+  }
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className={[
-        "group relative block w-full overflow-hidden bg-muted/40 text-left",
-        getAspectClass(ratio),
+        "group relative block w-full overflow-hidden bg-muted/40 text-left outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50",
+        getAspectClass(
+          embedUrl ? 16 / 9 : ratio,
+        ),
       ].join(" ")}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
       aria-label={`View ${title}`}
     >
       {media.type === "image" ? (
@@ -2640,21 +2815,17 @@ function GalleryMediaCard({
           src={media.thumbnailUrl}
           alt={title}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-          onLoad={(event) => {
-            const image =
-              event.currentTarget
-
-            if (
-              image.naturalHeight >
-              0
-            ) {
-              setRatio(
-                image.naturalWidth /
-                  image.naturalHeight,
-              )
-            }
-          }}
         />
+      ) : embedUrl ? (
+        <div className="relative h-full w-full overflow-hidden bg-black">
+          <iframe
+            src={embedUrl}
+            title={title}
+            className="pointer-events-none h-full w-full border-0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
       ) : (
         <video
           src={media.url}
@@ -2700,7 +2871,7 @@ function GalleryMediaCard({
           View
         </span>
       </div>
-    </button>
+    </div>
   )
 }
 
