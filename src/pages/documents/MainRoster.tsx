@@ -108,16 +108,6 @@ export default function MainRoster() {
   )
 
   const embedUrl = useMemo(() => {
-    if (
-      SHEET_ID ===
-        "YOUR_GOOGLE_SHEET_ID" ||
-      activeTabData.gid.startsWith(
-        "YOUR_",
-      )
-    ) {
-      return ""
-    }
-
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/preview?gid=${activeTabData.gid}`
   }, [activeTabData.gid])
 
