@@ -21,6 +21,9 @@ type Requirement = {
   rankId: string
   rankName: string
   hours: number
+  timeInRankDays: number
+  trainingLogs: number
+  recruitmentLogs: number
 }
 
 type RequirementsResponse = {
@@ -33,8 +36,8 @@ type RequirementsResponse = {
 /*
  * Department rank order.
  *
- * This is the official display order for
- * Department Requirements.
+ * The order here is the official display order used by
+ * Department Requirements and should not depend on MongoDB.
  *
  * rankId   = internal identifier
  * rankName = human-readable name
@@ -116,26 +119,7 @@ const Department_RANKS: Rank[] = [
 
 const DIVISION = "department"
 
-/*
- * Department Requirements use the Activity Requirements
- * API because this page stores required promotion hours.
- *
- * Activity:
- *   /api/requirements/activity/:division
- *
- * Promotion:
- *   /api/requirements/promotion/:division
- *
- * This page uses Activity Requirements and therefore
- * sends/receives `hours`.
- */
-const REQUIREMENTS_ENDPOINT =
-  `/api/requirements/activity/${DIVISION}`
-
-function createEmptyRequirements(): Record<
-  string,
-  Requirement
-> {
+function createEmptyRequirements(): Record<string, Requirement> {
   return Object.fromEntries(
     Department_RANKS.map((rank) => [
       rank.id,
@@ -143,43 +127,63 @@ function createEmptyRequirements(): Record<
         rankId: rank.id,
         rankName: rank.name,
         hours: 0,
+        timeInRankDays: 0,
+        trainingLogs: 0,
+        recruitmentLogs: 0,
       },
     ]),
   )
 }
 
 function normalizeRequirements(
-  loadedRequirements: Record<
-    string,
-    Requirement
-  > = {},
+  loadedRequirements: Record<string, Requirement> = {},
 ): Record<string, Requirement> {
-  const normalized =
-    createEmptyRequirements()
+  const normalized = createEmptyRequirements()
 
   for (const rank of Department_RANKS) {
-    const loaded =
-      loadedRequirements[rank.id]
+    const loaded = loadedRequirements[rank.id]
 
     const hours =
       typeof loaded?.hours === "number" &&
       Number.isFinite(loaded.hours)
-        ? Math.max(
-            0,
-            Math.floor(loaded.hours),
-          )
+        ? Math.max(0, Math.floor(loaded.hours))
+        : 0
+
+    const timeInRankDays =
+      typeof loaded?.timeInRankDays === "number" &&
+      Number.isFinite(loaded.timeInRankDays)
+        ? Math.max(0, Math.floor(loaded.timeInRankDays))
+        : 0
+
+    const trainingLogs =
+      typeof loaded?.trainingLogs === "number" &&
+      Number.isFinite(loaded.trainingLogs)
+        ? Math.max(0, Math.floor(loaded.trainingLogs))
+        : 0
+
+    const recruitmentLogs =
+      typeof loaded?.recruitmentLogs === "number" &&
+      Number.isFinite(loaded.recruitmentLogs)
+        ? Math.max(0, Math.floor(loaded.recruitmentLogs))
         : 0
 
     /*
      * Never trust rankName from MongoDB.
      *
-     * The frontend rank configuration is the
-     * source of truth for the displayed name.
+     * MongoDB may contain older records where:
+     *
+     * rankId   = "officer"
+     * rankName = "officer"
+     *
+     * The frontend always uses the hardcoded rank definition.
      */
     normalized[rank.id] = {
       rankId: rank.id,
       rankName: rank.name,
       hours,
+      timeInRankDays,
+      trainingLogs,
+      recruitmentLogs,
     }
   }
 
@@ -190,9 +194,63 @@ function areRequirementsEqual(
   first: Record<string, Requirement>,
   second: Record<string, Requirement>,
 ) {
+  return JSON.stringify(first) === JSON.stringify(second)
+}
+
+function RequirementInput({
+  label,
+  value,
+  onChange,
+  onIncrease,
+  onDecrease,
+  disabled,
+}: {
+  label: string
+  value: number
+  onChange: (value: string) => void
+  onIncrease: () => void
+  onDecrease: () => void
+  disabled: boolean
+}) {
   return (
-    JSON.stringify(first) ===
-    JSON.stringify(second)
+    <div className="min-w-0">
+      <label className="mb-1.5 block truncate text-xs font-medium text-muted-foreground">
+        {label}
+      </label>
+
+      <div className="flex h-11 overflow-hidden rounded-lg border border-border bg-background">
+        <input
+          type="number"
+          min="0"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
+          className="h-full min-w-0 flex-1 border-0 bg-transparent px-2 text-center text-sm font-semibold text-foreground outline-none focus:bg-muted/30 disabled:cursor-not-allowed disabled:opacity-60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+
+        <div className="flex w-8 shrink-0 flex-col border-l border-border">
+          <button
+            type="button"
+            onClick={onIncrease}
+            disabled={disabled}
+            className="flex h-1/2 items-center justify-center border-b border-border text-muted-foreground transition-colors hover:bg-blue-500/10 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={`Increase ${label}`}
+          >
+            <ChevronUp className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onDecrease}
+            disabled={disabled}
+            className="flex h-1/2 items-center justify-center text-muted-foreground transition-colors hover:bg-blue-500/10 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={`Decrease ${label}`}
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -202,19 +260,15 @@ export default function DepartmentRequirements() {
     [],
   )
 
-  const [
-    requirements,
-    setRequirements,
-  ] = useState<
-    Record<string, Requirement>
-  >(createEmptyRequirements())
+  const [requirements, setRequirements] =
+    useState<Record<string, Requirement>>(
+      createEmptyRequirements(),
+    )
 
-  const [
-    savedRequirements,
-    setSavedRequirements,
-  ] = useState<
-    Record<string, Requirement>
-  >(createEmptyRequirements())
+  const [savedRequirements, setSavedRequirements] =
+    useState<Record<string, Requirement>>(
+      createEmptyRequirements(),
+    )
 
   const [isLoading, setIsLoading] =
     useState(true)
@@ -222,9 +276,6 @@ export default function DepartmentRequirements() {
   const [isSaving, setIsSaving] =
     useState(false)
 
-  /*
-   * Load Department Activity Requirements.
-   */
   useEffect(() => {
     let cancelled = false
 
@@ -233,7 +284,7 @@ export default function DepartmentRequirements() {
         setIsLoading(true)
 
         const response = await fetch(
-          REQUIREMENTS_ENDPOINT,
+          `/api/requirements/activity/${DIVISION}`,
           {
             method: "GET",
             cache: "no-store",
@@ -269,22 +320,18 @@ export default function DepartmentRequirements() {
 
         const loaded =
           data.requirements &&
-          typeof data.requirements ===
-            "object"
+          typeof data.requirements === "object"
             ? data.requirements
             : {}
 
         const normalized =
-          normalizeRequirements(
-            loaded,
-          )
+          normalizeRequirements(loaded)
 
         if (cancelled) {
           return
         }
 
         setRequirements(normalized)
-
         setSavedRequirements({
           ...normalized,
         })
@@ -293,15 +340,12 @@ export default function DepartmentRequirements() {
           return
         }
 
-        toast.error(
-          "Failed to load requirements",
-          {
-            description:
-              err instanceof Error
-                ? err.message
-                : "An unexpected error occurred while loading requirements.",
-          },
-        )
+        toast.error("Failed to load requirements", {
+          description:
+            err instanceof Error
+              ? err.message
+              : "An unexpected error occurred while loading requirements.",
+        })
       } finally {
         if (!cancelled) {
           setIsLoading(false)
@@ -316,20 +360,18 @@ export default function DepartmentRequirements() {
     }
   }, [])
 
-  const hasChanges =
-    !areRequirementsEqual(
-      requirements,
-      savedRequirements,
-    )
+  const hasChanges = !areRequirementsEqual(
+    requirements,
+    savedRequirements,
+  )
 
   function changeHours(
     rankId: string,
     amount: number,
   ) {
-    const rank =
-      rankConfig.find(
-        (item) => item.id === rankId,
-      )
+    const rank = rankConfig.find(
+      (item) => item.id === rankId,
+    )
 
     if (!rank) {
       return
@@ -342,8 +384,8 @@ export default function DepartmentRequirements() {
         rankName: rank.name,
         hours: Math.max(
           0,
-          (current[rankId]?.hours ??
-            0) + amount,
+          (current[rankId]?.hours ?? 0) +
+            amount,
         ),
       },
     }))
@@ -353,10 +395,9 @@ export default function DepartmentRequirements() {
     rankId: string,
     value: string,
   ) {
-    const rank =
-      rankConfig.find(
-        (item) => item.id === rankId,
-      )
+    const rank = rankConfig.find(
+      (item) => item.id === rankId,
+    )
 
     if (!rank) {
       return
@@ -393,6 +434,87 @@ export default function DepartmentRequirements() {
     }))
   }
 
+  function setRequirementValue(
+    rankId: string,
+    field:
+      | "timeInRankDays"
+      | "trainingLogs"
+      | "recruitmentLogs",
+    value: string,
+  ) {
+    const rank = rankConfig.find(
+      (item) => item.id === rankId,
+    )
+
+    if (!rank) {
+      return
+    }
+
+    const parsed = Number.parseInt(value, 10)
+    const nextValue =
+      value === "" || !Number.isFinite(parsed)
+        ? 0
+        : Math.max(0, parsed)
+
+    setRequirements((current) => ({
+      ...current,
+      [rankId]: {
+        ...(current[rankId] ?? {
+          rankId: rank.id,
+          rankName: rank.name,
+          hours: 0,
+          timeInRankDays: 0,
+          trainingLogs: 0,
+          recruitmentLogs: 0,
+        }),
+        rankId: rank.id,
+        rankName: rank.name,
+        [field]: nextValue,
+      },
+    }))
+  }
+
+  function changeRequirementValue(
+    rankId: string,
+    field:
+      | "timeInRankDays"
+      | "trainingLogs"
+      | "recruitmentLogs",
+    amount: number,
+  ) {
+    const rank = rankConfig.find(
+      (item) => item.id === rankId,
+    )
+
+    if (!rank) {
+      return
+    }
+
+    setRequirements((current) => {
+      const existing = current[rankId] ?? {
+        rankId: rank.id,
+        rankName: rank.name,
+        hours: 0,
+        timeInRankDays: 0,
+        trainingLogs: 0,
+        recruitmentLogs: 0,
+      }
+
+      return {
+        ...current,
+        [rankId]: {
+          ...existing,
+          rankId: rank.id,
+          rankName: rank.name,
+          [field]: Math.max(
+            0,
+            Number(existing[field] ?? 0) + amount,
+          ),
+        },
+      }
+    })
+  }
+
   async function handleSave() {
     if (
       isSaving ||
@@ -404,26 +526,21 @@ export default function DepartmentRequirements() {
 
     setIsSaving(true)
 
-    const loadingToast =
-      toast.loading(
-        "Saving requirements...",
-        {
-          description:
-            "Updating Department rank requirements.",
-        },
-      )
+    const loadingToast = toast.loading(
+      "Saving requirements...",
+      {
+        description:
+          "Updating Department rank requirements.",
+      },
+    )
 
     try {
       /*
-       * Always build the payload from the
-       * frontend rank configuration.
+       * Always build the payload from the frontend
+       * rank configuration.
        *
-       * This guarantees:
-       * - rankId is correct
-       * - rankName is correct
-       * - hours is numeric
-       * - old MongoDB rankName values cannot
-       *   overwrite the current rank names
+       * This prevents old MongoDB rankName values
+       * from being written back into the database.
        */
       const normalizedRequirements: Record<
         string,
@@ -431,38 +548,41 @@ export default function DepartmentRequirements() {
       > = {}
 
       for (const rank of rankConfig) {
-        const currentHours =
-          requirements[rank.id]?.hours ??
-          0
+        const current =
+          requirements[rank.id]
 
-        normalizedRequirements[
-          rank.id
-        ] = {
+        normalizedRequirements[rank.id] = {
           rankId: rank.id,
           rankName: rank.name,
           hours: Math.max(
             0,
             Math.floor(
-              Number(currentHours),
+              Number(current?.hours ?? 0),
+            ),
+          ),
+          timeInRankDays: Math.max(
+            0,
+            Math.floor(
+              Number(current?.timeInRankDays ?? 0),
+            ),
+          ),
+          trainingLogs: Math.max(
+            0,
+            Math.floor(
+              Number(current?.trainingLogs ?? 0),
+            ),
+          ),
+          recruitmentLogs: Math.max(
+            0,
+            Math.floor(
+              Number(current?.recruitmentLogs ?? 0),
             ),
           ),
         }
       }
 
-      /*
-       * IMPORTANT:
-       *
-       * Department Requirements are Activity
-       * Requirements, so this must use:
-       *
-       * /api/requirements/activity/department
-       *
-       * NOT:
-       *
-       * /api/requirements/promotion/department
-       */
       const response = await fetch(
-        REQUIREMENTS_ENDPOINT,
+        `/api/requirements/activity/${DIVISION}`,
         {
           method: "POST",
           headers: {
@@ -508,14 +628,12 @@ export default function DepartmentRequirements() {
       }
 
       /*
-       * Normalize the response again so the UI
-       * never displays invalid rank names or
-       * invalid hour values.
+       * Normalize the response again so the UI never
+       * displays a bad rankName returned from MongoDB.
        */
       const savedData =
         data.requirements &&
-        typeof data.requirements ===
-          "object"
+        typeof data.requirements === "object"
           ? data.requirements
           : normalizedRequirements
 
@@ -524,9 +642,7 @@ export default function DepartmentRequirements() {
           savedData,
         )
 
-      setRequirements(
-        normalizedSaved,
-      )
+      setRequirements(normalizedSaved)
 
       setSavedRequirements({
         ...normalizedSaved,
@@ -541,26 +657,20 @@ export default function DepartmentRequirements() {
         },
       )
     } catch (err) {
-      toast.error(
-        "Failed to save requirements",
-        {
-          id: loadingToast,
-          description:
-            err instanceof Error
-              ? err.message
-              : "An unexpected error occurred while saving requirements.",
-        },
-      )
+      toast.error("Failed to save requirements", {
+        id: loadingToast,
+        description:
+          err instanceof Error
+            ? err.message
+            : "An unexpected error occurred while saving requirements.",
+      })
     } finally {
       setIsSaving(false)
     }
   }
 
   function handleReset() {
-    if (
-      !hasChanges ||
-      isSaving
-    ) {
+    if (!hasChanges || isSaving) {
       return
     }
 
@@ -608,8 +718,8 @@ export default function DepartmentRequirements() {
               </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Configure the required promotion
-                hours for each Department rank.
+                Configure the required promotion hours
+                for each Department rank.
               </p>
             </div>
           </div>
@@ -663,12 +773,11 @@ export default function DepartmentRequirements() {
 
                   <div>
                     <h2 className="text-base font-semibold">
-                      Required Promotion Hours
+                      Department Promotion Requirements
                     </h2>
 
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Set the minimum hours required
-                      for each rank.
+                      Configure hours, time in rank, and FTD log requirements for each rank.
                     </p>
                   </div>
                 </div>
@@ -682,183 +791,106 @@ export default function DepartmentRequirements() {
               </div>
 
               <div>
-                {rankConfig.map(
-                  (rank, index) => {
-                    const hours =
-                      requirements[
-                        rank.id
-                      ]?.hours ?? 0
+                {rankConfig.map((rank, index) => {
+                  const requirement =
+                    requirements[rank.id] ??
+                    createEmptyRequirements()[rank.id]
 
-                    return (
-                      <div
-                        key={rank.id}
-                        className={`
-                          flex
-                          min-h-[78px]
-                          items-center
-                          justify-between
-                          gap-6
-                          px-6
-                          py-4
-                          transition-colors
-                          hover:bg-muted/20
-                          ${
-                            index !==
-                            rankConfig.length - 1
-                              ? "border-b border-border"
-                              : ""
-                          }
-                        `}
-                      >
-                        <div
-                          className="
-                            flex min-w-0
-                            items-center gap-4
-                          "
-                        >
+                  return (
+                    <div
+                      key={rank.id}
+                      className={`
+                        px-6
+                        py-5
+                        transition-colors
+                        hover:bg-muted/20
+                        ${
+                          index !== rankConfig.length - 1
+                            ? "border-b border-border"
+                            : ""
+                        }
+                      `}
+                    >
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex min-w-0 items-center gap-4">
                           <div
                             className="
-                              flex h-10 w-10
-                              shrink-0
-                              items-center
-                              justify-center
-                              rounded-lg
-                              border
-                              border-blue-500/20
-                              bg-blue-500/10
+                              flex h-10 w-10 shrink-0 items-center justify-center
+                              rounded-lg border border-blue-500/20 bg-blue-500/10
                             "
                           >
                             <Shield className="h-5 w-5 text-blue-500" />
                           </div>
 
                           <div className="min-w-0">
-                            <p
-                              className="
-                                text-base
-                                font-semibold
-                                leading-5
-                              "
-                            >
+                            <p className="text-base font-semibold leading-5">
                               {rank.name}
                             </p>
-
-                            <p
-                              className="
-                                mt-1 text-sm
-                                text-muted-foreground
-                              "
-                            >
-                              Required hours
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Configure all promotion requirements for this rank.
                             </p>
                           </div>
                         </div>
 
-                        <div
-                          className="
-                            flex h-12
-                            shrink-0
-                            overflow-hidden
-                            rounded-lg
-                            border border-border
-                            bg-background
-                          "
-                        >
-                          <input
-                            type="number"
-                            min="0"
-                            value={hours}
-                            onChange={(event) =>
-                              setHours(
-                                rank.id,
-                                event.target.value,
-                              )
-                            }
+                        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-[760px] lg:grid-cols-4">
+                          <RequirementInput
+                            label="Promotion Hours"
+                            value={requirement.hours}
+                            onChange={(value) => setHours(rank.id, value)}
+                            onIncrease={() => changeHours(rank.id, 1)}
+                            onDecrease={() => changeHours(rank.id, -1)}
                             disabled={isSaving}
-                            className="
-                              h-full
-                              w-16
-                              border-0
-                              bg-transparent
-                              px-2
-                              text-center
-                              text-base
-                              font-semibold
-                              text-foreground
-                              outline-none
-                              focus:bg-muted/30
-                              disabled:cursor-not-allowed
-                              disabled:opacity-60
-                              [appearance:textfield]
-                              [&::-webkit-inner-spin-button]:appearance-none
-                              [&::-webkit-outer-spin-button]:appearance-none
-                            "
                           />
 
-                          <div
-                            className="
-                              flex w-9
-                              flex-col
-                              border-l
-                              border-border
-                            "
-                          >
-                            <button
-                              type="button"
-                              onClick={() =>
-                                changeHours(
-                                  rank.id,
-                                  1,
-                                )
-                              }
-                              disabled={isSaving}
-                              className="
-                                flex h-1/2
-                                items-center
-                                justify-center
-                                border-b
-                                border-border
-                                text-muted-foreground
-                                transition-colors
-                                hover:bg-blue-500/10
-                                hover:text-blue-500
-                                disabled:cursor-not-allowed
-                                disabled:opacity-50
-                              "
-                              aria-label={`Increase ${rank.name} hours`}
-                            >
-                              <ChevronUp className="h-4 w-4" />
-                            </button>
+                          <RequirementInput
+                            label="Time in Rank (Days)"
+                            value={requirement.timeInRankDays}
+                            onChange={(value) =>
+                              setRequirementValue(rank.id, "timeInRankDays", value)
+                            }
+                            onIncrease={() =>
+                              changeRequirementValue(rank.id, "timeInRankDays", 1)
+                            }
+                            onDecrease={() =>
+                              changeRequirementValue(rank.id, "timeInRankDays", -1)
+                            }
+                            disabled={isSaving}
+                          />
 
-                            <button
-                              type="button"
-                              onClick={() =>
-                                changeHours(
-                                  rank.id,
-                                  -1,
-                                )
-                              }
-                              disabled={isSaving}
-                              className="
-                                flex h-1/2
-                                items-center
-                                justify-center
-                                text-muted-foreground
-                                transition-colors
-                                hover:bg-blue-500/10
-                                hover:text-blue-500
-                                disabled:cursor-not-allowed
-                                disabled:opacity-50
-                              "
-                              aria-label={`Decrease ${rank.name} hours`}
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </button>
-                          </div>
+                          <RequirementInput
+                            label="Trainings (FTD)"
+                            value={requirement.trainingLogs}
+                            onChange={(value) =>
+                              setRequirementValue(rank.id, "trainingLogs", value)
+                            }
+                            onIncrease={() =>
+                              changeRequirementValue(rank.id, "trainingLogs", 1)
+                            }
+                            onDecrease={() =>
+                              changeRequirementValue(rank.id, "trainingLogs", -1)
+                            }
+                            disabled={isSaving}
+                          />
+
+                          <RequirementInput
+                            label="Recruitments / Ridealongs (FTD)"
+                            value={requirement.recruitmentLogs}
+                            onChange={(value) =>
+                              setRequirementValue(rank.id, "recruitmentLogs", value)
+                            }
+                            onIncrease={() =>
+                              changeRequirementValue(rank.id, "recruitmentLogs", 1)
+                            }
+                            onDecrease={() =>
+                              changeRequirementValue(rank.id, "recruitmentLogs", -1)
+                            }
+                            disabled={isSaving}
+                          />
                         </div>
                       </div>
-                    )
-                  },
-                )}
+                    </div>
+                  )
+                })}
               </div>
             </section>
 
