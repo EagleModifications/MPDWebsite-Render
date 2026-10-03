@@ -85,24 +85,27 @@ const DESCRIPTION_PREVIEW_LENGTH =
 function getDescriptionPreview(description: string) {
   const normalized = description.replace(/\r\n/g, "\n")
   const lines = normalized.split("\n")
-  const previewLines: string[] = []
+  const allPreviewLines: string[] = []
 
   for (const line of lines) {
+    // Keep every visual line at a maximum of 35 characters.
+    // Existing newlines are also treated as line breaks.
     if (!line) {
-      previewLines.push("")
-      if (previewLines.length >= DESCRIPTION_MAX_LINES) break
+      allPreviewLines.push("")
       continue
     }
 
     for (let index = 0; index < line.length; index += DESCRIPTION_LINE_LENGTH) {
-      previewLines.push(line.slice(index, index + DESCRIPTION_LINE_LENGTH))
-      if (previewLines.length >= DESCRIPTION_MAX_LINES) break
+      allPreviewLines.push(line.slice(index, index + DESCRIPTION_LINE_LENGTH))
     }
-
-    if (previewLines.length >= DESCRIPTION_MAX_LINES) break
   }
 
-  return previewLines.join("\n")
+  return {
+    preview: allPreviewLines
+      .slice(0, DESCRIPTION_MAX_LINES)
+      .join("\n"),
+    hasMore: allPreviewLines.length > DESCRIPTION_MAX_LINES,
+  }
 }
 
 type DropdownContextValue = {
@@ -1423,16 +1426,24 @@ export default function Gallery() {
 
                                 {item.description && (
                                   <div className="mt-1">
-                                    <p className="whitespace-pre text-xs leading-5 text-muted-foreground">
-                                      {getDescriptionPreview(item.description)}
-                                    </p>
+                                    {(() => {
+                                      const descriptionPreview =
+                                        getDescriptionPreview(item.description)
 
-                                    {item.description.length >
-                                      DESCRIPTION_PREVIEW_LENGTH && (
-                                      <span className="mt-1 inline-block cursor-pointer rounded px-1 text-[11px] font-medium text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-400 hover:underline">
-                                        Show more...
-                                      </span>
-                                    )}
+                                      return (
+                                        <>
+                                          <p className="whitespace-pre text-xs leading-5 text-muted-foreground">
+                                            {descriptionPreview.preview}
+                                          </p>
+
+                                          {descriptionPreview.hasMore && (
+                                            <span className="mt-1 inline-block cursor-pointer rounded px-1 text-[11px] font-medium text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-400 hover:underline">
+                                              Show more...
+                                            </span>
+                                          )}
+                                        </>
+                                      )
+                                    })()}
                                   </div>
                                 )}
 
