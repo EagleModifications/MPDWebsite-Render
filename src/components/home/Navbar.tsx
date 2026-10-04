@@ -61,22 +61,22 @@ const rosterItems: NavItem[] = [
   {
     name: "SWAT Roster",
     href: "/documents/rosters/swat-rosters",
-    permission: "swatdocs",
+    permission: "documents",
   },
   {
     name: "MCD Roster",
     href: "/documents/rosters/mcd-rosters",
-    permission: "mcddocs",
+    permission: "documents",
   },
   {
     name: "TRU Roster",
     href: "/documents/rosters/tru-rosters",
-    permission: "trudocs",
+    permission: "documents",
   },
   {
     name: "FTD Roster",
     href: "/documents/rosters/ftd-rosters",
-    permission: "ftddocs",
+    permission: "documents",
   },
 ]
 
@@ -89,22 +89,22 @@ const sopItems: NavItem[] = [
   {
     name: "SWAT SOPs",
     href: "/documents/sops/swat-sops",
-    permission: "swatdocs",
+    permission: "documents",
   },
   {
     name: "MCD SOPs",
     href: "/documents/sops/mcd-sops",
-    permission: "mcddocs",
+    permission: "documents",
   },
   {
     name: "TRU SOPs",
     href: "/documents/sops/tru-sops",
-    permission: "trudocs",
+    permission: "documents",
   },
   {
     name: "FTD SOPs",
     href: "/documents/sops/ftd-sops",
-    permission: "ftddocs",
+    permission: "documents",
   },
   {
     name: "Global SOPs",
@@ -117,17 +117,17 @@ const commandItems: NavItem[] = [
   {
     name: "Command SOPs",
     href: "/documents/command/sops",
-    permission: "commanddocs",
+    permission: "commanddocuments",
   },
   {
     name: "Command Roster",
     href: "/documents/command/roster",
-    permission: "commanddocs",
+    permission: "commanddocuments",
   },
   {
     name: "Command Guidelines",
     href: "/documents/command/guidelines",
-    permission: "commanddocs",
+    permission: "commanddocuments",
   },
 ]
 
