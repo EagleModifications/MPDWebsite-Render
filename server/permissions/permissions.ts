@@ -158,7 +158,7 @@ export function getSuperAdminDiscordIds(): string[] {
   return readAdminConfig().superAdminDiscordIds
 }
 
-export function getProtectedAdminUrls(): string[] {
+export function getProtectedPageUrls(): string[] {
   return readAdminConfig().protectedUrls
 }
 
@@ -413,16 +413,16 @@ function urlMatches(url: string, allowedUrl: string): boolean {
   )
 }
 
-export async function canAccessUrl(
+export async function canAccessPage(
   user: AuthUser,
   url: string,
 ): Promise<boolean> {
   if (user.permissions.includes("*")) return true
   if (url === "/") return true
 
-  const protectedAdminUrls = getProtectedAdminUrls()
+  const protectedPageUrls = getProtectedPageUrls()
 
-  if (protectedAdminUrls.some((allowed) => urlMatches(url, allowed))) {
+  if (protectedPageUrls.some((allowed) => urlMatches(url, allowed))) {
     return user.permissions.includes(PERMISSION_ADMIN)
   }
 
