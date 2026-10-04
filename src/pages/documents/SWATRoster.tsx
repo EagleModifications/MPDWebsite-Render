@@ -33,44 +33,44 @@ type Tab = {
  * the normal Google Sheets document URL.
  */
 const PUBLISHED_SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSgvtHyaCuv1K75Ru4pMhzduZxW_qdfTH8NsE-CwVna9qkL5Qe6FJEBzBinKXG5k2W67g7qdqbdL8IB/pubhtml"
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDo_yVusgQRYUpyDhfNnkBrJXPaNXAbSYvfndxC14IcKjVp9-8wDnOCb8_AGCsgRYLNeXyWzgimNuL/pubhtml"
 
 const tabs: Tab[] = [
   {
     id: "swat-home",
     label: "SWAT | Home",
     icon: Home,
-    gid: "156262505",
+    gid: "1932029060",
   },
   {
     id: "swat-roster",
     label: "SWAT | Master Roster",
     icon: Users,
-    gid: "437600097",
+    gid: "1093680513",
   },
   {
     id: "swat-vehicles",
     label: "SWAT | Vehicle Guidelines",
     icon: Car,
-    gid: "76203571",
+    gid: "1772848021",
   },
   {
     id: "swat-uniforms",
     label: "SWAT | Uniform Guidelines",
     icon: Shirt,
-    gid: "1493287950",
+    gid: "1693514661",
   },
   {
     id: "mtf7-roster",
     label: "MTF-7 | Master Roster",
     icon: Users,
-    gid: "921453366",
+    gid: "1598052317",
   },
   {
     id: "swat-activity",
     label: "SWAT | Activity & Promotion Guidelines",
     icon: Activity,
-    gid: "1307956519",
+    gid: "1693514661",
   },
 ]
 
@@ -109,7 +109,7 @@ export default function MainRoster() {
       <Navbar />
 
       <main className="relative min-h-screen pt-20">
-        <div className="relative mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-7">
+        <div className="relative mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-7">
           {/* Header */}
           <div className="mb-5">
             <div className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-500">
@@ -130,21 +130,19 @@ export default function MainRoster() {
 
           {/* Tabs */}
           <div className="mb-5 overflow-x-auto rounded-xl border border-border/70 bg-card/70 p-1 backdrop-blur">
-            <div className="flex min-w-max items-center gap-1">
+            <div className="flex min-w-max items-center gap-1 lg:min-w-0">
               {tabs.map((tab) => {
                 const Icon = tab.icon
-                const active =
-                  activeTab === tab.id
+                const active = activeTab === tab.id
 
                 return (
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() =>
-                      changeTab(tab.id)
-                    }
+                    onClick={() => changeTab(tab.id)}
                     className={[
-                      "inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors",
+                      "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition-colors",
+                      "lg:flex-1",
                       active
                         ? "bg-blue-500/10 text-blue-500"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
