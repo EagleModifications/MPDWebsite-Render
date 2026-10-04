@@ -51,36 +51,61 @@ const navItems: NavItem[] = [
 
 const rosterItems: NavItem[] = [
   {
-    name: "Main Roster",
-    href: "/documents/rosters/mainroster",
+    name: "Metro Roster",
+    href: "/documents/rosters/metro-roster",
     permission: "documents",
   },
   {
     name: "SWAT Roster",
-    href: "/documents/rosters/swatroster",
+    href: "/documents/rosters/swat-roster",
     permission: "documents",
   },
   {
     name: "MCD Roster",
-    href: "/documents/rosters/mcdroster",
+    href: "/documents/rosters/mcd-roster",
     permission: "documents",
   },
   {
     name: "TRU Roster",
-    href: "/documents/rosters/truroster",
+    href: "/documents/rosters/tru-roster",
     permission: "documents",
   },
   {
     name: "FTD Roster",
-    href: "/documents/rosters/ftdroster",
+    href: "/documents/rosters/ftd-roster",
     permission: "documents",
   },
 ]
 
 const sopItems: NavItem[] = [
   {
-    name: "Global SOP",
-    href: "/documents/sops/globalsop",
+    name: "Metro SOPs",
+    href: "/documents/sops/metro-sops",
+    permission: "documents",
+  },
+  {
+    name: "SWAT SOPs",
+    href: "/documents/sops/swat-sops",
+    permission: "documents",
+  },
+  {
+    name: "MCD SOPs",
+    href: "/documents/sops/mcd-sops",
+    permission: "documents",
+  },
+  {
+    name: "TRU SOPs",
+    href: "/documents/sops/tru-sops",
+    permission: "documents",
+  },
+  {
+    name: "FTD SOPs",
+    href: "/documents/sops/ftd-sops",
+    permission: "documents",
+  },
+  {
+    name: "Global SOPs",
+    href: "/documents/sops/global-sops",
     permission: "documents",
   },
 ]
