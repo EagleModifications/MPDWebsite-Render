@@ -21,8 +21,7 @@ import {
   setSessionCookie,
 } from "./auth/session"
 
-import { canAccessPage, hasPermission, isPageProtected } from "./permissions/permissions"
-import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
+import { hasPermission } from "./permissions/permissions"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
@@ -497,14 +496,6 @@ function cleanGalleryString(
     : ""
 }
 
-function extractGalleryStorageId(value: string) {
-  const match = value.match(
-    /\/api\/gallery\/file\/([a-f0-9]{24})(?:[/?#]|$)/i,
-  )
-
-  return match?.[1] ?? ""
-}
-
 function normalizeGalleryMedia(
   value: unknown,
 ): GalleryMedia[] {
@@ -536,17 +527,10 @@ function normalizeGalleryMedia(
           ? "upload"
           : "url"
 
-      const explicitStorageId =
+      const storageId =
         cleanGalleryString(
           item.storageId,
         )
-
-      // Older gallery documents may already point at a GridFS file but
-      // were saved before storageId was persisted separately. Recover the
-      // ID from the media URL so those files continue to use GridFS.
-      const storageId =
-        explicitStorageId ||
-        extractGalleryStorageId(url)
 
       return {
         id:
@@ -589,24 +573,20 @@ function getGalleryMedia(
     isGalleryMediaType(item.type) &&
     cleanGalleryString(item.url)
   ) {
-    const url = cleanGalleryString(item.url)
-    const storageId = extractGalleryStorageId(url)
-
     return [
       {
         id:
           item._id?.toString() ||
           randomUUID(),
         type: item.type,
-        url,
+        url: cleanGalleryString(
+          item.url,
+        ),
         thumbnailUrl:
           cleanGalleryString(
             item.thumbnailUrl,
           ),
-        source: storageId ? "upload" : "url",
-        ...(storageId
-          ? { storageId }
-          : {}),
+        source: "url",
       },
     ]
   }
@@ -622,6 +602,22 @@ const APP_ORIGIN =
 function getGalleryPublicMediaUrl(
   media: GalleryMedia,
 ) {
+  const originalUrl = cleanGalleryString(media.url)
+
+  // IMPORTANT: keep an existing media URL when one is already present.
+  // Older gallery records can contain a storageId that predates the
+  // current GridFS bucket. Replacing a perfectly usable legacy URL with
+  // /api/gallery/file/<old-id> makes those images appear broken.
+  if (originalUrl) {
+    if (originalUrl.startsWith("/")) {
+      return APP_ORIGIN
+        ? `${APP_ORIGIN}${originalUrl}`
+        : originalUrl
+    }
+
+    return originalUrl
+  }
+
   if (media.storageId) {
     const path =
       `/api/gallery/file/${media.storageId}`
@@ -631,13 +627,7 @@ function getGalleryPublicMediaUrl(
       : path
   }
 
-  if (media.url.startsWith("/")) {
-    return APP_ORIGIN
-      ? `${APP_ORIGIN}${media.url}`
-      : media.url
-  }
-
-  return media.url
+  return ""
 }
 
 function serializeGalleryItem(
@@ -649,15 +639,31 @@ function serializeGalleryItem(
     description: item.description,
     category: item.category ?? "Community",
     tags: normalizeGalleryTags(item.tags),
-    media: getGalleryMedia(item).map((media) => ({
-      ...media,
-      url: getGalleryPublicMediaUrl(media),
-      thumbnailUrl: media.thumbnailUrl?.startsWith("/")
-        ? APP_ORIGIN
-          ? `${APP_ORIGIN}${media.thumbnailUrl}`
-          : media.thumbnailUrl
-        : media.thumbnailUrl,
-    })),
+    media: getGalleryMedia(item).map((media) => {
+      const publicUrl = getGalleryPublicMediaUrl(media)
+      const originalUrl = cleanGalleryString(media.url)
+
+      return {
+        ...media,
+        url: publicUrl,
+        // Give the frontend a second chance to use the original URL if an
+        // old GridFS reference is broken. This is intentionally only sent
+        // when the URLs are different.
+        fallbackUrl:
+          originalUrl && originalUrl !== publicUrl
+            ? originalUrl.startsWith("/")
+              ? APP_ORIGIN
+                ? `${APP_ORIGIN}${originalUrl}`
+                : originalUrl
+              : originalUrl
+            : undefined,
+        thumbnailUrl: media.thumbnailUrl?.startsWith("/")
+          ? APP_ORIGIN
+            ? `${APP_ORIGIN}${media.thumbnailUrl}`
+            : media.thumbnailUrl
+          : media.thumbnailUrl,
+      }
+    }),
     createdBy: item.createdBy,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
@@ -4321,10 +4327,6 @@ export function createApp() {
   // Main Roster Google Sheets API routes.
   registerMainRosterRoutes(app)
 
-  // Permission administration routes.
-  // These are protected by the permissionadmin permission.
-  registerPermissionAdminRoutes(app)
-
   app.get("/health", (_req, res) => {
     res.status(200).json({
       ok: true,
@@ -4432,142 +4434,46 @@ export function createApp() {
   app.get(
     "/api/auth/check",
     async (req, res) => {
+      const user =
+        await getRequestUser(req)
+
+      if (!user) {
+        return res
+          .status(401)
+          .json({
+            error:
+              "Unauthorized",
+          })
+      }
+
       const permission =
-        typeof req.query.permission === "string"
+        typeof req.query
+          .permission ===
+        "string"
           ? req.query.permission
           : null
 
-      const url =
-        typeof req.query.url === "string"
-          ? req.query.url
-          : null
-
-      if (!permission && !url) {
-        return res.status(400).json({
-          allowed: false,
-          error:
-            "A permission or url query parameter is required.",
-        })
-      }
-
-      /*
-       * ----------------------------------------------------------
-       * DIRECT PERMISSION CHECK
-       * ----------------------------------------------------------
-       *
-       * This endpoint is explicitly asking whether the current
-       * session has a permission. Authentication is therefore
-       * required here.
-       */
-      if (permission) {
-        const user =
-          await getRequestUser(req)
-
-        if (!user) {
-          return res.status(401).json({
-            allowed: false,
-            error: "Unauthorized",
-          })
-        }
-
-        if (!hasPermission(user, permission)) {
-          return res.status(403).json({
-            allowed: false,
-            error: "Forbidden",
-          })
-        }
-
-        return res.json({
-          allowed: true,
-          protected: true,
+      if (
+        permission &&
+        !hasPermission(
           user,
-        })
+          permission,
+        )
+      ) {
+        return res
+          .status(403)
+          .json({
+            error:
+              "Forbidden",
+          })
       }
 
-      /*
-       * ----------------------------------------------------------
-       * FRONTEND PAGE CHECK
-       * ----------------------------------------------------------
-       *
-       * protectedUrls in config/admin_permissions.json is the
-       * ONLY master switch for frontend route protection.
-       *
-       * CRITICAL:
-       *
-       * We determine whether the URL is protected BEFORE
-       * calling getRequestUser().
-       *
-       * This means:
-       *
-       *   /                    -> public
-       *   /events              -> public
-       *   /gallery             -> public
-       *   protected URL        -> authentication required
-       *
-       * A public page therefore never receives a 401 simply
-       * because the visitor is not logged in.
-       */
-      if (url) {
-        const protectedPage =
-          await isPageProtected(url)
-
-        /*
-         * PUBLIC PAGE
-         */
-        if (!protectedPage) {
-          return res.json({
-            allowed: true,
-            protected: false,
-            user: null,
-          })
-        }
-
-        /*
-         * PROTECTED PAGE
-         *
-         * Authentication is only checked after we know the URL
-         * is in protectedUrls.
-         */
-        const user =
-          await getRequestUser(req)
-
-        if (!user) {
-          return res.status(401).json({
-            allowed: false,
-            protected: true,
-            error: "Unauthorized",
-          })
-        }
-
-        /*
-         * The user is authenticated, but still needs the
-         * matching MongoDB web permission.
-         */
-        if (
-          !(await canAccessPage(user, url))
-        ) {
-          return res.status(403).json({
-            allowed: false,
-            protected: true,
-            error: "Forbidden",
-          })
-        }
-
-        return res.json({
-          allowed: true,
-          protected: true,
-          user,
-        })
-      }
-
-      return res.status(400).json({
-        allowed: false,
-        error:
-          "A permission or url query parameter is required.",
+      return res.json({
+        allowed: true,
+        user,
       })
     },
   )
-
 
   /* ─────────────────────────────────────────
      Manual Roster Import
