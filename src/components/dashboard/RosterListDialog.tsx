@@ -17,13 +17,22 @@ export type RosterListMember = {
 type ListScope = "global" | "user"
 type ListDivision = "department" | "swat" | "mtf7" | "mcd" | "tru" | "teu" | "sar"
 
+type SavedListMember = {
+  userId: string
+  name: string
+  callsign: string
+  badgeNumber: string
+  rank: string
+  strike?: number
+}
+
 type SavedList = {
   id: string
   week: string
   scope: ListScope
   ownerUserId: string
   selectedUserIds: string[]
-  selectedUsers: RosterListMember[]
+  selectedUsers: SavedListMember[]
   createdByName: string
   createdAt: string
 }
