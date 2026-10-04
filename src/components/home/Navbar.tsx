@@ -52,27 +52,27 @@ const navItems: NavItem[] = [
 const rosterItems: NavItem[] = [
   {
     name: "Metro Roster",
-    href: "/documents/rosters/metro-roster",
+    href: "/documents/rosters/metro-rosters",
     permission: "documents",
   },
   {
     name: "SWAT Roster",
-    href: "/documents/rosters/swat-roster",
+    href: "/documents/rosters/swat-rosters",
     permission: "documents",
   },
   {
     name: "MCD Roster",
-    href: "/documents/rosters/mcd-roster",
+    href: "/documents/rosters/mcd-rosters",
     permission: "documents",
   },
   {
     name: "TRU Roster",
-    href: "/documents/rosters/tru-roster",
+    href: "/documents/rosters/tru-rosters",
     permission: "documents",
   },
   {
     name: "FTD Roster",
-    href: "/documents/rosters/ftd-roster",
+    href: "/documents/rosters/ftd-rosters",
     permission: "documents",
   },
 ]
