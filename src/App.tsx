@@ -270,14 +270,8 @@ export default function App() {
 
         <Route
           path="*"
-          element={
-            <Navigate
-              to="/"
-              replace
-            />
-          }
+          element={<NotFound />}
         />
-      </Routes>
 
       {/* Global notifications */}
 
