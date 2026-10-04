@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
 import {
-  ChevronDown,
-  ChevronUp,
   Plus,
   RotateCcw,
   Save,
