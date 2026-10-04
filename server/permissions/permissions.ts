@@ -407,30 +407,108 @@ export function hasPermission(
 }
 
 function urlMatches(url: string, allowedUrl: string): boolean {
+  const requestedPath =
+    clean(url).split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/"
+
+  const configuredPath =
+    clean(allowedUrl).split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/"
+
   return (
-    url === allowedUrl ||
-    url.startsWith(`${allowedUrl}/`)
+    requestedPath === configuredPath ||
+    requestedPath.startsWith(`${configuredPath}/`)
   )
 }
 
-export async function canAccessPage(
-  user: AuthUser,
-  url: string,
-): Promise<boolean> {
-  if (user.permissions.includes("*")) return true
-  if (url === "/") return true
+export const PERMISSION_ADMIN_URL = "/dashboard/admin/permissions"
 
+/**
+ * Returns true ONLY when the requested frontend URL is explicitly listed in
+ * config/admin_permissions.json.
+ *
+ * Mongo permission definitions do NOT automatically make a page protected.
+ * This is intentional: the JSON file is the master switch for which browser
+ * routes use the web-permission system.
+ */
+export function isConfiguredProtectedUrl(url: string): boolean {
   const protectedPageUrls = getProtectedPageUrls()
 
-  if (protectedPageUrls.some((allowed) => urlMatches(url, allowed))) {
-    return user.permissions.includes(PERMISSION_ADMIN)
+  return protectedPageUrls.some((configuredUrl) =>
+    urlMatches(url, configuredUrl),
+  )
+}
+
+/**
+ * Returns the MongoDB web permissions that apply to a configured protected
+ * URL. A URL can be covered by more than one permission definition.
+ */
+export async function getPagePermissions(
+  url: string,
+): Promise<PermissionDefinition[]> {
+  if (!isConfiguredProtectedUrl(url)) {
+    return []
   }
 
   const definitions = await getPermissionDefinitions()
 
-  return definitions.some(
-    (definition) =>
-      user.permissions.includes(definition.key) &&
-      definition.urls.some((allowed) => urlMatches(url, allowed)),
+  return definitions.filter((definition) =>
+    definition.urls.some((configuredUrl) =>
+      urlMatches(url, configuredUrl),
+    ),
+  )
+}
+
+/**
+ * Frontend page protection is driven exclusively by protectedUrls.
+ *
+ * - URL not in protectedUrls -> public, no login required.
+ * - URL in protectedUrls -> authentication + matching web permission.
+ * - Super Admin -> bypass.
+ *
+ * The Permissions administration page is not silently special-cased here.
+ * If it should be protected, put it in protectedUrls. When it is listed,
+ * permissionadmin is accepted as its required system permission.
+ */
+export async function isPageProtected(url: string): Promise<boolean> {
+  return isConfiguredProtectedUrl(url)
+}
+
+/**
+ * Checks access to a frontend page.
+ *
+ * IMPORTANT:
+ * protectedUrls decides whether a page is protected at all.
+ * MongoDB definitions decide which permission(s) can open that page.
+ *
+ * A protected URL with no matching Mongo permission is denied rather than
+ * accidentally becoming public. This is an intentional fail-closed rule.
+ */
+export async function canAccessPage(
+  user: AuthUser,
+  url: string,
+): Promise<boolean> {
+  if (!isConfiguredProtectedUrl(url)) {
+    return true
+  }
+
+  if (hasPermission(user, "*")) {
+    return true
+  }
+
+  /*
+   * The admin permissions page uses the system permission. Admin ranks in
+   * admin_permissions.json automatically receive permissionadmin.
+   */
+  if (urlMatches(url, PERMISSION_ADMIN_URL)) {
+    return hasPermission(user, PERMISSION_ADMIN)
+  }
+
+  const definitions = await getPagePermissions(url)
+
+  if (definitions.length === 0) {
+    return false
+  }
+
+  return definitions.some((definition) =>
+    hasPermission(user, definition.key),
   )
 }
