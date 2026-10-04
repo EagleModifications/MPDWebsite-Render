@@ -497,6 +497,14 @@ function cleanGalleryString(
     : ""
 }
 
+function extractGalleryStorageId(value: string) {
+  const match = value.match(
+    /\/api\/gallery\/file\/([a-f0-9]{24})(?:[/?#]|$)/i,
+  )
+
+  return match?.[1] ?? ""
+}
+
 function normalizeGalleryMedia(
   value: unknown,
 ): GalleryMedia[] {
@@ -528,10 +536,17 @@ function normalizeGalleryMedia(
           ? "upload"
           : "url"
 
-      const storageId =
+      const explicitStorageId =
         cleanGalleryString(
           item.storageId,
         )
+
+      // Older gallery documents may already point at a GridFS file but
+      // were saved before storageId was persisted separately. Recover the
+      // ID from the media URL so those files continue to use GridFS.
+      const storageId =
+        explicitStorageId ||
+        extractGalleryStorageId(url)
 
       return {
         id:
@@ -574,20 +589,24 @@ function getGalleryMedia(
     isGalleryMediaType(item.type) &&
     cleanGalleryString(item.url)
   ) {
+    const url = cleanGalleryString(item.url)
+    const storageId = extractGalleryStorageId(url)
+
     return [
       {
         id:
           item._id?.toString() ||
           randomUUID(),
         type: item.type,
-        url: cleanGalleryString(
-          item.url,
-        ),
+        url,
         thumbnailUrl:
           cleanGalleryString(
             item.thumbnailUrl,
           ),
-        source: "url",
+        source: storageId ? "upload" : "url",
+        ...(storageId
+          ? { storageId }
+          : {}),
       },
     ]
   }
