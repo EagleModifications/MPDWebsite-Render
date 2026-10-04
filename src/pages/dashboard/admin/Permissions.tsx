@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom"
 import {
   CheckCircle2,
   ChevronDown,
+  Copy,
   Pencil,
   Plus,
   RotateCcw,
@@ -426,6 +427,34 @@ export default function Permissions() {
       description: permission.description,
       urls: permission.urls.length ? [...permission.urls] : [""],
     })
+  }
+
+  function duplicatePermission(permission: Permission) {
+    const existingKeys = new Set(
+      permissions.map((item) => item.key.trim().toLowerCase()),
+    )
+
+    const baseKey = `${permission.key.trim().toLowerCase()}-copy`
+    let duplicateKey = baseKey
+    let number = 2
+
+    while (existingKeys.has(duplicateKey)) {
+      duplicateKey = `${baseKey}-${number}`
+      number += 1
+    }
+
+    setModalKind("permission")
+    setModalMode("create")
+    setEditingPermissionKey(null)
+
+    setPermissionDraft({
+      key: duplicateKey,
+      name: `${permission.name || permission.key} Copy`,
+      description: permission.description,
+      urls: permission.urls.length ? [...permission.urls] : [""],
+    })
+
+    toast.success(`Prepared a copy as ${duplicateKey}.`)
   }
 
   function openCreateRank() {
@@ -978,6 +1007,17 @@ export default function Permissions() {
                       >
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => duplicatePermission(permission)}
+                        aria-label={`Duplicate ${permission.name || permission.key}`}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy
                       </Button>
 
                       <Button
