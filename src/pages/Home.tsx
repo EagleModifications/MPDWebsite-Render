@@ -650,23 +650,12 @@ const ambientDots: AmbientDot[] = [
 ]
 
 const galleryTagClasses: Record<GalleryTag, string> = {
-  Dept:
-    "border-blue-500/35 bg-blue-500/10 text-blue-700 dark:border-blue-400/40 dark:bg-blue-500/20 dark:text-blue-300",
-
-  SWAT:
-    "border-slate-500/40 bg-slate-900/10 text-slate-800 dark:border-slate-500/50 dark:bg-slate-800/85 dark:text-slate-100",
-
-  "MTF-7":
-    "border-blue-700/30 bg-blue-700/10 text-blue-800 dark:border-blue-500/40 dark:bg-blue-900/55 dark:text-blue-300",
-
-  MCD:
-    "border-blue-950/40 bg-blue-950/10 text-blue-950 dark:border-blue-900/60 dark:bg-blue-950/75 dark:text-blue-200",
-
-  TRU:
-    "border-yellow-500/35 bg-yellow-500/10 text-yellow-700 dark:border-yellow-400/40 dark:bg-yellow-500/15 dark:text-yellow-300",
-
-  SAR:
-    "border-red-500/35 bg-red-500/10 text-red-700 dark:border-red-400/40 dark:bg-red-500/15 dark:text-red-300",
+  Dept: "!border-blue-500/50 !bg-blue-500/15 !text-blue-700 dark:!border-blue-400/50 dark:!bg-blue-500/25 dark:!text-blue-300",
+  SWAT: "!border-slate-500/60 !bg-slate-900/10 !text-slate-900 dark:!border-slate-400/50 dark:!bg-slate-800 dark:!text-white",
+  "MTF-7": "!border-blue-600/45 !bg-blue-700/10 !text-blue-800 dark:!border-blue-500/50 dark:!bg-blue-900/60 dark:!text-blue-200",
+  MCD: "!border-blue-950/60 !bg-blue-950/15 !text-blue-950 dark:!border-blue-800/70 dark:!bg-blue-950/90 dark:!text-blue-100",
+  TRU: "!border-yellow-500/50 !bg-yellow-500/15 !text-yellow-700 dark:!border-yellow-400/50 dark:!bg-yellow-500/20 dark:!text-yellow-300",
+  SAR: "!border-red-500/50 !bg-red-500/15 !text-red-700 dark:!border-red-400/50 dark:!bg-red-500/20 dark:!text-red-300",
 }
 
 const galleryCategoryClasses: Record<
@@ -1049,11 +1038,11 @@ export default function Home() {
 
         <div className="absolute right-[8%] top-[48%] h-[400px] w-[400px] rounded-full bg-blue-600/[0.018] blur-[140px]" />
 
-        {/* Static star field with subtle twinkling */}
+        {/* Fixed stars — they twinkle/blink but never move */}
         {visibleDots.map((dot, index) => (
           <span
             key={index}
-            className="absolute rounded-full bg-blue-300 animate-mpd-star"
+            className="absolute rounded-full bg-blue-300 mpd-star-twinkle"
             style={
               {
                 left: dot.left,
@@ -1063,7 +1052,7 @@ export default function Home() {
                 opacity: dot.opacity,
                 filter: `blur(${dot.blur})`,
                 animationDelay: dot.delay,
-                animationDuration: `${2.2 + (index % 7) * 0.35}s`,
+                animationDuration: `${2.4 + (index % 6) * 0.45}s`,
               } as React.CSSProperties
             }
           />
@@ -1204,7 +1193,7 @@ export default function Home() {
               Explore
             </span>
 
-            <ChevronDown className="h-5 w-5 animate-mpd-arrow" />
+            <ChevronDown className="h-5 w-5 mpd-arrow-bounce-real" />
           </a>
         </section>
 
@@ -1543,7 +1532,7 @@ export default function Home() {
             (dot, index) => (
               <span
                 key={`cta-dot-${index}`}
-                className="absolute rounded-full bg-blue-300 animate-mpd-star"
+                className="absolute rounded-full bg-blue-300 mpd-star-twinkle"
                 style={
                   {
                     left: dot.left,
@@ -1552,10 +1541,8 @@ export default function Home() {
                     height: dot.size,
                     opacity: dot.opacity * 0.8,
                     filter: `blur(${dot.blur})`,
-                    animationDelay: `${index * 0.43}s`,
+                    animationDelay: `${index * 0.18}s`,
                     animationDuration: `${2.2 + (index % 7) * 0.35}s`,
-                    "--drift-x": dot.driftX,
-                    "--drift-y": dot.driftY,
                   } as React.CSSProperties
                 }
               />
@@ -1608,65 +1595,57 @@ export default function Home() {
       {/* =========================================================== */}
       <style>{`
         /*
-         * Stars stay fixed in place and only twinkle:
-         * - fade gently in and out
-         * - slightly grow/shrink like a real star
-         * - never drift or move across the page
+         * Each star:
+         * - slowly drifts around the page
+         * - fades in/out
+         * - slightly changes scale
+         * - has its own delay + duration
+         *
+         * This makes the field feel randomized instead of
+         * having every dot move at the same time.
          */
         @keyframes mpd-star-twinkle {
-          0%,
-          100% {
-            opacity: 0.16;
+          0%, 100% {
+            opacity: 0.18;
             transform: scale(0.72);
           }
-
-          25% {
-            opacity: 0.32;
+          35% {
+            opacity: 0.45;
             transform: scale(0.9);
           }
-
           50% {
-            opacity: 0.9;
-            transform: scale(1.28);
+            opacity: 1;
+            transform: scale(1.35);
           }
-
-          72% {
-            opacity: 0.4;
-            transform: scale(0.92);
+          65% {
+            opacity: 0.5;
+            transform: scale(0.95);
           }
         }
 
-        .animate-mpd-star {
+        .mpd-star-twinkle {
           animation-name: mpd-star-twinkle;
           animation-timing-function: ease-in-out;
           animation-iteration-count: infinite;
-          will-change: transform, opacity;
+          will-change: opacity, transform;
         }
 
-        @keyframes mpd-arrow-bounce {
-          0%,
-          100% {
+        @keyframes mpd-arrow-bounce-real {
+          0%, 100% {
             transform: translateY(0);
-            opacity: 0.5;
+            opacity: 0.45;
           }
-
           50% {
-            transform: translateY(8px);
+            transform: translateY(10px);
             opacity: 1;
           }
         }
 
-        .animate-mpd-arrow {
-          animation: mpd-arrow-bounce 1.35s ease-in-out infinite;
+        .mpd-arrow-bounce-real {
+          animation: mpd-arrow-bounce-real 1.1s ease-in-out infinite;
           will-change: transform, opacity;
         }
 
-        @media (prefers-reduced-motion: reduce) {
-          .animate-mpd-star,
-          .animate-mpd-arrow {
-            animation: none;
-          }
-        }
       `}</style>
     </div>
   )
