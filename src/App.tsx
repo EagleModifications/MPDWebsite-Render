@@ -37,8 +37,6 @@ import GlobalSOP from "@/pages/documents/GlobalSOP"
 import SupervisorDocs from "@/pages/documents/SupervisorDocs"
 import CommandDocs from "@/pages/documents/CommandDocs"
 
-import APermissions from "@/pages/admin/Permissions"
-
 import Dashboard from "@/pages/dashboard/Dashboard"
 import AdminPermissions from "@/pages/dashboard/admin/Permissions"
 
@@ -270,11 +268,6 @@ export default function App() {
         <Route
           path="/documents/command/command-docs"
           element={<CommandDocs />}
-        />
-
-        <Route
-          path="/admin/permissions"
-          element={<APermissions />}
         />
 
         {/* =================================================
