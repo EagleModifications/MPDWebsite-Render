@@ -23,7 +23,7 @@ import {
 
 import { hasPermission } from "./permissions/permissions"
 import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
-import { registerPromotionActionLogRoutes, logPromotionAction } from "./promotion/actionLogs"
+import { registerPromotionActionLogRoutes } from "./promotion/actionLogs"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
@@ -3716,20 +3716,6 @@ async function handlePromotionImport(
       },
     )
 
-    await logPromotionAction(user, {
-      action: "promotion_import",
-      category: "import",
-      division,
-      target: `${division} promotion data`,
-      description: `Imported promotion points: ${rows.length} rows, ${added} added, ${updated} updated.`,
-      details: {
-        imported: rows.length,
-        added,
-        updated,
-        totalMembers: points.length,
-      },
-    })
-
     return res.json({
       success: true,
 
@@ -4073,22 +4059,6 @@ async function handlePromotionRequirementsSave(
         division,
         requirements,
       )
-
-    await logPromotionAction(user, {
-      action: "promotion_requirements_save",
-      category: "requirements",
-      division,
-      target: `${division} promotion requirements`,
-      description: `Saved promotion requirements for ${Object.keys(requirements).length} ranks.`,
-      details: {
-        rankCount: Object.keys(requirements).length,
-        requirements: Object.values(requirements).map((item) => ({
-          rankId: item.rankId,
-          rankName: item.rankName,
-          points: item.points,
-        })),
-      },
-    })
 
     return res.json({
       success: true,
@@ -5614,14 +5584,6 @@ export function createApp() {
           await syncGoogleRosters(
             userId,
           )
-
-        await logPromotionAction(user, {
-          action: "promotion_roster_refresh",
-          category: "roster",
-          target: "Google roster synchronization",
-          description: "Manually synchronized Google roster data.",
-          details: result as unknown as Record<string, unknown>,
-        })
 
         return res
           .status(200)
