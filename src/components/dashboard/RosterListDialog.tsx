@@ -98,6 +98,9 @@ export default function RosterListDialog({
   const [current, setCurrent] = useState<SavedList[]>([])
   const [history, setHistory] = useState<SavedList[]>([])
   const [preview, setPreview] = useState<PreviewItem[]>([])
+  const [effectiveCurrent, setEffectiveCurrent] = useState<SavedList | null>(null)
+  const [effectivePrevious, setEffectivePrevious] = useState<SavedList | null>(null)
+  const [previewScope, setPreviewScope] = useState<ListScope>("global")
   const [week, setWeek] = useState("")
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -118,7 +121,7 @@ export default function RosterListDialog({
   const load = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/roster-lists/${module}/${division}`, {
+      const response = await fetch(`/api/roster-lists/${module}/${division}?scope=${scope}`, {
         credentials: "include",
         cache: "no-store",
         headers: { Accept: "application/json" },
@@ -132,6 +135,9 @@ export default function RosterListDialog({
       setCurrent(Array.isArray(data.current) ? data.current : [])
       setHistory(Array.isArray(data.history) ? data.history : [])
       setPreview(Array.isArray(data.preview) ? data.preview : [])
+      setEffectiveCurrent(data.effectiveCurrent ?? null)
+      setEffectivePrevious(data.effectivePrevious ?? null)
+      setPreviewScope(data.previewScope === "user" ? "user" : "global")
 
       const own = (Array.isArray(data.current) ? data.current : []).find(
         (item: SavedList) => item.scope === scope,
@@ -161,13 +167,21 @@ export default function RosterListDialog({
 
   useEffect(() => {
     if (!open) return
+    void load()
+    // scope changes must load the matching global/user settings from the server.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope])
+
+  useEffect(() => {
+    if (!open) return
     const own = current.find((item) => item.scope === scope)
-    setSelected(own?.selectedUserIds?.length ? own.selectedUserIds : initialSelectedIds)
+    const fallback = scope === "user" ? current.find((item) => item.scope === "global") : null
+    setSelected(own?.selectedUserIds?.length ? own.selectedUserIds : fallback?.selectedUserIds?.length ? fallback.selectedUserIds : initialSelectedIds)
   }, [scope, open, current, initialSelectedIds])
 
   const savedStrikeMap = useMemo(
-    () => new Map((current.find((item) => item.scope === scope)?.selectedUsers ?? []).map((item) => [item.userId, item.strike])),
-    [current, scope],
+    () => new Map((effectiveCurrent?.selectedUsers ?? []).map((item) => [item.userId, item.strike])),
+    [effectiveCurrent],
   )
 
   const previewMap = useMemo(
@@ -292,7 +306,7 @@ export default function RosterListDialog({
 
     setSaving(true)
     try {
-      const response = await fetch(`/api/roster-lists/${module}/${division}`, {
+      const response = await fetch(`/api/roster-lists/${module}/${division}?scope=${scope}`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -329,7 +343,9 @@ export default function RosterListDialog({
 
   if (!open) return null
 
-  const scopeList = current.find((item) => item.scope === scope)
+  const scopeList = effectiveCurrent
+  const ownScopeList = current.find((item) => item.scope === scope)
+  const usingGlobalFallback = scope === "user" && !ownScopeList && Boolean(effectiveCurrent?.scope === "global")
   const previousWeeks = history.filter((item) => item.week < week)
 
   return (
@@ -376,9 +392,9 @@ export default function RosterListDialog({
                     </div>
                   </div>
                   {scopeList && (
-                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-500">
+                    <div className={`mt-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${usingGlobalFallback ? "border-amber-500/20 bg-amber-500/5 text-amber-500" : "border-blue-500/20 bg-blue-500/5 text-blue-500"}`}>
                       <Check className="h-3.5 w-3.5" />
-                      {scope === "global" ? "A global list already exists this week and can be updated." : "Your user list already exists this week and can be updated."}
+                      {usingGlobalFallback ? "Your user list is missing this week, so the global settings are being used." : scope === "global" ? "Global settings are active for this week." : "Your user settings are active for this week."}
                     </div>
                   )}
                 </div>
@@ -473,7 +489,7 @@ export default function RosterListDialog({
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                       <div>
                         <p className="text-sm font-semibold">Strike preview</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">Members selected in the previous week preview as Activity Strike 2 this week. Future weekly lists continue the progression to Strike 3.</p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{scope === "user" && previewScope === "user" ? "Your user list is used when one exists. If you missed a week, the global list is used automatically. " : "The global list is used for this view. "}Members selected in the previous effective week preview as the next activity strike. Future weekly lists continue the progression to Strike 3.</p>
                       </div>
                     </div>
                   </div>
@@ -484,7 +500,8 @@ export default function RosterListDialog({
                     <CalendarDays className="h-4 w-4 text-blue-500" />
                     <p className="text-sm font-semibold">This week</p>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{scopeList ? `${scopeList.selectedUserIds.length} members are currently saved.` : "No list has been submitted for this scope yet."}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{scopeList ? `${scopeList.selectedUserIds.length} members are currently saved.` : "No list has been submitted for this scope yet."}
+                  {usingGlobalFallback && <span className="mt-1 block text-amber-500">No user list was submitted this week — using the global list.</span>}</p>
                   <Button className="mt-4 w-full" onClick={() => void save()} disabled={saving || loading}>
                     {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                     {scopeList ? `Update ${title}` : `Submit ${title}`}
@@ -496,16 +513,24 @@ export default function RosterListDialog({
                     <Users className="h-4 w-4 text-blue-500" />
                     <p className="text-sm font-semibold">Previous weeks</p>
                   </div>
-                  <div className="mt-3 max-h-56 space-y-2 overflow-y-auto">
-                    {previousWeeks.map((item) => (
-                      <div key={item.id} className="rounded-lg border px-3 py-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium">{item.week}</span>
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase text-muted-foreground">{item.scope}</span>
+                  <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+                    {previousWeeks.map((item) => {
+                      const isGlobal = item.scope === "global"
+                      const isUser = item.scope === "user"
+                      const isEffective = scope === "global" ? isGlobal : item.id === effectivePrevious?.id
+                      return (
+                        <div key={item.id} className={`rounded-xl border p-3 transition-colors ${isEffective ? "border-blue-500/30 bg-blue-500/5" : "bg-muted/5"}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold">{item.week}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${isGlobal ? "border-blue-500/20 bg-blue-500/10 text-blue-500" : "border-purple-500/20 bg-purple-500/10 text-purple-400"}`}>{isGlobal ? "Global" : "User"}</span>
+                              {isEffective && <span className="rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-[10px] font-semibold text-green-500">Used</span>}
+                            </div>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">{item.selectedUserIds.length} selected · {item.createdByName || "Unknown"}</p>
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">{item.selectedUserIds.length} selected · {item.createdByName || "Unknown"}</p>
-                      </div>
-                    ))}
+                      )
+                    })}
                     {!previousWeeks.length && <p className="text-xs text-muted-foreground">No previous lists yet.</p>}
                   </div>
                 </div>
