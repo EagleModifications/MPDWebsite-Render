@@ -21,7 +21,7 @@ import {
   setSessionCookie,
 } from "./auth/session"
 
-import { canAccessUrl, hasPermission } from "./permissions/permissions"
+import { canAccessPage, hasPermission } from "./permissions/permissions"
 import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
@@ -4454,7 +4454,7 @@ export function createApp() {
 
       if (
         url &&
-        !(await canAccessUrl(user, url))
+        !(await canAccessPage(user, url))
       ) {
         return res
           .status(403)
