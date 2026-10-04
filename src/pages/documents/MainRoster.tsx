@@ -242,27 +242,6 @@ function findHeader(sheet: Sheet, definitions: ColumnDefinition[], minimumMatche
   return best
 }
 
-function extractRows(sheet: Sheet, definitions: ColumnDefinition[], minimumMatches = Math.ceil(definitions.length * 0.6)) {
-  const header = findHeader(sheet, definitions, minimumMatches)
-  if (!header) return [] as string[][]
-
-  const result: string[][] = []
-
-  for (let rowIndex = header.row + 1; rowIndex < sheet.rawRows.length; rowIndex += 1) {
-    const source = rowValues(sheet, rowIndex)
-    const selected = header.indexes.map((index) => (index >= 0 ? clean(source[index]) : ""))
-    if (!selected.some(Boolean)) continue
-
-    const normalized = selected.map(normalize)
-    const headerWords = definitions.map(([label]) => normalize(label))
-    if (headerWords.filter((word) => normalized.includes(word)).length >= Math.min(3, definitions.length)) continue
-
-    result.push(selected)
-  }
-
-  return result
-}
-
 function getValue(row: string[], columns: ColumnDefinition[], label: string): string {
   const index = columns.findIndex(([column]) => column === label)
   return index >= 0 ? clean(row[index]) : ""
