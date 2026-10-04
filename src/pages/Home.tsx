@@ -677,7 +677,7 @@ const galleryCategoryClasses: Record<
     "!border-blue-500/50 !bg-blue-500/10 !text-blue-500 dark:!border-blue-400/50 dark:!bg-blue-500/10 dark:!text-blue-400",
 
   Fleet:
-    "!border-yellow-500/50 !bg-yellow-500/10 !text-yellow-500 dark:!border-yellow-500/50 dark:!bg-yellow-500/10 dark:!text-yellow-400",
+    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
 }
 
 function formatEventDate(date: string) {
@@ -1310,7 +1310,7 @@ export default function Home() {
                       {/* Category */}
                       {item.category && (
                         <span
-                          className={`absolute left-4 top-4 rounded-md border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider backdrop-blur-md ${
+                          className={`absolute left-4 top-4 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-md ${
                             galleryCategoryClasses[
                               item.category
                             ]
@@ -1326,7 +1326,7 @@ export default function Home() {
                           {tags.map((tag) => (
                             <span
                               key={tag}
-                              className={`rounded-md border px-2 py-1 text-[9px] font-bold uppercase tracking-wide backdrop-blur-md ${galleryTagClasses[tag]}`}
+                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide backdrop-blur-md ${galleryTagClasses[tag]}`}
                             >
                               {tag}
                             </span>
@@ -1347,7 +1347,7 @@ export default function Home() {
                           {tags.map((tag) => (
                             <span
                               key={`card-${tag}`}
-                              className={`rounded-md border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${galleryTagClasses[tag]}`}
+                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${galleryTagClasses[tag]}`}
                             >
                               {tag}
                             </span>
