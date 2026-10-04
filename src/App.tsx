@@ -28,6 +28,7 @@ import SWATRoster from "@/pages/documents/SWATRoster"
 import MCDRoster from "@/pages/documents/MCDRoster"
 import TRURoster from "@/pages/documents/TRURoster"
 import FTDRoster from "@/pages/documents/FTDRoster"
+import GlobalSOP from "@/pages/documents/GlobalSOP"
 
 import Dashboard from "@/pages/dashboard/Dashboard"
 
@@ -219,6 +220,11 @@ export default function App() {
         <Route
           path="/documents/FTDroster"
           element={<FTDRoster />}
+        />
+
+        <Route
+          path="/documents/globalsop"
+          element={<GlobalSOP />}
         />
 
         {/* =================================================
