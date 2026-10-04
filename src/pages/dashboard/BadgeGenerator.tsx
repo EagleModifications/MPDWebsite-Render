@@ -1,8 +1,8 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
-  type FormEvent,
   type ReactNode,
 } from "react"
 
@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Copy,
   RefreshCw,
-  Search,
   Shield,
   UserRound,
 } from "lucide-react"
@@ -19,11 +18,14 @@ import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   getSession,
   type User,
 } from "@/lib/auth"
+
+/* ═════════════════════════════════════════════
+   TYPES
+═════════════════════════════════════════════ */
 
 type BadgeLines = {
   "1": string
@@ -40,6 +42,8 @@ type BadgeOfficer = {
   discordId: string
   callsign: string
   status: string
+  timeInDept?: string
+  timeInRank?: string
 }
 
 type BadgeData = {
@@ -56,9 +60,14 @@ type BadgeResponse = {
 }
 
 type ApiError = {
+  success?: boolean
   error?: string
   message?: string
 }
+
+/* ═════════════════════════════════════════════
+   SMALL COMPONENTS
+═════════════════════════════════════════════ */
 
 function InfoRow({
   label,
@@ -69,7 +78,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border/60 py-3 last:border-b-0">
-      <span className="text-sm text-muted-foreground">
+      <span className="shrink-0 text-sm text-muted-foreground">
         {label}
       </span>
 
@@ -92,7 +101,7 @@ function ConfigCard({
   return (
     <section className="rounded-xl border border-border bg-card">
       <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
           {icon}
         </div>
 
@@ -128,36 +137,67 @@ function BadgeLine({
   )
 }
 
+/* ═════════════════════════════════════════════
+   PAGE
+═════════════════════════════════════════════ */
+
 export default function BadgeGenerator() {
-  const [user, setUser] = useState<User | null>(null)
-  const [discordId, setDiscordId] = useState("")
+  const [user, setUser] =
+    useState<User | null>(null)
+
   const [badgeData, setBadgeData] =
-    useState<BadgeResponse | null>(null)
+    useState<BadgeResponse | null>(
+      null,
+    )
 
-  const [loading, setLoading] = useState(true)
-  const [searching, setSearching] = useState(false)
+  const [loading, setLoading] =
+    useState(true)
 
-  const loadBadge = useCallback(
-    async (targetDiscordId: string) => {
-      const trimmedDiscordId =
-        targetDiscordId.trim()
+  const [refreshing, setRefreshing] =
+    useState(false)
 
-      if (!trimmedDiscordId) {
-        setBadgeData(null)
-        return
-      }
+  /*
+   * Prevent duplicate initial requests
+   * during React Strict Mode development
+   * mounting.
+   */
+  const initialLoadRef =
+    useRef(false)
 
-      setSearching(true)
+  /* ═════════════════════════════════════════
+     LOAD BADGE
+  ═════════════════════════════════════════ */
+
+  const loadBadge =
+    useCallback(async () => {
+      setRefreshing(true)
 
       try {
-        const response = await fetch(
-          `/api/badges/${encodeURIComponent(
-            trimmedDiscordId,
-          )}`,
-          {
-            credentials: "include",
-          },
-        )
+        /*
+         * The backend gets the Discord ID
+         * directly from the authenticated
+         * mpd_session cookie.
+         *
+         * We therefore do NOT send a
+         * Discord ID from the browser.
+         */
+        const response =
+          await fetch(
+            "/api/badges/me",
+            {
+              method: "GET",
+
+              credentials:
+                "include",
+
+              cache: "no-store",
+
+              headers: {
+                Accept:
+                  "application/json",
+              },
+            },
+          )
 
         const data =
           (await response.json()) as
@@ -166,131 +206,216 @@ export default function BadgeGenerator() {
 
         if (!response.ok) {
           throw new Error(
-            ("error" in data && data.error) ||
-              ("message" in data && data.message) ||
-              "Failed to load badge data.",
+            data &&
+              typeof data ===
+                "object" &&
+              "error" in data &&
+              typeof data.error ===
+                "string"
+              ? data.error
+              : `Failed to load badge (${response.status}).`,
           )
         }
 
-        setBadgeData(data as BadgeResponse)
+        if (
+          !data ||
+          typeof data !==
+            "object" ||
+          !("badge" in data) ||
+          !("officer" in data)
+        ) {
+          throw new Error(
+            "The badge API returned an invalid response.",
+          )
+        }
+
+        setBadgeData(
+          data as BadgeResponse,
+        )
       } catch (error) {
         console.error(
-          "[BadgeGenerator] Failed to load badge:",
+          "[BadgeGenerator] Badge request failed:",
           error,
         )
 
         setBadgeData(null)
 
-        toast.error("Unable to load badge", {
-          description:
-            error instanceof Error
-              ? error.message
-              : "An unexpected error occurred.",
-        })
+        /*
+         * Do not show a toast for a cancelled
+         * component request.
+         */
+        if (
+          error instanceof DOMException &&
+          error.name ===
+            "AbortError"
+        ) {
+          return
+        }
+
+        toast.error(
+          "Unable to load badge",
+          {
+            description:
+              error instanceof Error
+                ? error.message
+                : "An unexpected error occurred.",
+          },
+        )
       } finally {
-        setSearching(false)
+        setRefreshing(false)
       }
-    },
-    [],
-  )
+    }, [])
+
+  /* ═════════════════════════════════════════
+     SESSION + INITIAL BADGE
+  ═════════════════════════════════════════ */
 
   useEffect(() => {
-    let mounted = true
+    let active = true
 
-    const loadSession = async () => {
+    /*
+     * React Strict Mode can run an effect
+     * twice in development. Only perform
+     * the initial badge request once.
+     */
+    if (
+      initialLoadRef.current
+    ) {
+      return () => {
+        active = false
+      }
+    }
+
+    initialLoadRef.current =
+      true
+
+    const load = async () => {
       try {
+        const session =
+          await getSession()
+
+        if (!active) {
+          return
+        }
+
         /*
-         * getSession() returns User | null directly.
+         * getSession() returns User | null.
          *
-         * Do NOT use session.user here.
+         * There is no session.user here.
          */
-        const session = await getSession()
+        setUser(
+          session ?? null,
+        )
 
-        if (!mounted) {
+        if (!session) {
+          setBadgeData(null)
+
+          toast.error(
+            "Unable to load badge",
+            {
+              description:
+                "You are not authenticated.",
+            },
+          )
+
           return
         }
 
-        setUser(session ?? null)
-
-        if (session?.discordId) {
-          setDiscordId(session.discordId)
-
-          await loadBadge(session.discordId)
-        }
+        await loadBadge()
       } catch (error) {
-        if (!mounted) {
-          return
-        }
-
         console.error(
-          "[BadgeGenerator] Failed to load session:",
+          "[BadgeGenerator] Session load failed:",
           error,
         )
+
+        if (!active) {
+          return
+        }
 
         setUser(null)
         setBadgeData(null)
+
+        toast.error(
+          "Unable to load badge",
+          {
+            description:
+              error instanceof Error
+                ? error.message
+                : "Unable to verify your session.",
+          },
+        )
       } finally {
-        if (mounted) {
+        if (active) {
           setLoading(false)
         }
       }
     }
 
-    void loadSession()
+    void load()
 
     return () => {
-      mounted = false
+      active = false
     }
   }, [loadBadge])
 
-  const handleSubmit = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
-    event.preventDefault()
+  /* ═════════════════════════════════════════
+     REFRESH
+  ═════════════════════════════════════════ */
 
-    await loadBadge(discordId)
-  }
-
-  const handleRefresh = async () => {
-    if (!discordId.trim()) {
-      return
+  const handleRefresh =
+    async () => {
+      await loadBadge()
     }
 
-    await loadBadge(discordId)
-  }
+  /* ═════════════════════════════════════════
+     COPY
+  ═════════════════════════════════════════ */
 
-  const handleCopy = async () => {
-    if (!badgeData) {
-      return
+  const handleCopy =
+    async () => {
+      if (!badgeData) {
+        return
+      }
+
+      const text = [
+        badgeData.badge.lines["1"],
+        badgeData.badge.lines["2"],
+        badgeData.badge.lines["3"],
+        badgeData.badge.lines["4"],
+        badgeData.badge.lines["5"],
+      ].join("\n")
+
+      try {
+        await navigator.clipboard.writeText(
+          text,
+        )
+
+        toast.success(
+          "Badge lines copied",
+          {
+            description:
+              "The five badge lines have been copied to your clipboard.",
+          },
+        )
+      } catch (error) {
+        console.error(
+          "[BadgeGenerator] Clipboard error:",
+          error,
+        )
+
+        toast.error(
+          "Copy failed",
+          {
+            description:
+              "Your browser could not access the clipboard.",
+          },
+        )
+      }
     }
 
-    const text = [
-      badgeData.badge.lines["1"],
-      badgeData.badge.lines["2"],
-      badgeData.badge.lines["3"],
-      badgeData.badge.lines["4"],
-      badgeData.badge.lines["5"],
-    ].join("\n")
-
-    try {
-      await navigator.clipboard.writeText(text)
-
-      toast.success("Badge lines copied", {
-        description:
-          "The five badge lines have been copied to your clipboard.",
-      })
-    } catch (error) {
-      console.error(
-        "[BadgeGenerator] Clipboard failed:",
-        error,
-      )
-
-      toast.error("Copy failed", {
-        description:
-          "Your browser could not access the clipboard.",
-      })
-    }
-  }
+  /* ═════════════════════════════════════════
+     LOADING
+  ═════════════════════════════════════════ */
 
   if (loading) {
     return (
@@ -298,19 +423,26 @@ export default function BadgeGenerator() {
         <div className="flex min-h-[60vh] items-center justify-center">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <RefreshCw className="h-4 w-4 animate-spin" />
-            Loading badge generator...
+
+            <span>
+              Loading badge generator...
+            </span>
           </div>
         </div>
       </DashboardLayout>
     )
   }
 
+  /* ═════════════════════════════════════════
+     PAGE
+  ═════════════════════════════════════════ */
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* ============================================================
+        {/* ───────────────────────────────────
             HEADER
-        ============================================================ */}
+        ─────────────────────────────────── */}
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -327,20 +459,25 @@ export default function BadgeGenerator() {
             </h1>
 
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Generate the badge configuration for an officer using
-              their current roster information.
+              Generate your department badge using
+              your current Metro Police Department
+              roster information.
             </p>
           </div>
 
           <Button
             type="button"
             variant="outline"
-            onClick={handleRefresh}
-            disabled={searching || !discordId.trim()}
+            onClick={
+              handleRefresh
+            }
+            disabled={refreshing}
           >
             <RefreshCw
               className={`mr-2 h-4 w-4 ${
-                searching ? "animate-spin" : ""
+                refreshing
+                  ? "animate-spin"
+                  : ""
               }`}
             />
 
@@ -348,82 +485,61 @@ export default function BadgeGenerator() {
           </Button>
         </div>
 
-        {/* ============================================================
-            SEARCH
-        ============================================================ */}
-
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-xl border border-border bg-card p-5"
-        >
-          <div className="mb-4">
-            <h2 className="text-sm font-semibold text-foreground">
-              Find Officer
-            </h2>
-
-            <p className="mt-1 text-xs text-muted-foreground">
-              Enter a Discord ID to load the officer's current
-              name and rank from the database.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
-              <Input
-                value={discordId}
-                onChange={(event) =>
-                  setDiscordId(event.target.value)
-                }
-                placeholder="Discord ID"
-                className="pl-9"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={
-                searching ||
-                !discordId.trim()
-              }
-            >
-              {searching ? (
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="mr-2 h-4 w-4" />
-              )}
-
-              Generate
-            </Button>
-          </div>
-        </form>
+        {/* ───────────────────────────────────
+            NO BADGE
+        ─────────────────────────────────── */}
 
         {!badgeData ? (
-          <div className="flex min-h-[320px] items-center justify-center rounded-xl border border-dashed border-border bg-card">
-            <div className="max-w-sm px-6 text-center">
+          <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-dashed border-border bg-card">
+            <div className="max-w-md px-6 text-center">
               <BadgeCheck className="mx-auto h-10 w-10 text-muted-foreground/50" />
 
               <h2 className="mt-4 text-sm font-semibold text-foreground">
-                No badge loaded
+                Badge unavailable
               </h2>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Enter an officer's Discord ID above to load their
-                badge information.
+                Your badge could not be generated from
+                the current roster information.
               </p>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-5"
+                onClick={
+                  handleRefresh
+                }
+                disabled={
+                  refreshing
+                }
+              >
+                <RefreshCw
+                  className={`mr-2 h-4 w-4 ${
+                    refreshing
+                      ? "animate-spin"
+                      : ""
+                  }`}
+                />
+
+                Try Again
+              </Button>
             </div>
           </div>
         ) : (
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
-            {/* ========================================================
-                OFFICER
-            ======================================================== */}
+            {/* ───────────────────────────────
+                LEFT
+            ─────────────────────────────── */}
 
             <div className="space-y-6">
+              {/* OFFICER */}
+
               <ConfigCard
                 title="Officer Information"
-                icon={<UserRound className="h-4 w-4" />}
+                icon={
+                  <UserRound className="h-4 w-4" />
+                }
               >
                 <div className="divide-y divide-border/60">
                   <InfoRow
@@ -462,6 +578,24 @@ export default function BadgeGenerator() {
                   />
 
                   <InfoRow
+                    label="Time in Department"
+                    value={
+                      badgeData.officer
+                        .timeInDept ??
+                      ""
+                    }
+                  />
+
+                  <InfoRow
+                    label="Time in Rank"
+                    value={
+                      badgeData.officer
+                        .timeInRank ??
+                      ""
+                    }
+                  />
+
+                  <InfoRow
                     label="Discord ID"
                     value={
                       badgeData.officer.discordId
@@ -470,13 +604,13 @@ export default function BadgeGenerator() {
                 </div>
               </ConfigCard>
 
-              {/* ======================================================
-                  BADGE CONFIGURATION
-              ====================================================== */}
+              {/* BADGE CONFIGURATION */}
 
               <ConfigCard
                 title="Badge Configuration"
-                icon={<Shield className="h-4 w-4" />}
+                icon={
+                  <Shield className="h-4 w-4" />
+                }
               >
                 <div className="divide-y divide-border/60">
                   <InfoRow
@@ -502,13 +636,13 @@ export default function BadgeGenerator() {
                 </div>
               </ConfigCard>
 
-              {/* ======================================================
-                  BADGE LINES
-              ====================================================== */}
+              {/* BADGE LINES */}
 
               <ConfigCard
                 title="Badge Lines"
-                icon={<BadgeCheck className="h-4 w-4" />}
+                icon={
+                  <BadgeCheck className="h-4 w-4" />
+                }
               >
                 <div className="space-y-2">
                   <BadgeLine
@@ -551,31 +685,43 @@ export default function BadgeGenerator() {
                   type="button"
                   variant="outline"
                   className="mt-4 w-full"
-                  onClick={handleCopy}
+                  onClick={
+                    handleCopy
+                  }
                 >
                   <Copy className="mr-2 h-4 w-4" />
+
                   Copy Badge Lines
                 </Button>
               </ConfigCard>
             </div>
 
-            {/* ========================================================
-                PREVIEW
-            ======================================================== */}
+            {/* ───────────────────────────────
+                RIGHT — PREVIEW
+            ─────────────────────────────── */}
 
             <div className="xl:sticky xl:top-6 xl:self-start">
               <ConfigCard
                 title="Badge Preview"
-                icon={<CheckCircle2 className="h-4 w-4" />}
+                icon={
+                  <CheckCircle2 className="h-4 w-4" />
+                }
               >
                 <div className="flex min-h-[500px] items-center justify-center rounded-xl border border-border bg-muted/20 p-8">
                   <div className="w-full max-w-[290px]">
                     <div className="relative overflow-hidden rounded-[28px] border border-border bg-gradient-to-b from-muted/70 to-background p-7 shadow-xl">
-                      {/* Badge top */}
                       <div className="text-center">
+                        {/* LINE 1 */}
+
                         <div className="text-[10px] font-bold tracking-[0.35em] text-muted-foreground">
-                          {badgeData.badge.lines["1"]}
+                          {
+                            badgeData.badge.lines[
+                              "1"
+                            ]
+                          }
                         </div>
+
+                        {/* SEAL */}
 
                         <div className="mt-5 flex justify-center">
                           <div className="flex h-20 w-20 items-center justify-center rounded-full border border-border bg-background shadow-sm">
@@ -583,48 +729,79 @@ export default function BadgeGenerator() {
                           </div>
                         </div>
 
+                        {/* LINE 2 */}
+
                         <div className="mt-5 text-sm font-bold uppercase tracking-[0.12em] text-foreground">
-                          {badgeData.badge.lines["2"]}
+                          {
+                            badgeData.badge.lines[
+                              "2"
+                            ]
+                          }
                         </div>
+
+                        {/* LINE 3 */}
 
                         <div className="mt-1 text-base font-semibold uppercase tracking-[0.08em] text-foreground">
-                          {badgeData.badge.lines["3"]}
+                          {
+                            badgeData.badge.lines[
+                              "3"
+                            ]
+                          }
                         </div>
+
+                        {/* LINE 4 */}
 
                         <div className="mt-5 text-[9px] font-semibold tracking-[0.18em] text-muted-foreground">
-                          {badgeData.badge.lines["4"]}
+                          {
+                            badgeData.badge.lines[
+                              "4"
+                            ]
+                          }
                         </div>
 
+                        {/* LINE 5 */}
+
                         <div className="mt-1 text-[8px] font-medium tracking-[0.16em] text-muted-foreground">
-                          {badgeData.badge.lines["5"]}
+                          {
+                            badgeData.badge.lines[
+                              "5"
+                            ]
+                          }
                         </div>
                       </div>
 
-                      {/* Badge metadata */}
+                      {/* METADATA */}
+
                       <div className="mt-7 border-t border-border pt-4 text-center">
                         <div className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
-                          {badgeData.badge.badgeId}
+                          {
+                            badgeData.badge.badgeId
+                          }
                         </div>
 
                         <div className="mt-1 text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
-                          {badgeData.badge.finish}
+                          {
+                            badgeData.badge.finish ||
+                            "Configured Finish"
+                          }
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Current logged-in user */}
+                {/* CURRENT USER */}
+
                 {user && (
                   <div className="mt-4 rounded-lg border border-border bg-muted/30 px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
 
                       <span className="text-xs text-muted-foreground">
-                        Loaded for
+                        Authenticated as
                       </span>
 
-                      <span className="truncate text-xs font-medium text-foreground">
+                      <span className="min-w-0 truncate text-xs font-medium text-foreground">
                         {user.discordId}
                       </span>
                     </div>
