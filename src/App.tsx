@@ -35,6 +35,7 @@ import TRUSOP from "@/pages/documents/TRUSOP"
 import FTDSOP from "@/pages/documents/FTDSOP"
 import GlobalSOP from "@/pages/documents/GlobalSOP"
 import SupervisorDocs from "@/pages/documents/SupervisorDocs"
+import CommandDocs from "@/pages/documents/CommandDocs"
 
 import Dashboard from "@/pages/dashboard/Dashboard"
 
@@ -261,6 +262,11 @@ export default function App() {
         <Route
           path="/documents/supervisor/supervisor-docs"
           element={<SupervisorDocs />}
+        />
+
+        <Route
+          path="/documents/supervisor/command-docs"
+          element={<CommandDocs />}
         />
 
         {/* =================================================
