@@ -298,8 +298,8 @@ body,
 
 [data-sonner-toast] [data-close-button] {
   left: auto !important;
-  right: -7px !important;
-  top: -7px !important;
+  right: -1px !important;
+  top: -4px !important;
 
   width: 20px !important;
   height: 20px !important;
