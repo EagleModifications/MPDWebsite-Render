@@ -29,8 +29,8 @@ export default function ErrorPage() {
           </h1>
 
           <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-muted-foreground">
-            We were unable to verify your request. Please try again, or return
-            to the home page if the problem continues.
+            We were unable to verify your access to this page. Please try
+            again, or return to the home page if the problem continues.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
