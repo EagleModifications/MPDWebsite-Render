@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Link, NavLink } from "react-router-dom"
+import { NavLink, Link } from "react-router-dom"
 import {
   ChevronDown,
   LogIn,
@@ -89,22 +89,22 @@ const sopItems: NavItem[] = [
   {
     name: "SWAT SOPs",
     href: "/documents/sops/swat-sops",
-    permission: "documents",
+    permission: "swatdocs",
   },
   {
     name: "MCD SOPs",
     href: "/documents/sops/mcd-sops",
-    permission: "documents",
+    permission: "mcddocs",
   },
   {
     name: "TRU SOPs",
     href: "/documents/sops/tru-sops",
-    permission: "documents",
+    permission: "trudocs",
   },
   {
     name: "FTD SOPs",
     href: "/documents/sops/ftd-sops",
-    permission: "ftddocuments",
+    permission: "ftddocs",
   },
   {
     name: "Global SOPs",
@@ -115,9 +115,19 @@ const sopItems: NavItem[] = [
 
 const commandItems: NavItem[] = [
   {
-    name: "Command",
-    href: "/documents/command",
-    permission: "commanddocuments",
+    name: "Command SOPs",
+    href: "/documents/command/sops",
+    permission: "commanddocs",
+  },
+  {
+    name: "Command Roster",
+    href: "/documents/command/roster",
+    permission: "commanddocs",
+  },
+  {
+    name: "Command Guidelines",
+    href: "/documents/command/guidelines",
+    permission: "commanddocs",
   },
 ]
 
@@ -134,7 +144,11 @@ export default function Navbar() {
   const [sopsOpen, setSopsOpen] =
     useState(false)
 
-  const documentsRef = useRef<HTMLDivElement>(null)
+  const [commandOpen, setCommandOpen] =
+    useState(false)
+
+  const documentsRef =
+    useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     getSession().then(setUser)
@@ -147,7 +161,10 @@ export default function Navbar() {
       }
     }
 
-    window.addEventListener("resize", handleResize)
+    window.addEventListener(
+      "resize",
+      handleResize,
+    )
 
     return () => {
       window.removeEventListener(
@@ -162,7 +179,9 @@ export default function Navbar() {
       return
     }
 
-    const handlePointerDown = (event: PointerEvent) => {
+    const handlePointerDown = (
+      event: PointerEvent,
+    ) => {
       const target = event.target as Node
 
       if (
@@ -172,6 +191,7 @@ export default function Navbar() {
         setDocumentsOpen(false)
         setRostersOpen(false)
         setSopsOpen(false)
+        setCommandOpen(false)
       }
     }
 
@@ -202,15 +222,20 @@ export default function Navbar() {
     }
 
     if (Array.isArray(item.permission)) {
-      return item.permission.some((permission) =>
-        hasPermission(user, permission),
+      return item.permission.some(
+        (permission) =>
+          hasPermission(user, permission),
       )
     }
 
-    return hasPermission(user, item.permission)
+    return hasPermission(
+      user,
+      item.permission,
+    )
   }
 
-  const visibleItems = navItems.filter(canViewItem)
+  const visibleItems =
+    navItems.filter(canViewItem)
 
   const visibleRosters =
     rosterItems.filter(canViewItem)
@@ -226,7 +251,8 @@ export default function Navbar() {
     visibleSops.length > 0 ||
     visibleCommand.length > 0
 
-  const currentPath = window.location.pathname
+  const currentPath =
+    window.location.pathname
 
   const documentsActive =
     visibleRosters.some(
@@ -239,39 +265,47 @@ export default function Navbar() {
       (item) => currentPath === item.href,
     )
 
-  const rostersActive = visibleRosters.some(
-    (item) => currentPath === item.href,
-  )
+  const rostersActive =
+    visibleRosters.some(
+      (item) => currentPath === item.href,
+    )
 
-  const sopsActive = visibleSops.some(
-    (item) => currentPath === item.href,
-  )
-
-  const commandActive = visibleCommand.some(
-    (item) => currentPath === item.href,
-  )
+  const sopsActive =
+    visibleSops.some(
+      (item) => currentPath === item.href,
+    )
 
   const closeMobileMenu = () => {
     setMobileOpen(false)
     setDocumentsOpen(false)
     setRostersOpen(false)
     setSopsOpen(false)
+    setCommandOpen(false)
   }
 
   const toggleDocuments = () => {
     setDocumentsOpen((open) => !open)
     setRostersOpen(false)
     setSopsOpen(false)
+    setCommandOpen(false)
   }
 
   const toggleRosters = () => {
     setRostersOpen((open) => !open)
     setSopsOpen(false)
+    setCommandOpen(false)
   }
 
   const toggleSops = () => {
     setSopsOpen((open) => !open)
     setRostersOpen(false)
+    setCommandOpen(false)
+  }
+
+  const toggleCommand = () => {
+    setCommandOpen((open) => !open)
+    setRostersOpen(false)
+    setSopsOpen(false)
   }
 
   return (
@@ -323,7 +357,7 @@ export default function Navbar() {
               </NavLink>
             ))}
 
-          {/* DOCUMENTS DROPDOWN */}
+          {/* DOCUMENTS */}
           {hasDocuments && (
             <div
               ref={documentsRef}
@@ -523,38 +557,71 @@ export default function Navbar() {
 
                   {/* COMMAND */}
                   {visibleCommand.length > 0 && (
-                    <div className="mt-1 border-t border-border pt-1">
-                      <div className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Command
-                      </div>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={toggleCommand}
+                        className={`
+                          flex w-full items-center justify-between
+                          rounded-lg px-3 py-2.5
+                          text-sm font-medium
+                          transition-colors
+                          ${
+                            commandOpen
+                              ? "bg-foreground/10 text-foreground"
+                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                          }
+                        `}
+                        aria-expanded={commandOpen}
+                      >
+                        <span>Command</span>
 
-                      {visibleCommand.map(
-                        (item) => (
-                          <NavLink
-                            key={item.href}
-                            to={item.href}
-                            onClick={() =>
-                              setDocumentsOpen(false)
+                        <ChevronDown
+                          className={`
+                            h-4 w-4
+                            transition-transform duration-200
+                            ${
+                              commandOpen
+                                ? "rotate-180"
+                                : ""
                             }
-                            className={({
-                              isActive,
-                            }) =>
-                              `
-                                block rounded-lg px-3 py-2.5
-                                text-sm font-medium
-                                transition-colors
-                                ${
-                                  isActive
-                                    ? "bg-foreground/10 text-foreground"
-                                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                          `}
+                        />
+                      </button>
+
+                      {commandOpen && (
+                        <div className="ml-2 border-l border-border pl-2">
+                          {visibleCommand.map(
+                            (item) => (
+                              <NavLink
+                                key={item.href}
+                                to={item.href}
+                                onClick={() =>
+                                  setDocumentsOpen(
+                                    false,
+                                  )
                                 }
-                              `
-                            }
-                            role="menuitem"
-                          >
-                            {item.name}
-                          </NavLink>
-                        ),
+                                className={({
+                                  isActive,
+                                }) =>
+                                  `
+                                    block rounded-lg px-3 py-2.5
+                                    text-sm font-medium
+                                    transition-colors
+                                    ${
+                                      isActive
+                                        ? "bg-foreground/10 text-foreground"
+                                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                    }
+                                  `
+                                }
+                                role="menuitem"
+                              >
+                                {item.name}
+                              </NavLink>
+                            ),
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
@@ -563,7 +630,7 @@ export default function Navbar() {
             </div>
           )}
 
-          {/* DASHBOARD — AFTER DOCUMENTS */}
+          {/* DASHBOARD */}
           {visibleItems
             .filter(
               (item) => item.name === "Dashboard",
@@ -877,37 +944,68 @@ export default function Navbar() {
 
                     {/* MOBILE COMMAND */}
                     {visibleCommand.length > 0 && (
-                      <div className="mt-1 border-t border-border pt-1">
-                        <div className="px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                          Command
-                        </div>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={toggleCommand}
+                          className={`
+                            flex w-full items-center justify-between
+                            rounded-lg px-4 py-2.5
+                            text-left text-sm font-medium
+                            transition-colors
+                            ${
+                              commandOpen
+                                ? "bg-foreground/10 text-foreground"
+                                : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                            }
+                          `}
+                          aria-expanded={commandOpen}
+                        >
+                          <span>Command</span>
 
-                        {visibleCommand.map(
-                          (item) => (
-                            <NavLink
-                              key={item.href}
-                              to={item.href}
-                              onClick={
-                                closeMobileMenu
+                          <ChevronDown
+                            className={`
+                              h-4 w-4
+                              transition-transform duration-200
+                              ${
+                                commandOpen
+                                  ? "rotate-180"
+                                  : ""
                               }
-                              className={({
-                                isActive,
-                              }) =>
-                                `
-                                  block rounded-lg px-4 py-2.5
-                                  text-sm font-medium
-                                  transition-colors
-                                  ${
-                                    isActive
-                                      ? "bg-foreground/10 text-foreground"
-                                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                            `}
+                          />
+                        </button>
+
+                        {commandOpen && (
+                          <div className="ml-3 border-l border-border pl-2">
+                            {visibleCommand.map(
+                              (item) => (
+                                <NavLink
+                                  key={item.href}
+                                  to={item.href}
+                                  onClick={
+                                    closeMobileMenu
                                   }
-                                `
-                              }
-                            >
-                              {item.name}
-                            </NavLink>
-                          ),
+                                  className={({
+                                    isActive,
+                                  }) =>
+                                    `
+                                      block rounded-lg px-4 py-2.5
+                                      text-sm font-medium
+                                      transition-colors
+                                      ${
+                                        isActive
+                                          ? "bg-foreground/10 text-foreground"
+                                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                      }
+                                    `
+                                  }
+                                >
+                                  {item.name}
+                                </NavLink>
+                              ),
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
