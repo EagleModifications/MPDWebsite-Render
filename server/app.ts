@@ -8,6 +8,7 @@ import XLSX from "xlsx"
 
 import { syncGoogleRosters } from "./googleRosterSync"
 import { registerMainRosterRoutes } from "./googleMainRoster"
+import { registerBadgeRoutes } from "./badges"
 
 import {
   authenticateDiscordCode,
@@ -4300,6 +4301,9 @@ export function createApp() {
 
   // Main Roster Google Sheets API routes.
   registerMainRosterRoutes(app)
+
+  // Badge Generator API routes.
+  registerBadgeRoutes(app)
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
