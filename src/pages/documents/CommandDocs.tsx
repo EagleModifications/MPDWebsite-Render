@@ -30,7 +30,7 @@ const tabs: Tab[] = [
   },
   {
     id: "command-punishmentguidelines",
-    label: "Command Punishment Guidelines",
+    label: "Punishment Guidelines",
     icon: FileSpreadsheet,
     url: "https://docs.google.com/spreadsheets/d/1WlES0v7NUSRccYvdd7EUHQgHvcdrBPJGUoKqNWbTDP8/preview",
   },
