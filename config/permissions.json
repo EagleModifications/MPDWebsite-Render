@@ -50,11 +50,31 @@
   },
   "documents": {
     "urls": [
-      "/documents/mainroster",
-      "/documents/swatroster",
-      "/documents/mcdroster",
-      "/documents/truroster",
-      "/documents/ftdroster",
+      "/documents/rosters/metro-roster",
+      "/documents/rosters/swat-roster",
+      "/documents/rosters/mcd-roster",
+      "/documents/rosters/tru-roster",
+      "/documents/roster/ftd-roster",
+      "/documents/sops/metro-sops",
+      "/documents/sops/swat-sops",
+      "/documents/sops/mcd-sops",
+      "/documents/sops/tru-sops",
+      "/documents/sops/global-sops",
+    ]
+  }
+  "ftddocuments": {
+    "urls": [
+      "/documents/sops/ftd-sops",
+    ]
+  }
+  "supervisordocuments": {
+    "urls": [
+      "/documents/supervisor/supervisor-sops",
+    ]
+  }
+  "commanddocuments": {
+    "urls": [
+      "/documents/command/command-sops",
     ]
   }
 }
