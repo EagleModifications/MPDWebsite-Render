@@ -26,6 +26,7 @@ import SignIn from "@/pages/SignIn"
 import SignedOut from "@/pages/SignedOut"
 import Verifying from "@/pages/Verifying"
 import NotFound from "@/pages/NotFound"
+import NoPermission from "@/pages/NoPermission"
 import Events from "@/pages/Events"
 import Gallery from "@/pages/Gallery"
 
@@ -589,6 +590,12 @@ export default function App() {
           path="*"
           element={<NotFound />}
         />
+
+        <Route
+          path="/no-permission"
+          element={<NoPermission />}
+        />
+          
         </Routes>
       </PageProtection>
 
