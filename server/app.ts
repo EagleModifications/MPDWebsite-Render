@@ -21,7 +21,7 @@ import {
   setSessionCookie,
 } from "./auth/session"
 
-import { hasPermission } from "./permissions/permissions"
+import { canAccessUrl, hasPermission } from "./permissions/permissions"
 import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
@@ -4432,12 +4432,29 @@ export function createApp() {
           ? req.query.permission
           : null
 
+      const url =
+        typeof req.query.url === "string"
+          ? req.query.url
+          : null
+
       if (
         permission &&
         !hasPermission(
           user,
           permission,
         )
+      ) {
+        return res
+          .status(403)
+          .json({
+            error:
+              "Forbidden",
+          })
+      }
+
+      if (
+        url &&
+        !(await canAccessUrl(user, url))
       ) {
         return res
           .status(403)
