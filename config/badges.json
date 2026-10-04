@@ -1,0 +1,34 @@
+{
+  "badgeId": "S503A",
+  "sealId": "C125P",
+
+  "lines": {
+    "1": "METRO",
+    "2": "{{rank}}",
+    "3": "{{name}}",
+    "4": "POLICE DEPARTMENT",
+    "5": "EST. 2024"
+  },
+
+  "rankFinishes": {
+    "Officer 1": "Gold Electroplate",
+    "Officer 2": "Gold Electroplate",
+    "Officer 3": "Gold Electroplate",
+    "Lance Corporal": "Gold Electroplate",
+    "Corporal": "Gold Electroplate",
+    "Sergeant": "Gold Electroplate",
+    "Staff Sergeant": "Gold Electroplate",
+    "Master Sergeant": "Gold Electroplate",
+
+    "2nd Lieutenant": "Gold Electroplate",
+    "1st Lieutenant": "Gold Electroplate",
+    "Captain": "Gold Electroplate",
+    "Major": "Gold Electroplate",
+    "Lieutenant Colonel": "Gold Electroplate",
+    "Colonel": "Gold Electroplate",
+    "Chief Of Staff": "Gold Electroplate",
+    "Assistant Chief": "Gold Electroplate",
+    "Deputy Chief": "Gold Electroplate",
+    "Chief": "Gold Electroplate"
+  }
+}
