@@ -1,5 +1,4 @@
 import {
-  Search,
   Shield,
   Users,
   Car,
@@ -7,16 +6,10 @@ import {
   Home,
   Database,
 } from "lucide-react"
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react"
+import { useMemo, useState } from "react"
 
 import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
-
-import { Button } from "@/components/ui/button"
 
 type TabId =
   | "home"
@@ -30,14 +23,14 @@ type Tab = {
   label: string
   icon: typeof Home
   gid: string
-  searchable?: boolean
 }
 
 /*
- * Published Google Sheets URL.
+ * IMPORTANT:
  *
- * This must be the published spreadsheet URL,
- * not the normal spreadsheet URL.
+ * This is the PUBLISHED Google Sheets URL.
+ *
+ * Do NOT use the normal spreadsheet ID here.
  */
 const PUBLISHED_SHEET_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDo_yVusgQRYUpyDhfNnkBrJXPaNXAbSYvfndxC14IcKjVp9-8wDnOCb8_AGCsgRYLNeXyWzgimNuL/pubhtml"
@@ -54,14 +47,12 @@ const tabs: Tab[] = [
     label: "Department Roster",
     icon: Users,
     gid: "1093680513",
-    searchable: true,
   },
   {
     id: "employees",
     label: "Employee Database",
     icon: Database,
     gid: "1598052317",
-    searchable: true,
   },
   {
     id: "vehicles",
@@ -77,116 +68,9 @@ const tabs: Tab[] = [
   },
 ]
 
-type SheetRow = string[]
-
-/*
- * Google Sheets published CSV endpoint.
- *
- * This allows the searchable tabs to be loaded directly
- * into React instead of being trapped inside an iframe.
- */
-function getCsvUrl(gid: string) {
-  return `${PUBLISHED_SHEET_URL.replace(
-    "/pubhtml",
-    "/pub",
-  )}?gid=${encodeURIComponent(
-    gid,
-  )}&single=true&output=csv`
-}
-
-/*
- * Small CSV parser.
- *
- * Handles:
- * - quoted values
- * - commas inside quoted values
- * - escaped quotes
- * - new lines inside quoted values
- */
-function parseCsv(csv: string): SheetRow[] {
-  const rows: SheetRow[] = []
-
-  let row: string[] = []
-  let value = ""
-  let insideQuotes = false
-
-  for (let i = 0; i < csv.length; i += 1) {
-    const char = csv[i]
-    const next = csv[i + 1]
-
-    if (char === '"') {
-      if (insideQuotes && next === '"') {
-        value += '"'
-        i += 1
-      } else {
-        insideQuotes = !insideQuotes
-      }
-
-      continue
-    }
-
-    if (char === "," && !insideQuotes) {
-      row.push(value)
-      value = ""
-      continue
-    }
-
-    if (
-      (char === "\n" || char === "\r") &&
-      !insideQuotes
-    ) {
-      if (char === "\r" && next === "\n") {
-        i += 1
-      }
-
-      row.push(value)
-      value = ""
-
-      if (
-        row.some(
-          (cell) => cell.trim().length > 0,
-        )
-      ) {
-        rows.push(row)
-      }
-
-      row = []
-      continue
-    }
-
-    value += char
-  }
-
-  if (value.length > 0 || row.length > 0) {
-    row.push(value)
-
-    if (
-      row.some(
-        (cell) => cell.trim().length > 0,
-      )
-    ) {
-      rows.push(row)
-    }
-  }
-
-  return rows
-}
-
 export default function MainRoster() {
   const [activeTab, setActiveTab] =
     useState<TabId>("home")
-
-  const [search, setSearch] =
-    useState("")
-
-  const [sheetRows, setSheetRows] =
-    useState<SheetRow[]>([])
-
-  const [isLoadingSheet, setIsLoadingSheet] =
-    useState(false)
-
-  const [sheetError, setSheetError] =
-    useState<string | null>(null)
 
   const activeTabData = useMemo(
     () =>
@@ -199,124 +83,14 @@ export default function MainRoster() {
   const ActiveIcon = activeTabData.icon
 
   /*
-   * Load CSV data only for searchable tabs.
-   */
-  useEffect(() => {
-    if (!activeTabData.searchable) {
-      setSheetRows([])
-      setSheetError(null)
-      setIsLoadingSheet(false)
-      return
-    }
-
-    const controller =
-      new AbortController()
-
-    async function loadSheet() {
-      try {
-        setIsLoadingSheet(true)
-        setSheetError(null)
-        setSheetRows([])
-
-        const response = await fetch(
-          getCsvUrl(activeTabData.gid),
-          {
-            signal: controller.signal,
-            cache: "no-store",
-          },
-        )
-
-        if (!response.ok) {
-          throw new Error(
-            `Google Sheets returned ${response.status}`,
-          )
-        }
-
-        const csv =
-          await response.text()
-
-        const rows = parseCsv(csv)
-
-        if (!rows.length) {
-          throw new Error(
-            "The Google Sheet returned no data.",
-          )
-        }
-
-        setSheetRows(rows)
-      } catch (error) {
-        if (
-          error instanceof DOMException &&
-          error.name === "AbortError"
-        ) {
-          return
-        }
-
-        console.error(
-          "Failed to load Google Sheet:",
-          error,
-        )
-
-        setSheetError(
-          "Unable to load the roster data.",
-        )
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoadingSheet(false)
-        }
-      }
-    }
-
-    loadSheet()
-
-    return () => {
-      controller.abort()
-    }
-  }, [
-    activeTabData.gid,
-    activeTabData.searchable,
-  ])
-
-  /*
-   * Search every column in every row.
+   * Google Sheets published embed.
    *
-   * This means a search for:
-   * - callsign
-   * - badge number
-   * - name
-   * - rank
-   * - department
-   * - status
-   * etc.
-   *
-   * will find the matching row.
+   * gid     = selected worksheet
+   * single  = only show selected worksheet
+   * widget  = disable widget mode
+   * headers = hide Google row/column headers
+   * chrome  = hide Google Sheets chrome
    */
-  const filteredRows = useMemo(() => {
-    if (!activeTabData.searchable) {
-      return []
-    }
-
-    const query = search
-      .trim()
-      .toLowerCase()
-
-    if (!query) {
-      return sheetRows
-    }
-
-    return sheetRows.filter((row) =>
-      row.some((cell) =>
-        cell
-          .toLowerCase()
-          .includes(query),
-      ),
-    )
-  }, [
-    activeTabData.searchable,
-    search,
-    sheetRows,
-  ])
-
   const embedUrl = useMemo(() => {
     const params = new URLSearchParams({
       gid: activeTabData.gid,
@@ -331,27 +105,18 @@ export default function MainRoster() {
 
   function changeTab(tab: TabId) {
     setActiveTab(tab)
-    setSearch("")
   }
-
-  const headers =
-    sheetRows.length > 0
-      ? sheetRows[0]
-      : []
-
-  const dataRows =
-    filteredRows.length > 0
-      ? filteredRows.slice(1)
-      : []
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
       <Navbar />
 
       <main className="relative min-h-screen pt-20">
-        <div className="relative mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:py-7">
+        <div className="relative mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-7">
 
-          {/* PAGE HEADER */}
+          {/* ============================================================ */}
+          {/* PAGE HEADER                                                   */}
+          {/* ============================================================ */}
 
           <div className="mb-5 flex flex-col gap-4">
             <div className="flex items-center gap-3">
@@ -362,6 +127,7 @@ export default function MainRoster() {
               <div className="min-w-0">
                 <div className="mb-1 flex items-center gap-2 text-xs font-bold text-blue-500">
                   <Shield className="h-3.5 w-3.5" />
+
                   METRO POLICE DEPARTMENT
                 </div>
 
@@ -377,7 +143,9 @@ export default function MainRoster() {
               </div>
             </div>
 
-            {/* TABS */}
+            {/* ========================================================== */}
+            {/* TABS                                                         */}
+            {/* ========================================================== */}
 
             <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <div className="inline-flex min-w-full items-center gap-1 rounded-xl border border-border/70 bg-card/80 p-1.5 shadow-sm backdrop-blur sm:min-w-0">
@@ -411,11 +179,15 @@ export default function MainRoster() {
             </div>
           </div>
 
-          {/* CONTENT CARD */}
+          {/* ============================================================ */}
+          {/* GOOGLE SHEETS CARD                                            */}
+          {/* ============================================================ */}
 
           <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
 
-            {/* CARD HEADER */}
+            {/* ---------------------------------------------------------- */}
+            {/* CARD HEADER                                                  */}
+            {/* ---------------------------------------------------------- */}
 
             <div className="border-b border-border/70 bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-5">
               <div className="flex min-w-0 items-center gap-3">
@@ -429,193 +201,26 @@ export default function MainRoster() {
                   </h2>
 
                   <p className="truncate text-xs text-muted-foreground">
-                    {activeTabData.searchable
-                      ? "Live roster data"
-                      : "Google Sheets"}
+                    Google Sheets
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* SEARCH */}
+            {/* ---------------------------------------------------------- */}
+            {/* GOOGLE SHEET                                                 */}
+            {/* ---------------------------------------------------------- */}
 
-            {activeTabData.searchable && (
-              <div className="border-b border-border/70 bg-card p-3 sm:p-4">
-                <div className="relative w-full">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(event) =>
-                      setSearch(
-                        event.target.value,
-                      )
-                    }
-                    placeholder={
-                      activeTabData.id ===
-                      "employees"
-                        ? "Search employees..."
-                        : "Search roster..."
-                    }
-                    className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-4 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-
-                {!isLoadingSheet &&
-                  !sheetError &&
-                  sheetRows.length > 0 && (
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {search.trim()
-                        ? `${dataRows.length} result${
-                            dataRows.length === 1
-                              ? ""
-                              : "s"
-                          } found`
-                        : `${dataRows.length} entries`}
-                    </div>
-                  )}
-              </div>
-            )}
-
-            {/* SEARCHABLE SHEET */}
-
-            {activeTabData.searchable ? (
-              <div className="w-full bg-background">
-
-                {isLoadingSheet && (
-                  <div className="flex h-[500px] items-center justify-center">
-                    <div className="flex flex-col items-center gap-3 text-center">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-blue-500" />
-
-                      <p className="text-sm text-muted-foreground">
-                        Loading roster...
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {!isLoadingSheet &&
-                  sheetError && (
-                    <div className="flex h-[500px] items-center justify-center px-6">
-                      <div className="text-center">
-                        <Shield className="mx-auto mb-3 h-8 w-8 text-destructive" />
-
-                        <h3 className="font-semibold">
-                          Unable to load roster
-                        </h3>
-
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {sheetError}
-                        </p>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="mt-4"
-                          onClick={() =>
-                            window.location.reload()
-                          }
-                        >
-                          Retry
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                {!isLoadingSheet &&
-                  !sheetError &&
-                  sheetRows.length > 0 && (
-                    <div className="max-h-[800px] w-full overflow-auto">
-                      <table className="w-full min-w-max border-collapse text-sm">
-                        <thead className="sticky top-0 z-10 bg-muted">
-                          <tr>
-                            {headers.map(
-                              (
-                                header,
-                                index,
-                              ) => (
-                                <th
-                                  key={`${header}-${index}`}
-                                  className="whitespace-nowrap border-b border-r border-border px-4 py-3 text-left text-xs font-semibold text-foreground last:border-r-0"
-                                >
-                                  {header ||
-                                    `Column ${
-                                      index +
-                                      1
-                                    }`}
-                                </th>
-                              ),
-                            )}
-                          </tr>
-                        </thead>
-
-                        <tbody>
-                          {dataRows.map(
-                            (
-                              row,
-                              rowIndex,
-                            ) => (
-                              <tr
-                                key={`row-${rowIndex}`}
-                                className="transition-colors hover:bg-muted/40"
-                              >
-                                {headers.map(
-                                  (
-                                    _,
-                                    columnIndex,
-                                  ) => (
-                                    <td
-                                      key={`${rowIndex}-${columnIndex}`}
-                                      className="whitespace-nowrap border-b border-r border-border px-4 py-3 text-muted-foreground last:border-r-0"
-                                    >
-                                      {row[
-                                        columnIndex
-                                      ] ?? ""}
-                                    </td>
-                                  ),
-                                )}
-                              </tr>
-                            ),
-                          )}
-                        </tbody>
-                      </table>
-
-                      {dataRows.length ===
-                        0 && (
-                        <div className="flex h-40 items-center justify-center">
-                          <div className="text-center">
-                            <Search className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-
-                            <p className="text-sm font-medium">
-                              No results found
-                            </p>
-
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Try a different
-                              search term.
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-              </div>
-            ) : (
-              /* NON-SEARCHABLE SHEETS */
-
-              <div className="w-full overflow-hidden bg-background">
-                <iframe
-                  key={`${activeTabData.id}-${activeTabData.gid}`}
-                  src={embedUrl}
-                  title={`${activeTabData.label} Google Sheet`}
-                  className="block h-[800px] w-full border-0 bg-background"
-                  frameBorder="0"
-                  loading="lazy"
-                />
-              </div>
-            )}
+            <div className="w-full overflow-x-auto bg-background">
+              <iframe
+                key={`${activeTabData.id}-${activeTabData.gid}`}
+                src={embedUrl}
+                title={`${activeTabData.label} Google Sheet`}
+                className="block h-[850px] w-full min-w-0 border-0 bg-background"
+                frameBorder="0"
+                loading="lazy"
+              />
+            </div>
           </section>
         </div>
 
