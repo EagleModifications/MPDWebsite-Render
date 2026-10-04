@@ -9,21 +9,17 @@ import {
 
 import {
   Activity,
-  ArrowDown,
-  ArrowUp,
-  ArrowUpRight,
   ChevronDown,
+  ChevronUp,
   Clipboard,
   Copy,
   FileEdit,
   Filter,
   History,
-  ListFilter,
   RefreshCw,
   Search,
   Settings2,
   Shield,
-  Trash2,
   Upload,
   UserCheck,
   Users,
@@ -41,6 +37,7 @@ type Category =
   | "requirements"
   | "navigation"
   | "management"
+
 type Division =
   | ""
   | "department"
@@ -55,6 +52,7 @@ type ActionLog = {
   id: string
   entryNumber: number
   createdAt: string
+
   userId: string
   userName: string
   username: string
@@ -62,13 +60,16 @@ type ActionLog = {
   callsign: string
   badgeNumber: string
   avatar?: string | null
+
   action: string
   module: Exclude<Module, "">
   category: Exclude<Category, "">
   division?: Exclude<Division, ""> | null
+
   targetUserId?: string
   targetName?: string
   targetRank?: string
+
   summary: string
   details?: Record<string, unknown>
   path?: string
@@ -91,10 +92,10 @@ type Option = {
   label: string
 }
 
-const moduleTabs: Array<{ value: Module; label: string; icon: typeof Activity }> = [
-  { value: "", label: "All modules", icon: ListFilter },
-  { value: "promotion", label: "Promotion", icon: ArrowUp },
-  { value: "activity", label: "Activity", icon: Activity },
+const moduleOptions: Option[] = [
+  { value: "", label: "All modules" },
+  { value: "promotion", label: "Promotion" },
+  { value: "activity", label: "Activity" },
 ]
 
 const categoryOptions: Option[] = [
@@ -123,6 +124,12 @@ const divisionOptions: Option[] = [
     label,
   })),
 ]
+
+const moduleLabel = (value: string) => {
+  if (value === "promotion") return "Promotion"
+  if (value === "activity") return "Activity"
+  return value || "All modules"
+}
 
 const actionLabel = (value: string) =>
   value
@@ -167,7 +174,9 @@ const getAvatarUrl = (discordId: string, avatar?: string | null) => {
 const relativeTime = (value: string) => {
   const timestamp = new Date(value).getTime()
 
-  if (!Number.isFinite(timestamp)) return "Unknown time"
+  if (!Number.isFinite(timestamp)) {
+    return "Unknown time"
+  }
 
   const seconds = Math.max(
     0,
@@ -196,7 +205,9 @@ const relativeTime = (value: string) => {
 const formatDateTime = (value: string) => {
   const date = new Date(value)
 
-  if (Number.isNaN(date.getTime())) return "Unknown"
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown"
+  }
 
   return new Intl.DateTimeFormat(undefined, {
     weekday: "short",
@@ -212,7 +223,9 @@ const formatDateTime = (value: string) => {
 const dateHeading = (value: string) => {
   const date = new Date(value)
 
-  if (Number.isNaN(date.getTime())) return "UNKNOWN DATE"
+  if (Number.isNaN(date.getTime())) {
+    return "UNKNOWN DATE"
+  }
 
   return new Intl.DateTimeFormat(undefined, {
     weekday: "long",
@@ -224,38 +237,15 @@ const dateHeading = (value: string) => {
     .toUpperCase()
 }
 
-const formatValue = (value: unknown): string => {
-  if (value === null || value === undefined || value === "") return "—"
-
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return String(value)
-  }
-
-  try {
-    return JSON.stringify(value, null, 2)
-  } catch {
-    return String(value)
-  }
-}
-
 function getLogIcon(log: ActionLog) {
   const action = log.action.toLowerCase()
-  const summary = log.summary.toLowerCase()
 
-  if (action.includes("delete") || summary.includes("deleted")) return Trash2
-  if (action.includes("copy") || summary.includes("copied")) return Copy
-  if (action.includes("select") || summary.includes("selected")) return UserCheck
-  if (action.includes("import") || summary.includes("imported")) return Upload
+  if (action.includes("copy")) return Copy
+  if (action.includes("select")) return UserCheck
+  if (action.includes("import")) return Upload
   if (action.includes("requirement")) return Settings2
   if (action.includes("refresh")) return RefreshCw
   if (action.includes("filter") || action.includes("search")) return Filter
-  if (action.includes("navigate") || action.includes("division")) {
-    return ArrowUpRight
-  }
   if (log.category === "management") return Shield
   if (log.category === "roster") return Users
   if (log.module === "activity") return Activity
@@ -285,6 +275,7 @@ function Avatar({
           src={url}
           alt=""
           className="h-full w-full object-cover"
+          loading="lazy"
         />
       ) : (
         <span className="flex h-full w-full items-center justify-center text-[8px] font-semibold text-muted-foreground">
@@ -305,6 +296,11 @@ function CopyMenu({
   avatar?: string | null
 }) {
   const [open, setOpen] = useState(false)
+  const [position, setPosition] = useState({
+    left: 0,
+    top: 0,
+  })
+
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -316,16 +312,18 @@ function CopyMenu({
       }
     }
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false)
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false)
+      }
     }
 
     document.addEventListener("mousedown", handleMouseDown)
-    document.addEventListener("keydown", handleEscape)
+    document.addEventListener("keydown", handleKeyDown)
 
     return () => {
       document.removeEventListener("mousedown", handleMouseDown)
-      document.removeEventListener("keydown", handleEscape)
+      document.removeEventListener("keydown", handleKeyDown)
     }
   }, [open])
 
@@ -334,9 +332,11 @@ function CopyMenu({
 
     try {
       await navigator.clipboard.writeText(value)
+
       toast.success(`${label} copied`, {
         description: value,
       })
+
       setOpen(false)
     } catch {
       toast.error("Copy failed")
@@ -352,6 +352,12 @@ function CopyMenu({
       onContextMenu={(event: ReactMouseEvent) => {
         event.preventDefault()
         event.stopPropagation()
+
+        setPosition({
+          left: event.clientX,
+          top: event.clientY + 4,
+        })
+
         setOpen(true)
       }}
     >
@@ -359,44 +365,52 @@ function CopyMenu({
         type="button"
         onClick={(event) => {
           event.stopPropagation()
+
+          const rect = event.currentTarget.getBoundingClientRect()
+
+          setPosition({
+            left: rect.left,
+            top: rect.bottom + 5,
+          })
+
           setOpen((current) => !current)
         }}
-        className="inline-flex max-w-full items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted/50"
+        className="inline-flex max-w-full items-center gap-2 rounded-md py-0.5 text-left transition-colors hover:text-blue-400"
       >
         <Avatar name={display} id={id ?? ""} avatar={avatar} />
-        <span className="truncate text-xs font-medium text-blue-400 hover:text-blue-300">
+
+        <span className="truncate text-xs font-medium text-blue-400">
           {display}
         </span>
-        <ChevronDown
-          className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
-        />
       </button>
 
       {open ? (
         <div
-          className="absolute left-0 top-[calc(100%+4px)] z-[100] min-w-[190px] overflow-hidden rounded-lg border border-border bg-popover p-1 shadow-2xl"
+          className="fixed z-[100] min-w-[205px] overflow-hidden rounded-lg border border-border bg-popover p-1 shadow-2xl"
+          style={{
+            left: Math.min(position.left, window.innerWidth - 220),
+            top: Math.min(position.top, window.innerHeight - 190),
+          }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             Copy
           </div>
 
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-blue-500/10 hover:text-blue-400"
             onClick={() => void copy(display, "Name")}
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-blue-500/10 hover:text-blue-400"
           >
-            <Copy className="h-3.5 w-3.5 text-blue-400" />
+            <Clipboard className="h-3.5 w-3.5 text-blue-400" />
             Copy name
           </button>
 
           <button
             type="button"
             disabled={!id}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-blue-500/10 hover:text-blue-400 disabled:opacity-40"
             onClick={() => id && void copy(id, "Discord ID")}
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-blue-500/10 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Clipboard className="h-3.5 w-3.5 text-blue-400" />
             Copy Discord ID
@@ -405,10 +419,10 @@ function CopyMenu({
           <button
             type="button"
             disabled={!id}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-blue-500/10 hover:text-blue-400 disabled:opacity-40"
             onClick={() =>
               id && void copy(`<@${id}>`, "Discord mention")
             }
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-blue-500/10 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Clipboard className="h-3.5 w-3.5 text-blue-400" />
             Copy Discord mention
@@ -417,10 +431,10 @@ function CopyMenu({
           <button
             type="button"
             disabled={!id}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-blue-500/10 hover:text-blue-400 disabled:opacity-40"
             onClick={() =>
               id && void copy(`${display} — ${id}`, "Name and ID")
             }
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-blue-500/10 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Clipboard className="h-3.5 w-3.5 text-blue-400" />
             Copy name + ID
@@ -431,322 +445,290 @@ function CopyMenu({
   )
 }
 
-function SelectBox({
+function FilterSelect({
   value,
   options,
   onChange,
-  className = "",
+  icon: Icon,
+  ariaLabel,
 }: {
   value: string
   options: Option[]
   onChange: (value: string) => void
-  className?: string
+  icon?: typeof Users
+  ariaLabel: string
 }) {
   return (
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className={`h-9 rounded-md border border-border bg-background px-3 text-xs outline-none transition-colors focus:border-blue-500/60 ${className}`}
-    >
-      {options.map((option) => (
-        <option
-          key={option.value || "all"}
-          value={option.value}
-        >
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <div className="relative min-w-0">
+      {Icon ? (
+        <Icon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-blue-400" />
+      ) : null}
+
+      <select
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={`h-10 w-full appearance-none rounded-lg border border-border bg-transparent pr-9 text-xs outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/70 ${
+          Icon ? "pl-9" : "pl-3"
+        }`}
+      >
+        {options.map((option) => (
+          <option
+            key={option.value || `all-${ariaLabel}`}
+            value={option.value}
+          >
+            {option.label}
+          </option>
+        ))}
+      </select>
+
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+    </div>
   )
 }
 
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") {
+    return "—"
+  }
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value)
+  }
+
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
+function displayChangeValue(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "—"
+  }
+
+  if (typeof value === "object") {
+    return formatValue(value)
+  }
+
+  return String(value)
+}
+
 function ChangeList({ changes }: { changes: unknown }) {
-  if (!Array.isArray(changes) || !changes.length) return null
+  if (!Array.isArray(changes) || changes.length === 0) {
+    return null
+  }
 
   const visible = changes.slice(0, 120) as Array<
     Record<string, unknown>
   >
 
   return (
-    <div className="space-y-2">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        Changes
-      </div>
+    <div className="overflow-hidden rounded-lg border border-border">
+      {visible.map((change, index) => {
+        const oldValue = change.old
+        const newValue = change.new
 
-      <div className="overflow-hidden rounded-lg border border-border">
-        {visible.map((change, index) => {
-          const oldValue = change.old
-          const newValue = change.new
-          const label = String(
-            change.rank ??
-              change.name ??
-              change.label ??
-              change.field ??
-              change.discordId ??
-              `Change ${index + 1}`,
-          )
+        const rank = String(
+          change.rank ??
+            change.name ??
+            change.discordId ??
+            `Change ${index + 1}`,
+        )
 
-          return (
-            <div
-              key={`${label}-${index}`}
-              className="grid gap-3 border-b border-border p-3 last:border-b-0 sm:grid-cols-[minmax(140px,0.8fr)_1fr]"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-foreground">
-                  {label}
-                </p>
-                {change.discordId ? (
-                  <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                    {String(change.discordId)}
-                  </p>
-                ) : null}
-              </div>
+        return (
+          <div
+            key={`${rank}-${index}`}
+            className="grid gap-4 border-b border-border p-3 last:border-b-0 md:grid-cols-[1.1fr_1fr_1fr]"
+          >
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Requirement
+              </p>
 
-              <div className="min-w-0">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-md border border-red-500/15 bg-red-500/5 p-2">
-                    <p className="text-[9px] font-semibold uppercase tracking-wide text-red-400">
-                      Old
-                    </p>
-                    <p className="mt-1 break-words text-xs text-muted-foreground">
-                      {formatValue(oldValue)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-md border border-blue-500/15 bg-blue-500/5 p-2">
-                    <p className="text-[9px] font-semibold uppercase tracking-wide text-blue-400">
-                      New
-                    </p>
-                    <p className="mt-1 break-words text-xs font-medium text-foreground">
-                      {formatValue(newValue)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <p className="mt-1 break-words text-xs font-medium text-foreground">
+                {rank}
+              </p>
             </div>
-          )
-        })}
-      </div>
 
-      {changes.length > visible.length ? (
-        <p className="text-[10px] text-muted-foreground">
-          Showing the first {visible.length} changes. {changes.length} values
-          were recorded in total.
-        </p>
-      ) : null}
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Old
+              </p>
+
+              <p className="mt-1 break-words text-xs text-muted-foreground line-through decoration-red-500/70">
+                {displayChangeValue(oldValue)}
+              </p>
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                New
+              </p>
+
+              <p className="mt-1 break-words text-xs font-semibold text-emerald-400">
+                {displayChangeValue(newValue)}
+              </p>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
 function DetailPanel({ log }: { log: ActionLog }) {
   const details = log.details ?? {}
-  const extraDetails = Object.entries(details).filter(
-    ([key]) => key !== "changes",
+
+  const additionalDetails = Object.entries(details).filter(
+    ([key]) =>
+      key !== "changes" &&
+      key !== "old" &&
+      key !== "new",
   )
 
   return (
-    <div className="border-t border-border bg-muted/[0.08] px-4 py-4">
-      <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
-        <div className="min-w-0 space-y-4">
-          <ChangeList changes={details.changes} />
+    <div className="border-t border-border bg-muted/5 px-4 py-4">
+      <div className="grid gap-4">
+        <ChangeList changes={details.changes} />
 
-          {extraDetails.length ? (
-            <div className="rounded-lg border border-border bg-background/40 p-3">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Additional details
-              </p>
-
-              <div className="divide-y divide-border">
-                {extraDetails.map(([key, value]) => (
-                  <div
-                    key={key}
-                    className="grid gap-1 py-2 sm:grid-cols-[150px_1fr]"
-                  >
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {actionLabel(key)}
-                    </span>
-                    <pre className="m-0 whitespace-pre-wrap break-words font-sans text-xs text-foreground/90">
-                      {formatValue(value)}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="space-y-3">
-          <div className="rounded-lg border border-border bg-background/40 p-3">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Changed by
             </p>
 
-            <div className="mt-2">
-              <CopyMenu
-                name={log.userName || log.username || "Unknown User"}
-                id={log.userId}
-                avatar={log.avatar}
-              />
-            </div>
-
-            <div className="mt-2 space-y-1 text-[10px] text-muted-foreground">
-              {log.rank ? <p>{log.rank}</p> : null}
-              {log.callsign ? <p>Callsign: {log.callsign}</p> : null}
-              {log.badgeNumber ? <p>Badge: {log.badgeNumber}</p> : null}
-              {log.userId ? (
-                <p className="break-all">{log.userId}</p>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-border bg-background/40 p-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Entry
-                </p>
-                <p className="mt-1 font-mono text-sm font-semibold text-blue-400">
-                  #{log.entryNumber}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Recorded
-                </p>
-                <p className="mt-1 text-xs font-medium">
-                  {relativeTime(log.createdAt)}
-                </p>
-              </div>
-            </div>
-
-            <p className="mt-2 text-[10px] text-muted-foreground">
-              {formatDateTime(log.createdAt)}
+            <p className="mt-1 text-xs font-medium text-blue-400">
+              {log.username || log.userName || "Unknown user"}
             </p>
           </div>
 
-          {log.targetName || log.targetRank || log.targetUserId ? (
-            <div className="rounded-lg border border-border bg-background/40 p-3">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Target
-              </p>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Entry
+            </p>
 
-              <div className="space-y-1.5 text-xs">
-                {log.targetName ? (
-                  <p>
-                    <span className="text-muted-foreground">Name: </span>
+            <p className="mt-1 font-mono text-xs font-medium text-foreground">
+              #{log.entryNumber}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Discord ID
+            </p>
+
+            <p className="mt-1 break-all text-xs font-medium text-foreground">
+              {log.userId || "—"}
+            </p>
+          </div>
+        </div>
+
+        {log.targetName || log.targetRank || log.targetUserId ? (
+          <div className="border-t border-border pt-4">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Target
+            </p>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {log.targetName ? (
+                <div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Name
+                  </p>
+
+                  <p className="mt-1 text-xs font-medium">
                     {log.targetName}
                   </p>
-                ) : null}
+                </div>
+              ) : null}
 
-                {log.targetRank ? (
-                  <p>
-                    <span className="text-muted-foreground">Rank: </span>
+              {log.targetRank ? (
+                <div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Rank
+                  </p>
+
+                  <p className="mt-1 text-xs font-medium">
                     {log.targetRank}
                   </p>
-                ) : null}
+                </div>
+              ) : null}
 
-                {log.targetUserId ? (
-                  <p className="break-all">
-                    <span className="text-muted-foreground">
-                      Discord ID:{" "}
-                    </span>
+              {log.targetUserId ? (
+                <div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Discord ID
+                  </p>
+
+                  <p className="mt-1 break-all text-xs font-medium">
                     {log.targetUserId}
                   </p>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          </div>
+        ) : null}
+
+        {additionalDetails.length > 0 ? (
+          <div className="border-t border-border pt-4">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Additional details
+            </p>
+
+            <div className="divide-y divide-border">
+              {additionalDetails.map(([key, value]) => (
+                <div
+                  key={key}
+                  className="grid gap-1 py-2 sm:grid-cols-[160px_1fr]"
+                >
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {actionLabel(key)}
+                  </span>
+
+                  <pre className="m-0 whitespace-pre-wrap break-words font-sans text-xs text-foreground/90">
+                    {formatValue(value)}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Action
+            </p>
+
+            <p className="mt-1 text-xs font-medium">
+              {actionLabel(log.action)}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Recorded
+            </p>
+
+            <p className="mt-1 text-xs font-medium">
+              {formatDateTime(log.createdAt)}
+            </p>
+          </div>
         </div>
+
+        {log.path ? (
+          <p className="break-all border-t border-border pt-3 text-[10px] text-muted-foreground">
+            {log.path}
+          </p>
+        ) : null}
       </div>
     </div>
-  )
-}
-
-function LogRow({
-  log,
-  expanded,
-  onToggle,
-}: {
-  log: ActionLog
-  expanded: boolean
-  onToggle: () => void
-}) {
-  const Icon = getLogIcon(log)
-
-  const moduleLabel =
-    log.module === "promotion" ? "Promotion" : "Activity"
-
-  return (
-    <article className="border-b border-border last:border-b-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="group grid w-full gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/20 md:grid-cols-[42px_minmax(170px,0.65fr)_minmax(300px,1.7fr)_auto] md:items-center"
-      >
-        <div className="flex items-center">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-            <Icon className="h-3.5 w-3.5 text-blue-400" />
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <CopyMenu
-            name={log.userName || log.username || "Unknown User"}
-            id={log.userId}
-            avatar={log.avatar}
-          />
-
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-            {log.rank ? <span>{log.rank}</span> : null}
-            {log.callsign ? (
-              <>
-                <span>•</span>
-                <span>{log.callsign}</span>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-blue-400">
-              {moduleLabel}
-            </span>
-
-            <span className="rounded border border-border bg-muted/30 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
-              {divisionLabel(log.division)}
-            </span>
-
-            <span className="text-[10px] text-muted-foreground">
-              {actionLabel(log.category)}
-            </span>
-          </div>
-
-          <p className="mt-1 truncate text-sm font-medium text-foreground">
-            {log.summary}
-          </p>
-
-          <p className="mt-0.5 text-[10px] text-muted-foreground">
-            #{log.entryNumber} · {relativeTime(log.createdAt)}
-          </p>
-        </div>
-
-        <div className="flex items-center justify-end gap-2">
-          <span className="hidden rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-400 lg:inline-flex">
-            {expanded ? "Open" : "Updated"}
-          </span>
-
-          <ChevronDown
-            className={`h-4 w-4 text-muted-foreground transition-transform ${
-              expanded ? "rotate-180" : ""
-            }`}
-          />
-        </div>
-      </button>
-
-      {expanded ? <DetailPanel log={log} /> : null}
-    </article>
   )
 }
 
@@ -758,10 +740,11 @@ export default function ActionLogs() {
   const [module, setModule] = useState<Module>("")
   const [category, setCategory] = useState<Category>("")
   const [division, setDivision] = useState<Division>("")
-  const [user, setUser] = useState("")
+  const [userId, setUserId] = useState("")
   const [search, setSearch] = useState("")
 
   const [expanded, setExpanded] = useState<string | null>(null)
+
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [pages, setPages] = useState(1)
@@ -780,7 +763,7 @@ export default function ActionLogs() {
       if (module) params.set("module", module)
       if (category) params.set("category", category)
       if (division) params.set("division", division)
-      if (user) params.set("userId", user)
+      if (userId) params.set("userId", userId)
       if (search.trim()) params.set("search", search.trim())
 
       const response = await fetch(
@@ -803,7 +786,9 @@ export default function ActionLogs() {
         )
       }
 
-      setLogs(Array.isArray(data.logs) ? data.logs : [])
+      const nextLogs = Array.isArray(data.logs) ? data.logs : []
+
+      setLogs(nextLogs)
       setTotal(data.pagination?.total ?? 0)
       setPages(data.pagination?.pages ?? 1)
 
@@ -817,6 +802,7 @@ export default function ActionLogs() {
       setLogs([])
       setTotal(0)
       setPages(1)
+
       setError(
         err instanceof Error
           ? err.message
@@ -832,7 +818,7 @@ export default function ActionLogs() {
     page,
     pageSize,
     search,
-    user,
+    userId,
   ])
 
   useEffect(() => {
@@ -850,18 +836,20 @@ export default function ActionLogs() {
     for (const log of logs) {
       if (!log.userId) continue
 
-      const name =
+      const label =
         log.userName ||
         log.username ||
         log.userId
 
-      map.set(log.userId, name)
+      map.set(log.userId, label)
     }
 
     return [
       { value: "", label: "All users" },
       ...Array.from(map.entries())
-        .sort((a, b) => a[1].localeCompare(b[1]))
+        .sort((a, b) =>
+          a[1].localeCompare(b[1]),
+        )
         .map(([value, label]) => ({
           value,
           label,
@@ -875,6 +863,7 @@ export default function ActionLogs() {
     for (const log of logs) {
       const key = dateHeading(log.createdAt)
       const current = map.get(key) ?? []
+
       current.push(log)
       map.set(key, current)
     }
@@ -883,36 +872,40 @@ export default function ActionLogs() {
   }, [logs])
 
   const clearFilters = () => {
-    setModule("")
     setCategory("")
     setDivision("")
-    setUser("")
+    setUserId("")
     setSearch("")
     setPage(1)
     setExpanded(null)
   }
 
-  const setModuleTab = (value: Module) => {
+  const selectModule = (value: Module) => {
     setModule(value)
     setPage(1)
     setExpanded(null)
   }
 
-  const start = total ? (page - 1) * pageSize + 1 : 0
-  const end = Math.min(page * pageSize, total)
+  const start = total
+    ? (page - 1) * pageSize + 1
+    : 0
+
+  const end = total
+    ? Math.min(page * pageSize, total)
+    : 0
 
   const hasFilters = Boolean(
-    module ||
-      category ||
+    category ||
       division ||
-      user ||
+      userId ||
       search,
   )
 
   return (
     <DashboardLayout>
       <div className="mx-auto w-full max-w-[1120px] px-4 py-6 sm:px-6 lg:px-0">
-        <header className="mb-5 flex items-start justify-between gap-4">
+        {/* Header */}
+        <header className="mb-6 flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10">
               <History className="h-5 w-5 text-blue-400" />
@@ -924,14 +917,14 @@ export default function ActionLogs() {
                   Action Logs
                 </h1>
 
-                <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                  Last 60 days
+                <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
+                  60 days
                 </span>
               </div>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Every change your command team has made. Older entries
-                are automatically removed after 60 days.
+                Every change your command team has made. Older
+                entries aren't kept here.
               </p>
             </div>
           </div>
@@ -939,52 +932,48 @@ export default function ActionLogs() {
           <button
             type="button"
             onClick={() => void loadLogs()}
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-card px-3 text-xs font-medium transition-colors hover:bg-muted"
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
           >
             <RefreshCw
               className={`h-3.5 w-3.5 text-blue-400 ${
                 loading ? "animate-spin" : ""
               }`}
             />
+
             Refresh
           </button>
         </header>
 
-        <section className="mb-4 rounded-xl border border-border bg-card p-2">
-          <div className="flex flex-wrap items-center gap-1">
-            {moduleTabs.map((tab) => {
-              const Icon = tab.icon
-              const active = module === tab.value
+        {/* Module tabs */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {moduleOptions.map((option) => {
+            const active = module === option.value
 
-              return (
-                <button
-                  key={tab.value || "all"}
-                  type="button"
-                  onClick={() => setModuleTab(tab.value)}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${
-                    active
-                      ? "bg-blue-500/10 text-blue-400"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {tab.label}
-                  {tab.value ? (
-                    <span className="ml-0.5 text-[9px] opacity-60">
-                      {tab.value === "promotion"
-                        ? "PROM"
-                        : "ACT"}
-                    </span>
-                  ) : null}
-                </button>
-              )
-            })}
-          </div>
-        </section>
+            return (
+              <button
+                key={option.value || "all"}
+                type="button"
+                onClick={() =>
+                  selectModule(
+                    option.value as Module,
+                  )
+                }
+                className={`h-9 rounded-lg px-3.5 text-xs font-medium transition-colors ${
+                  active
+                    ? "border border-blue-500/60 bg-blue-500/10 text-blue-400"
+                    : "border border-border bg-transparent text-muted-foreground hover:border-blue-500/30 hover:bg-blue-500/5 hover:text-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            )
+          })}
+        </div>
 
-        <section className="mb-5 rounded-xl border border-border bg-card p-3 shadow-sm">
-          <div className="grid gap-2 lg:grid-cols-[minmax(240px,1fr)_170px_170px_170px_170px_auto]">
-            <div className="relative">
+        {/* Search + filters — deliberately no surrounding box */}
+        <section className="mb-4">
+          <div className="grid gap-2 md:grid-cols-[minmax(240px,1fr)_170px_170px_170px_170px_auto]">
+            <div className="relative min-w-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
               <input
@@ -992,38 +981,13 @@ export default function ActionLogs() {
                 onChange={(event) => {
                   setSearch(event.target.value)
                   setPage(1)
-                  setExpanded(null)
                 }}
                 placeholder="Search entries, people, ranks, IDs..."
-                className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-9 text-xs outline-none transition-colors focus:border-blue-500/60"
+                className="h-10 w-full rounded-lg border border-border bg-transparent pl-9 pr-3 text-xs outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/60"
               />
-
-              {search ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearch("")
-                    setPage(1)
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Clear search"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              ) : null}
             </div>
 
-            <SelectBox
-              value={user}
-              options={userOptions}
-              onChange={(value) => {
-                setUser(value)
-                setPage(1)
-                setExpanded(null)
-              }}
-            />
-
-            <SelectBox
+            <FilterSelect
               value={category}
               options={categoryOptions}
               onChange={(value) => {
@@ -1031,9 +995,10 @@ export default function ActionLogs() {
                 setPage(1)
                 setExpanded(null)
               }}
+              ariaLabel="Category"
             />
 
-            <SelectBox
+            <FilterSelect
               value={division}
               options={divisionOptions}
               onChange={(value) => {
@@ -1041,164 +1006,252 @@ export default function ActionLogs() {
                 setPage(1)
                 setExpanded(null)
               }}
+              ariaLabel="Division"
             />
 
-            <div className="flex items-center gap-2">
-              <select
-                value={pageSize}
-                onChange={(event) => {
-                  setPageSize(Number(event.target.value))
-                  setPage(1)
-                }}
-                className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-xs outline-none focus:border-blue-500/60"
-                aria-label="Logs per page"
-              >
-                <option value={25}>25 / page</option>
-                <option value={50}>50 / page</option>
-                <option value={75}>75 / page</option>
-                <option value={100}>100 / page</option>
-              </select>
+            <FilterSelect
+              value={userId}
+              options={userOptions}
+              onChange={(value) => {
+                setUserId(value)
+                setPage(1)
+                setExpanded(null)
+              }}
+              icon={Users}
+              ariaLabel="User"
+            />
 
-              {hasFilters ? (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-                  title="Clear filters"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              ) : null}
-            </div>
+            <FilterSelect
+              value=""
+              options={[
+                { value: "", label: "All actions" },
+              ]}
+              onChange={() => {
+                // Reserved for future action-level filtering.
+              }}
+              ariaLabel="Action"
+            />
+
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs text-muted-foreground transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </button>
+            ) : null}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-[11px] text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span>{total.toLocaleString()} changes</span>
-
-              {hasFilters ? (
-                <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-medium text-blue-400">
-                  Filtered
-                </span>
-              ) : null}
-            </div>
+          <div className="mt-3 flex items-center justify-between gap-3 border-b border-border pb-3 text-[11px] text-muted-foreground">
+            <span>
+              {total.toLocaleString()} entries
+            </span>
 
             <span>
-              Showing {start.toLocaleString()}–
-              {end.toLocaleString()}
+              {total
+                ? `Showing ${start.toLocaleString()}–${end.toLocaleString()}`
+                : "Showing 0–0"}
             </span>
           </div>
         </section>
 
         {error ? (
-          <div className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
-            <span>{error}</span>
-
-            <button
-              type="button"
-              onClick={() => void loadLogs()}
-              className="shrink-0 rounded-md border border-red-500/20 px-2.5 py-1.5 text-xs hover:bg-red-500/10"
-            >
-              Retry
-            </button>
+          <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
+            {error}
           </div>
         ) : null}
 
-        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        {/* Logs */}
+        <section>
           {loading && !logs.length ? (
-            <div className="flex min-h-[360px] items-center justify-center text-sm text-muted-foreground">
+            <div className="flex min-h-[300px] items-center justify-center text-sm text-muted-foreground">
               <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
               Loading action logs...
             </div>
           ) : null}
 
           {!loading && !logs.length ? (
-            <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-blue-500/15 bg-blue-500/5">
-                <History className="h-6 w-6 text-blue-400/70" />
-              </div>
+            <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
+              <History className="h-8 w-8 text-muted-foreground" />
 
-              <p className="mt-4 font-medium">
+              <p className="mt-3 font-medium">
                 No action logs found
               </p>
 
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                {hasFilters
-                  ? "Try clearing the filters or changing your search."
-                  : "Action logs will appear here when dashboard changes are made."}
+              <p className="mt-1 text-sm text-muted-foreground">
+                Try clearing the filters or perform a dashboard action.
               </p>
-
-              {hasFilters ? (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs hover:bg-muted"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Clear filters
-                </button>
-              ) : null}
             </div>
           ) : null}
 
           {grouped.map(([heading, group]) => (
-            <div key={heading}>
-              <div className="border-b border-border bg-card px-4 py-2.5">
+            <div key={heading} className="mb-6">
+              <div className="mb-2">
                 <span className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
                   {heading}
                 </span>
               </div>
 
-              <div>
-                {group.map((log) => (
-                  <LogRow
-                    key={log.id}
-                    log={log}
-                    expanded={expanded === log.id}
-                    onToggle={() =>
-                      setExpanded((current) =>
-                        current === log.id ? null : log.id,
-                      )
-                    }
-                  />
-                ))}
+              <div className="space-y-2">
+                {group.map((log) => {
+                  const Icon = getLogIcon(log)
+                  const isOpen = expanded === log.id
+
+                  return (
+                    <article
+                      key={log.id}
+                      className="overflow-hidden rounded-lg border border-border bg-transparent transition-colors hover:border-blue-500/30"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpanded(
+                            isOpen ? null : log.id,
+                          )
+                        }
+                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-blue-500/[0.025] md:grid-cols-[50px_42px_minmax(150px,0.7fr)_minmax(280px,2fr)_auto] md:items-center"
+                      >
+                        <div className="font-mono text-xs font-bold text-blue-400">
+                          #{log.entryNumber}
+                        </div>
+
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-500/30 bg-blue-500/10">
+                          <Icon className="h-4 w-4 text-blue-400" />
+                        </div>
+
+                        <div className="min-w-0">
+                          <CopyMenu
+                            name={
+                              log.userName ||
+                              log.username ||
+                              "Unknown User"
+                            }
+                            id={log.userId}
+                            avatar={log.avatar}
+                          />
+
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <span>
+                              {log.rank ||
+                                "Unknown rank"}
+                            </span>
+
+                            {log.callsign ? (
+                              <>
+                                <span>•</span>
+                                <span>
+                                  {log.callsign}
+                                </span>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[9px] font-semibold text-blue-400">
+                              {moduleLabel(log.module)}
+                            </span>
+
+                            <span className="rounded-full border border-border px-2 py-0.5 text-[9px] text-muted-foreground">
+                              {divisionLabel(
+                                log.division,
+                              )}
+                            </span>
+                          </div>
+
+                          <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                            {log.summary}
+                          </p>
+
+                          <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                            {actionLabel(log.action)}{" "}
+                            · {relativeTime(log.createdAt)}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-3">
+                          <span className="hidden rounded-full border border-blue-500/40 px-2 py-0.5 text-[9px] font-semibold text-blue-400 lg:inline-flex">
+                            Updated
+                          </span>
+
+                          {isOpen ? (
+                            <ChevronUp className="h-4 w-4 text-blue-400" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                      </button>
+
+                      {isOpen ? (
+                        <DetailPanel log={log} />
+                      ) : null}
+                    </article>
+                  )
+                })}
               </div>
             </div>
           ))}
         </section>
 
-        {pages > 1 || total > 0 ? (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
-            <div className="text-xs text-muted-foreground">
-              Page <span className="font-medium text-foreground">{page}</span>{" "}
-              of <span className="font-medium text-foreground">{pages}</span>
+        {/* Pagination */}
+        {total > 0 ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>
+                Page {page} of {pages}
+              </span>
+
+              <select
+                value={pageSize}
+                onChange={(event) => {
+                  setPageSize(
+                    Number(event.target.value),
+                  )
+                  setPage(1)
+                }}
+                className="h-8 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-blue-500/60"
+              >
+                <option value={25}>
+                  25 / page
+                </option>
+                <option value={50}>
+                  50 / page
+                </option>
+                <option value={75}>
+                  75 / page
+                </option>
+                <option value={100}>
+                  100 / page
+                </option>
+              </select>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 disabled={page <= 1 || loading}
                 onClick={() =>
-                  setPage((value) => Math.max(1, value - 1))
+                  setPage((value) => value - 1)
                 }
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-xs transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+                className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ArrowDown className="h-3 w-3 rotate-90" />
                 Previous
               </button>
 
               <button
                 type="button"
-                disabled={page >= pages || loading}
-                onClick={() =>
-                  setPage((value) =>
-                    Math.min(pages, value + 1),
-                  )
+                disabled={
+                  page >= pages || loading
                 }
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-xs transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+                onClick={() =>
+                  setPage((value) => value + 1)
+                }
+                className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Next
-                <ArrowUp className="h-3 w-3 rotate-90" />
               </button>
             </div>
           </div>
