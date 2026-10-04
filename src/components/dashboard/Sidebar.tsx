@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   LogOut,
   RefreshCw,
+  List,
 } from "lucide-react"
 
 import {
@@ -1271,6 +1272,31 @@ export default function DashboardSidebar() {
 
                           <span>
                             Promotion Roster
+                          </span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip="Action Logs"
+                        isActive={isRouteActive(
+                          "/dashboard/promotion/actionlogs",
+                        )}
+                        className={
+                          navigationButtonClass
+                        }
+                      >
+                        <NavLink
+                          to="/dashboard/promotion/promotionroster"
+                          end
+                          className="text-sidebar-foreground"
+                        >
+                          <List  className="h-4 w-4 shrink-0" />
+
+                          <span>
+                            Action Logs
                           </span>
                         </NavLink>
                       </SidebarMenuButton>
