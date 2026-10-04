@@ -132,12 +132,23 @@ const GALLERY_TAGS: readonly GalleryTag[] = [
 ]
 
 const GALLERY_TAG_CLASSES: Record<GalleryTag, string> = {
-  Dept: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  SWAT: "border-slate-500/40 bg-slate-800/80 text-slate-100 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-100",
-  "MTF-7": "border-sky-500/30 bg-sky-500/10 text-sky-800 dark:text-sky-300",
-  MCD: "border-blue-950/40 bg-blue-950/15 text-blue-950 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200",
-  TRU: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
-  SAR: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
+  Dept:
+    "border-blue-500/35 bg-blue-500/10 text-blue-700 dark:border-blue-400/40 dark:bg-blue-500/20 dark:text-blue-300",
+
+  SWAT:
+    "border-slate-500/40 bg-slate-900/10 text-slate-800 dark:border-slate-500/50 dark:bg-slate-800/85 dark:text-slate-100",
+
+  "MTF-7":
+    "border-blue-700/30 bg-blue-700/10 text-blue-800 dark:border-blue-500/40 dark:bg-blue-900/55 dark:text-blue-300",
+
+  MCD:
+    "border-blue-950/40 bg-blue-950/10 text-blue-950 dark:border-blue-900/60 dark:bg-blue-950/75 dark:text-blue-200",
+
+  TRU:
+    "border-yellow-500/35 bg-yellow-500/10 text-yellow-700 dark:border-yellow-400/40 dark:bg-yellow-500/15 dark:text-yellow-300",
+
+  SAR:
+    "border-red-500/35 bg-red-500/10 text-red-700 dark:border-red-400/40 dark:bg-red-500/15 dark:text-red-300",
 }
 type GalleryMediaFilter = "All" | "Images" | "Videos"
 
