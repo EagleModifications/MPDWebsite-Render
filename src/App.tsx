@@ -103,11 +103,8 @@ function PageProtection() {
     useState<PageProtectionState>("checking")
 
   /*
-   * These pages must never be intercepted by the
-   * page-protection system.
-   *
-   * Otherwise /verifying could redirect to itself
-   * while the permission check is taking place.
+   * Authentication/system pages are never checked by the
+   * frontend page-protection middleware.
    */
   const protectionExemptRoutes = [
     "/sign-in",
@@ -121,10 +118,6 @@ function PageProtection() {
     protectionExemptRoutes.includes(location.pathname)
 
   useEffect(() => {
-    /*
-     * Do not perform page protection checks on
-     * the system/redirect pages.
-     */
     if (isProtectionExempt) {
       setState("allowed")
       return
@@ -148,13 +141,39 @@ function PageProtection() {
           },
         )
 
+        let data: {
+          allowed?: boolean
+          protected?: boolean
+        } = {}
+
+        try {
+          data = await response.json()
+        } catch {
+          data = {}
+        }
+
         if (cancelled) {
           return
         }
 
         /*
-         * The page is protected and the user
-         * is not authenticated.
+         * PUBLIC PAGE
+         *
+         * protectedUrls is the only master switch for frontend
+         * page protection. If this URL is not in that list, the
+         * visitor is allowed through without authentication.
+         */
+        if (
+          response.ok &&
+          data.allowed === true &&
+          data.protected === false
+        ) {
+          setState("allowed")
+          return
+        }
+
+        /*
+         * Protected page + no active session.
          */
         if (response.status === 401) {
           setState("unauthenticated")
@@ -162,8 +181,8 @@ function PageProtection() {
         }
 
         /*
-         * The page is protected and the user
-         * does not have the required permission.
+         * Protected page + authenticated user without the
+         * required MongoDB web permission.
          */
         if (response.status === 403) {
           setState("forbidden")
@@ -171,25 +190,23 @@ function PageProtection() {
         }
 
         /*
-         * The permission check itself failed.
+         * Protected page successfully authorized.
          */
-        if (!response.ok) {
-          setState("error")
+        if (
+          response.ok &&
+          data.allowed === true
+        ) {
+          setState("allowed")
           return
         }
 
-        /*
-         * Either:
-         *
-         * - The page is public because it is not in
-         *   protectedUrls
-         *
-         * OR
-         *
-         * - The user has the required permission.
-         */
-        setState("allowed")
-      } catch {
+        setState("error")
+      } catch (error) {
+        console.error(
+          "Page protection check failed:",
+          error,
+        )
+
         if (!cancelled) {
           setState("error")
         }
@@ -207,30 +224,35 @@ function PageProtection() {
     isProtectionExempt,
   ])
 
+  if (isProtectionExempt) {
+    return <Outlet />
+  }
+
   /*
-   * The permission check is currently running.
+   * DO NOT redirect to /verifying while every route is still
+   * being checked.
    *
-   * Send the user to the dedicated verifying page.
+   * The server must first tell us whether the URL is public.
+   * Otherwise public pages can accidentally enter the login
+   * flow before the protection result is known.
    */
-  if (
-    state === "checking" &&
-    !isProtectionExempt
-  ) {
+  if (state === "checking") {
     return (
-      <Navigate
-        to="/verifying"
-        replace
-        state={{
-          from:
-            location.pathname +
-            location.search,
-        }}
-      />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+
+          <p className="text-sm text-muted-foreground">
+            Checking access...
+          </p>
+        </div>
+      </div>
     )
   }
 
   /*
-   * Protected page but no active session.
+   * This redirect can ONLY happen after the server has
+   * determined that the requested URL is protected.
    */
   if (state === "unauthenticated") {
     return (
@@ -246,10 +268,6 @@ function PageProtection() {
     )
   }
 
-  /*
-   * User is authenticated but does not have
-   * the required web permission.
-   */
   if (state === "forbidden") {
     return (
       <Navigate
@@ -264,9 +282,6 @@ function PageProtection() {
     )
   }
 
-  /*
-   * Permission system/server error.
-   */
   if (state === "error") {
     return (
       <Navigate
@@ -281,105 +296,7 @@ function PageProtection() {
     )
   }
 
-  /*
-   * Access has been granted.
-   */
-  if (state === "allowed") {
-    return <Outlet />
-  }
-
-  return null
-}
-
-/* =========================================================
-   SITE PROTECTION
-========================================================= */
-
-function useSiteProtection() {
-  useEffect(() => {
-    /*
-     * Disable right-click context menu.
-     */
-    const handleContextMenu = (event: MouseEvent) => {
-      event.preventDefault()
-    }
-
-    /*
-     * Disable common browser developer-tool shortcuts.
-     *
-     * This is only a client-side deterrent and is NOT
-     * a security mechanism.
-     */
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase()
-
-      const isF12 =
-        event.key === "F12"
-
-      const isDeveloperTools =
-        event.ctrlKey &&
-        event.shiftKey &&
-        (
-          key === "i" ||
-          key === "j" ||
-          key === "c"
-        )
-
-      const isViewSource =
-        event.ctrlKey &&
-        key === "u"
-
-      if (
-        isF12 ||
-        isDeveloperTools ||
-        isViewSource
-      ) {
-        event.preventDefault()
-        event.stopPropagation()
-      }
-    }
-
-    /*
-     * Prevent normal page content from being dragged.
-     */
-    const handleDragStart = (event: DragEvent) => {
-      event.preventDefault()
-    }
-
-    document.addEventListener(
-      "contextmenu",
-      handleContextMenu,
-    )
-
-    document.addEventListener(
-      "keydown",
-      handleKeyDown,
-      true,
-    )
-
-    document.addEventListener(
-      "dragstart",
-      handleDragStart,
-    )
-
-    return () => {
-      document.removeEventListener(
-        "contextmenu",
-        handleContextMenu,
-      )
-
-      document.removeEventListener(
-        "keydown",
-        handleKeyDown,
-        true,
-      )
-
-      document.removeEventListener(
-        "dragstart",
-        handleDragStart,
-      )
-    }
-  }, [])
+  return <Outlet />
 }
 
 /* =========================================================
