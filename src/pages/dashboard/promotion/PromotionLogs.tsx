@@ -25,7 +25,6 @@ import {
   useEffect,
   useMemo,
   useState,
-  type MouseEvent,
 } from "react"
 import { toast } from "sonner"
 
