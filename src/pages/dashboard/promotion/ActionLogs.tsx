@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react"
 
@@ -978,7 +977,6 @@ export default function ActionLogs() {
   const start = total ? (page - 1) * pageSize + 1 : 0
   const end = total ? Math.min(page * pageSize, total) : 0
   const hasFilters = Boolean(category || division || userId || action || search)
-  const activeFilterCount = [category, division, userId, action, search].filter(Boolean).length
 
   return (
     <DashboardLayout>
