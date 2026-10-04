@@ -500,7 +500,7 @@ export default function Navbar() {
             >
               <Link to="/login">
                 <LogIn className="h-4 w-4" />
-                Login
+                Log In
               </Link>
             </Button>
           )}
