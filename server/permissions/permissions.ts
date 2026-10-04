@@ -4,54 +4,80 @@ import path from "node:path"
 import type { AuthUser } from "../types"
 import { getMongoDb } from "../../src/lib/mongodb"
 
-type AdminConfig = {
+export type AdminConfig = {
   adminRanks: string[]
   superAdminDiscordIds: string[]
+  protectedUrls: string[]
 }
 
-type PermissionDocument = {
+export type PermissionDefinition = {
   key: string
   name?: string
   description?: string
   urls: string[]
-  createdAt?: Date
-  updatedAt?: Date
 }
 
-type RankPermissionDocument = {
+export type RankPermissionEntry = {
   rank: string
   permissions: string[]
-  createdAt?: Date
-  updatedAt?: Date
 }
 
-type DiscordPermissionDocument = {
+export type DiscordPermissionEntry = {
   discordId: string
   permissions: string[]
-  createdAt?: Date
+}
+
+/**
+ * MongoDB uses ONE collection and ONE document.
+ *
+ * permissions
+ * └── _id: "main"
+ *     ├── definitions: []
+ *     ├── ranks: []
+ *     └── discord: []
+ *
+ * Admin ranks, Super Admin Discord IDs, and the protected admin URLs remain
+ * in config/admin_permissions.json.
+ */
+export type PermissionStoreDocument = {
+  _id: "main"
+  definitions: PermissionDefinition[]
+  ranks: RankPermissionEntry[]
+  discord: DiscordPermissionEntry[]
   updatedAt?: Date
 }
 
-const PERMISSION_COLLECTION = "permissionDefinitions"
-const RANK_COLLECTION = "rankPermissions"
-const DISCORD_COLLECTION = "discordPermissionOverrides"
-
-// This is the only permission that is hard-coded into the application.
-// Admin ranks in admin_permissions.json receive it automatically.
+export const PERMISSIONS_COLLECTION = "permissions"
 export const PERMISSION_ADMIN = "permissionadmin"
+export const PERMISSION_STORE_ID = "main"
 
 let permissionInitializationPromise: Promise<void> | null = null
 
 function readAdminConfig(): AdminConfig {
-  const file = path.join(process.cwd(), "config", "admin_permissions.json")
-  return JSON.parse(fs.readFileSync(file, "utf8")) as AdminConfig
+  const file = path.join(
+    process.cwd(),
+    "config",
+    "admin_permissions.json",
+  )
+
+  const parsed = JSON.parse(
+    fs.readFileSync(file, "utf8"),
+  ) as Partial<AdminConfig>
+
+  return {
+    adminRanks: uniqueStrings(parsed.adminRanks),
+    superAdminDiscordIds: uniqueStrings(
+      parsed.superAdminDiscordIds,
+    ),
+    protectedUrls: uniqueStrings(parsed.protectedUrls),
+  }
 }
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
-function uniqueStrings(values: unknown): string[] {
+export function uniqueStrings(values: unknown): string[] {
   if (!Array.isArray(values)) return []
 
   return Array.from(
@@ -67,48 +93,195 @@ function normalise(value: string): string {
   return clean(value).toLowerCase()
 }
 
+function normaliseStore(
+  document?: Partial<PermissionStoreDocument> | null,
+): PermissionStoreDocument {
+  const definitions = Array.isArray(document?.definitions)
+    ? document.definitions
+        .map((item) => ({
+          key: clean(item?.key).toLowerCase(),
+          name: clean(item?.name),
+          description: clean(item?.description),
+          urls: uniqueStrings(item?.urls),
+        }))
+        .filter((item) => item.key && item.urls.length > 0)
+    : []
+
+  const ranks = Array.isArray(document?.ranks)
+    ? document.ranks
+        .map((item) => ({
+          rank: clean(item?.rank),
+          permissions: uniqueStrings(item?.permissions),
+        }))
+        .filter((item) => item.rank)
+    : []
+
+  const discord = Array.isArray(document?.discord)
+    ? document.discord
+        .map((item) => ({
+          discordId: clean(item?.discordId),
+          permissions: uniqueStrings(item?.permissions),
+        }))
+        .filter((item) => item.discordId)
+    : []
+
+  return {
+    _id: PERMISSION_STORE_ID,
+    definitions,
+    ranks,
+    discord,
+    updatedAt: document?.updatedAt,
+  }
+}
+
 export function isSuperAdmin(discordId: string): boolean {
   const id = clean(discordId)
   if (!id) return false
 
-  return uniqueStrings(readAdminConfig().superAdminDiscordIds).includes(id)
+  return readAdminConfig().superAdminDiscordIds.includes(id)
 }
 
 export function isAdminRank(rank: string): boolean {
   const normalized = normalise(rank)
   if (!normalized) return false
 
-  return uniqueStrings(readAdminConfig().adminRanks).some(
+  return readAdminConfig().adminRanks.some(
     (adminRank) => normalise(adminRank) === normalized,
   )
 }
 
 export function getAdminRanks(): string[] {
-  return uniqueStrings(readAdminConfig().adminRanks)
+  return readAdminConfig().adminRanks
 }
 
-export async function ensurePermissionIndexes() {
+export function getSuperAdminDiscordIds(): string[] {
+  return readAdminConfig().superAdminDiscordIds
+}
+
+export function getProtectedAdminUrls(): string[] {
+  return readAdminConfig().protectedUrls
+}
+
+async function getCollection() {
   const db = await getMongoDb()
+  return db.collection<PermissionStoreDocument>(PERMISSIONS_COLLECTION)
+}
 
-  await db.collection<PermissionDocument>(PERMISSION_COLLECTION).createIndex(
-    { key: 1 },
-    { unique: true, name: "permission_key" },
-  )
+/**
+ * Migrates the previous three-document layout into the new single-document
+ * layout once. This means existing Mongo data is not lost when the new code is
+ * deployed.
+ */
+async function migrateLegacyPermissionDocuments() {
+  const collection = await getCollection()
+  const current = await collection.findOne({
+    _id: PERMISSION_STORE_ID,
+  })
 
-  await db.collection<RankPermissionDocument>(RANK_COLLECTION).createIndex(
-    { rank: 1 },
-    { unique: true, name: "rank_name" },
-  )
+  const legacyDocuments = await collection
+    .find({
+      _id: { $ne: PERMISSION_STORE_ID },
+      type: { $in: ["definition", "rank", "discord"] },
+    })
+    .toArray()
 
-  await db.collection<DiscordPermissionDocument>(DISCORD_COLLECTION).createIndex(
-    { discordId: 1 },
-    { unique: true, name: "discord_permission_id" },
-  )
+  if (current) {
+    if (legacyDocuments.length > 0) {
+      await collection.deleteMany({
+        _id: { $in: legacyDocuments.map((item) => item._id) },
+      })
+    }
+
+    await dropLegacyIndexes(collection)
+    return
+  }
+
+  const definitions: PermissionDefinition[] = []
+  const ranks: RankPermissionEntry[] = []
+  const discord: DiscordPermissionEntry[] = []
+
+  for (const item of legacyDocuments as Array<Record<string, unknown>>) {
+    if (item.type === "definition") {
+      definitions.push({
+        key: clean(item.key).toLowerCase(),
+        name: clean(item.name),
+        description: clean(item.description),
+        urls: uniqueStrings(item.urls),
+      })
+    }
+
+    if (item.type === "rank") {
+      ranks.push({
+        rank: clean(item.rank),
+        permissions: uniqueStrings(item.permissions),
+      })
+    }
+
+    if (item.type === "discord") {
+      discord.push({
+        discordId: clean(item.discordId),
+        permissions: uniqueStrings(item.permissions),
+      })
+    }
+  }
+
+  const now = new Date()
+
+  await collection.insertOne({
+    _id: PERMISSION_STORE_ID,
+    definitions,
+    ranks,
+    discord,
+    updatedAt: now,
+  })
+
+  if (legacyDocuments.length > 0) {
+    await collection.deleteMany({
+      _id: {
+        $in: legacyDocuments.map((item) => item._id),
+      },
+    })
+  }
+
+  await dropLegacyIndexes(collection)
+}
+
+async function dropLegacyIndexes(
+  collection: Awaited<ReturnType<typeof getCollection>>,
+) {
+  for (const name of [
+    "permission_definition_key",
+    "permission_rank_name",
+    "permission_discord_id",
+  ]) {
+    try {
+      await collection.dropIndex(name)
+    } catch {
+      // The index may not exist on a fresh installation.
+    }
+  }
 }
 
 export async function ensurePermissionStore() {
   if (!permissionInitializationPromise) {
-    permissionInitializationPromise = ensurePermissionIndexes().catch((error) => {
+    permissionInitializationPromise = (async () => {
+      await migrateLegacyPermissionDocuments()
+
+      const collection = await getCollection()
+      const current = await collection.findOne({
+        _id: PERMISSION_STORE_ID,
+      })
+
+      if (!current) {
+        await collection.insertOne({
+          _id: PERMISSION_STORE_ID,
+          definitions: [],
+          ranks: [],
+          discord: [],
+          updatedAt: new Date(),
+        })
+      }
+    })().catch((error) => {
       permissionInitializationPromise = null
       throw error
     })
@@ -117,18 +290,59 @@ export async function ensurePermissionStore() {
   return permissionInitializationPromise
 }
 
-export async function getRankPermissions(rank: string): Promise<string[]> {
+export async function getPermissionStore(): Promise<PermissionStoreDocument> {
   await ensurePermissionStore()
 
-  const db = await getMongoDb()
-  const document = await db
-    .collection<RankPermissionDocument>(RANK_COLLECTION)
-    .findOne({ rank: clean(rank) })
+  const collection = await getCollection()
+  const document = await collection.findOne({
+    _id: PERMISSION_STORE_ID,
+  })
 
-  const permissions = uniqueStrings(document?.permissions)
+  return normaliseStore(document)
+}
 
-  // Admin rank status is deliberately NOT stored in MongoDB.
-  // The JSON file is the authoritative bootstrap/security layer.
+export async function savePermissionStore(
+  store: PermissionStoreDocument,
+): Promise<PermissionStoreDocument> {
+  const normalized = normaliseStore(store)
+  normalized.updatedAt = new Date()
+
+  const collection = await getCollection()
+
+  await collection.replaceOne(
+    { _id: PERMISSION_STORE_ID },
+    normalized,
+    { upsert: true },
+  )
+
+  return normalized
+}
+
+export async function getPermissionDefinitions(): Promise<PermissionDefinition[]> {
+  const store = await getPermissionStore()
+  return store.definitions
+}
+
+export async function getRankPermissionDocuments(): Promise<RankPermissionEntry[]> {
+  const store = await getPermissionStore()
+  return store.ranks
+}
+
+export async function getDiscordPermissionDocuments(): Promise<DiscordPermissionEntry[]> {
+  const store = await getPermissionStore()
+  return store.discord
+}
+
+export async function getRankPermissions(rank: string): Promise<string[]> {
+  const store = await getPermissionStore()
+  const normalizedRank = normalise(rank)
+
+  const entry = store.ranks.find(
+    (item) => normalise(item.rank) === normalizedRank,
+  )
+
+  const permissions = uniqueStrings(entry?.permissions)
+
   if (isAdminRank(rank)) {
     permissions.push(PERMISSION_ADMIN)
   }
@@ -136,22 +350,21 @@ export async function getRankPermissions(rank: string): Promise<string[]> {
   return uniqueStrings(permissions)
 }
 
-export async function getDiscordPermissionOverride(discordId: string) {
-  const db = await getMongoDb()
+export async function getDiscordPermissionOverride(
+  discordId: string,
+): Promise<DiscordPermissionEntry | null> {
+  const store = await getPermissionStore()
+  const id = clean(discordId)
 
-  return db
-    .collection<DiscordPermissionDocument>(DISCORD_COLLECTION)
-    .findOne({ discordId: clean(discordId) })
+  return (
+    store.discord.find((item) => item.discordId === id) ?? null
+  )
 }
 
 export async function resolvePermissions(
   discordId: string,
   rank: string,
 ): Promise<string[]> {
-  await ensurePermissionStore()
-
-  // Super admins are the only users with a true full bypass.
-  // This cannot be created or granted from the admin page.
   if (isSuperAdmin(discordId)) {
     return ["*"]
   }
@@ -187,7 +400,17 @@ export function hasPermission(
   user: AuthUser,
   permission: string,
 ): boolean {
-  return user.permissions.includes("*") || user.permissions.includes(permission)
+  return (
+    user.permissions.includes("*") ||
+    user.permissions.includes(permission)
+  )
+}
+
+function urlMatches(url: string, allowedUrl: string): boolean {
+  return (
+    url === allowedUrl ||
+    url.startsWith(`${allowedUrl}/`)
+  )
 }
 
 export async function canAccessUrl(
@@ -197,24 +420,17 @@ export async function canAccessUrl(
   if (user.permissions.includes("*")) return true
   if (url === "/") return true
 
-  const db = await getMongoDb()
-  const definitions = await db
-    .collection<PermissionDocument>(PERMISSION_COLLECTION)
-    .find({ key: { $in: user.permissions } })
-    .toArray()
+  const protectedAdminUrls = getProtectedAdminUrls()
 
-  return definitions.some((definition) =>
-    uniqueStrings(definition.urls).some(
-      (allowed) =>
-        url === allowed ||
-        url.startsWith(`${allowed}/`),
-    ),
+  if (protectedAdminUrls.some((allowed) => urlMatches(url, allowed))) {
+    return user.permissions.includes(PERMISSION_ADMIN)
+  }
+
+  const definitions = await getPermissionDefinitions()
+
+  return definitions.some(
+    (definition) =>
+      user.permissions.includes(definition.key) &&
+      definition.urls.some((allowed) => urlMatches(url, allowed)),
   )
-}
-
-export type {
-  AdminConfig,
-  DiscordPermissionDocument,
-  PermissionDocument,
-  RankPermissionDocument,
 }
