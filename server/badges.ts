@@ -1,9 +1,17 @@
-import type { Express, Request } from "express"
+import type {
+  Express,
+  Request,
+} from "express"
+
 import fs from "node:fs/promises"
 import path from "node:path"
 
 import { getMongoDb } from "../src/lib/mongodb"
 import { getRequestUser } from "./auth/session"
+
+/* ═════════════════════════════════════════════
+   TYPES
+═════════════════════════════════════════════ */
 
 type BadgeLines = {
   "1": string
@@ -20,41 +28,52 @@ type BadgeConfig = {
   rankFinishes: Record<string, string>
 }
 
-type RankConfig = {
+type RankDefinition = {
   id?: string
   name: string
 }
 
 type RankConfigDocument = {
   division: string
-  ranks: RankConfig[]
+  ranks: RankDefinition[]
 }
 
 type RosterMember = {
   callsign?: string
   badgeNumber?: string
   name?: string
+  insignia?: string
   rank?: string
+  jobDescription?: string
   timeInDept?: string
   timeInRank?: string
-  discordId?: string
   status?: string
+  strike1?: boolean
+  strike2?: boolean
+  discordId?: string
+  hoursThisMonth?: string
 }
 
 type RosterDocument = {
-  userId: string
-  division: string
-  members: RosterMember[]
+  userId?: string
+  division?: string
+  members?: RosterMember[]
   updatedAt?: Date
 }
 
-function normalize(value: unknown): string {
+/* ═════════════════════════════════════════════
+   HELPERS
+═════════════════════════════════════════════ */
+
+function normalize(
+  value: unknown,
+): string {
   return String(value ?? "")
     .trim()
     .toLowerCase()
 }
 
-async function getBadgeConfig(): Promise<BadgeConfig> {
+async function readBadgeConfig(): Promise<BadgeConfig> {
   const configPath = path.join(
     process.cwd(),
     "config",
@@ -66,77 +85,248 @@ async function getBadgeConfig(): Promise<BadgeConfig> {
     "utf8",
   )
 
-  return JSON.parse(file) as BadgeConfig
+  const parsed = JSON.parse(
+    file,
+  ) as Partial<BadgeConfig>
+
+  if (
+    typeof parsed.badgeId !== "string" ||
+    typeof parsed.sealId !== "string" ||
+    !parsed.lines ||
+    typeof parsed.lines !== "object" ||
+    !parsed.rankFinishes ||
+    typeof parsed.rankFinishes !== "object"
+  ) {
+    throw new Error(
+      "config/badges.json is invalid.",
+    )
+  }
+
+  return {
+    badgeId: parsed.badgeId,
+    sealId: parsed.sealId,
+
+    lines: {
+      "1":
+        typeof parsed.lines["1"] ===
+        "string"
+          ? parsed.lines["1"]
+          : "",
+      "2":
+        typeof parsed.lines["2"] ===
+        "string"
+          ? parsed.lines["2"]
+          : "",
+      "3":
+        typeof parsed.lines["3"] ===
+        "string"
+          ? parsed.lines["3"]
+          : "",
+      "4":
+        typeof parsed.lines["4"] ===
+        "string"
+          ? parsed.lines["4"]
+          : "",
+      "5":
+        typeof parsed.lines["5"] ===
+        "string"
+          ? parsed.lines["5"]
+          : "",
+    },
+
+    rankFinishes:
+      parsed.rankFinishes,
+  }
 }
 
-function replaceLineVariables(
+function replaceVariables(
   value: string,
-  variables: {
-    rank: string
-    name: string
-  },
+  rank: string,
+  name: string,
 ): string {
   return value
     .replaceAll(
       "{{rank}}",
-      variables.rank,
+      rank,
     )
     .replaceAll(
       "{{name}}",
-      variables.name,
+      name,
     )
 }
+
+function getConfiguredFinish(
+  rank: string,
+  config: BadgeConfig,
+): string {
+  /*
+   * First try the exact configured rank.
+   */
+  if (
+    config.rankFinishes[rank]
+  ) {
+    return config.rankFinishes[rank]
+  }
+
+  /*
+   * Then perform a case-insensitive
+   * comparison so casing in MongoDB does
+   * not break the configuration lookup.
+   */
+  const normalizedRank =
+    normalize(rank)
+
+  const match =
+    Object.entries(
+      config.rankFinishes,
+    ).find(
+      ([configuredRank]) =>
+        normalize(
+          configuredRank,
+        ) === normalizedRank,
+    )
+
+  return match?.[1] ?? ""
+}
+
+/* ═════════════════════════════════════════════
+   AUTHENTICATION
+═════════════════════════════════════════════ */
+
+async function getAuthenticatedUser(
+  req: Request,
+) {
+  try {
+    const user =
+      await getRequestUser(req)
+
+    if (!user) {
+      return null
+    }
+
+    if (
+      typeof user.discordId !==
+      "string"
+    ) {
+      return null
+    }
+
+    if (
+      !user.discordId.trim()
+    ) {
+      return null
+    }
+
+    return user
+  } catch (error) {
+    console.error(
+      "[badges] Authentication lookup failed:",
+      error,
+    )
+
+    return null
+  }
+}
+
+/* ═════════════════════════════════════════════
+   MONGODB — ROSTER
+═════════════════════════════════════════════ */
 
 async function getDepartmentRosterMember(
   discordId: string,
 ): Promise<RosterMember | null> {
-  const db = await getMongoDb()
+  const db =
+    await getMongoDb()
 
+  const rosters =
+    db.collection<RosterDocument>(
+      "rosters",
+    )
+
+  /*
+   * Your roster documents use:
+   *
+   * {
+   *   division: "department",
+   *   members: [...]
+   * }
+   *
+   * Find the department document
+   * containing this Discord ID.
+   */
   const document =
-    await db
-      .collection<RosterDocument>("rosters")
-      .findOne({
-        division: "department",
-        "members.discordId": discordId,
-      })
+    await rosters.findOne({
+      division: "department",
+      "members.discordId":
+        discordId,
+    })
 
   if (!document) {
     return null
   }
 
-  return (
+  if (
+    !Array.isArray(
+      document.members,
+    )
+  ) {
+    return null
+  }
+
+  const member =
     document.members.find(
-      (member) =>
-        normalize(member.discordId) ===
-        normalize(discordId),
-    ) ?? null
-  )
+      (candidate) =>
+        normalize(
+          candidate.discordId,
+        ) === normalize(discordId),
+    )
+
+  return member ?? null
 }
 
-async function getDepartmentRanks(): Promise<RankConfig[]> {
-  const db = await getMongoDb()
+/* ═════════════════════════════════════════════
+   MONGODB — RANK CONFIGURATION
+═════════════════════════════════════════════ */
+
+async function getDepartmentRanks(): Promise<
+  RankDefinition[]
+> {
+  const db =
+    await getMongoDb()
+
+  const rankConfigs =
+    db.collection<RankConfigDocument>(
+      "rankConfigs",
+    )
 
   const document =
-    await db
-      .collection<RankConfigDocument>(
-        "rankConfigs",
-      )
-      .findOne({
-        division: "department",
-      })
+    await rankConfigs.findOne({
+      division: "department",
+    })
 
   if (!document) {
     return []
   }
 
-  return Array.isArray(document.ranks)
-    ? document.ranks
-    : []
+  if (
+    !Array.isArray(
+      document.ranks,
+    )
+  ) {
+    return []
+  }
+
+  return document.ranks.filter(
+    (rank) =>
+      rank &&
+      typeof rank.name ===
+        "string",
+  )
 }
 
-function getCanonicalRank(
+function resolveCanonicalRank(
   rosterRank: string,
-  ranks: RankConfig[],
+  ranks: RankDefinition[],
 ): string {
   const matchingRank =
     ranks.find(
@@ -145,34 +335,23 @@ function getCanonicalRank(
         normalize(rosterRank),
     )
 
-  return matchingRank?.name ?? rosterRank
+  /*
+   * If the rank exists in the DB
+   * configuration, use the configured
+   * spelling.
+   *
+   * Otherwise retain the actual roster
+   * value rather than inventing a rank.
+   */
+  return (
+    matchingRank?.name ??
+    rosterRank
+  )
 }
 
-function getRankFinish(
-  rank: string,
-  config: BadgeConfig,
-): string {
-  const exact =
-    config.rankFinishes[rank]
-
-  if (exact) {
-    return exact
-  }
-
-  const normalizedRank =
-    normalize(rank)
-
-  const matchingEntry =
-    Object.entries(
-      config.rankFinishes,
-    ).find(
-      ([configuredRank]) =>
-        normalize(configuredRank) ===
-        normalizedRank,
-    )
-
-  return matchingEntry?.[1] ?? ""
-}
+/* ═════════════════════════════════════════════
+   BADGE GENERATION
+═════════════════════════════════════════════ */
 
 async function generateBadge(
   discordId: string,
@@ -182,7 +361,7 @@ async function generateBadge(
     rosterMember,
     ranks,
   ] = await Promise.all([
-    getBadgeConfig(),
+    readBadgeConfig(),
     getDepartmentRosterMember(
       discordId,
     ),
@@ -196,143 +375,152 @@ async function generateBadge(
   }
 
   const name =
-    rosterMember.name?.trim() ?? ""
+    rosterMember.name?.trim() ??
+    ""
 
   const rosterRank =
-    rosterMember.rank?.trim() ?? ""
+    rosterMember.rank?.trim() ??
+    ""
 
   if (!name) {
     throw new Error(
-      "Officer does not have a name in the roster.",
+      "Officer does not have a name in the department roster.",
     )
   }
 
   if (!rosterRank) {
     throw new Error(
-      "Officer does not have a rank in the roster.",
+      "Officer does not have a rank in the department roster.",
     )
   }
 
   /*
-   * The officer's actual rank comes from MongoDB.
+   * Rank comes from the roster DB.
    *
-   * rankConfigs is only used to resolve the canonical
-   * configured spelling/casing of that rank.
+   * rankConfigs only supplies the
+   * canonical configured name.
    */
   const rank =
-    getCanonicalRank(
+    resolveCanonicalRank(
       rosterRank,
       ranks,
     )
 
+  /*
+   * Finish is controlled by
+   * config/badges.json.
+   *
+   * It is NOT hardcoded in the
+   * React application.
+   */
   const finish =
-    getRankFinish(
+    getConfiguredFinish(
       rank,
       config,
     )
 
-  const lines = {
-    "1": replaceLineVariables(
+  const lines: BadgeLines = {
+    "1": replaceVariables(
       config.lines["1"],
-      {
-        rank,
-        name,
-      },
+      rank,
+      name,
     ),
-    "2": replaceLineVariables(
+
+    "2": replaceVariables(
       config.lines["2"],
-      {
-        rank,
-        name,
-      },
+      rank,
+      name,
     ),
-    "3": replaceLineVariables(
+
+    "3": replaceVariables(
       config.lines["3"],
-      {
-        rank,
-        name,
-      },
+      rank,
+      name,
     ),
-    "4": replaceLineVariables(
+
+    "4": replaceVariables(
       config.lines["4"],
-      {
-        rank,
-        name,
-      },
+      rank,
+      name,
     ),
-    "5": replaceLineVariables(
+
+    "5": replaceVariables(
       config.lines["5"],
-      {
-        rank,
-        name,
-      },
+      rank,
+      name,
     ),
   }
 
   return {
     badge: {
-      badgeId: config.badgeId,
-      sealId: config.sealId,
+      badgeId:
+        config.badgeId,
+
+      sealId:
+        config.sealId,
+
       finish,
+
       lines,
     },
 
     officer: {
       name,
+
       rank,
+
       badgeNumber:
-        rosterMember.badgeNumber ?? "",
-      discordId,
+        rosterMember.badgeNumber ??
+        "",
+
       callsign:
-        rosterMember.callsign ?? "",
+        rosterMember.callsign ??
+        "",
+
+      discordId,
+
       status:
-        rosterMember.status ?? "",
+        rosterMember.status ??
+        "",
+
       timeInDept:
-        rosterMember.timeInDept ?? "",
+        rosterMember.timeInDept ??
+        "",
+
       timeInRank:
-        rosterMember.timeInRank ?? "",
+        rosterMember.timeInRank ??
+        "",
     },
   }
 }
 
-async function requireAuthenticatedUser(
-  req: Request,
-) {
-  const user =
-    await getRequestUser(req)
-
-  if (!user) {
-    return null
-  }
-
-  if (!user.discordId) {
-    return null
-  }
-
-  return user
-}
+/* ═════════════════════════════════════════════
+   ROUTES
+═════════════════════════════════════════════ */
 
 export function registerBadgeRoutes(
   app: Express,
 ) {
   /*
-   * Current logged-in officer.
+   * GET /api/badges/me
    *
-   * This is the endpoint BadgeGenerator should use.
+   * Generates the badge for the
+   * currently authenticated officer.
    */
   app.get(
     "/api/badges/me",
     async (req, res) => {
       try {
         const user =
-          await requireAuthenticatedUser(
+          await getAuthenticatedUser(
             req,
           )
 
         if (!user) {
           return res.status(401).json({
             success: false,
-            error: "Not authenticated.",
+            error:
+              "Not authenticated.",
           })
         }
 
@@ -347,67 +535,82 @@ export function registerBadgeRoutes(
         })
       } catch (error) {
         console.error(
-          "[badges] Failed to generate current user's badge:",
+          "[badges] /api/badges/me failed:",
           error,
         )
 
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to generate badge."
+
+        /*
+         * Database/configuration errors
+         * should be distinguishable from
+         * authentication errors.
+         */
         return res.status(500).json({
           success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to generate badge.",
+          error: message,
         })
       }
     },
   )
 
   /*
-   * Specific officer.
+   * GET /api/badges/:discordId
    *
-   * Still requires an authenticated session.
+   * Kept for future admin functionality.
+   *
+   * It still requires authentication.
    */
   app.get(
     "/api/badges/:discordId",
     async (req, res) => {
       try {
         const user =
-          await requireAuthenticatedUser(
+          await getAuthenticatedUser(
             req,
           )
 
         if (!user) {
           return res.status(401).json({
             success: false,
-            error: "Not authenticated.",
+            error:
+              "Not authenticated.",
           })
         }
 
         const requestedDiscordId =
-          req.params.discordId?.trim()
+          String(
+            req.params.discordId ??
+              "",
+          ).trim()
 
-        if (!requestedDiscordId) {
+        if (
+          !requestedDiscordId
+        ) {
           return res.status(400).json({
             success: false,
             error:
-              "A Discord ID is required.",
+              "Discord ID is required.",
           })
         }
 
         /*
-         * Do not allow an authenticated user to
-         * arbitrarily access another officer's badge
-         * unless you later explicitly add a permission
-         * for that functionality.
+         * Normal users can only request
+         * their own badge.
          *
-         * For now, the requested ID must match the
-         * authenticated Discord ID.
+         * Admin/management access can be
+         * added here later.
          */
         if (
           normalize(
             requestedDiscordId,
           ) !==
-          normalize(user.discordId)
+          normalize(
+            user.discordId,
+          )
         ) {
           return res.status(403).json({
             success: false,
@@ -427,7 +630,7 @@ export function registerBadgeRoutes(
         })
       } catch (error) {
         console.error(
-          "[badges] Failed to generate badge:",
+          "[badges] /api/badges/:discordId failed:",
           error,
         )
 
