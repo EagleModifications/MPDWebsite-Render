@@ -501,7 +501,7 @@ export default function Navbar() {
               asChild
               variant="ghost"
               size="sm"
-              className="gap-2"
+              className="gap-2 border border-border"
             >
               <a href="/api/auth/logout">
                 <LogOut className="h-4 w-4" />
