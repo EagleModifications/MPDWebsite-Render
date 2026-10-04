@@ -519,7 +519,7 @@ export default function Navbar() {
               size="sm"
               className="gap-2"
             >
-              <Link to="/log-in">
+              <Link to="/sign-in">
                 <LogIn className="h-4 w-4" />
                 Log In
               </Link>
@@ -741,7 +741,7 @@ export default function Navbar() {
                   className="gap-2"
                 >
                   <Link
-                    to="/log-in"
+                    to="/sign-in"
                     onClick={closeMobileMenu}
                   >
                     <LogIn className="h-4 w-4" />
