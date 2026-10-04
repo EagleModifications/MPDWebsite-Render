@@ -265,7 +265,7 @@ export default function App() {
         />
 
         <Route
-          path="/documents/supervisor/command-docs"
+          path="/documents/command/command-docs"
           element={<CommandDocs />}
         />
 
