@@ -2017,7 +2017,7 @@ export default function PromotionRoster() {
                       </th>
 
                       <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
-                        Activity
+                        Hours
                       </th>
 
                       <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
