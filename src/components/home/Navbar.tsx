@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { NavLink, Link } from "react-router-dom"
 import {
   ChevronDown,
@@ -49,18 +49,6 @@ const navItems: NavItem[] = [
   },
 ]
 
-/*
- * Documents dropdown items
- *
- * Add/remove document pages here.
- *
- * Example:
- * {
- *   name: "Main Roster",
- *   href: "/documents/main-roster",
- *   permission: "view",
- * }
- */
 const documentsItems: NavItem[] = [
   {
     name: "Main Roster",
@@ -94,6 +82,8 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [documentsOpen, setDocumentsOpen] = useState(false)
 
+  const documentsRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     getSession().then(setUser)
   }, [])
@@ -111,6 +101,41 @@ export default function Navbar() {
       window.removeEventListener("resize", handleResize)
     }
   }, [])
+
+  /*
+   * Close the Documents dropdown when clicking
+   * anywhere outside of the dropdown.
+   *
+   * Clicks inside the dropdown are ignored.
+   */
+  useEffect(() => {
+    if (!documentsOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+
+      if (
+        documentsRef.current &&
+        !documentsRef.current.contains(target)
+      ) {
+        setDocumentsOpen(false)
+      }
+    }
+
+    document.addEventListener(
+      "pointerdown",
+      handlePointerDown,
+    )
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handlePointerDown,
+      )
+    }
+  }, [documentsOpen])
 
   const canViewItem = (item: NavItem) => {
     if (item.public) {
@@ -135,10 +160,12 @@ export default function Navbar() {
   }
 
   const visibleItems = navItems.filter(canViewItem)
-  const visibleDocuments = documentsItems.filter(canViewItem)
+  const visibleDocuments =
+    documentsItems.filter(canViewItem)
 
   const documentsActive = visibleDocuments.some(
-    (item) => window.location.pathname === item.href,
+    (item) =>
+      window.location.pathname === item.href,
   )
 
   const closeMobileMenu = () => {
@@ -193,16 +220,21 @@ export default function Navbar() {
 
           {/* DOCUMENTS DROPDOWN */}
           {visibleDocuments.length > 0 && (
-            <div className="relative">
+            <div
+              ref={documentsRef}
+              className="relative"
+            >
               <button
                 type="button"
-                onClick={() => setDocumentsOpen((open) => !open)}
+                onClick={() =>
+                  setDocumentsOpen((open) => !open)
+                }
                 className={`
                   flex items-center gap-1.5
                   font-medium
                   transition-colors
                   ${
-                    documentsActive
+                    documentsActive || documentsOpen
                       ? "text-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }
@@ -216,7 +248,11 @@ export default function Navbar() {
                   className={`
                     h-4 w-4
                     transition-transform duration-200
-                    ${documentsOpen ? "rotate-180" : ""}
+                    ${
+                      documentsOpen
+                        ? "rotate-180"
+                        : ""
+                    }
                   `}
                 />
               </button>
@@ -235,12 +271,15 @@ export default function Navbar() {
                     shadow-xl
                     backdrop-blur-md
                   "
+                  role="menu"
                 >
                   {visibleDocuments.map((item) => (
                     <NavLink
                       key={item.href}
                       to={item.href}
-                      onClick={() => setDocumentsOpen(false)}
+                      onClick={() =>
+                        setDocumentsOpen(false)
+                      }
                       className={({ isActive }) =>
                         `
                           block rounded-lg px-3 py-2.5
@@ -253,6 +292,7 @@ export default function Navbar() {
                           }
                         `
                       }
+                      role="menuitem"
                     >
                       {item.name}
                     </NavLink>
@@ -284,7 +324,8 @@ export default function Navbar() {
                 hover:text-foreground
               "
               onClick={() => {
-                window.location.href = "/api/auth/logout"
+                window.location.href =
+                  "/api/auth/logout"
               }}
             >
               <LogOut className="h-4 w-4" />
@@ -321,10 +362,16 @@ export default function Navbar() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-label={
+              mobileOpen
+                ? "Close menu"
+                : "Open menu"
+            }
             aria-expanded={mobileOpen}
             className="h-9 w-9"
-            onClick={() => setMobileOpen((open) => !open)}
+            onClick={() =>
+              setMobileOpen((open) => !open)
+            }
           >
             {mobileOpen ? (
               <X className="h-5 w-5" />
@@ -367,14 +414,19 @@ export default function Navbar() {
               <div>
                 <button
                   type="button"
-                  onClick={() => setDocumentsOpen((open) => !open)}
+                  onClick={() =>
+                    setDocumentsOpen(
+                      (open) => !open,
+                    )
+                  }
                   className={`
                     flex w-full items-center justify-between
                     rounded-lg px-4 py-3
                     text-left text-sm font-medium
                     transition-colors
                     ${
-                      documentsActive
+                      documentsActive ||
+                      documentsOpen
                         ? "bg-foreground/10 text-foreground"
                         : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                     }
@@ -387,7 +439,11 @@ export default function Navbar() {
                     className={`
                       h-4 w-4
                       transition-transform duration-200
-                      ${documentsOpen ? "rotate-180" : ""}
+                      ${
+                        documentsOpen
+                          ? "rotate-180"
+                          : ""
+                      }
                     `}
                   />
                 </button>
@@ -426,7 +482,8 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => {
-                  window.location.href = "/api/auth/logout"
+                  window.location.href =
+                    "/api/auth/logout"
                 }}
                 className="
                   flex w-full items-center gap-3
