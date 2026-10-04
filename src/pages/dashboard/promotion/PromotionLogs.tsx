@@ -25,7 +25,6 @@ import {
   Search,
   Settings2,
   Trash2,
-  Upload,
   Users,
             X,
 } from "lucide-react"
@@ -351,6 +350,17 @@ function LogActionIcon({ log }: { log: ActionLog }) {
   )
 }
 
+function statusLabel(log: ActionLog) {
+  const value = log.action.toLowerCase()
+
+  if (value.includes("copy")) return "Copied"
+  if (value.includes("select")) return "Selected"
+  if (value.includes("import")) return "Imported"
+  if (value.includes("delete") || value.includes("remove")) return "Removed"
+  if (value.includes("create") || value.includes("add")) return "Created"
+  return "Updated"
+}
+
 function statusClass(log: ActionLog) {
   const value = statusLabel(log).toLowerCase()
 
@@ -652,6 +662,7 @@ function FilterSelect({
   onChange,
   icon: Icon,
   ariaLabel,
+  className,
 }: {
   value: string
   options: Option[]
@@ -750,7 +761,7 @@ function ChangeList({ changes }: { changes: unknown }) {
           >
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {change.field || change.label || change.key || (change.rank ? "Rank" : "Change")}
+                {String(change.field ?? change.label ?? change.key ?? (change.rank ? "Rank" : "Change"))}
               </p>
 
               <p className="mt-1 break-words text-xs font-medium text-foreground">
@@ -1172,16 +1183,6 @@ export default function ActionLogs() {
   const end = total ? Math.min(page * pageSize, total) : 0
   const hasFilters = Boolean(category || division || userId || action || search)
   const activeFilterCount = [category, division, userId, action, search].filter(Boolean).length
-
-  const statusLabel = (log: ActionLog) => {
-    const value = log.action.toLowerCase()
-    if (value.includes("copy")) return "Copied"
-    if (value.includes("select")) return "Selected"
-    if (value.includes("import")) return "Imported"
-    if (value.includes("delete") || value.includes("remove")) return "Removed"
-    if (value.includes("create") || value.includes("add")) return "Created"
-    return "Updated"
-  }
 
   return (
     <DashboardLayout>
