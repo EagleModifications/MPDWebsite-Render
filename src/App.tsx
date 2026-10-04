@@ -51,7 +51,9 @@ import Dashboard from "@/pages/dashboard/Dashboard"
 import AdminPermissions from "@/pages/dashboard/admin/Permissions"
 
 import ActivityRoster from "@/pages/dashboard/activity/ActivityRoster"
+
 import PromotionRoster from "@/pages/dashboard/promotion/PromotionRoster"
+import PromotionActionLogs from "@/pages/dashboard/promotion/ActionLogs"
 
 import ActivityImportDepartment from "@/pages/dashboard/activity/imports/Department"
 import ActivityImportMCD from "@/pages/dashboard/activity/imports/MCD"
@@ -484,6 +486,11 @@ export default function App() {
           <Route
             path="/dashboard/promotion/promotionroster"
             element={<PromotionRoster />}
+          />
+
+          <Route
+            path="/dashboard/promotion/actionlogs"
+            element={<PromotionActionLogs />}
           />
 
           {/* ===================================================
