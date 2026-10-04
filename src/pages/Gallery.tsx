@@ -205,7 +205,10 @@ function CustomSelect({
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpenDropdown(null)
+      if (event.key === "Escape") {
+        event.stopPropagation()
+        setOpenDropdown(null)
+      }
     }
 
     document.addEventListener("mousedown", handlePointerDown)
@@ -324,7 +327,10 @@ function CustomMultiSelect({
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpenDropdown(null)
+      if (event.key === "Escape") {
+        event.stopPropagation()
+        setOpenDropdown(null)
+      }
     }
 
     document.addEventListener("mousedown", handlePointerDown)
@@ -1519,20 +1525,43 @@ export default function Gallery() {
   }
 
   useEffect(() => {
-    if (!viewer) {
+    const overlayOpen =
+      showModal ||
+      Boolean(viewer) ||
+      Boolean(infoItem) ||
+      Boolean(deleteTarget)
+
+    if (!overlayOpen) {
       return
     }
 
-    function handleKeyDown(
-      event: KeyboardEvent,
-    ) {
+    function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        // Let the custom dropdown handlers close their own menus first.
+        // They stop propagation so ESC does not also close the parent modal.
+        if (deleteTarget) {
+          closeDeleteDialog()
+          return
+        }
+
+        if (showModal) {
+          closeModal()
+          return
+        }
+
         if (infoItem) {
           closeInfo()
           return
         }
 
-        closeViewer()
+        if (viewer) {
+          closeViewer()
+          return
+        }
+      }
+
+      if (!viewer) {
+        return
       }
 
       if (event.key === "ArrowLeft") {
@@ -1544,18 +1573,12 @@ export default function Gallery() {
       }
     }
 
-    window.addEventListener(
-      "keydown",
-      handleKeyDown,
-    )
+    window.addEventListener("keydown", handleKeyDown)
 
     return () => {
-      window.removeEventListener(
-        "keydown",
-        handleKeyDown,
-      )
+      window.removeEventListener("keydown", handleKeyDown)
     }
-  }, [infoItem, viewer])
+  }, [deleteTarget, infoItem, showModal, viewer, saving, deletingId])
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
