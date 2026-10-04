@@ -1,0 +1,16 @@
+{
+  "permissionmanagement": [
+    "Lieutenant Colonel",
+    "Chief Of Staff",
+    "Assistant Chief Of Police",
+    "Deputy Chief Of Police",
+    "Chief Of Police"
+  ],
+  "permissionadmin": [
+    "Lieutenant Colonel",
+    "Chief Of Staff",
+    "Assistant Chief Of Police",
+    "Deputy Chief Of Police",
+    "Chief Of Police"
+  ]
+}
