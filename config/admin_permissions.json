@@ -10,6 +10,7 @@
     "YOUR_DISCORD_ID_HERE"
   ],
   "protectedUrls": [
+    "/dashboard/admin/permissions",
     "/dashboard/promotion/promotionroster"
   ]
 }
