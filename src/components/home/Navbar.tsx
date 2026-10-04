@@ -489,7 +489,7 @@ export default function Navbar() {
               className="gap-2"
             >
               <LogOut className="h-4 w-4" />
-              Logout
+              Sign Uut
             </Button>
           ) : (
             <Button
@@ -730,7 +730,7 @@ export default function Navbar() {
                     onClick={closeMobileMenu}
                   >
                     <LogIn className="h-4 w-4" />
-                    Login
+                    Sign In
                   </Link>
                 </Button>
               )}
