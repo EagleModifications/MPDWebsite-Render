@@ -100,6 +100,10 @@ type CopyType =
   | "name-badge-discord"
   | "full"
 
+/* ─────────────────────────────────────────────
+   Discord Helpers
+───────────────────────────────────────────── */
+
 function getDiscordAvatarUrl(
   discordId?: string,
   avatar?: string | null,
@@ -120,6 +124,7 @@ function getDiscordAvatarUrl(
 
     if (match) {
       const [, id, hashWithExtension] = match
+
       const hash = hashWithExtension.replace(
         /\.(gif|webp|png|jpg|jpeg)$/i,
         "",
@@ -133,7 +138,10 @@ function getDiscordAvatarUrl(
     return cleanAvatar
   }
 
-  if (discordId && cleanAvatar.startsWith("a_")) {
+  if (
+    discordId &&
+    cleanAvatar.startsWith("a_")
+  ) {
     return `https://cdn.discordapp.com/avatars/${discordId}/${cleanAvatar}.gif?size=256`
   }
 
@@ -152,7 +160,9 @@ function getDiscordDefaultAvatarUrl(
   }
 
   try {
-    const avatarIndex = Number(BigInt(discordId) % 6n)
+    const avatarIndex = Number(
+      BigInt(discordId) % 6n,
+    )
 
     return `https://cdn.discordapp.com/embed/avatars/${avatarIndex}.png?size=256`
   } catch {
@@ -172,12 +182,18 @@ function getDiscordInitials(
   return (
     value
       .split(/\s+/)
-      .map((part) => part.charAt(0))
+      .map((part) =>
+        part.charAt(0),
+      )
       .join("")
       .slice(0, 2)
       .toUpperCase() || "U"
   )
 }
+
+/* ─────────────────────────────────────────────
+   Constants
+───────────────────────────────────────────── */
 
 const divisions: {
   id: Division
@@ -221,6 +237,10 @@ const statusOptions: {
     icon: XCircle,
   },
 ]
+
+/* ─────────────────────────────────────────────
+   Value Helpers
+───────────────────────────────────────────── */
 
 const cleanValue = (
   value: unknown,
@@ -313,12 +333,8 @@ const compareCallsigns = (
   a: PromotionRosterMember,
   b: PromotionRosterMember,
 ) =>
-  cleanValue(
-    a.callsign,
-  ).localeCompare(
-    cleanValue(
-      b.callsign,
-    ),
+  cleanValue(a.callsign).localeCompare(
+    cleanValue(b.callsign),
     undefined,
     {
       numeric: true,
@@ -334,9 +350,13 @@ type DiscordProfileDropdownProps = {
   member: PromotionRosterMember
   profile?: DiscordProfile
   profileLoading?: boolean
+  open: boolean
   onOpenChange: (open: boolean) => void
   onCopyId: (
     member: PromotionRosterMember,
+  ) => void
+  onContextMenu?: (
+    event: React.MouseEvent<HTMLButtonElement>,
   ) => void
   mobile?: boolean
 }
@@ -345,8 +365,10 @@ function DiscordProfileDropdown({
   member,
   profile,
   profileLoading = false,
+  open,
   onOpenChange,
   onCopyId,
+  onContextMenu,
   mobile = false,
 }: DiscordProfileDropdownProps) {
   const displayName =
@@ -355,8 +377,7 @@ function DiscordProfileDropdown({
     "Discord User"
 
   const username =
-    profile?.username ||
-    ""
+    profile?.username || ""
 
   const avatar =
     getDiscordAvatarUrl(
@@ -375,21 +396,19 @@ function DiscordProfileDropdown({
 
   return (
     <DropdownMenu
+      open={open}
       onOpenChange={onOpenChange}
     >
       <DropdownMenuTrigger asChild>
         <button
           type="button"
           title={`${member.name} (${member.discordId})`}
+          onContextMenu={onContextMenu}
           className={
             mobile
               ? "min-w-0 max-w-full truncate rounded-md px-2 py-1 text-left text-[11px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
               : "mx-auto block max-w-full truncate rounded-md px-1.5 py-1 text-[10px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
           }
-          onContextMenu={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-          }}
         >
           <span className="font-medium">
             {member.name}
@@ -402,10 +421,10 @@ function DiscordProfileDropdown({
 
       <DropdownMenuContent
         align={mobile ? "start" : "end"}
-        sideOffset={5}
+        sideOffset={6}
         className="w-72"
       >
-        <DropdownMenuLabel className="p-2">
+        <DropdownMenuLabel className="p-2 font-normal">
           <div className="flex items-center gap-3">
             <Avatar className="h-9 w-9 shrink-0 rounded-lg">
               <AvatarImage
@@ -425,7 +444,7 @@ function DiscordProfileDropdown({
                   : displayName}
               </p>
 
-              <p className="truncate text-xs font-normal text-muted-foreground">
+              <p className="truncate text-xs text-muted-foreground">
                 {profileLoading
                   ? "Fetching Discord information"
                   : username
@@ -452,6 +471,10 @@ function DiscordProfileDropdown({
     </DropdownMenu>
   )
 }
+
+/* ─────────────────────────────────────────────
+   Page
+───────────────────────────────────────────── */
 
 export default function PromotionRoster() {
   const [division, setDivision] =
@@ -481,20 +504,32 @@ export default function PromotionRoster() {
   const [selectedCopied, setSelectedCopied] =
     useState(false)
 
-  const [openDiscordMenu, setOpenDiscordMenu] =
-    useState<string | null>(null)
+  const [
+    openDiscordMenu,
+    setOpenDiscordMenu,
+  ] = useState<string | null>(null)
 
-  const [discordContextMenu, setDiscordContextMenu] =
-    useState<DiscordContextMenu>(null)
+  const [
+    discordContextMenu,
+    setDiscordContextMenu,
+  ] = useState<DiscordContextMenu>(null)
 
   const [discordProfiles, setDiscordProfiles] =
-    useState<Record<string, DiscordProfile>>({})
+    useState<
+      Record<string, DiscordProfile>
+    >({})
 
-  const [discordProfileLoading, setDiscordProfileLoading] =
-    useState<Record<string, boolean>>({})
+  const [
+    discordProfileLoading,
+    setDiscordProfileLoading,
+  ] = useState<Record<string, boolean>>({})
 
   const shiftSelectingRef =
     useRef(false)
+
+  /* ─────────────────────────────────────────
+     Discord Profile Loading
+  ───────────────────────────────────────── */
 
   const loadDiscordProfile = useCallback(
     async (discordId: string) => {
@@ -587,6 +622,33 @@ export default function PromotionRoster() {
       discordProfiles,
     ],
   )
+
+  const handleDiscordDropdownOpen = useCallback(
+    (
+      member: PromotionRosterMember,
+      open: boolean,
+    ) => {
+      if (open) {
+        setDiscordContextMenu(null)
+        setOpenDiscordMenu(
+          member.discordId,
+        )
+
+        void loadDiscordProfile(
+          member.discordId,
+        )
+
+        return
+      }
+
+      setOpenDiscordMenu(null)
+    },
+    [loadDiscordProfile],
+  )
+
+  /* ─────────────────────────────────────────
+     Division / Roster
+  ───────────────────────────────────────── */
 
   const showRecruitmentLogs =
     division === "department"
@@ -730,13 +792,10 @@ export default function PromotionRoster() {
     void loadRoster()
   }, [loadRoster])
 
-  /*
-   * The Discord profile dropdown is a Radix dropdown,
-   * so it handles outside-click behavior itself.
-   *
-   * The custom right-click context menu is still closed
-   * when clicking or scrolling elsewhere.
-   */
+  /* ─────────────────────────────────────────
+     Context Menu
+  ───────────────────────────────────────── */
+
   useEffect(() => {
     const closeContextMenu = () => {
       setDiscordContextMenu(null)
@@ -770,6 +829,10 @@ export default function PromotionRoster() {
       )
     }
   }, [])
+
+  /* ─────────────────────────────────────────
+     Sorting / Filtering
+  ───────────────────────────────────────── */
 
   const sortedMembers = useMemo(
     () =>
@@ -856,6 +919,10 @@ export default function PromotionRoster() {
     rankFilters,
   ])
 
+  /* ─────────────────────────────────────────
+     Stats
+  ───────────────────────────────────────── */
+
   const stats = useMemo(() => {
     const compliant =
       members.filter(
@@ -886,6 +953,10 @@ export default function PromotionRoster() {
       totalHours,
     }
   }, [members])
+
+  /* ─────────────────────────────────────────
+     Selection
+  ───────────────────────────────────────── */
 
   const toggleMember = (
     discordId: string,
@@ -1000,6 +1071,10 @@ export default function PromotionRoster() {
 
     setSelectedCopied(false)
   }
+
+  /* ─────────────────────────────────────────
+     Copy Selected
+  ───────────────────────────────────────── */
 
   const copySelected = async (
     type: CopyType,
@@ -1199,6 +1274,10 @@ export default function PromotionRoster() {
     }
   }
 
+  /* ─────────────────────────────────────────
+     Filters
+  ───────────────────────────────────────── */
+
   const toggleStatusFilter = (
     status: Status,
   ) => {
@@ -1257,6 +1336,7 @@ export default function PromotionRoster() {
     setRankFilters([
       ...rankOptions,
     ])
+
     setSelectedCopied(false)
   }
 
@@ -1272,29 +1352,9 @@ export default function PromotionRoster() {
     setSelectedCopied(false)
   }
 
-  const allVisibleSelected =
-    filteredMembers.length > 0 &&
-    filteredMembers
-      .filter(
-        (member) =>
-          member.discordId,
-      )
-      .every((member) =>
-        selectedIds.includes(
-          member.discordId,
-        ),
-      )
-
-  const hasFilters =
-    Boolean(search.trim()) ||
-    statusFilters.length > 0 ||
-    rankFilters.length > 0
-
-  const selectedStatusCount =
-    statusFilters.length
-
-  const selectedRankCount =
-    rankFilters.length
+  /* ─────────────────────────────────────────
+     Discord Copy / Context Menu
+  ───────────────────────────────────────── */
 
   const copyDiscordId = async (
     member: PromotionRosterMember,
@@ -1324,25 +1384,75 @@ export default function PromotionRoster() {
     }
   }
 
-  const handleDiscordDropdownOpen = (
+  const handleDiscordContextMenu = (
+    event: React.MouseEvent<HTMLButtonElement>,
     member: PromotionRosterMember,
-    open: boolean,
   ) => {
-    if (open) {
-      setDiscordContextMenu(null)
-      setOpenDiscordMenu(
-        member.discordId,
-      )
-
-      void loadDiscordProfile(
-        member.discordId,
-      )
-
-      return
-    }
+    event.preventDefault()
+    event.stopPropagation()
 
     setOpenDiscordMenu(null)
+
+    const menuWidth = 208
+    const menuHeight = 52
+    const padding = 8
+
+    const x = Math.min(
+      event.clientX,
+      window.innerWidth -
+        menuWidth -
+        padding,
+    )
+
+    const y = Math.min(
+      event.clientY,
+      window.innerHeight -
+        menuHeight -
+        padding,
+    )
+
+    setDiscordContextMenu({
+      discordId:
+        member.discordId,
+      name: member.name,
+      x: Math.max(
+        padding,
+        x,
+      ),
+      y: Math.max(
+        padding,
+        y,
+      ),
+    })
   }
+
+  /* ─────────────────────────────────────────
+     Derived State
+  ───────────────────────────────────────── */
+
+  const allVisibleSelected =
+    filteredMembers.length > 0 &&
+    filteredMembers
+      .filter(
+        (member) =>
+          member.discordId,
+      )
+      .every((member) =>
+        selectedIds.includes(
+          member.discordId,
+        ),
+      )
+
+  const hasFilters =
+    Boolean(search.trim()) ||
+    statusFilters.length > 0 ||
+    rankFilters.length > 0
+
+  const selectedStatusCount =
+    statusFilters.length
+
+  const selectedRankCount =
+    rankFilters.length
 
   return (
     <DashboardLayout>
@@ -2289,8 +2399,6 @@ export default function PromotionRoster() {
                                 : ""
                             }`}
                           >
-                            {/* Select */}
-
                             <td className="overflow-hidden px-2 py-3 text-center align-middle">
                               <div className="flex justify-center">
                                 <Checkbox
@@ -2323,15 +2431,11 @@ export default function PromotionRoster() {
                               </div>
                             </td>
 
-                            {/* Callsign */}
-
                             <td className="overflow-hidden px-2 py-3 text-center align-middle font-medium">
                               <span className="block truncate">
                                 {member.callsign}
                               </span>
                             </td>
-
-                            {/* Badge */}
 
                             <td className="overflow-hidden px-2 py-3 text-center align-middle text-muted-foreground">
                               <span className="block truncate">
@@ -2339,15 +2443,11 @@ export default function PromotionRoster() {
                               </span>
                             </td>
 
-                            {/* Name */}
-
                             <td className="overflow-hidden px-2 py-3 text-center align-middle">
                               <span className="block truncate">
                                 {member.name}
                               </span>
                             </td>
-
-                            {/* Rank */}
 
                             <td className="overflow-hidden px-2 py-3 text-center align-middle text-muted-foreground">
                               <span
@@ -2377,6 +2477,10 @@ export default function PromotionRoster() {
                                     member.discordId
                                   ]
                                 }
+                                open={
+                                  openDiscordMenu ===
+                                  member.discordId
+                                }
                                 onOpenChange={(
                                   open,
                                 ) =>
@@ -2388,10 +2492,16 @@ export default function PromotionRoster() {
                                 onCopyId={
                                   copyDiscordId
                                 }
+                                onContextMenu={(
+                                  event,
+                                ) =>
+                                  handleDiscordContextMenu(
+                                    event,
+                                    member,
+                                  )
+                                }
                               />
                             </td>
-
-                            {/* Time in Department */}
 
                             <td className="overflow-hidden px-2 py-3 text-center align-middle text-muted-foreground">
                               <span className="block truncate">
@@ -2400,16 +2510,12 @@ export default function PromotionRoster() {
                               </span>
                             </td>
 
-                            {/* Time in Rank */}
-
                             <td className="overflow-hidden px-2 py-3 text-center align-middle text-muted-foreground">
                               <span className="block truncate">
                                 {member.timeInRank ||
                                   "—"}
                               </span>
                             </td>
-
-                            {/* Required Time in Rank */}
 
                             <td className="overflow-hidden px-2 py-3 text-center align-middle font-medium">
                               <span className="block truncate">
@@ -2419,8 +2525,6 @@ export default function PromotionRoster() {
                                 DAYS
                               </span>
                             </td>
-
-                            {/* Required Logs */}
 
                             <td className="overflow-hidden px-2 py-3 text-center align-middle">
                               <div className="space-y-0.5 text-[11px] leading-4">
@@ -2442,8 +2546,6 @@ export default function PromotionRoster() {
                               </div>
                             </td>
 
-                            {/* Required Hours */}
-
                             <td className="overflow-hidden px-2 py-3 text-center align-middle font-medium">
                               <span className="block truncate">
                                 {member.requiredHours.toFixed(
@@ -2453,8 +2555,6 @@ export default function PromotionRoster() {
                               </span>
                             </td>
 
-                            {/* Activity */}
-
                             <td className="overflow-hidden px-2 py-3 text-center align-middle font-medium">
                               <span className="block truncate">
                                 {member.promotionHours.toFixed(
@@ -2463,8 +2563,6 @@ export default function PromotionRoster() {
                                 h
                               </span>
                             </td>
-
-                            {/* Status */}
 
                             <td className="overflow-hidden px-2 py-3 text-center align-middle">
                               <div
@@ -2712,6 +2810,10 @@ export default function PromotionRoster() {
                                     ]
                                   }
                                   mobile
+                                  open={
+                                    openDiscordMenu ===
+                                    member.discordId
+                                  }
                                   onOpenChange={(
                                     open,
                                   ) =>
@@ -2722,6 +2824,14 @@ export default function PromotionRoster() {
                                   }
                                   onCopyId={
                                     copyDiscordId
+                                  }
+                                  onContextMenu={(
+                                    event,
+                                  ) =>
+                                    handleDiscordContextMenu(
+                                      event,
+                                      member,
+                                    )
                                   }
                                 />
                               </div>
