@@ -14,6 +14,7 @@ import {
   Clock3,
   Copy,
   Filter,
+  ListPlus,
   Search,
   Shield,
   Users,
@@ -23,6 +24,7 @@ import {
 import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
+import RosterListDialog from "@/components/dashboard/RosterListDialog"
 import GoogleRosterRefresh from "@/components/dashboard/GoogleRosterRefresh"
 import { logAction } from "@/lib/actionLog"
 import { Button } from "@/components/ui/button"
@@ -252,6 +254,9 @@ export default function ActivityRoster() {
     useState<string[]>([])
 
   const [selectedCopied, setSelectedCopied] =
+    useState(false)
+
+  const [rosterListOpen, setRosterListOpen] =
     useState(false)
 
   /*
@@ -1160,6 +1165,21 @@ export default function ActivityRoster() {
               />
             </div>
 
+            {/* Clear Filters */}
+
+            {hasFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="shrink-0 gap-2 text-white hover:bg-white/5 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+                Clear
+              </Button>
+            )}
+
             {/* Status Filter */}
 
             <DropdownMenu>
@@ -1433,6 +1453,21 @@ export default function ActivityRoster() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Activity List */}
+
+            {selectedIds.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => setRosterListOpen(true)}
+              >
+                <ListPlus className="h-4 w-4 text-blue-500" />
+                Activity List
+              </Button>
+            )}
+
             {/* Selected Copy Actions */}
 
             {selectedIds.length > 0 && (
@@ -1695,21 +1730,6 @@ export default function ActivityRoster() {
               </DropdownMenu>
             )}
 
-            {/* Clear Filters */}
-
-            {hasFilters && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="shrink-0 gap-2"
-              >
-                <X className="h-4 w-4" />
-                Clear
-              </Button>
-            )}
-
             {/* Google Sheets Refresh */}
 
             <GoogleRosterRefresh
@@ -1722,38 +1742,14 @@ export default function ActivityRoster() {
 
           {/* Active Filters */}
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Filter className="h-3.5 w-3.5" />
+          {(statusFilters.length > 0 ||
+            rankFilters.length > 0) && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Filter className="h-3.5 w-3.5" />
 
-              Filters:
-            </div>
-
-            {search.trim() ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("")
-                  setSelectedCopied(false)
-                }}
-                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
-                title="Clear search filter"
-              >
-                <Search className="h-3 w-3 shrink-0" />
-                <span className="max-w-[280px] truncate">
-                  Search: {search.trim()}
-                </span>
-                <X className="h-3 w-3 shrink-0" />
-              </button>
-            ) : null}
-
-            {statusFilters.length === 0 &&
-              rankFilters.length === 0 &&
-              !search.trim() && (
-                <span className="rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                  None
-                </span>
-              )}
+                Active filters:
+              </div>
 
               {statusFilters.map(
                 (status) => {
@@ -1805,7 +1801,8 @@ export default function ActivityRoster() {
                   </button>
                 ),
               )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Error */}
@@ -2192,6 +2189,15 @@ export default function ActivityRoster() {
           )}
         </div>
       </div>
+
+      <RosterListDialog
+        open={rosterListOpen}
+        onClose={() => setRosterListOpen(false)}
+        module="activity"
+        division={division}
+        members={members}
+        initialSelectedIds={selectedIds}
+      />
     </DashboardLayout>
   )
 }
