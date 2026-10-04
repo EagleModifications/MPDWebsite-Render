@@ -247,25 +247,54 @@ function getValue(row: string[], columns: ColumnDefinition[], label: string): st
   return index >= 0 ? clean(row[index]) : ""
 }
 
-const SECTION_LABELS = new Set([
-  "normalnonsupervisor",
-  "nonsupervisor",
-  "trialsupervisor",
-  "supervisors",
-  "triallowcommand",
-  "lowcommand",
-  "trialhighcommand",
-  "highcommand",
-  "patrol",
-  "cadets",
-  "cadet",
-])
+const DEPARTMENT_SECTION_ORDER = [
+  "High Command",
+  "Trial High Command",
+  "Low Command",
+  "Trial Low Command",
+  "Supervisors",
+  "Supervisor In Training",
+  "Patrol Officers",
+  "Cadets",
+] as const
 
-function isSectionLabel(value: string): boolean {
-  const normalized = normalize(value)
-  if (!normalized) return false
-  if (SECTION_LABELS.has(normalized)) return true
-  return normalized.includes("command") || normalized.includes("supervisor")
+const DEPARTMENT_SECTION_ALIASES: Record<string, string> = {
+  highcommand: "High Command",
+  trialhighcommand: "Trial High Command",
+  lowcommand: "Low Command",
+  triallowcommand: "Trial Low Command",
+  supervisors: "Supervisors",
+  supervisor: "Supervisors",
+  trialsupervisor: "Supervisor In Training",
+  supervisorintraining: "Supervisor In Training",
+  patrol: "Patrol Officers",
+  patrolofficers: "Patrol Officers",
+  cadet: "Cadets",
+  cadets: "Cadets",
+}
+
+function sectionName(value: string): string {
+  return DEPARTMENT_SECTION_ALIASES[normalize(value)] ?? ""
+}
+
+function sectionFromRow(row: string[]): string {
+  for (const value of row) {
+    const section = sectionName(value)
+    if (section) return section
+  }
+  return ""
+}
+
+function isRepeatedDepartmentHeader(row: string[]): boolean {
+  const normalized = row.map(normalize).filter(Boolean)
+  if (!normalized.length) return false
+
+  const headerWords = DEPARTMENT_COLUMNS.flatMap(([, aliases]) =>
+    aliases.map(normalize),
+  )
+
+  const matches = normalized.filter((value) => headerWords.includes(value)).length
+  return matches >= 4
 }
 
 function getSectionColumn(sheet: Sheet): number {
@@ -277,15 +306,87 @@ function getSectionColumn(sheet: Sheet): number {
   return -1
 }
 
-function isOnlySectionRow(row: string[], identityIndexes: number[]): string {
-  const populated = row
-    .map((value, index) => ({ value: clean(value), index }))
-    .filter((item) => item.value)
+function findHomeCellValue(sheet: Sheet, label: string): string {
+  const position = findCell(sheet, label)
+  if (!position) return ""
 
-  if (populated.length !== 1) return ""
-  if (identityIndexes.includes(populated[0].index)) return ""
+  const row = rowValues(sheet, position.row)
+  for (let column = position.column + 1; column < Math.min(sheet.columnCount, position.column + 4); column += 1) {
+    const value = clean(row[column])
+    if (value) return value
+  }
 
-  return isSectionLabel(populated[0].value) ? populated[0].value : ""
+  return ""
+}
+
+function homeSubdivisionRows(
+  sheet: Sheet,
+  title: string,
+  rows: Array<[string, string]>,
+): Array<[string, string]> {
+  const titlePosition = findCell(sheet, title)
+  if (!titlePosition) {
+    return rows.map(([label]) => [label, ""])
+  }
+
+  const startRow = titlePosition.row + 1
+  const startColumn = titlePosition.column
+  const endRow = Math.min(sheet.rawRows.length - 1, startRow + 12)
+  const wanted = new Map(rows.map(([label]) => [normalize(label), label]))
+  const found = new Map<string, string>()
+
+  for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
+    const row = rowValues(sheet, rowIndex)
+    const cells = row.slice(startColumn, Math.min(sheet.columnCount, startColumn + 4))
+
+    for (let i = 0; i < cells.length; i += 1) {
+      const label = clean(cells[i])
+      if (!label) continue
+
+      const wantedLabel = wanted.get(normalize(label))
+      if (!wantedLabel) continue
+
+      let value = ""
+      for (let j = i + 1; j < cells.length; j += 1) {
+        if (clean(cells[j])) {
+          value = clean(cells[j])
+          break
+        }
+      }
+      found.set(normalize(wantedLabel), value)
+    }
+  }
+
+  return rows.map(([label]) => [label, found.get(normalize(label)) ?? findHomeCellValue(sheet, label)])
+}
+
+function homeSubdivisionTable(sheet: Sheet): Array<{
+  title: string
+  rows: Array<[string, string]>
+}> {
+  const sections = [
+    {
+      title: "Field Training Division",
+      rows: [["Director", ""], ["Co-Director", ""]] as Array<[string, string]>,
+    },
+    {
+      title: "Traffic & Rescue Unit",
+      rows: [["TRU-01", ""], ["TRU-02", ""], ["TRU-03", ""]] as Array<[string, string]>,
+    },
+    {
+      title: "Gang Investigations Unit",
+      rows: [["GIU-01", ""], ["GIU-02", ""], ["GIU-03", ""], ["GIU-04", ""], ["GIU-05", ""]] as Array<[string, string]>,
+    },
+    {
+      title: "SWAT",
+      rows: [["SWAT-01", ""], ["SWAT-02", ""], ["SWAT-03", ""], ["SWAT-04", ""], ["SWAT-05", ""]] as Array<[string, string]>,
+    },
+  ]
+
+  return sections.map((section) => ({
+    title: section.title,
+    rows: homeSubdivisionRows(sheet, section.title, section.rows),
+  }))
 }
 
 function parseDepartment(sheet: Sheet): DepartmentRow[] {
@@ -293,13 +394,6 @@ function parseDepartment(sheet: Sheet): DepartmentRow[] {
   if (!header) return []
 
   const sectionColumn = getSectionColumn(sheet)
-  const identityIndexes = [
-    header.indexes[0],
-    header.indexes[1],
-    header.indexes[2],
-    header.indexes[8],
-  ].filter((index) => index >= 0)
-
   const result: DepartmentRow[] = []
   let currentSection = ""
 
@@ -307,14 +401,15 @@ function parseDepartment(sheet: Sheet): DepartmentRow[] {
     const source = rowValues(sheet, rowIndex)
     if (!source.some(Boolean)) continue
 
-    const explicitSection =
-      sectionColumn >= 0 ? clean(source[sectionColumn]) : ""
+    // The Google Sheet repeats the column headings between command sections.
+    // Never allow "Callsign" (or another column heading) to become a section.
+    if (isRepeatedDepartmentHeader(source)) continue
 
-    if (explicitSection) currentSection = explicitSection
+    const explicitSection = sectionColumn >= 0 ? sectionName(clean(source[sectionColumn])) : ""
+    const rowSection = sectionFromRow(source)
 
-    const sectionRow = isOnlySectionRow(source, identityIndexes)
-    if (sectionRow) {
-      currentSection = sectionRow
+    if (explicitSection || rowSection) {
+      currentSection = explicitSection || rowSection
       continue
     }
 
@@ -324,11 +419,8 @@ function parseDepartment(sheet: Sheet): DepartmentRow[] {
 
     if (!selected.some(Boolean)) continue
 
-    const normalized = selected.map(normalize)
-    const headerWords = DEPARTMENT_COLUMNS.map(([label]) => normalize(label))
-    if (headerWords.filter((word) => normalized.includes(word)).length >= 4) {
-      continue
-    }
+    // A repeated header can sometimes arrive as a single populated cell.
+    if (normalize(selected[0]) === "callsign") continue
 
     const row: DepartmentRow = {
       section: currentSection,
@@ -356,12 +448,6 @@ function parseEmployees(sheet: Sheet): EmployeeRow[] {
   const header = findHeader(sheet, EMPLOYEE_COLUMNS, 10)
   if (!header) return []
 
-  const identityIndexes = [
-    header.indexes[0],
-    header.indexes[1],
-    header.indexes[2],
-  ].filter((index) => index >= 0)
-
   const result: EmployeeRow[] = []
   let currentSection = ""
 
@@ -369,7 +455,9 @@ function parseEmployees(sheet: Sheet): EmployeeRow[] {
     const source = rowValues(sheet, rowIndex)
     if (!source.some(Boolean)) continue
 
-    const sectionRow = isOnlySectionRow(source, identityIndexes)
+    if (isRepeatedDepartmentHeader(source)) continue
+
+    const sectionRow = sectionFromRow(source)
     if (sectionRow) {
       currentSection = sectionRow
       continue
@@ -380,6 +468,8 @@ function parseEmployees(sheet: Sheet): EmployeeRow[] {
     )
 
     if (!selected.some(Boolean)) continue
+
+    if (normalize(selected[0]) === "badgenumber" || normalize(selected[1]) === "name") continue
 
     const normalized = selected.map(normalize)
     const headerWords = EMPLOYEE_COLUMNS.map(([label]) => normalize(label))
@@ -524,7 +614,7 @@ function HomeView({ sheet }: { sheet: Sheet }) {
   const hours = homeValues(sheet, "This Month's Dept. Hours", 4, 1)
   const documents = uniqueInOrder(homeValues(sheet, "Documents", 10, 2))
   const statistics = uniqueInOrder(homeValues(sheet, "Statistics", 12, 2))
-  const subdivisions = uniqueInOrder(homeValues(sheet, "FTD & Subdivisions", 30, 2))
+  const subdivisionSections = homeSubdivisionTable(sheet)
   const founders = uniqueInOrder(homeValues(sheet, "Metro PD Founders", 15, 2))
 
   const leadership = HOME_CARDS.filter((card) => card.kind === "leadership").map((card) => ({
@@ -572,11 +662,27 @@ function HomeView({ sheet }: { sheet: Sheet }) {
       </div>
 
       <div className="space-y-4">
+        <HomeCard title="1N-05" icon={Shield}>
+          <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-center text-sm font-semibold">
+            Vacant
+          </div>
+        </HomeCard>
+
         <HomeCard title="FTD & Subdivisions" icon={Users}>
-          <div className="space-y-1.5">
-            {subdivisions.length ? subdivisions.slice(0, 40).map((value) => (
-              <div key={value} className="rounded-md border border-border px-3 py-2 text-xs">{value}</div>
-            )) : <p className="text-sm text-muted-foreground">No subdivision data found.</p>}
+          <div className="overflow-hidden rounded-md border border-blue-950/70 bg-muted/10">
+            {subdivisionSections.map((section) => (
+              <div key={section.title}>
+                <div className="border-b border-blue-950/70 bg-muted/70 px-3 py-2 text-center text-xs font-bold">
+                  {section.title}
+                </div>
+                {section.rows.map(([label, value]) => (
+                  <div key={`${section.title}-${label}`} className="grid grid-cols-[88px_minmax(0,1fr)] border-b border-blue-950/70 last:border-b-0">
+                    <div className="border-r border-blue-950/70 px-2 py-1.5 text-center text-xs font-medium">{label}</div>
+                    <div className="px-2 py-1.5 text-center text-xs">{display(value)}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         </HomeCard>
 
@@ -923,27 +1029,33 @@ export default function MainRoster() {
   const departmentGroups = useMemo(() => {
     const groups = new Map<string, DepartmentRow[]>()
 
-    for (const row of filteredDepartmentRows) {
-      const section = row.section || "Department Roster"
-      const current = groups.get(section) ?? []
-      current.push(row)
-      groups.set(section, current)
+    for (const section of DEPARTMENT_SECTION_ORDER) {
+      groups.set(section, [])
     }
 
-    return Array.from(groups.entries())
+    for (const row of filteredDepartmentRows) {
+      const section = sectionName(row.section) || row.section
+      if (!groups.has(section)) continue
+      groups.get(section)!.push(row)
+    }
+
+    return Array.from(groups.entries()).filter(([, rows]) => rows.length)
   }, [filteredDepartmentRows])
 
   const employeeGroups = useMemo(() => {
     const groups = new Map<string, EmployeeRow[]>()
 
-    for (const row of filteredEmployeeRows) {
-      const section = row.section || "Employee Database"
-      const current = groups.get(section) ?? []
-      current.push(row)
-      groups.set(section, current)
+    for (const section of DEPARTMENT_SECTION_ORDER) {
+      groups.set(section, [])
     }
 
-    return Array.from(groups.entries())
+    for (const row of filteredEmployeeRows) {
+      const section = sectionName(row.section) || row.section
+      if (!groups.has(section)) continue
+      groups.get(section)!.push(row)
+    }
+
+    return Array.from(groups.entries()).filter(([, rows]) => rows.length)
   }, [filteredEmployeeRows])
 
   const counts = countCards(departmentRows, employeeRows, vehicleRows, uniformRows)
