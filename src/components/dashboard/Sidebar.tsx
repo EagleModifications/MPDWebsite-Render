@@ -706,15 +706,12 @@ export default function DashboardSidebar() {
      PERMISSIONS
   ============================================================== */
 
-  /*
-   * Sidebar visibility must use the same permission rules as the rest of
-   * the application. In particular, super admins receive ["*"] from the
-   * server, so a direct `includes(permission)` check would incorrectly
-   * hide every management section from them.
-   */
   const hasPermission = (
     permission: string,
-  ) => checkPermission(user, permission)
+  ) => checkPermission(
+    user,
+    permission,
+  )
 
   const canSeeActivityManagement =
     hasPermission(
