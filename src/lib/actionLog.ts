@@ -25,30 +25,17 @@ export type ActionLogInput = {
   targetRank?: string
   summary: string
   details?: Record<string, unknown>
-  path?: string
 }
 
-/**
- * Client-side audit helper. Logging is fire-and-forget so an audit-log
- * failure can never break the dashboard action that the user is performing.
- * The server persists entries in MongoDB so Render deploys/restarts do not erase them.
- */
+/** Fire-and-forget audit request. The server compacts the payload before MongoDB storage. */
 export function logAction(input: ActionLogInput): void {
   void fetch("/api/action-logs", {
     method: "POST",
     credentials: "include",
     cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      ...input,
-      path:
-        input.path ??
-        `${window.location.pathname}${window.location.search}`,
-    }),
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(input),
   }).catch((error) => {
-    console.warn("Action logging failed:", error, input)
+    console.warn("Action logging failed:", error)
   })
 }
