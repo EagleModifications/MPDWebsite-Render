@@ -39,7 +39,7 @@ type GalleryItem = {
   title: string
   description?: string
   category?: "Community" | "Fleet"
-  tags?: GalleryTag[]
+  tags?: unknown[]
   media: GalleryMedia[]
   createdAt: string
 }
@@ -67,80 +67,617 @@ type AmbientDot = {
   opacity: number
   delay: string
   duration: string
-  drift: string
+  driftX: string
+  driftY: string
+  blur: string
 }
 
-/**
- * Deterministic pseudo-random generator.
- *
- * This gives us randomized-looking stars without using Math.random()
- * during rendering.
- */
-function seededRandom(seed: number) {
-  const value = Math.sin(seed * 12.9898) * 43758.5453
-  return value - Math.floor(value)
+const ambientDots: AmbientDot[] = [
+  {
+    left: "3%",
+    top: "7%",
+    size: "2px",
+    opacity: 0.38,
+    delay: "1.4s",
+    duration: "13s",
+    driftX: "18px",
+    driftY: "-12px",
+    blur: "0px",
+  },
+  {
+    left: "8%",
+    top: "17%",
+    size: "3px",
+    opacity: 0.24,
+    delay: "5.8s",
+    duration: "17s",
+    driftX: "-14px",
+    driftY: "16px",
+    blur: "0.2px",
+  },
+  {
+    left: "13%",
+    top: "31%",
+    size: "2px",
+    opacity: 0.32,
+    delay: "3.2s",
+    duration: "15s",
+    driftX: "11px",
+    driftY: "-18px",
+    blur: "0px",
+  },
+  {
+    left: "18%",
+    top: "10%",
+    size: "2px",
+    opacity: 0.45,
+    delay: "8.4s",
+    duration: "19s",
+    driftX: "-17px",
+    driftY: "11px",
+    blur: "0px",
+  },
+  {
+    left: "23%",
+    top: "24%",
+    size: "3px",
+    opacity: 0.2,
+    delay: "2.1s",
+    duration: "16s",
+    driftX: "15px",
+    driftY: "13px",
+    blur: "0.3px",
+  },
+  {
+    left: "28%",
+    top: "5%",
+    size: "2px",
+    opacity: 0.4,
+    delay: "7.3s",
+    duration: "14s",
+    driftX: "-12px",
+    driftY: "-15px",
+    blur: "0px",
+  },
+  {
+    left: "33%",
+    top: "18%",
+    size: "2px",
+    opacity: 0.3,
+    delay: "10.1s",
+    duration: "18s",
+    driftX: "19px",
+    driftY: "9px",
+    blur: "0px",
+  },
+  {
+    left: "38%",
+    top: "36%",
+    size: "3px",
+    opacity: 0.23,
+    delay: "4.5s",
+    duration: "20s",
+    driftX: "-13px",
+    driftY: "-14px",
+    blur: "0.2px",
+  },
+  {
+    left: "43%",
+    top: "13%",
+    size: "2px",
+    opacity: 0.42,
+    delay: "1.8s",
+    duration: "15s",
+    driftX: "16px",
+    driftY: "17px",
+    blur: "0px",
+  },
+  {
+    left: "48%",
+    top: "28%",
+    size: "2px",
+    opacity: 0.28,
+    delay: "6.7s",
+    duration: "18s",
+    driftX: "-18px",
+    driftY: "12px",
+    blur: "0px",
+  },
+  {
+    left: "53%",
+    top: "7%",
+    size: "3px",
+    opacity: 0.36,
+    delay: "11.2s",
+    duration: "16s",
+    driftX: "13px",
+    driftY: "-11px",
+    blur: "0.3px",
+  },
+  {
+    left: "58%",
+    top: "20%",
+    size: "2px",
+    opacity: 0.24,
+    delay: "3.9s",
+    duration: "21s",
+    driftX: "-15px",
+    driftY: "18px",
+    blur: "0px",
+  },
+  {
+    left: "63%",
+    top: "40%",
+    size: "2px",
+    opacity: 0.38,
+    delay: "8.1s",
+    duration: "17s",
+    driftX: "17px",
+    driftY: "-13px",
+    blur: "0px",
+  },
+  {
+    left: "68%",
+    top: "12%",
+    size: "3px",
+    opacity: 0.2,
+    delay: "5.2s",
+    duration: "19s",
+    driftX: "-11px",
+    driftY: "15px",
+    blur: "0.2px",
+  },
+  {
+    left: "73%",
+    top: "27%",
+    size: "2px",
+    opacity: 0.44,
+    delay: "9.7s",
+    duration: "15s",
+    driftX: "14px",
+    driftY: "11px",
+    blur: "0px",
+  },
+  {
+    left: "78%",
+    top: "8%",
+    size: "2px",
+    opacity: 0.31,
+    delay: "2.8s",
+    duration: "20s",
+    driftX: "-19px",
+    driftY: "-10px",
+    blur: "0px",
+  },
+  {
+    left: "83%",
+    top: "35%",
+    size: "3px",
+    opacity: 0.26,
+    delay: "7.6s",
+    duration: "18s",
+    driftX: "12px",
+    driftY: "16px",
+    blur: "0.3px",
+  },
+  {
+    left: "88%",
+    top: "15%",
+    size: "2px",
+    opacity: 0.4,
+    delay: "4.1s",
+    duration: "14s",
+    driftX: "-16px",
+    driftY: "13px",
+    blur: "0px",
+  },
+  {
+    left: "94%",
+    top: "6%",
+    size: "3px",
+    opacity: 0.23,
+    delay: "10.5s",
+    duration: "19s",
+    driftX: "18px",
+    driftY: "-16px",
+    blur: "0.2px",
+  },
+
+  {
+    left: "5%",
+    top: "44%",
+    size: "2px",
+    opacity: 0.35,
+    delay: "6.2s",
+    duration: "17s",
+    driftX: "-13px",
+    driftY: "17px",
+    blur: "0px",
+  },
+  {
+    left: "11%",
+    top: "57%",
+    size: "3px",
+    opacity: 0.22,
+    delay: "1.7s",
+    duration: "21s",
+    driftX: "15px",
+    driftY: "-12px",
+    blur: "0.3px",
+  },
+  {
+    left: "16%",
+    top: "72%",
+    size: "2px",
+    opacity: 0.42,
+    delay: "9.3s",
+    duration: "16s",
+    driftX: "-18px",
+    driftY: "14px",
+    blur: "0px",
+  },
+  {
+    left: "22%",
+    top: "51%",
+    size: "2px",
+    opacity: 0.27,
+    delay: "3.4s",
+    duration: "18s",
+    driftX: "11px",
+    driftY: "-17px",
+    blur: "0px",
+  },
+  {
+    left: "27%",
+    top: "67%",
+    size: "3px",
+    opacity: 0.34,
+    delay: "7.9s",
+    duration: "20s",
+    driftX: "17px",
+    driftY: "12px",
+    blur: "0.2px",
+  },
+  {
+    left: "32%",
+    top: "48%",
+    size: "2px",
+    opacity: 0.21,
+    delay: "11.8s",
+    duration: "15s",
+    driftX: "-14px",
+    driftY: "-11px",
+    blur: "0px",
+  },
+  {
+    left: "37%",
+    top: "76%",
+    size: "2px",
+    opacity: 0.4,
+    delay: "5.5s",
+    duration: "19s",
+    driftX: "13px",
+    driftY: "16px",
+    blur: "0px",
+  },
+  {
+    left: "42%",
+    top: "59%",
+    size: "3px",
+    opacity: 0.25,
+    delay: "2.4s",
+    duration: "22s",
+    driftX: "-17px",
+    driftY: "10px",
+    blur: "0.3px",
+  },
+  {
+    left: "47%",
+    top: "84%",
+    size: "2px",
+    opacity: 0.36,
+    delay: "8.8s",
+    duration: "17s",
+    driftX: "19px",
+    driftY: "-15px",
+    blur: "0px",
+  },
+  {
+    left: "52%",
+    top: "52%",
+    size: "2px",
+    opacity: 0.29,
+    delay: "4.7s",
+    duration: "16s",
+    driftX: "-12px",
+    driftY: "18px",
+    blur: "0px",
+  },
+  {
+    left: "57%",
+    top: "70%",
+    size: "3px",
+    opacity: 0.43,
+    delay: "10.2s",
+    duration: "20s",
+    driftX: "16px",
+    driftY: "-13px",
+    blur: "0.2px",
+  },
+  {
+    left: "62%",
+    top: "49%",
+    size: "2px",
+    opacity: 0.2,
+    delay: "1.3s",
+    duration: "18s",
+    driftX: "-19px",
+    driftY: "11px",
+    blur: "0px",
+  },
+  {
+    left: "67%",
+    top: "82%",
+    size: "2px",
+    opacity: 0.38,
+    delay: "6.9s",
+    duration: "21s",
+    driftX: "14px",
+    driftY: "15px",
+    blur: "0px",
+  },
+  {
+    left: "72%",
+    top: "58%",
+    size: "3px",
+    opacity: 0.24,
+    delay: "3.6s",
+    duration: "15s",
+    driftX: "-15px",
+    driftY: "-16px",
+    blur: "0.3px",
+  },
+  {
+    left: "77%",
+    top: "74%",
+    size: "2px",
+    opacity: 0.41,
+    delay: "9.1s",
+    duration: "19s",
+    driftX: "18px",
+    driftY: "13px",
+    blur: "0px",
+  },
+  {
+    left: "82%",
+    top: "52%",
+    size: "2px",
+    opacity: 0.28,
+    delay: "5.4s",
+    duration: "17s",
+    driftX: "-13px",
+    driftY: "17px",
+    blur: "0px",
+  },
+  {
+    left: "87%",
+    top: "68%",
+    size: "3px",
+    opacity: 0.35,
+    delay: "11.1s",
+    duration: "22s",
+    driftX: "12px",
+    driftY: "-14px",
+    blur: "0.2px",
+  },
+  {
+    left: "93%",
+    top: "47%",
+    size: "2px",
+    opacity: 0.23,
+    delay: "2.6s",
+    duration: "16s",
+    driftX: "-18px",
+    driftY: "12px",
+    blur: "0px",
+  },
+
+  {
+    left: "4%",
+    top: "88%",
+    size: "3px",
+    opacity: 0.3,
+    delay: "7.2s",
+    duration: "20s",
+    driftX: "15px",
+    driftY: "-13px",
+    blur: "0.2px",
+  },
+  {
+    left: "9%",
+    top: "78%",
+    size: "2px",
+    opacity: 0.43,
+    delay: "4.3s",
+    duration: "18s",
+    driftX: "-16px",
+    driftY: "15px",
+    blur: "0px",
+  },
+  {
+    left: "14%",
+    top: "94%",
+    size: "2px",
+    opacity: 0.22,
+    delay: "10.8s",
+    duration: "21s",
+    driftX: "18px",
+    driftY: "10px",
+    blur: "0px",
+  },
+  {
+    left: "20%",
+    top: "85%",
+    size: "3px",
+    opacity: 0.36,
+    delay: "1.9s",
+    duration: "17s",
+    driftX: "-12px",
+    driftY: "-18px",
+    blur: "0.3px",
+  },
+  {
+    left: "26%",
+    top: "96%",
+    size: "2px",
+    opacity: 0.27,
+    delay: "6.4s",
+    duration: "19s",
+    driftX: "16px",
+    driftY: "13px",
+    blur: "0px",
+  },
+  {
+    left: "34%",
+    top: "91%",
+    size: "2px",
+    opacity: 0.39,
+    delay: "3.1s",
+    duration: "15s",
+    driftX: "-17px",
+    driftY: "12px",
+    blur: "0px",
+  },
+  {
+    left: "40%",
+    top: "97%",
+    size: "3px",
+    opacity: 0.2,
+    delay: "8.6s",
+    duration: "22s",
+    driftX: "13px",
+    driftY: "-15px",
+    blur: "0.2px",
+  },
+  {
+    left: "46%",
+    top: "93%",
+    size: "2px",
+    opacity: 0.34,
+    delay: "5.1s",
+    duration: "18s",
+    driftX: "-14px",
+    driftY: "16px",
+    blur: "0px",
+  },
+  {
+    left: "55%",
+    top: "89%",
+    size: "3px",
+    opacity: 0.25,
+    delay: "11.4s",
+    duration: "20s",
+    driftX: "19px",
+    driftY: "-12px",
+    blur: "0.3px",
+  },
+  {
+    left: "61%",
+    top: "96%",
+    size: "2px",
+    opacity: 0.4,
+    delay: "2.7s",
+    duration: "16s",
+    driftX: "-11px",
+    driftY: "14px",
+    blur: "0px",
+  },
+  {
+    left: "69%",
+    top: "92%",
+    size: "2px",
+    opacity: 0.3,
+    delay: "7.7s",
+    duration: "21s",
+    driftX: "17px",
+    driftY: "11px",
+    blur: "0px",
+  },
+  {
+    left: "75%",
+    top: "87%",
+    size: "3px",
+    opacity: 0.42,
+    delay: "4.9s",
+    duration: "17s",
+    driftX: "-15px",
+    driftY: "-14px",
+    blur: "0.2px",
+  },
+  {
+    left: "81%",
+    top: "95%",
+    size: "2px",
+    opacity: 0.23,
+    delay: "9.6s",
+    duration: "19s",
+    driftX: "12px",
+    driftY: "18px",
+    blur: "0px",
+  },
+  {
+    left: "88%",
+    top: "84%",
+    size: "2px",
+    opacity: 0.37,
+    delay: "1.1s",
+    duration: "15s",
+    driftX: "-19px",
+    driftY: "13px",
+    blur: "0px",
+  },
+  {
+    left: "96%",
+    top: "92%",
+    size: "3px",
+    opacity: 0.28,
+    delay: "6.8s",
+    duration: "22s",
+    driftX: "14px",
+    driftY: "-16px",
+    blur: "0.3px",
+  },
+]
+
+const galleryTagClasses: Record<GalleryTag, string> = {
+  Dept:
+    "border-blue-400/40 bg-blue-500/20 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.14)]",
+
+  SWAT:
+    "border-slate-400/30 bg-slate-800/70 text-slate-100 shadow-[0_0_12px_rgba(148,163,184,0.08)]",
+
+  "MTF-7":
+    "border-sky-400/35 bg-sky-900/45 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.1)]",
+
+  MCD:
+    "border-blue-900/70 bg-blue-950/90 text-blue-300 shadow-[0_0_12px_rgba(30,64,175,0.12)]",
+
+  TRU:
+    "border-yellow-400/40 bg-yellow-500/15 text-yellow-300 shadow-[0_0_12px_rgba(234,179,8,0.1)]",
+
+  SAR:
+    "border-red-400/40 bg-red-500/15 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.1)]",
 }
 
-/**
- * Generate a large field of subtle stars.
- *
- * The stars are intentionally spread across the whole page instead
- * of being concentrated around the CTA section.
- */
-function createAmbientDots(count: number): AmbientDot[] {
-  return Array.from(
-    { length: count },
-    (_, index) => {
-      const x = seededRandom(index + 1)
-      const y = seededRandom(index + 101)
-      const sizeValue = seededRandom(index + 201)
-      const opacityValue = seededRandom(index + 301)
-      const delayValue = seededRandom(index + 401)
-      const durationValue = seededRandom(index + 501)
-      const driftValue = seededRandom(index + 601)
-
-      return {
-        left: `${(x * 98) + 1}%`,
-        top: `${(y * 94) + 3}%`,
-        size:
-          sizeValue > 0.9
-            ? "3px"
-            : sizeValue > 0.62
-              ? "2.5px"
-              : "2px",
-        opacity:
-          0.12 +
-          opacityValue * 0.3,
-        delay: `${(delayValue * 14).toFixed(2)}s`,
-        duration: `${(
-          9 +
-          durationValue * 10
-        ).toFixed(2)}s`,
-        drift: `${(
-          4 +
-          driftValue * 9
-        ).toFixed(2)}px`,
-      }
-    },
-  )
-}
-
-const galleryTagClasses: Record<
-  GalleryTag,
+const galleryCategoryClasses: Record<
+  NonNullable<GalleryItem["category"]>,
   string
 > = {
-  Dept:
-    "border-blue-500/30 bg-blue-500/10 text-blue-400",
-  SWAT:
-    "border-white/15 bg-white/10 text-foreground",
-  "MTF-7":
-    "border-slate-500/30 bg-slate-500/10 text-slate-300",
-  MCD:
-    "border-blue-900/40 bg-blue-950/30 text-blue-300",
-  TRU:
-    "border-yellow-500/30 bg-yellow-500/10 text-yellow-400",
-  SAR:
-    "border-red-500/30 bg-red-500/10 text-red-400",
+  Community:
+    "border-blue-400/30 bg-blue-950/80 text-blue-300",
+
+  Fleet:
+    "border-white/15 bg-black/75 text-white",
 }
 
 function formatEventDate(date: string) {
@@ -150,19 +687,14 @@ function formatEventDate(date: string) {
     return date
   }
 
-  return parsed.toLocaleDateString(
-    undefined,
-    {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    },
-  )
+  return parsed.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })
 }
 
-function getGalleryPreview(
-  item: GalleryItem,
-) {
+function getGalleryPreview(item: GalleryItem) {
   const media = item.media?.[0]
 
   if (!media) {
@@ -170,6 +702,93 @@ function getGalleryPreview(
   }
 
   return media.thumbnailUrl || media.url
+}
+
+/**
+ * Normalizes gallery tags so the home page still displays
+ * the correct colored tag if the API returns different
+ * casing or common alternate names.
+ */
+function normalizeGalleryTags(
+  tags: unknown[] | undefined,
+): GalleryTag[] {
+  if (!Array.isArray(tags)) {
+    return []
+  }
+
+  const normalized: GalleryTag[] = []
+
+  for (const rawTag of tags) {
+    let value = ""
+
+    if (typeof rawTag === "string") {
+      value = rawTag
+    } else if (
+      rawTag &&
+      typeof rawTag === "object"
+    ) {
+      const objectTag =
+        rawTag as Record<string, unknown>
+
+      const possibleValue =
+        objectTag.name ??
+        objectTag.label ??
+        objectTag.value ??
+        objectTag.tag
+
+      if (typeof possibleValue === "string") {
+        value = possibleValue
+      }
+    }
+
+    const cleaned = value
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, "-")
+      .replace(/\s+/g, "-")
+
+    let normalizedTag: GalleryTag | null = null
+
+    switch (cleaned) {
+      case "dept":
+      case "department":
+        normalizedTag = "Dept"
+        break
+
+      case "swat":
+        normalizedTag = "SWAT"
+        break
+
+      case "mtf7":
+      case "mtf-7":
+        normalizedTag = "MTF-7"
+        break
+
+      case "mcd":
+        normalizedTag = "MCD"
+        break
+
+      case "tru":
+        normalizedTag = "TRU"
+        break
+
+      case "sar":
+        normalizedTag = "SAR"
+        break
+
+      default:
+        normalizedTag = null
+    }
+
+    if (
+      normalizedTag &&
+      !normalized.includes(normalizedTag)
+    ) {
+      normalized.push(normalizedTag)
+    }
+  }
+
+  return normalized
 }
 
 export default function Home() {
@@ -193,26 +812,17 @@ export default function Home() {
   const [contentLoading, setContentLoading] =
     useState(true)
 
-  /**
-   * Large star field.
-   */
-  const ambientDots = useMemo(
-    () => createAmbientDots(95),
-    [],
-  )
-
   useEffect(() => {
     let mounted = true
 
     const checkAuth = async () => {
       try {
-        const sessionResponse =
-          await fetch(
-            "/api/auth/session",
-            {
-              credentials: "include",
-            },
-          )
+        const sessionResponse = await fetch(
+          "/api/auth/session",
+          {
+            credentials: "include",
+          },
+        )
 
         if (!sessionResponse.ok) {
           if (mounted) {
@@ -233,9 +843,7 @@ export default function Home() {
         const authenticated =
           Boolean(sessionData?.user)
 
-        setIsAuthenticated(
-          authenticated,
-        )
+        setIsAuthenticated(authenticated)
 
         if (!authenticated) {
           setCanViewDashboard(false)
@@ -285,159 +893,134 @@ export default function Home() {
   useEffect(() => {
     let mounted = true
 
-    const loadPublicContent =
-      async () => {
-        try {
-          const [
-            galleryResponse,
-            eventsResponse,
-          ] =
-            await Promise.allSettled([
-              fetch("/api/gallery", {
-                credentials: "include",
-              }),
-              fetch("/api/events", {
-                credentials: "include",
-              }),
-            ])
+    const loadPublicContent = async () => {
+      try {
+        const [
+          galleryResponse,
+          eventsResponse,
+        ] = await Promise.allSettled([
+          fetch("/api/gallery", {
+            credentials: "include",
+          }),
+          fetch("/api/events", {
+            credentials: "include",
+          }),
+        ])
 
-          if (!mounted) {
-            return
-          }
+        if (!mounted) {
+          return
+        }
 
-          /*
-           * Gallery
-           */
-          if (
-            galleryResponse.status ===
-              "fulfilled" &&
-            galleryResponse.value.ok
-          ) {
-            try {
-              const data =
-                await galleryResponse.value.json()
+        if (
+          galleryResponse.status ===
+            "fulfilled" &&
+          galleryResponse.value.ok
+        ) {
+          try {
+            const data =
+              await galleryResponse.value.json()
 
-              const items = Array.isArray(
-                data,
-              )
-                ? data
-                : Array.isArray(
-                      data?.items,
-                    )
-                  ? data.items
-                  : []
+            const items = Array.isArray(data)
+              ? data
+              : Array.isArray(data?.items)
+                ? data.items
+                : []
 
-              setGallery(
-                items
-                  .filter(
-                    (item: GalleryItem) =>
-                      item &&
-                      item.id &&
-                      Array.isArray(
-                        item.media,
-                      ),
-                  )
-                  .sort(
-                    (
-                      a: GalleryItem,
-                      b: GalleryItem,
-                    ) =>
-                      new Date(
-                        b.createdAt,
-                      ).getTime() -
-                      new Date(
-                        a.createdAt,
-                      ).getTime(),
-                  )
-                  .slice(0, 6),
-              )
-            } catch {
-              setGallery([])
-            }
-          }
-
-          /*
-           * Events
-           */
-          if (
-            eventsResponse.status ===
-              "fulfilled" &&
-            eventsResponse.value.ok
-          ) {
-            try {
-              const data =
-                await eventsResponse.value.json()
-
-              const items = Array.isArray(
-                data,
-              )
-                ? data
-                : Array.isArray(
-                      data?.events,
-                    )
-                  ? data.events
-                  : []
-
-              const now = new Date()
-
-              const today = new Date(
-                now.getFullYear(),
-                now.getMonth(),
-                now.getDate(),
-              )
-
-              setEvents(
-                items
-                  .filter(
-                    (
-                      event: CalendarEvent,
-                    ) =>
-                      event &&
-                      event.id &&
-                      event.title &&
-                      event.date,
-                  )
-                  .filter(
-                    (
-                      event: CalendarEvent,
-                    ) => {
-                      const eventDate =
-                        new Date(
-                          event.date,
-                        )
-
-                      return (
-                        !Number.isNaN(
-                          eventDate.getTime(),
-                        ) &&
-                        eventDate >= today
-                      )
-                    },
-                  )
-                  .sort(
-                    (
-                      a: CalendarEvent,
-                      b: CalendarEvent,
-                    ) =>
-                      new Date(
-                        a.date,
-                      ).getTime() -
-                      new Date(
-                        b.date,
-                      ).getTime(),
-                  )
-                  .slice(0, 5),
-              )
-            } catch {
-              setEvents([])
-            }
-          }
-        } finally {
-          if (mounted) {
-            setContentLoading(false)
+            setGallery(
+              items
+                .filter(
+                  (item: GalleryItem) =>
+                    item &&
+                    item.id &&
+                    Array.isArray(item.media),
+                )
+                .sort(
+                  (
+                    a: GalleryItem,
+                    b: GalleryItem,
+                  ) =>
+                    new Date(
+                      b.createdAt,
+                    ).getTime() -
+                    new Date(
+                      a.createdAt,
+                    ).getTime(),
+                )
+                .slice(0, 6),
+            )
+          } catch {
+            setGallery([])
           }
         }
+
+        if (
+          eventsResponse.status ===
+            "fulfilled" &&
+          eventsResponse.value.ok
+        ) {
+          try {
+            const data =
+              await eventsResponse.value.json()
+
+            const items = Array.isArray(data)
+              ? data
+              : Array.isArray(data?.events)
+                ? data.events
+                : []
+
+            const now = new Date()
+
+            setEvents(
+              items
+                .filter(
+                  (event: CalendarEvent) =>
+                    event &&
+                    event.id &&
+                    event.title &&
+                    event.date,
+                )
+                .filter(
+                  (event: CalendarEvent) => {
+                    const eventDate =
+                      new Date(event.date)
+
+                    return (
+                      !Number.isNaN(
+                        eventDate.getTime(),
+                      ) &&
+                      eventDate >=
+                        new Date(
+                          now.getFullYear(),
+                          now.getMonth(),
+                          now.getDate(),
+                        )
+                    )
+                  },
+                )
+                .sort(
+                  (
+                    a: CalendarEvent,
+                    b: CalendarEvent,
+                  ) =>
+                    new Date(
+                      a.date,
+                    ).getTime() -
+                    new Date(
+                      b.date,
+                    ).getTime(),
+                )
+                .slice(0, 5),
+            )
+          } catch {
+            setEvents([])
+          }
+        }
+      } finally {
+        if (mounted) {
+          setContentLoading(false)
+        }
       }
+    }
 
     void loadPublicContent()
 
@@ -446,62 +1029,63 @@ export default function Home() {
     }
   }, [])
 
+  const visibleDots = useMemo(
+    () => ambientDots,
+    [],
+  )
+
   return (
     <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
       <Navbar />
 
-      {/* =========================================================
-          GLOBAL STARFIELD
-          ========================================================= */}
+      {/* ========================================================= */}
+      {/* GLOBAL STAR FIELD                                         */}
+      {/* ========================================================= */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        {/* Very subtle central atmosphere */}
-        <div className="absolute left-1/2 top-[28%] h-[600px] w-[850px] -translate-x-1/2 rounded-full bg-blue-600/[0.035] blur-[170px]" />
+        {/* Very subtle atmosphere */}
+        <div className="absolute left-1/2 top-[18%] h-[650px] w-[850px] -translate-x-1/2 rounded-full bg-blue-700/[0.035] blur-[150px]" />
 
-        {/* Small side atmosphere */}
-        <div className="absolute left-[-10%] top-[38%] h-[500px] w-[500px] rounded-full bg-blue-500/[0.018] blur-[150px]" />
+        <div className="absolute left-[8%] top-[30%] h-[350px] w-[350px] rounded-full bg-blue-500/[0.018] blur-[130px]" />
 
-        <div className="absolute right-[-10%] top-[50%] h-[500px] w-[500px] rounded-full bg-blue-500/[0.018] blur-[150px]" />
+        <div className="absolute right-[8%] top-[48%] h-[400px] w-[400px] rounded-full bg-blue-600/[0.018] blur-[140px]" />
 
-        {/* Stars */}
-        {ambientDots.map(
-          (dot, index) => (
-            <span
-              key={`ambient-dot-${index}`}
-              className="absolute rounded-full bg-blue-300 animate-mpd-star"
-              style={
-                {
-                  left: dot.left,
-                  top: dot.top,
-                  width: dot.size,
-                  height: dot.size,
-                  opacity: dot.opacity,
-                  animationDelay:
-                    dot.delay,
-                  animationDuration:
-                    dot.duration,
-                  "--star-drift":
-                    dot.drift,
-                } as React.CSSProperties
-              }
-            />
-          ),
-        )}
+        {/* Moving / blinking stars */}
+        {visibleDots.map((dot, index) => (
+          <span
+            key={index}
+            className="absolute rounded-full bg-blue-400 animate-mpd-star"
+            style={
+              {
+                left: dot.left,
+                top: dot.top,
+                width: dot.size,
+                height: dot.size,
+                opacity: dot.opacity,
+                filter: `blur(${dot.blur})`,
+                animationDelay: dot.delay,
+                animationDuration: dot.duration,
+                "--drift-x": dot.driftX,
+                "--drift-y": dot.driftY,
+              } as React.CSSProperties
+            }
+          />
+        ))}
       </div>
 
-      {/* =========================================================
-          PAGE
-          ========================================================= */}
       <main className="relative z-10 flex flex-1 flex-col">
-        {/* =======================================================
-            HERO
-            ======================================================= */}
-        <section className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
+        {/* ========================================================= */}
+        {/* HERO                                                       */}
+        {/* ========================================================= */}
+        <section
+          id="top"
+          className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center px-6"
+        >
           <div className="flex w-full max-w-5xl flex-col items-center text-center">
             {/* Brand */}
             <div className="mb-7 flex items-center gap-3">
               <img
                 src="/logo.png"
-                alt="Metro Police Department"
+                alt="MPD"
                 className="h-9 w-9 object-contain"
               />
 
@@ -533,25 +1117,20 @@ export default function Home() {
 
             {/* Description */}
             <p className="mt-8 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-              The Metro Police Department
-              is built around immersive
-              law enforcement, dedicated
-              officers, community
-              interaction, and unforgettable
-              stories across CaliRP.
+              The Metro Police Department is
+              built around immersive law
+              enforcement, dedicated officers,
+              community interaction, and
+              unforgettable stories across CaliRP.
             </p>
 
-            {/* CTA */}
+            {/* CTA Buttons */}
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
               <a
                 href="https://discord.gg/metropd"
-                target="_blank"
-                rel="noreferrer"
                 className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
               >
-                <span>
-                  Join Metro PD
-                </span>
+                <span>Join Metro PD</span>
 
                 <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
               </a>
@@ -560,13 +1139,11 @@ export default function Home() {
                 !isAuthenticated && (
                   <Link
                     to="/sign-in"
-                    className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.035] px-8 text-sm font-semibold uppercase tracking-wide text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.07]"
+                    className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] px-8 text-sm font-semibold uppercase tracking-wide text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.08]"
                   >
                     <LogIn className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
 
-                    <span>
-                      Member Login
-                    </span>
+                    <span>Member Login</span>
                   </Link>
                 )}
 
@@ -575,13 +1152,11 @@ export default function Home() {
                 canViewDashboard && (
                   <Link
                     to="/dashboard"
-                    className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.035] px-8 text-sm font-semibold uppercase tracking-wide text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.07]"
+                    className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] px-8 text-sm font-semibold uppercase tracking-wide text-foreground transition-all duration-200 hover:border-white/25 hover:bg-white/[0.08]"
                   >
                     <LayoutDashboard className="h-4 w-4 transition-transform duration-200 group-hover:scale-105" />
 
-                    <span>
-                      Dashboard
-                    </span>
+                    <span>Dashboard</span>
                   </Link>
                 )}
             </div>
@@ -621,52 +1196,46 @@ export default function Home() {
             </div>
           </div>
 
-          {/* =====================================================
-              BOUNCING DOWN ARROW
-              ===================================================== */}
+          {/* Bouncing down arrow */}
           <a
             href="#gallery"
             aria-label="Scroll to gallery"
-            className="group absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-muted-foreground/50 transition-colors hover:text-blue-500"
+            className="group absolute bottom-7 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-muted-foreground/50 transition-colors hover:text-blue-400"
           >
-            <span className="text-[9px] font-semibold uppercase tracking-[0.28em] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.25em] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
               Explore
             </span>
 
-            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-sm">
-              <ChevronDown className="h-4 w-4 animate-mpd-arrow" />
-            </span>
+            <ChevronDown className="h-5 w-5 animate-mpd-arrow" />
           </a>
         </section>
 
-        {/* =======================================================
-            SEPARATOR
-            ======================================================= */}
-        <div
-          id="gallery"
-          className="mx-auto w-full max-w-6xl px-6"
-        >
+        {/* ========================================================= */}
+        {/* SEPARATOR                                                  */}
+        {/* ========================================================= */}
+        <div className="mx-auto w-full max-w-6xl px-6">
           <div className="flex items-center gap-4">
-            <div className="h-px flex-1 bg-border/40" />
+            <div className="h-px flex-1 bg-border/50" />
 
-            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.55)]" />
+            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
 
-            <div className="h-px flex-1 bg-border/40" />
+            <div className="h-px flex-1 bg-border/50" />
           </div>
         </div>
 
-        {/* =======================================================
-            GALLERY
-            ======================================================= */}
-        <section className="mx-auto w-full max-w-6xl px-6 py-24">
+        {/* ========================================================= */}
+        {/* GALLERY                                                    */}
+        {/* ========================================================= */}
+        <section
+          id="gallery"
+          className="mx-auto w-full max-w-6xl px-6 py-24"
+        >
           <div className="mb-10 flex items-end justify-between gap-6">
             <div>
               <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-blue-500">
                 <ImageIcon className="h-4 w-4" />
 
-                <span>
-                  Department Gallery
-                </span>
+                <span>Department Gallery</span>
               </div>
 
               <h2 className="text-3xl font-black uppercase tracking-tight sm:text-4xl">
@@ -674,11 +1243,9 @@ export default function Home() {
               </h2>
 
               <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-                Take a look at the latest
-                moments, vehicles,
-                operations, and community
-                stories from the Metro
-                Police Department.
+                Take a look at the latest moments,
+                vehicles, operations, and community
+                stories from the Metro Police Department.
               </p>
             </div>
 
@@ -694,113 +1261,118 @@ export default function Home() {
 
           {contentLoading ? (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map(
-                (item) => (
-                  <div
-                    key={item}
-                    className="h-64 animate-pulse rounded-xl border border-border/40 bg-white/[0.02]"
-                  />
-                ),
-              )}
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="h-64 animate-pulse rounded-xl border border-border/40 bg-white/[0.02]"
+                />
+              ))}
             </div>
           ) : gallery.length > 0 ? (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {gallery.map(
-                (item) => {
-                  const preview =
-                    getGalleryPreview(
-                      item,
-                    )
+              {gallery.map((item) => {
+                const preview =
+                  getGalleryPreview(item)
 
-                  return (
-                    <Link
-                      key={item.id}
-                      to="/gallery"
-                      className="group overflow-hidden rounded-xl border border-border/50 bg-background/40 transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/30 hover:bg-blue-500/[0.025]"
-                    >
-                      {/* Image */}
-                      <div className="relative aspect-[16/10] overflow-hidden bg-black/30">
-                        {preview ? (
-                          item.media?.[0]
-                            ?.type ===
-                          "video" ? (
-                            <video
-                              src={preview}
-                              muted
-                              playsInline
-                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-                          ) : (
-                            <img
-                              src={preview}
-                              alt={
-                                item.title
-                              }
-                              loading="lazy"
-                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-                          )
+                const tags =
+                  normalizeGalleryTags(item.tags)
+
+                return (
+                  <Link
+                    key={item.id}
+                    to="/gallery"
+                    className="group overflow-hidden rounded-xl border border-border/50 bg-background/40 transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/30 hover:bg-blue-500/[0.025]"
+                  >
+                    <div className="relative aspect-[16/10] overflow-hidden bg-black/30">
+                      {preview ? (
+                        item.media?.[0]?.type ===
+                        "video" ? (
+                          <video
+                            src={preview}
+                            muted
+                            playsInline
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
                         ) : (
-                          <div className="flex h-full items-center justify-center text-muted-foreground">
-                            <ImageIcon className="h-8 w-8" />
-                          </div>
-                        )}
+                          <img
+                            src={preview}
+                            alt={item.title}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        )
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-muted-foreground">
+                          <ImageIcon className="h-8 w-8" />
+                        </div>
+                      )}
 
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                      {/* Darker, cleaner image gradient */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
-                        {item.category && (
-                          <span className="absolute left-4 top-4 rounded-md border border-white/10 bg-black/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
-                            {item.category}
-                          </span>
-                        )}
-                      </div>
+                      {/* Category */}
+                      {item.category && (
+                        <span
+                          className={`absolute left-4 top-4 rounded-md border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider backdrop-blur-md ${
+                            galleryCategoryClasses[
+                              item.category
+                            ]
+                          }`}
+                        >
+                          {item.category}
+                        </span>
+                      )}
 
-                      {/* Content */}
-                      <div className="p-5">
-                        <h3 className="font-bold tracking-tight">
-                          {item.title}
-                        </h3>
+                      {/* Color-coded department tags */}
+                      {tags.length > 0 && (
+                        <div className="absolute left-4 top-[3.15rem] flex max-w-[calc(100%-2rem)] flex-wrap gap-1.5">
+                          {tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className={`rounded-md border px-2 py-1 text-[9px] font-bold uppercase tracking-wide backdrop-blur-md ${galleryTagClasses[tag]}`}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
-                        {/* Color coded tags */}
-                        {item.tags &&
-                          item.tags.length >
-                            0 && (
-                            <div className="mt-3 flex flex-wrap gap-1.5">
-                              {item.tags.map(
-                                (tag) => (
-                                  <span
-                                    key={
-                                      tag
-                                    }
-                                    className={`rounded-md border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${galleryTagClasses[tag]}`}
-                                  >
-                                    {tag}
-                                  </span>
-                                ),
-                              )}
-                            </div>
-                          )}
+                    <div className="p-5">
+                      <h3 className="font-bold tracking-tight">
+                        {item.title}
+                      </h3>
 
-                        {item.description && (
-                          <p className="mt-3 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                            {
-                              item.description
-                            }
-                          </p>
-                        )}
-                      </div>
-                    </Link>
-                  )
-                },
-              )}
+                      {/* Tags also appear below the title on cards
+                          when the image is too busy to read them */}
+                      {tags.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {tags.map((tag) => (
+                            <span
+                              key={`card-${tag}`}
+                              className={`rounded-md border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${galleryTagClasses[tag]}`}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {item.description && (
+                        <p className="mt-3 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border/50 bg-white/[0.015] px-6 py-16 text-center">
               <ImageIcon className="mx-auto h-8 w-8 text-muted-foreground/40" />
 
               <p className="mt-4 text-sm text-muted-foreground">
-                No gallery posts are
-                available yet.
+                No gallery posts are available yet.
               </p>
             </div>
           )}
@@ -815,31 +1387,29 @@ export default function Home() {
           </Link>
         </section>
 
-        {/* =======================================================
-            SEPARATOR
-            ======================================================= */}
+        {/* ========================================================= */}
+        {/* SEPARATOR                                                  */}
+        {/* ========================================================= */}
         <div className="mx-auto w-full max-w-6xl px-6">
           <div className="flex items-center gap-4">
-            <div className="h-px flex-1 bg-border/40" />
+            <div className="h-px flex-1 bg-border/50" />
 
-            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.55)]" />
+            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
 
-            <div className="h-px flex-1 bg-border/40" />
+            <div className="h-px flex-1 bg-border/50" />
           </div>
         </div>
 
-        {/* =======================================================
-            EVENTS
-            ======================================================= */}
+        {/* ========================================================= */}
+        {/* EVENTS                                                     */}
+        {/* ========================================================= */}
         <section className="mx-auto w-full max-w-6xl px-6 py-24">
           <div className="mb-10 flex items-end justify-between gap-6">
             <div>
               <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-blue-500">
                 <CalendarDays className="h-4 w-4" />
 
-                <span>
-                  Department Events
-                </span>
+                <span>Department Events</span>
               </div>
 
               <h2 className="text-3xl font-black uppercase tracking-tight sm:text-4xl">
@@ -847,10 +1417,8 @@ export default function Home() {
               </h2>
 
               <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-                Stay up to date with
-                upcoming activities,
-                patrols, operations, and
-                meetings.
+                Stay up to date with upcoming activities,
+                patrols, operations, and meetings.
               </p>
             </div>
 
@@ -866,97 +1434,77 @@ export default function Home() {
 
           {contentLoading ? (
             <div className="space-y-3">
-              {[1, 2, 3].map(
-                (item) => (
-                  <div
-                    key={item}
-                    className="h-24 animate-pulse rounded-xl border border-border/40 bg-white/[0.02]"
-                  />
-                ),
-              )}
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="h-24 animate-pulse rounded-xl border border-border/40 bg-white/[0.02]"
+                />
+              ))}
             </div>
           ) : events.length > 0 ? (
             <div className="space-y-3">
-              {events.map(
-                (event) => (
-                  <Link
-                    key={event.id}
-                    to="/events"
-                    className="group flex flex-col gap-5 rounded-xl border border-border/50 bg-background/40 p-5 transition-all duration-300 hover:border-blue-500/30 hover:bg-blue-500/[0.025] sm:flex-row sm:items-center"
-                  >
-                    {/* Date */}
-                    <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/[0.06]">
-                      <CalendarDays className="mb-1 h-4 w-4 text-blue-500" />
+              {events.map((event) => (
+                <Link
+                  key={event.id}
+                  to="/events"
+                  className="group flex flex-col gap-5 rounded-xl border border-border/50 bg-background/40 p-5 transition-all duration-300 hover:border-blue-500/30 hover:bg-blue-500/[0.025] sm:flex-row sm:items-center"
+                >
+                  <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/[0.06]">
+                    <CalendarDays className="mb-1 h-4 w-4 text-blue-500" />
 
-                      <span className="text-center text-[9px] font-bold uppercase tracking-wide text-blue-400">
-                        {formatEventDate(
-                          event.date,
-                        )}
+                    <span className="text-[9px] font-bold uppercase tracking-wide text-blue-400">
+                      {formatEventDate(event.date)}
+                    </span>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold tracking-tight transition-colors group-hover:text-blue-400">
+                        {event.title}
+                      </h3>
+
+                      <span className="rounded-md border border-border/50 bg-white/[0.03] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {event.category}
                       </span>
                     </div>
 
-                    {/* Main */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-bold tracking-tight transition-colors group-hover:text-blue-400">
-                          {
-                            event.title
-                          }
-                        </h3>
+                    {event.description && (
+                      <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                        {event.description}
+                      </p>
+                    )}
 
-                        <span className="rounded-md border border-border/50 bg-white/[0.03] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          {
-                            event.category
-                          }
+                    <div className="mt-2 flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
+                      {(event.startTime ||
+                        event.endTime) && (
+                        <span>
+                          {event.startTime || ""}
+                          {event.endTime
+                            ? ` – ${event.endTime}`
+                            : ""}
                         </span>
-                      </div>
-
-                      {event.description && (
-                        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                          {
-                            event.description
-                          }
-                        </p>
                       )}
 
-                      <div className="mt-2 flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
-                        {(event.startTime ||
-                          event.endTime) && (
-                          <span>
-                            {
-                              event.startTime
-                            }
+                      {event.location && (
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="h-3 w-3" />
 
-                            {event.endTime
-                              ? ` – ${event.endTime}`
-                              : ""}
-                          </span>
-                        )}
-
-                        {event.location && (
-                          <span className="flex items-center gap-1.5">
-                            <MapPin className="h-3 w-3" />
-
-                            {
-                              event.location
-                            }
-                          </span>
-                        )}
-                      </div>
+                          {event.location}
+                        </span>
+                      )}
                     </div>
+                  </div>
 
-                    <ChevronRight className="hidden h-5 w-5 shrink-0 text-muted-foreground transition-all group-hover:translate-x-1 group-hover:text-blue-500 sm:block" />
-                  </Link>
-                ),
-              )}
+                  <ChevronRight className="hidden h-5 w-5 shrink-0 text-muted-foreground transition-all group-hover:translate-x-1 group-hover:text-blue-500 sm:block" />
+                </Link>
+              ))}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border/50 bg-white/[0.015] px-6 py-16 text-center">
               <CalendarDays className="mx-auto h-8 w-8 text-muted-foreground/40" />
 
               <p className="mt-4 text-sm text-muted-foreground">
-                No upcoming events are
-                currently scheduled.
+                No upcoming events are currently scheduled.
               </p>
             </div>
           )}
@@ -971,60 +1519,50 @@ export default function Home() {
           </Link>
         </section>
 
-        {/* =======================================================
-            FINAL SEPARATOR
-            ======================================================= */}
+        {/* ========================================================= */}
+        {/* FINAL SEPARATOR                                             */}
+        {/* ========================================================= */}
         <div className="mx-auto w-full max-w-6xl px-6">
           <div className="flex items-center gap-4">
-            <div className="h-px flex-1 bg-border/40" />
+            <div className="h-px flex-1 bg-border/50" />
 
-            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.55)]" />
+            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
 
-            <div className="h-px flex-1 bg-border/40" />
+            <div className="h-px flex-1 bg-border/50" />
           </div>
         </div>
 
-        {/* =======================================================
-            FINAL DISCORD CTA
-            ======================================================= */}
+        {/* ========================================================= */}
+        {/* FINAL DISCORD CTA                                           */}
+        {/* ========================================================= */}
         <section className="relative isolate overflow-hidden">
-          {/* Very subtle blue atmosphere.
-              No large bottom glare. */}
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.055),transparent_48%)]" />
+          {/* No large bottom glare.
+              Just a very subtle blue atmospheric wash. */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.055),transparent_55%)]" />
 
-          {/* A few additional stars inside the CTA */}
-          <div className="pointer-events-none absolute inset-0">
-            {ambientDots
-              .slice(0, 35)
-              .map(
-                (dot, index) => (
-                  <span
-                    key={`cta-star-${index}`}
-                    className="absolute rounded-full bg-blue-300 animate-mpd-star"
-                    style={
-                      {
-                        left: dot.left,
-                        top: dot.top,
-                        width: dot.size,
-                        height: dot.size,
-                        opacity:
-                          dot.opacity *
-                          0.75,
-                        animationDelay:
-                          `${(
-                            index *
-                            0.31
-                          ).toFixed(2)}s`,
-                        animationDuration:
-                          dot.duration,
-                        "--star-drift":
-                          dot.drift,
-                      } as React.CSSProperties
-                    }
-                  />
-                ),
-              )}
-          </div>
+          {/* A few stars continue through the CTA */}
+          {visibleDots.slice(0, 32).map(
+            (dot, index) => (
+              <span
+                key={`cta-dot-${index}`}
+                className="absolute rounded-full bg-blue-400 animate-mpd-star"
+                style={
+                  {
+                    left: dot.left,
+                    top: dot.top,
+                    width: dot.size,
+                    height: dot.size,
+                    opacity: dot.opacity * 0.8,
+                    filter: `blur(${dot.blur})`,
+                    animationDelay: `${index * 0.43}s`,
+                    animationDuration: dot.duration,
+                    "--drift-x": dot.driftX,
+                    "--drift-y": dot.driftY,
+                  } as React.CSSProperties
+                }
+              />
+            ),
+          )}
 
           <div className="relative mx-auto flex min-h-[430px] w-full max-w-6xl items-center justify-center px-6 py-24 text-center">
             <div className="max-w-4xl">
@@ -1041,9 +1579,8 @@ export default function Home() {
               </h2>
 
               <p className="mx-auto mt-7 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Join the Discord, create a
-                ticket, and start a story
-                worth telling.
+                Join the Discord, create a ticket,
+                and start a story worth telling.
               </p>
 
               <div className="mt-9 flex justify-center">
@@ -1053,87 +1590,110 @@ export default function Home() {
                   rel="noreferrer"
                   className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
                 >
-                  <span>
-                    Join Discord
-                  </span>
+                  <span>Join Discord</span>
 
                   <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
                 </a>
               </div>
             </div>
           </div>
+
+          {/* Very subtle divider instead of heavy bottom glow */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-blue-500/20" />
         </section>
       </main>
 
       <Footer />
 
-      {/* =========================================================
-          ANIMATIONS
-          ========================================================= */}
+      {/* =========================================================== */}
+      {/* ANIMATIONS                                                   */}
+      {/* =========================================================== */}
       <style>{`
-        @keyframes mpd-star-blink {
-          0%,
-          100% {
+        /*
+         * Each star:
+         * - slowly drifts around the page
+         * - fades in/out
+         * - slightly changes scale
+         * - has its own delay + duration
+         *
+         * This makes the field feel randomized instead of
+         * having every dot move at the same time.
+         */
+        @keyframes mpd-star-drift {
+          0% {
             opacity: 0.08;
-            transform: translate3d(
-              0,
-              0,
-              0
-            ) scale(0.72);
+            transform:
+              translate3d(0, 0, 0)
+              scale(0.7);
           }
 
           18% {
-            opacity: 0.16;
+            opacity: 0.24;
           }
 
-          38% {
-            opacity: 0.48;
-            transform: translate3d(
-              calc(var(--star-drift) * -0.35),
-              calc(var(--star-drift) * 0.2),
-              0
-            ) scale(1);
+          35% {
+            opacity: 0.55;
+            transform:
+              translate3d(
+                calc(var(--drift-x) * 0.45),
+                calc(var(--drift-y) * 0.45),
+                0
+              )
+              scale(1);
           }
 
-          52% {
-            opacity: 0.72;
-            transform: translate3d(
-              calc(var(--star-drift) * 0.25),
-              calc(var(--star-drift) * -0.25),
-              0
-            ) scale(1.18);
+          50% {
+            opacity: 0.8;
+            transform:
+              translate3d(
+                var(--drift-x),
+                var(--drift-y),
+                0
+              )
+              scale(1.18);
           }
 
           68% {
-            opacity: 0.22;
+            opacity: 0.3;
           }
 
           82% {
-            opacity: 0.42;
-            transform: translate3d(
-              calc(var(--star-drift) * -0.15),
-              calc(var(--star-drift) * 0.25),
-              0
-            ) scale(0.92);
+            opacity: 0.55;
+            transform:
+              translate3d(
+                calc(var(--drift-x) * -0.35),
+                calc(var(--drift-y) * -0.35),
+                0
+              )
+              scale(0.95);
           }
+
+          100% {
+            opacity: 0.08;
+            transform:
+              translate3d(0, 0, 0)
+              scale(0.7);
+          }
+        }
+
+        .animate-mpd-star {
+          animation-name: mpd-star-drift;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+          will-change: transform, opacity;
         }
 
         @keyframes mpd-arrow-bounce {
           0%,
           100% {
             transform: translateY(0);
+            opacity: 0.45;
           }
 
           50% {
-            transform: translateY(6px);
+            transform: translateY(7px);
+            opacity: 1;
           }
-        }
-
-        .animate-mpd-star {
-          animation-name: mpd-star-blink;
-          animation-timing-function: ease-in-out;
-          animation-iteration-count: infinite;
-          will-change: opacity, transform;
         }
 
         .animate-mpd-arrow {
