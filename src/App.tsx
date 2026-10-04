@@ -25,6 +25,7 @@ import Gallery from "@/pages/Gallery"
 
 import MainRoster from "@/pages/documents/MainRoster"
 import SWATRoster from "@/pages/documents/SWATRoster"
+import MCDRoster from "@/pages/documents/MCDRoster"
 
 import Dashboard from "@/pages/dashboard/Dashboard"
 
@@ -201,6 +202,11 @@ export default function App() {
         <Route
           path="/documents/swatroster"
           element={<SWATRoster />}
+        />
+
+        <Route
+          path="/documents/mcdroster"
+          element={<MCDRoster />}
         />
 
         {/* =================================================
