@@ -903,7 +903,7 @@ export default function ActionLogs() {
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.error || `Failed to load action logs (${response.status}).`,
+          data.error || `Failed to load promotion logs (${response.status}).`,
         )
       }
 
@@ -919,7 +919,7 @@ export default function ActionLogs() {
       setLogs([])
       setTotal(0)
       setPages(1)
-      setError(err instanceof Error ? err.message : "Failed to load action logs.")
+      setError(err instanceof Error ? err.message : "Failed to load promotion logs.")
     } finally {
       setLoading(false)
     }
@@ -1005,7 +1005,7 @@ export default function ActionLogs() {
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight">Action Logs</h1>
+                <h1 className="text-xl font-semibold tracking-tight">Promotion Logs</h1>
                 <span className="rounded-full border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
                   60 days
                 </span>
@@ -1119,14 +1119,14 @@ export default function ActionLogs() {
           {loading && !logs.length ? (
             <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
               <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-              Loading action logs...
+              Loading promotion logs...
             </div>
           ) : null}
 
           {!loading && !logs.length ? (
             <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
               <History className="h-8 w-8 text-muted-foreground" />
-              <p className="mt-3 font-medium">No action logs found</p>
+              <p className="mt-3 font-medium">No promotion logs found</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Try clearing the filters or perform a dashboard action.
               </p>
