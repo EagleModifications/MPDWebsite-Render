@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { NavLink, Link } from "react-router-dom"
+import { Link, NavLink } from "react-router-dom"
 import {
   ChevronDown,
   LogIn,
@@ -45,7 +45,10 @@ const navItems: NavItem[] = [
   {
     name: "Dashboard",
     href: "/dashboard",
-    permission: ["activitymanagement", "promotionmanagement"],
+    permission: [
+      "activitymanagement",
+      "promotionmanagement",
+    ],
   },
 ]
 
@@ -58,22 +61,22 @@ const rosterItems: NavItem[] = [
   {
     name: "SWAT Roster",
     href: "/documents/rosters/swat-rosters",
-    permission: "documents",
+    permission: "swatdocs",
   },
   {
     name: "MCD Roster",
     href: "/documents/rosters/mcd-rosters",
-    permission: "documents",
+    permission: "mcddocs",
   },
   {
     name: "TRU Roster",
     href: "/documents/rosters/tru-rosters",
-    permission: "documents",
+    permission: "trudocs",
   },
   {
     name: "FTD Roster",
     href: "/documents/rosters/ftd-rosters",
-    permission: "documents",
+    permission: "ftddocs",
   },
 ]
 
@@ -101,7 +104,7 @@ const sopItems: NavItem[] = [
   {
     name: "FTD SOPs",
     href: "/documents/sops/ftd-sops",
-    permission: "documents",
+    permission: "ftddocuments",
   },
   {
     name: "Global SOPs",
@@ -110,12 +113,26 @@ const sopItems: NavItem[] = [
   },
 ]
 
+const commandItems: NavItem[] = [
+  {
+    name: "Command",
+    href: "/documents/command",
+    permission: "commanddocuments",
+  },
+]
+
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [documentsOpen, setDocumentsOpen] = useState(false)
-  const [rostersOpen, setRostersOpen] = useState(false)
-  const [sopsOpen, setSopsOpen] = useState(false)
+
+  const [documentsOpen, setDocumentsOpen] =
+    useState(false)
+
+  const [rostersOpen, setRostersOpen] =
+    useState(false)
+
+  const [sopsOpen, setSopsOpen] =
+    useState(false)
 
   const documentsRef = useRef<HTMLDivElement>(null)
 
@@ -133,16 +150,13 @@ export default function Navbar() {
     window.addEventListener("resize", handleResize)
 
     return () => {
-      window.removeEventListener("resize", handleResize)
+      window.removeEventListener(
+        "resize",
+        handleResize,
+      )
     }
   }, [])
 
-  /*
-   * Close the Documents dropdown when clicking
-   * anywhere outside of the dropdown.
-   *
-   * Clicks inside the dropdown are ignored.
-   */
   useEffect(() => {
     if (!documentsOpen) {
       return
@@ -197,27 +211,44 @@ export default function Navbar() {
   }
 
   const visibleItems = navItems.filter(canViewItem)
-  const visibleRosters = rosterItems.filter(canViewItem)
-  const visibleSops = sopItems.filter(canViewItem)
+
+  const visibleRosters =
+    rosterItems.filter(canViewItem)
+
+  const visibleSops =
+    sopItems.filter(canViewItem)
+
+  const visibleCommand =
+    commandItems.filter(canViewItem)
 
   const hasDocuments =
     visibleRosters.length > 0 ||
-    visibleSops.length > 0
+    visibleSops.length > 0 ||
+    visibleCommand.length > 0
+
+  const currentPath = window.location.pathname
 
   const documentsActive =
     visibleRosters.some(
-      (item) => window.location.pathname === item.href,
+      (item) => currentPath === item.href,
     ) ||
     visibleSops.some(
-      (item) => window.location.pathname === item.href,
+      (item) => currentPath === item.href,
+    ) ||
+    visibleCommand.some(
+      (item) => currentPath === item.href,
     )
 
   const rostersActive = visibleRosters.some(
-    (item) => window.location.pathname === item.href,
+    (item) => currentPath === item.href,
   )
 
   const sopsActive = visibleSops.some(
-    (item) => window.location.pathname === item.href,
+    (item) => currentPath === item.href,
+  )
+
+  const commandActive = visibleCommand.some(
+    (item) => currentPath === item.href,
   )
 
   const closeMobileMenu = () => {
@@ -268,7 +299,9 @@ export default function Navbar() {
         {/* DESKTOP — Navigation */}
         <nav className="hidden items-center justify-center gap-7 whitespace-nowrap px-6 text-sm md:flex lg:gap-8">
           {visibleItems
-            .filter((item) => item.name !== "Dashboard")
+            .filter(
+              (item) => item.name !== "Dashboard",
+            )
             .map((item) => (
               <NavLink
                 key={item.href}
@@ -304,7 +337,8 @@ export default function Navbar() {
                   font-medium
                   transition-colors
                   ${
-                    documentsActive || documentsOpen
+                    documentsActive ||
+                    documentsOpen
                       ? "text-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }
@@ -331,7 +365,7 @@ export default function Navbar() {
                 <div
                   className="
                     absolute left-1/2 top-full mt-3
-                    min-w-[220px]
+                    min-w-[240px]
                     -translate-x-1/2
                     overflow-hidden
                     rounded-xl
@@ -355,7 +389,8 @@ export default function Navbar() {
                           text-sm font-medium
                           transition-colors
                           ${
-                            rostersActive || rostersOpen
+                            rostersActive ||
+                            rostersOpen
                               ? "bg-foreground/10 text-foreground"
                               : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                           }
@@ -379,36 +414,42 @@ export default function Navbar() {
 
                       {rostersOpen && (
                         <div className="ml-2 border-l border-border pl-2">
-                          {visibleRosters.map((item) => (
-                            <NavLink
-                              key={item.href}
-                              to={item.href}
-                              onClick={() =>
-                                setDocumentsOpen(false)
-                              }
-                              className={({ isActive }) =>
-                                `
-                                  block rounded-lg px-3 py-2.5
-                                  text-sm font-medium
-                                  transition-colors
-                                  ${
-                                    isActive
-                                      ? "bg-foreground/10 text-foreground"
-                                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                                  }
-                                `
-                              }
-                              role="menuitem"
-                            >
-                              {item.name}
-                            </NavLink>
-                          ))}
+                          {visibleRosters.map(
+                            (item) => (
+                              <NavLink
+                                key={item.href}
+                                to={item.href}
+                                onClick={() =>
+                                  setDocumentsOpen(
+                                    false,
+                                  )
+                                }
+                                className={({
+                                  isActive,
+                                }) =>
+                                  `
+                                    block rounded-lg px-3 py-2.5
+                                    text-sm font-medium
+                                    transition-colors
+                                    ${
+                                      isActive
+                                        ? "bg-foreground/10 text-foreground"
+                                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                    }
+                                  `
+                                }
+                                role="menuitem"
+                              >
+                                {item.name}
+                              </NavLink>
+                            ),
+                          )}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* SOPS */}
+                  {/* SOPs */}
                   {visibleSops.length > 0 && (
                     <div>
                       <button
@@ -420,7 +461,8 @@ export default function Navbar() {
                           text-sm font-medium
                           transition-colors
                           ${
-                            sopsActive || sopsOpen
+                            sopsActive ||
+                            sopsOpen
                               ? "bg-foreground/10 text-foreground"
                               : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                           }
@@ -444,31 +486,75 @@ export default function Navbar() {
 
                       {sopsOpen && (
                         <div className="ml-2 border-l border-border pl-2">
-                          {visibleSops.map((item) => (
-                            <NavLink
-                              key={item.href}
-                              to={item.href}
-                              onClick={() =>
-                                setDocumentsOpen(false)
-                              }
-                              className={({ isActive }) =>
-                                `
-                                  block rounded-lg px-3 py-2.5
-                                  text-sm font-medium
-                                  transition-colors
-                                  ${
-                                    isActive
-                                      ? "bg-foreground/10 text-foreground"
-                                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                                  }
-                                `
-                              }
-                              role="menuitem"
-                            >
-                              {item.name}
-                            </NavLink>
-                          ))}
+                          {visibleSops.map(
+                            (item) => (
+                              <NavLink
+                                key={item.href}
+                                to={item.href}
+                                onClick={() =>
+                                  setDocumentsOpen(
+                                    false,
+                                  )
+                                }
+                                className={({
+                                  isActive,
+                                }) =>
+                                  `
+                                    block rounded-lg px-3 py-2.5
+                                    text-sm font-medium
+                                    transition-colors
+                                    ${
+                                      isActive
+                                        ? "bg-foreground/10 text-foreground"
+                                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                    }
+                                  `
+                                }
+                                role="menuitem"
+                              >
+                                {item.name}
+                              </NavLink>
+                            ),
+                          )}
                         </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* COMMAND */}
+                  {visibleCommand.length > 0 && (
+                    <div className="mt-1 border-t border-border pt-1">
+                      <div className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Command
+                      </div>
+
+                      {visibleCommand.map(
+                        (item) => (
+                          <NavLink
+                            key={item.href}
+                            to={item.href}
+                            onClick={() =>
+                              setDocumentsOpen(false)
+                            }
+                            className={({
+                              isActive,
+                            }) =>
+                              `
+                                block rounded-lg px-3 py-2.5
+                                text-sm font-medium
+                                transition-colors
+                                ${
+                                  isActive
+                                    ? "bg-foreground/10 text-foreground"
+                                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                }
+                              `
+                            }
+                            role="menuitem"
+                          >
+                            {item.name}
+                          </NavLink>
+                        ),
                       )}
                     </div>
                   )}
@@ -479,7 +565,9 @@ export default function Navbar() {
 
           {/* DASHBOARD — AFTER DOCUMENTS */}
           {visibleItems
-            .filter((item) => item.name === "Dashboard")
+            .filter(
+              (item) => item.name === "Dashboard",
+            )
             .map((item) => (
               <NavLink
                 key={item.href}
@@ -586,7 +674,9 @@ export default function Navbar() {
         <div className="mx-4 mt-1 overflow-hidden rounded-xl border border-border bg-background/95 shadow-lg backdrop-blur-md md:hidden">
           <nav className="flex flex-col p-2">
             {visibleItems
-              .filter((item) => item.name !== "Dashboard")
+              .filter(
+                (item) => item.name !== "Dashboard",
+              )
               .map((item) => (
                 <NavLink
                   key={item.href}
@@ -684,33 +774,39 @@ export default function Navbar() {
 
                         {rostersOpen && (
                           <div className="ml-3 border-l border-border pl-2">
-                            {visibleRosters.map((item) => (
-                              <NavLink
-                                key={item.href}
-                                to={item.href}
-                                onClick={closeMobileMenu}
-                                className={({ isActive }) =>
-                                  `
-                                    block rounded-lg px-4 py-2.5
-                                    text-sm font-medium
-                                    transition-colors
-                                    ${
-                                      isActive
-                                        ? "bg-foreground/10 text-foreground"
-                                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                                    }
-                                  `
-                                }
-                              >
-                                {item.name}
-                              </NavLink>
-                            ))}
+                            {visibleRosters.map(
+                              (item) => (
+                                <NavLink
+                                  key={item.href}
+                                  to={item.href}
+                                  onClick={
+                                    closeMobileMenu
+                                  }
+                                  className={({
+                                    isActive,
+                                  }) =>
+                                    `
+                                      block rounded-lg px-4 py-2.5
+                                      text-sm font-medium
+                                      transition-colors
+                                      ${
+                                        isActive
+                                          ? "bg-foreground/10 text-foreground"
+                                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                      }
+                                    `
+                                  }
+                                >
+                                  {item.name}
+                                </NavLink>
+                              ),
+                            )}
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* MOBILE SOPS */}
+                    {/* MOBILE SOPs */}
                     {visibleSops.length > 0 && (
                       <div>
                         <button
@@ -722,7 +818,8 @@ export default function Navbar() {
                             text-left text-sm font-medium
                             transition-colors
                             ${
-                              sopsActive || sopsOpen
+                              sopsActive ||
+                              sopsOpen
                                 ? "bg-foreground/10 text-foreground"
                                 : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                             }
@@ -746,28 +843,71 @@ export default function Navbar() {
 
                         {sopsOpen && (
                           <div className="ml-3 border-l border-border pl-2">
-                            {visibleSops.map((item) => (
-                              <NavLink
-                                key={item.href}
-                                to={item.href}
-                                onClick={closeMobileMenu}
-                                className={({ isActive }) =>
-                                  `
-                                    block rounded-lg px-4 py-2.5
-                                    text-sm font-medium
-                                    transition-colors
-                                    ${
-                                      isActive
-                                        ? "bg-foreground/10 text-foreground"
-                                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                                    }
-                                  `
-                                }
-                              >
-                                {item.name}
-                              </NavLink>
-                            ))}
+                            {visibleSops.map(
+                              (item) => (
+                                <NavLink
+                                  key={item.href}
+                                  to={item.href}
+                                  onClick={
+                                    closeMobileMenu
+                                  }
+                                  className={({
+                                    isActive,
+                                  }) =>
+                                    `
+                                      block rounded-lg px-4 py-2.5
+                                      text-sm font-medium
+                                      transition-colors
+                                      ${
+                                        isActive
+                                          ? "bg-foreground/10 text-foreground"
+                                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                      }
+                                    `
+                                  }
+                                >
+                                  {item.name}
+                                </NavLink>
+                              ),
+                            )}
                           </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* MOBILE COMMAND */}
+                    {visibleCommand.length > 0 && (
+                      <div className="mt-1 border-t border-border pt-1">
+                        <div className="px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          Command
+                        </div>
+
+                        {visibleCommand.map(
+                          (item) => (
+                            <NavLink
+                              key={item.href}
+                              to={item.href}
+                              onClick={
+                                closeMobileMenu
+                              }
+                              className={({
+                                isActive,
+                              }) =>
+                                `
+                                  block rounded-lg px-4 py-2.5
+                                  text-sm font-medium
+                                  transition-colors
+                                  ${
+                                    isActive
+                                      ? "bg-foreground/10 text-foreground"
+                                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                  }
+                                `
+                              }
+                            >
+                              {item.name}
+                            </NavLink>
+                          ),
                         )}
                       </div>
                     )}
@@ -778,7 +918,9 @@ export default function Navbar() {
 
             {/* MOBILE DASHBOARD */}
             {visibleItems
-              .filter((item) => item.name === "Dashboard")
+              .filter(
+                (item) => item.name === "Dashboard",
+              )
               .map((item) => (
                 <NavLink
                   key={item.href}
