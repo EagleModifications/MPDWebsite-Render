@@ -3,14 +3,14 @@
 @import "@fontsource-variable/geist";
 
 /* =========================================================
-DARK MODE
-Tailwind v4 uses the .dark class on <html>
+   DARK MODE
+   Tailwind v4 uses the .dark class on <html>
 ========================================================= */
 
 @custom-variant dark (&:is(.dark *));
 
 /* =========================================================
-THEME TOKENS
+   THEME TOKENS
 ========================================================= */
 
 @theme inline {
@@ -70,7 +70,7 @@ THEME TOKENS
 }
 
 /* =========================================================
-LIGHT MODE
+   LIGHT MODE
 ========================================================= */
 
 :root {
@@ -112,8 +112,6 @@ LIGHT MODE
 
   --radius: 0.625rem;
 
-  /* Sidebar */
-
   --sidebar: #fafafa;
   --sidebar-foreground: #09090b;
 
@@ -128,7 +126,7 @@ LIGHT MODE
 }
 
 /* =========================================================
-DARK MODE
+   DARK MODE
 ========================================================= */
 
 .dark {
@@ -168,8 +166,6 @@ DARK MODE
   --chart-4: #71717a;
   --chart-5: #52525b;
 
-  /* Sidebar */
-
   --sidebar: #09090b;
   --sidebar-foreground: #fafafa;
 
@@ -184,7 +180,7 @@ DARK MODE
 }
 
 /* =========================================================
-BASE
+   BASE
 ========================================================= */
 
 @layer base {
@@ -270,7 +266,7 @@ BASE
 }
 
 /* =========================================================
-THEME TRANSITIONS
+   THEME TRANSITIONS
 ========================================================= */
 
 html,
@@ -282,7 +278,7 @@ body,
 }
 
 /* =========================================================
-UTILITY HELPERS
+   UTILITY HELPERS
 ========================================================= */
 
 @layer utilities {
@@ -297,10 +293,22 @@ UTILITY HELPERS
 
 /* =========================================================
    SONNER CLOSE BUTTON
+   Half inside / half outside the top-right corner
 ========================================================= */
 
 [data-sonner-toast] [data-close-button] {
   left: auto !important;
-  right: 8px !important;
-  top: 8px !important;
+  right: -10px !important;
+  top: -10px !important;
+
+  width: 20px !important;
+  height: 20px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  border-radius: 9999px !important;
+
+  z-index: 50 !important;
 }
