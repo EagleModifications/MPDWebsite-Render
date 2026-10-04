@@ -24,6 +24,7 @@ import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
 import GoogleRosterRefresh from "@/components/dashboard/GoogleRosterRefresh"
+import { logPromotionAction } from "@/lib/promotionActionLog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -553,6 +554,25 @@ export default function PromotionRoster() {
       return
     }
 
+    const wasSelected = selectedIds.includes(discordId)
+
+    const member = members.find(
+      (item) => item.discordId === discordId,
+    )
+
+    logPromotionAction({
+      action: "select-member",
+      category: "roster",
+      division,
+      targetUserId: discordId,
+      targetName: member?.name,
+      targetRank: member?.rank,
+      summary: `${wasSelected ? "Deselected" : "Selected"} ${member?.name || discordId} in the Promotion Roster.`,
+      details: {
+        shiftSelection: false,
+      },
+    })
+
     setSelectedIds((current) =>
       current.includes(discordId)
         ? current.filter(
@@ -613,6 +633,16 @@ export default function PromotionRoster() {
     }
 
     if (shiftKey) {
+      logPromotionAction({
+        action: "select-rank-members",
+        category: "roster",
+        division,
+        targetUserId: member.discordId,
+        targetName: member.name,
+        targetRank: member.rank,
+        summary: `Selected members in the ${member.rank} rank using shift selection.`,
+      })
+
       selectRankMembers(member)
       return
     }
@@ -636,6 +666,17 @@ export default function PromotionRoster() {
       visibleIds.every((id) =>
         selectedIds.includes(id),
       )
+
+    logPromotionAction({
+      action: "select-all-visible",
+      category: "roster",
+      division,
+      summary: `${allSelected ? "Deselected" : "Selected"} all visible Promotion Roster members.`,
+      details: {
+        visibleCount: visibleIds.length,
+        selectedCountBefore: selectedIds.length,
+      },
+    })
 
     if (allSelected) {
       setSelectedIds((current) =>
@@ -838,6 +879,18 @@ export default function PromotionRoster() {
         },
       )
 
+      logPromotionAction({
+        action: "copy-roster",
+        category: "roster",
+        division,
+        summary: `Copied ${selectedMembers.length} ${selectedMembers.length === 1 ? "member" : "members"} from the Promotion Roster.`,
+        details: {
+          copyType: type,
+          memberCount: selectedMembers.length,
+          discordIds: selectedMembers.map((member) => member.discordId),
+        },
+      })
+
       window.setTimeout(() => {
         setSelectedCopied(false)
       }, 1800)
@@ -861,6 +914,17 @@ export default function PromotionRoster() {
   const toggleStatusFilter = (
     status: Status,
   ) => {
+    logPromotionAction({
+      action: "filter-roster",
+      category: "roster",
+      division,
+      summary: `Changed Promotion Roster status filter to ${getStatusLabel(status)}.`,
+      details: {
+        filterType: "status",
+        value: status,
+      },
+    })
+
     setStatusFilters((current) =>
       current.includes(status)
         ? current.filter(
@@ -894,6 +958,17 @@ export default function PromotionRoster() {
   const toggleRankFilter = (
     rank: string,
   ) => {
+    logPromotionAction({
+      action: "filter-roster",
+      category: "roster",
+      division,
+      summary: `Changed Promotion Roster rank filter to ${rank}.`,
+      details: {
+        filterType: "rank",
+        value: rank,
+      },
+    })
+
     setRankFilters((current) => {
       const exists = current.some(
         (item) =>
@@ -930,6 +1005,18 @@ export default function PromotionRoster() {
   ───────────────────────────────────────────── */
 
   const clearFilters = () => {
+    logPromotionAction({
+      action: "clear-filters",
+      category: "roster",
+      division,
+      summary: "Cleared Promotion Roster search and filters.",
+      details: {
+        search,
+        statusFilters,
+        rankFilters,
+      },
+    })
+
     setSearch("")
     setStatusFilters([])
     setRankFilters([])
@@ -1007,6 +1094,17 @@ export default function PromotionRoster() {
                       ) {
                         return
                       }
+
+                      logPromotionAction({
+                        action: "change-division",
+                        category: "navigation",
+                        division: item.id,
+                        summary: `Changed Promotion Roster division to ${item.label}.`,
+                        details: {
+                          previousDivision: division,
+                          nextDivision: item.id,
+                        },
+                      })
 
                       setDivision(item.id)
                       setSearch("")
@@ -1107,6 +1205,19 @@ export default function PromotionRoster() {
                     event.target.value,
                   )
                   setSelectedCopied(false)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return
+
+                  logPromotionAction({
+                    action: "search-roster",
+                    category: "roster",
+                    division,
+                    summary: "Searched the Promotion Roster.",
+                    details: {
+                      search: event.currentTarget.value,
+                    },
+                  })
                 }}
                 placeholder="Search name, callsign, badge, rank or Discord ID..."
                 className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -1643,9 +1754,16 @@ export default function PromotionRoster() {
             {/* Google Sheets Refresh */}
 
             <GoogleRosterRefresh
-              onRefreshed={() =>
-                loadRoster(false)
-              }
+              onRefreshed={() => {
+                logPromotionAction({
+                  action: "refresh-roster",
+                  category: "roster",
+                  division,
+                  summary: "Refreshed the Promotion Roster.",
+                })
+
+                return loadRoster(false)
+              }}
             />
           </div>
 
@@ -2009,6 +2127,16 @@ export default function PromotionRoster() {
                                             description: `${member.name}'s Discord ID has been copied to your clipboard.`,
                                           },
                                         )
+
+                                        logPromotionAction({
+                                          action: "copy-discord-id",
+                                          category: "roster",
+                                          division,
+                                          targetUserId: member.discordId,
+                                          targetName: member.name,
+                                          targetRank: member.rank,
+                                          summary: `Copied ${member.name}'s Discord ID from the Promotion Roster.`,
+                                        })
                                       } catch {
                                         toast.error(
                                           "Copy failed",
@@ -2364,6 +2492,16 @@ export default function PromotionRoster() {
                                             description: `${member.name}'s Discord ID has been copied to your clipboard.`,
                                           },
                                         )
+
+                                        logPromotionAction({
+                                          action: "copy-discord-id",
+                                          category: "roster",
+                                          division,
+                                          targetUserId: member.discordId,
+                                          targetName: member.name,
+                                          targetRank: member.rank,
+                                          summary: `Copied ${member.name}'s Discord ID from the Promotion Roster.`,
+                                        })
                                       } catch {
                                         toast.error(
                                           "Copy failed",
