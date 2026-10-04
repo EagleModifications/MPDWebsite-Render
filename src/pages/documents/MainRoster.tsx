@@ -102,7 +102,7 @@ export default function MainRoster() {
       <Navbar />
 
       <main className="relative min-h-screen pt-20">
-        <div className="relative mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-7">
+        <div className="relative mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-7">
           {/* Header */}
           <div className="mb-5">
             <div className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-500">
@@ -123,7 +123,7 @@ export default function MainRoster() {
 
           {/* Tabs */}
           <div className="mb-5 overflow-x-auto rounded-xl border border-border/70 bg-card/70 p-1 backdrop-blur">
-            <div className="flex min-w-max items-center gap-1">
+            <div className="flex min-w-max items-center gap-1 lg:min-w-0">
               {tabs.map((tab) => {
                 const Icon = tab.icon
                 const active =
@@ -137,7 +137,8 @@ export default function MainRoster() {
                       changeTab(tab.id)
                     }
                     className={[
-                      "inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors",
+                      "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition-colors",
+                      "lg:flex-1",
                       active
                         ? "bg-blue-500/10 text-blue-500"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
