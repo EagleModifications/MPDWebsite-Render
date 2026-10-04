@@ -1,8 +1,6 @@
 import {
   ChevronDown,
   ChevronUp,
-  CalendarDays,
-  Check,
   Clipboard,
   FileText,
   Filter,
@@ -10,12 +8,12 @@ import {
   Search,
   Shield,
   UserRound,
+  X,
 } from "lucide-react"
 import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react"
 import { toast } from "sonner"
@@ -142,162 +140,6 @@ const formatDetailValue = (value: unknown): string => {
   } catch {
     return String(value)
   }
-}
-
-type FilterOption = {
-  value: string
-  label: string
-}
-
-function FilterSelect({
-  value,
-  options,
-  onChange,
-  ariaLabel,
-}: {
-  value: string
-  options: FilterOption[]
-  onChange: (value: string) => void
-  ariaLabel: string
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  const selected =
-    options.find((option) => option.value === value) ??
-    options[0]
-
-  useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!ref.current?.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown)
-
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        handlePointerDown,
-      )
-    }
-  }, [])
-
-  return (
-    <div ref={ref} className="relative min-w-0">
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className={[
-          "flex h-9 w-full items-center justify-between gap-2 rounded-md",
-          "border border-input bg-background px-3 text-left text-sm",
-          "text-foreground transition-colors",
-          "hover:bg-accent/40",
-          "focus:outline-none focus:ring-2 focus:ring-blue-500/20",
-          open ? "border-blue-500" : "",
-        ].join(" ")}
-      >
-        <span className="min-w-0 truncate">
-          {selected?.label ?? "Select"}
-        </span>
-        <ChevronDown
-          className={[
-            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-            open ? "rotate-180" : "",
-          ].join(" ")}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl">
-          <div className="max-h-64 overflow-y-auto">
-            {options.map((option) => {
-              const selectedOption =
-                option.value === value
-
-              return (
-                <button
-                  key={option.value || "all"}
-                  type="button"
-                  onClick={() => {
-                    onChange(option.value)
-                    setOpen(false)
-                  }}
-                  className={[
-                    "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm",
-                    "transition-colors hover:bg-accent",
-                    selectedOption
-                      ? "bg-blue-500/10 text-blue-400"
-                      : "text-foreground",
-                  ].join(" ")}
-                >
-                  <span className="truncate">
-                    {option.label}
-                  </span>
-                  {selectedOption && (
-                    <Check className="h-4 w-4 shrink-0 text-blue-500" />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function DateFilter({
-  value,
-  onChange,
-  ariaLabel,
-}: {
-  value: string
-  onChange: (value: string) => void
-  ariaLabel: string
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const displayValue = value
-    ? new Intl.DateTimeFormat("en-GB").format(
-        new Date(`${value}T00:00:00`),
-      )
-    : ""
-
-  return (
-    <div className="relative min-w-0">
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        onClick={() => inputRef.current?.showPicker?.()}
-        className={[
-          "flex h-9 w-full items-center justify-between gap-2 rounded-md",
-          "border border-input bg-background px-3 text-left text-sm",
-          "transition-colors hover:bg-accent/40",
-          "focus:outline-none focus:ring-2 focus:ring-blue-500/20",
-          value ? "text-foreground" : "text-muted-foreground",
-        ].join(" ")}
-      >
-        <span className="truncate">
-          {displayValue || "dd/mm/yyyy"}
-        </span>
-        <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-      </button>
-
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="pointer-events-none absolute inset-0 h-9 w-full opacity-0"
-        tabIndex={-1}
-        aria-hidden="true"
-      />
-    </div>
-  )
 }
 
 function UserIdentity({
@@ -529,6 +371,17 @@ export default function ActionLogs() {
     [availableActions],
   )
 
+  const clearFilters = () => {
+    setSearch("")
+    setCategory("")
+    setDivision("")
+    setAction("")
+    setFrom("")
+    setTo("")
+    setPage(1)
+    setExpanded(null)
+  }
+
   const openContextMenu = (
     event: React.MouseEvent,
     log: ActionLog,
@@ -593,7 +446,7 @@ export default function ActionLogs() {
           </Button>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
             <Filter className="h-4 w-4 text-blue-500" />
             <span className="text-sm font-semibold">
@@ -601,8 +454,8 @@ export default function ActionLogs() {
             </span>
           </div>
 
-          <div className="grid gap-3 xl:grid-cols-[minmax(260px,1.9fr)_minmax(165px,1fr)_minmax(165px,1fr)_minmax(175px,1fr)_150px_150px]">
-            <div className="relative min-w-0">
+          <div className="grid gap-3 xl:grid-cols-[minmax(240px,2fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(180px,1fr)_150px_150px_auto]">
+            <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
@@ -611,63 +464,95 @@ export default function ActionLogs() {
                   setPage(1)
                 }}
                 placeholder="Search user, action, target, ID, details..."
-                className="h-9 border-input bg-background pl-9"
+                className="pl-9"
               />
             </div>
 
-            <FilterSelect
+            <select
               value={category}
-              onChange={(value) => {
-                setCategory(value as Category)
+              onChange={(event) => {
+                setCategory(event.target.value as Category)
                 setPage(1)
               }}
-              ariaLabel="Filter by category"
-              options={categoryOptions}
-            />
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            >
+              {categoryOptions.map((option) => (
+                <option
+                  key={option.value || "all"}
+                  value={option.value}
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
 
-            <FilterSelect
+            <select
               value={division}
-              onChange={(value) => {
-                setDivision(value as Division)
+              onChange={(event) => {
+                setDivision(event.target.value as Division)
                 setPage(1)
               }}
-              ariaLabel="Filter by division"
-              options={divisionOptions}
-            />
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            >
+              {divisionOptions.map((option) => (
+                <option
+                  key={option.value || "all"}
+                  value={option.value}
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
 
-            <FilterSelect
+            <select
               value={action}
-              onChange={(value) => {
-                setAction(value)
+              onChange={(event) => {
+                setAction(event.target.value)
                 setPage(1)
               }}
-              ariaLabel="Filter by action"
-              options={[
-                { value: "", label: "All Actions" },
-                ...actionOptions.map((item) => ({
-                  value: item,
-                  label: actionLabel(item),
-                })),
-              ]}
-            />
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value="">All Actions</option>
+              {actionOptions.map((item) => (
+                <option key={item} value={item}>
+                  {actionLabel(item)}
+                </option>
+              ))}
+            </select>
 
-            <DateFilter
+            <Input
+              type="date"
               value={from}
-              onChange={(value) => {
-                setFrom(value)
+              onChange={(event) => {
+                setFrom(event.target.value)
                 setPage(1)
               }}
-              ariaLabel="Filter from date"
+              title="From date"
             />
 
-            <DateFilter
+            <Input
+              type="date"
               value={to}
-              onChange={(value) => {
-                setTo(value)
+              onChange={(event) => {
+                setTo(event.target.value)
                 setPage(1)
               }}
-              ariaLabel="Filter to date"
+              title="To date"
             />
+
+            {hasFilters ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="gap-2"
+                onClick={clearFilters}
+              >
+                <X className="h-4 w-4" />
+                Clear
+              </Button>
+            ) : (
+              <div />
+            )}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -688,7 +573,7 @@ export default function ActionLogs() {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="hidden border-b bg-muted/20 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground lg:grid lg:grid-cols-[1.4fr_1.1fr_1fr_0.8fr_2fr_0.9fr] lg:gap-4">
             <span>User</span>
             <span>Action</span>
