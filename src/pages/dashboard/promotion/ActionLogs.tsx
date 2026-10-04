@@ -235,69 +235,69 @@ function tagClass(type: "module" | "division" | "category", value?: string | nul
 
   if (type === "module") {
     if (key === "promotion") {
-      return "border-violet-500/30 bg-violet-500/10 text-violet-300"
+      return "border-blue-500/20 bg-blue-500/10 text-blue-400"
     }
 
     if (key === "activity") {
-      return "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+      return "border-blue-500/20 bg-blue-500/10 text-blue-400"
     }
 
-    return "border-slate-500/30 bg-slate-500/10 text-slate-300"
+    return "border-border bg-muted/30 text-muted-foreground"
   }
 
   if (type === "division") {
     if (key === "department") {
-      return "border-blue-500/30 bg-blue-500/10 text-blue-300"
+      return "border-blue-500/20 bg-blue-500/10 text-blue-400"
     }
 
     if (key === "swat") {
-      return "border-indigo-500/30 bg-indigo-500/10 text-indigo-300"
+      return "border-blue-500/20 bg-blue-500/5 text-blue-300"
     }
 
     if (key === "mtf7") {
-      return "border-amber-500/30 bg-amber-500/10 text-amber-300"
+      return "border-border bg-muted/30 text-muted-foreground"
     }
 
     if (key === "mcd") {
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+      return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
     }
 
     if (key === "tru") {
-      return "border-rose-500/30 bg-rose-500/10 text-rose-300"
+      return "border-red-500/20 bg-red-500/10 text-red-400"
     }
 
     if (key === "teu") {
-      return "border-orange-500/30 bg-orange-500/10 text-orange-300"
+      return "border-border bg-muted/30 text-muted-foreground"
     }
 
     if (key === "sar") {
-      return "border-sky-500/30 bg-sky-500/10 text-sky-300"
+      return "border-blue-500/20 bg-blue-500/5 text-blue-400"
     }
 
-    return "border-slate-500/30 bg-slate-500/10 text-slate-300"
+    return "border-border bg-muted/30 text-muted-foreground"
   }
 
   if (key === "requirements") {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-300"
+    return "border-border bg-muted/30 text-muted-foreground"
   }
 
   if (key === "import") {
-    return "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
   }
 
   if (key === "roster") {
-    return "border-blue-500/30 bg-blue-500/10 text-blue-300"
+    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
   }
 
   if (key === "management") {
-    return "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300"
+    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
   }
 
   if (key === "navigation") {
-    return "border-slate-500/30 bg-slate-500/10 text-slate-300"
+    return "border-border bg-muted/30 text-muted-foreground"
   }
 
-  return "border-slate-500/30 bg-slate-500/10 text-slate-300"
+  return "border-border bg-muted/30 text-muted-foreground"
 }
 
 function statusLabel(log: ActionLog) {
@@ -315,22 +315,22 @@ function statusClass(log: ActionLog) {
   const value = statusLabel(log).toLowerCase()
 
   if (value === "created") {
-    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
   }
 
   if (value === "removed" || value === "deleted") {
-    return "border-red-500/30 bg-red-500/10 text-red-300"
+    return "border-red-500/20 bg-red-500/10 text-red-400"
   }
 
   if (value === "copied") {
-    return "border-violet-500/30 bg-violet-500/10 text-violet-300"
+    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
   }
 
   if (value === "selected") {
-    return "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
   }
 
-  return "border-blue-500/30 bg-blue-500/10 text-blue-300"
+  return "border-blue-500/20 bg-blue-500/10 text-blue-400"
 }
 
 function Tag({
@@ -567,25 +567,25 @@ function CopyMenu({
 
       {open ? (
         <div
-          className="fixed z-[200] w-[264px] overflow-hidden rounded-[4px] border border-[#252a31] bg-[#090a0c] p-1 shadow-[0_18px_45px_rgba(0,0,0,0.65)]"
+          className="fixed z-[200] w-[264px] overflow-hidden rounded-[4px] border border-border bg-popover p-1 shadow-[0_18px_45px_rgba(0,0,0,0.65)]"
           style={{ left: position.left, top: position.top }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="max-h-[365px] overflow-y-auto pr-0.5 [scrollbar-width:thin] [scrollbar-color:#30343b_transparent]">
+          <div className="max-h-[365px] overflow-y-auto pr-0.5 [scrollbar-width:thin] [scrollbar-color:hsl(var(--border)_transparent)]">
             {items.map((item) => (
               <button
                 key={item.label}
                 type="button"
                 disabled={!item.value}
                 onClick={() => void copy(item.value, item.copyLabel)}
-                className="flex h-[29px] w-full items-center gap-2 rounded-[3px] px-2.5 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                className="flex h-[29px] w-full items-center gap-2 rounded-[3px] px-2.5 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-muted/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
               >
                 <Clipboard className="h-[15px] w-[15px] shrink-0 text-blue-400" />
                 <span className="truncate">{item.label}</span>
               </button>
             ))}
 
-            <div className="mx-1 my-1 border-t border-[#252a31]" />
+            <div className="mx-1 my-1 border-t border-border" />
 
             {combined.map((item) => (
               <button
@@ -593,7 +593,7 @@ function CopyMenu({
                 type="button"
                 disabled={!item.value}
                 onClick={() => void copy(item.value, item.label)}
-                className="flex h-[29px] w-full items-center gap-2 rounded-[3px] px-2.5 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                className="flex h-[29px] w-full items-center gap-2 rounded-[3px] px-2.5 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-muted/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
               >
                 <Clipboard className="h-[15px] w-[15px] shrink-0 text-blue-400" />
                 <span className="truncate">{item.label}</span>
@@ -631,7 +631,7 @@ function FilterSelect({
         aria-label={ariaLabel}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={`h-10 w-full appearance-none rounded-lg border border-[#303744] bg-[#0d1117] pr-9 text-xs outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/70 ${
+        className={`h-10 w-full appearance-none rounded-lg border border-border bg-card pr-9 text-xs outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/70 ${
           Icon ? "pl-9" : "pl-3"
         }`}
       >
@@ -756,7 +756,7 @@ function DetailPanel({ log }: { log: ActionLog }) {
   )
 
   return (
-    <div className="border-t border-[#303744] bg-[#0e1219] px-4 py-4">
+    <div className="border-t border-border bg-muted/10 px-4 py-4">
       <div className="grid gap-4">
         <ChangeList changes={details.changes} />
 
@@ -1068,11 +1068,11 @@ export default function ActionLogs() {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-semibold tracking-tight">Action Logs</h1>
                 <span className="rounded-full border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
-                  Persistent
+                  60 days
                 </span>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                A permanent, numbered audit trail for roster, import, requirement, selection and management changes.
+                A numbered audit trail for roster, import, requirement, selection and management changes. Entries are retained for 60 days.
               </p>
             </div>
           </div>
@@ -1080,7 +1080,7 @@ export default function ActionLogs() {
           <button
             type="button"
             onClick={() => void loadLogs()}
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[#303744] bg-[#0d1117] px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
           >
             <RefreshCw className={`h-3.5 w-3.5 text-blue-400 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -1098,8 +1098,8 @@ export default function ActionLogs() {
                 onClick={() => selectModule(option.value as Module)}
                 className={`h-8 rounded-lg border px-3 text-xs font-medium transition-all ${
                   active
-                    ? "border-fuchsia-600/80 bg-fuchsia-600/10 text-fuchsia-400"
-                    : "border-[#303744] bg-[#0d1117] text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
+                    ? "border-blue-500/60 bg-blue-500/10 text-blue-400"
+                    : "border-border bg-card text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
                 }`}
               >
                 {option.label}
@@ -1140,7 +1140,7 @@ export default function ActionLogs() {
             className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${
               showFilters || activeFilterCount
                 ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
-                : "border-[#303744] bg-[#0d1117] text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
+                : "border-border bg-card text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
             }`}
           >
             Filters
@@ -1157,7 +1157,7 @@ export default function ActionLogs() {
             className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${
               showSearch || search
                 ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
-                : "border-[#303744] bg-[#0d1117] text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
+                : "border-border bg-card text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
             }`}
           >
             Search
@@ -1179,7 +1179,7 @@ export default function ActionLogs() {
                 setPage(1)
               }}
               placeholder="Search entries, people, ranks, IDs..."
-              className="h-9 w-full rounded-lg border border-[#303744] bg-[#0d1117] pl-9 pr-3 text-xs outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
+              className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-xs outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
             />
           </div>
         ) : null}
@@ -1212,7 +1212,7 @@ export default function ActionLogs() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#303744] px-3 text-xs text-muted-foreground transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs text-muted-foreground transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
                 Clear filters
@@ -1260,12 +1260,12 @@ export default function ActionLogs() {
                   return (
                     <article
                       key={log.id}
-                      className="overflow-hidden rounded-xl border border-[#303744] bg-[#11151d] transition-colors hover:border-[#3d4758] hover:bg-[#131821]"
+                      className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-blue-500/25 hover:bg-muted/20"
                     >
                       <button
                         type="button"
                         onClick={() => setExpanded(isOpen ? null : log.id)}
-                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.025] md:grid-cols-[44px_minmax(165px,0.65fr)_minmax(280px,2fr)_auto] md:items-center"
+                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/20 md:grid-cols-[44px_minmax(165px,0.65fr)_minmax(280px,2fr)_auto] md:items-center"
                       >
                         <div className="flex items-center">
                           <span className="font-mono text-[10px] font-semibold text-blue-400">
@@ -1349,7 +1349,7 @@ export default function ActionLogs() {
                   setPageSize(Number(event.target.value))
                   setPage(1)
                 }}
-                className="h-8 rounded-md border border-[#303744] bg-[#0d1117] px-2 text-xs outline-none focus:border-blue-500/60"
+                className="h-8 rounded-md border border-border bg-card px-2 text-xs outline-none focus:border-blue-500/60"
               >
                 <option value={25}>25 / page</option>
                 <option value={50}>50 / page</option>
@@ -1364,7 +1364,7 @@ export default function ActionLogs() {
                 type="button"
                 disabled={page <= 1 || loading}
                 onClick={() => setPage((value) => value - 1)}
-                className="h-8 rounded-md border border-[#303744] px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Previous
               </button>
@@ -1372,7 +1372,7 @@ export default function ActionLogs() {
                 type="button"
                 disabled={page >= pages || loading}
                 onClick={() => setPage((value) => value + 1)}
-                className="h-8 rounded-md border border-[#303744] px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Next
               </button>
