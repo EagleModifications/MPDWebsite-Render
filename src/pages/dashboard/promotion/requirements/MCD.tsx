@@ -10,7 +10,10 @@ import {
 import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
+import { logPromotionAction } from "@/lib/promotionActionLog"
 import { Button } from "@/components/ui/button"
+
+const PROMOTION_LOG_DIVISION = "mcd" as const
 
 type Rank = {
   id: string
@@ -629,6 +632,47 @@ export default function MCDRequirements() {
         ...normalizedSaved,
       })
 
+      const changedRequirements = Object.values(
+        normalizedSaved,
+      )
+        .map((nextRequirement) => {
+          const previousRequirement =
+            savedRequirements[nextRequirement.rankId]
+
+          if (!previousRequirement) {
+            return {
+              rank: nextRequirement.rankName,
+              before: null,
+              after: nextRequirement,
+            }
+          }
+
+          if (
+            JSON.stringify(previousRequirement) ===
+            JSON.stringify(nextRequirement)
+          ) {
+            return null
+          }
+
+          return {
+            rank: nextRequirement.rankName,
+            before: previousRequirement,
+            after: nextRequirement,
+          }
+        })
+        .filter(Boolean)
+
+      logPromotionAction({
+        action: "save-requirements",
+        category: "requirements",
+        division: PROMOTION_LOG_DIVISION,
+        summary: `Saved ${PROMOTION_LOG_DIVISION.toUpperCase()} promotion requirements.`,
+        details: {
+          rankCount: Object.keys(normalizedSaved).length,
+          changedRanks: changedRequirements,
+        },
+      })
+
       toast.success(
         "Requirements saved successfully",
         {
@@ -654,6 +698,13 @@ export default function MCDRequirements() {
     if (!hasChanges || isSaving) {
       return
     }
+
+    logPromotionAction({
+      action: "reset-requirements",
+      category: "requirements",
+      division: PROMOTION_LOG_DIVISION,
+      summary: `Reset unsaved ${PROMOTION_LOG_DIVISION.toUpperCase()} promotion requirement changes.`,
+    })
 
     setRequirements({
       ...savedRequirements,
