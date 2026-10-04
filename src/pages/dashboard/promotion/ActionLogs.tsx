@@ -15,7 +15,8 @@ import {
       History,
   RefreshCw,
   Search,
-            X,
+  Users,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -297,6 +298,17 @@ function tagClass(type: "module" | "division" | "category", value?: string | nul
   }
 
   return "border-slate-500/30 bg-slate-500/10 text-slate-300"
+}
+
+function statusLabel(log: ActionLog) {
+  const value = log.action.toLowerCase()
+
+  if (value.includes("copy")) return "Copied"
+  if (value.includes("select")) return "Selected"
+  if (value.includes("import")) return "Imported"
+  if (value.includes("delete") || value.includes("remove")) return "Removed"
+  if (value.includes("create") || value.includes("add")) return "Created"
+  return "Updated"
 }
 
 function statusClass(log: ActionLog) {
@@ -600,15 +612,17 @@ function FilterSelect({
   onChange,
   icon: Icon,
   ariaLabel,
+  className = "",
 }: {
   value: string
   options: Option[]
   onChange: (value: string) => void
   icon?: typeof Users
   ariaLabel: string
+  className?: string
 }) {
   return (
-    <div className="relative min-w-0">
+    <div className={`relative min-w-0 ${className}`}>
       {Icon ? (
         <Icon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-blue-400" />
       ) : null}
@@ -697,7 +711,7 @@ function ChangeList({ changes }: { changes: unknown }) {
           >
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {change.field || change.label || change.key || (change.rank ? "Rank" : "Change")}
+                {String(change.field ?? change.label ?? change.key ?? (change.rank ? "Rank" : "Change"))}
               </p>
 
               <p className="mt-1 break-words text-xs font-medium text-foreground">
@@ -1041,16 +1055,6 @@ export default function ActionLogs() {
   const end = total ? Math.min(page * pageSize, total) : 0
   const hasFilters = Boolean(category || division || userId || action || search)
   const activeFilterCount = [category, division, userId, action, search].filter(Boolean).length
-
-  const statusLabel = (log: ActionLog) => {
-    const value = log.action.toLowerCase()
-    if (value.includes("copy")) return "Copied"
-    if (value.includes("select")) return "Selected"
-    if (value.includes("import")) return "Imported"
-    if (value.includes("delete") || value.includes("remove")) return "Removed"
-    if (value.includes("create") || value.includes("add")) return "Created"
-    return "Updated"
-  }
 
   return (
     <DashboardLayout>
