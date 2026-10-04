@@ -1,7 +1,7 @@
 import { FileText } from "lucide-react"
 
-const PUBLISHED_DOC_URL =
-  "PASTE_YOUR_PUBLISHED_GOOGLE_DOC_URL_HERE"
+const GOOGLE_DOC_URL =
+  "https://docs.google.com/document/d/1ZfhE0RDj036Y6b56QJq_0KF0r-fl0dbNF7FZvyk5H64/preview"
 
 export default function SOPs() {
   return (
@@ -23,13 +23,14 @@ export default function SOPs() {
           </p>
         </div>
 
-        {/* Google Doc */}
+        {/* Google Docs Viewer */}
         <div className="overflow-hidden rounded-xl border border-border/70 bg-card/70 shadow-sm">
           <iframe
-            src={PUBLISHED_DOC_URL}
+            src={GOOGLE_DOC_URL}
             title="Metro Police Department Standard Operating Procedures"
             className="block h-[900px] w-full border-0"
             loading="lazy"
+            allowFullScreen
           />
         </div>
       </div>
