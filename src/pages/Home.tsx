@@ -651,22 +651,22 @@ const ambientDots: AmbientDot[] = [
 
 const galleryTagClasses: Record<GalleryTag, string> = {
   Dept:
-    "border-blue-400/40 bg-blue-500/20 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.14)]",
+    "border-blue-500/35 bg-blue-500/10 text-blue-700 dark:border-blue-400/40 dark:bg-blue-500/20 dark:text-blue-300",
 
   SWAT:
-    "border-slate-400/30 bg-slate-800/70 text-slate-100 shadow-[0_0_12px_rgba(148,163,184,0.08)]",
+    "border-slate-500/40 bg-slate-900/10 text-slate-800 dark:border-slate-500/50 dark:bg-slate-800/85 dark:text-slate-100",
 
   "MTF-7":
-    "border-sky-400/35 bg-sky-900/45 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.1)]",
+    "border-blue-700/30 bg-blue-700/10 text-blue-800 dark:border-blue-500/40 dark:bg-blue-900/55 dark:text-blue-300",
 
   MCD:
-    "border-blue-900/70 bg-blue-950/90 text-blue-300 shadow-[0_0_12px_rgba(30,64,175,0.12)]",
+    "border-blue-950/40 bg-blue-950/10 text-blue-950 dark:border-blue-900/60 dark:bg-blue-950/75 dark:text-blue-200",
 
   TRU:
-    "border-yellow-400/40 bg-yellow-500/15 text-yellow-300 shadow-[0_0_12px_rgba(234,179,8,0.1)]",
+    "border-yellow-500/35 bg-yellow-500/10 text-yellow-700 dark:border-yellow-400/40 dark:bg-yellow-500/15 dark:text-yellow-300",
 
   SAR:
-    "border-red-400/40 bg-red-500/15 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.1)]",
+    "border-red-500/35 bg-red-500/10 text-red-700 dark:border-red-400/40 dark:bg-red-500/15 dark:text-red-300",
 }
 
 const galleryCategoryClasses: Record<
@@ -1049,11 +1049,11 @@ export default function Home() {
 
         <div className="absolute right-[8%] top-[48%] h-[400px] w-[400px] rounded-full bg-blue-600/[0.018] blur-[140px]" />
 
-        {/* Moving / blinking stars */}
+        {/* Static star field with subtle twinkling */}
         {visibleDots.map((dot, index) => (
           <span
             key={index}
-            className="absolute rounded-full bg-blue-400 animate-mpd-star"
+            className="absolute rounded-full bg-blue-300 animate-mpd-star"
             style={
               {
                 left: dot.left,
@@ -1063,9 +1063,7 @@ export default function Home() {
                 opacity: dot.opacity,
                 filter: `blur(${dot.blur})`,
                 animationDelay: dot.delay,
-                animationDuration: dot.duration,
-                "--drift-x": dot.driftX,
-                "--drift-y": dot.driftY,
+                animationDuration: `${2.2 + (index % 7) * 0.35}s`,
               } as React.CSSProperties
             }
           />
@@ -1545,7 +1543,7 @@ export default function Home() {
             (dot, index) => (
               <span
                 key={`cta-dot-${index}`}
-                className="absolute rounded-full bg-blue-400 animate-mpd-star"
+                className="absolute rounded-full bg-blue-300 animate-mpd-star"
                 style={
                   {
                     left: dot.left,
@@ -1555,7 +1553,7 @@ export default function Home() {
                     opacity: dot.opacity * 0.8,
                     filter: `blur(${dot.blur})`,
                     animationDelay: `${index * 0.43}s`,
-                    animationDuration: dot.duration,
+                    animationDuration: `${2.2 + (index % 7) * 0.35}s`,
                     "--drift-x": dot.driftX,
                     "--drift-y": dot.driftY,
                   } as React.CSSProperties
@@ -1610,74 +1608,36 @@ export default function Home() {
       {/* =========================================================== */}
       <style>{`
         /*
-         * Each star:
-         * - slowly drifts around the page
-         * - fades in/out
-         * - slightly changes scale
-         * - has its own delay + duration
-         *
-         * This makes the field feel randomized instead of
-         * having every dot move at the same time.
+         * Stars stay fixed in place and only twinkle:
+         * - fade gently in and out
+         * - slightly grow/shrink like a real star
+         * - never drift or move across the page
          */
-        @keyframes mpd-star-drift {
-          0% {
-            opacity: 0.08;
-            transform:
-              translate3d(0, 0, 0)
-              scale(0.7);
+        @keyframes mpd-star-twinkle {
+          0%,
+          100% {
+            opacity: 0.16;
+            transform: scale(0.72);
           }
 
-          18% {
-            opacity: 0.24;
-          }
-
-          35% {
-            opacity: 0.55;
-            transform:
-              translate3d(
-                calc(var(--drift-x) * 0.45),
-                calc(var(--drift-y) * 0.45),
-                0
-              )
-              scale(1);
+          25% {
+            opacity: 0.32;
+            transform: scale(0.9);
           }
 
           50% {
-            opacity: 0.8;
-            transform:
-              translate3d(
-                var(--drift-x),
-                var(--drift-y),
-                0
-              )
-              scale(1.18);
+            opacity: 0.9;
+            transform: scale(1.28);
           }
 
-          68% {
-            opacity: 0.3;
-          }
-
-          82% {
-            opacity: 0.55;
-            transform:
-              translate3d(
-                calc(var(--drift-x) * -0.35),
-                calc(var(--drift-y) * -0.35),
-                0
-              )
-              scale(0.95);
-          }
-
-          100% {
-            opacity: 0.08;
-            transform:
-              translate3d(0, 0, 0)
-              scale(0.7);
+          72% {
+            opacity: 0.4;
+            transform: scale(0.92);
           }
         }
 
         .animate-mpd-star {
-          animation-name: mpd-star-drift;
+          animation-name: mpd-star-twinkle;
           animation-timing-function: ease-in-out;
           animation-iteration-count: infinite;
           will-change: transform, opacity;
@@ -1687,17 +1647,18 @@ export default function Home() {
           0%,
           100% {
             transform: translateY(0);
-            opacity: 0.45;
+            opacity: 0.5;
           }
 
           50% {
-            transform: translateY(7px);
+            transform: translateY(8px);
             opacity: 1;
           }
         }
 
         .animate-mpd-arrow {
-          animation: mpd-arrow-bounce 1.8s ease-in-out infinite;
+          animation: mpd-arrow-bounce 1.35s ease-in-out infinite;
+          will-change: transform, opacity;
         }
 
         @media (prefers-reduced-motion: reduce) {
