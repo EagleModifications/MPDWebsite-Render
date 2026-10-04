@@ -31,7 +31,7 @@ export type ActionLogInput = {
 /**
  * Client-side audit helper. Logging is fire-and-forget so an audit-log
  * failure can never break the dashboard action that the user is performing.
- * The server stores the entry in an in-memory Map, never MongoDB.
+ * The server persists entries in MongoDB so Render deploys/restarts do not erase them.
  */
 export function logAction(input: ActionLogInput): void {
   void fetch("/api/action-logs", {
