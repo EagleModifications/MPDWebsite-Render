@@ -505,14 +505,12 @@ function FilterSelect({
   value,
   options,
   onChange,
-  icon: Icon,
   ariaLabel,
   className = "",
 }: {
   value: string
   options: Option[]
   onChange: (value: string) => void
-  icon?: typeof Users
   ariaLabel: string
   className?: string
 }) {
@@ -1083,7 +1081,6 @@ export default function ActionLogs() {
             value={userId}
             options={userOptions}
             onChange={(value) => { setUserId(value); setPage(1); setExpanded(null) }}
-            icon={UserRound}
             ariaLabel="People"
             className="w-[170px]"
           />
@@ -1091,7 +1088,6 @@ export default function ActionLogs() {
             value={action}
             options={actionOptions}
             onChange={(value) => { setAction(value); setPage(1); setExpanded(null) }}
-            icon={History}
             ariaLabel="Actions"
             className="w-[160px]"
           />
@@ -1099,7 +1095,6 @@ export default function ActionLogs() {
             value={category}
             options={categoryOptions}
             onChange={(value) => { setCategory(value as Category); setPage(1); setExpanded(null) }}
-            icon={Clipboard}
             ariaLabel="Categories"
             className="w-[175px]"
           />
@@ -1107,7 +1102,6 @@ export default function ActionLogs() {
             value={division}
             options={divisionOptions}
             onChange={(value) => { setDivision(value as Division); setPage(1); setExpanded(null) }}
-            icon={Users}
             ariaLabel="Divisions"
             className="w-[175px]"
           />
