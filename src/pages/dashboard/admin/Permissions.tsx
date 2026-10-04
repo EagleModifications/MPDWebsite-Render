@@ -3,12 +3,13 @@ import {
   useEffect,
   useMemo,
   useState,
+  type KeyboardEvent,
   type ReactNode,
 } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-  ChevronDown,
   CheckCircle2,
+  ChevronDown,
   Pencil,
   Plus,
   RotateCcw,
@@ -83,30 +84,54 @@ function normalizePath(value: string): string {
     return ""
   }
 
-  if (!trimmed.startsWith("/")) {
-    return `/${trimmed}`
-  }
-
-  return trimmed
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`
 }
 
-function uniqueStrings(values: string[]): string[] {
+function uniqueStrings(values: unknown): string[] {
+  if (!Array.isArray(values)) {
+    return []
+  }
+
   return Array.from(
     new Set(
       values
+        .filter((value): value is string => typeof value === "string")
         .map((value) => value.trim())
         .filter(Boolean),
     ),
   )
 }
 
-function formatApiError(
+function getApiErrorMessage(
   status: number,
   statusText: string,
   raw: string,
 ): string {
-  if (raw.includes("<!DOCTYPE") || raw.includes("<html")) {
-    return `The server returned HTML instead of JSON (${status} ${statusText}). Check that the API route is running and that the request is reaching Express.`
+  const trimmed = raw.trim()
+
+  if (!trimmed) {
+    return `Request failed (${status} ${statusText}).`
+  }
+
+  if (trimmed.startsWith("<!DOCTYPE") || trimmed.includes("<html")) {
+    return `The server returned HTML instead of JSON (${status} ${statusText}). Check that the API route is running.`
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as {
+      error?: unknown
+      message?: unknown
+    }
+
+    if (typeof parsed.error === "string" && parsed.error.trim()) {
+      return parsed.error
+    }
+
+    if (typeof parsed.message === "string" && parsed.message.trim()) {
+      return parsed.message
+    }
+  } catch {
+    // Fall through to the generic message.
   }
 
   return `Request failed (${status} ${statusText}).`
@@ -126,43 +151,39 @@ async function requestJson<T>(
   url: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const headers = new Headers(options.headers)
+
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json")
+  }
+
   const response = await fetch(url, {
     ...options,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers ?? {}),
-    },
+    headers,
   })
 
   const raw = await response.text()
 
-  let data: {
-    error?: string
-    message?: string
-  } = {}
-
-  if (raw.trim()) {
-    try {
-      data = JSON.parse(raw) as typeof data
-    } catch {
-      throw new ApiError(
-        formatApiError(response.status, response.statusText, raw),
-        response.status,
-      )
-    }
-  }
-
   if (!response.ok) {
     throw new ApiError(
-      data.error ||
-        data.message ||
-        `Request failed (${response.status} ${response.statusText}).`,
+      getApiErrorMessage(response.status, response.statusText, raw),
       response.status,
     )
   }
 
-  return data as T
+  if (!raw.trim()) {
+    return {} as T
+  }
+
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    throw new ApiError(
+      "The server returned an invalid JSON response.",
+      response.status,
+    )
+  }
 }
 
 type ModalProps = {
@@ -358,20 +379,27 @@ export default function Permissions() {
   }, [load])
 
   function closeModal() {
-    if (isSaving) {
-      return
-    }
-
     setModalKind(null)
     setModalMode("create")
 
-    setPermissionDraft(emptyPermission)
+    setPermissionDraft({
+      ...emptyPermission,
+      urls: [""],
+    })
+
     setEditingPermissionKey(null)
 
-    setRankDraft(emptyRank)
+    setRankDraft({
+      ...emptyRank,
+      permissions: [],
+    })
+
     setEditingRankName(null)
 
-    setDiscordDraft(emptyDiscord)
+    setDiscordDraft({
+      ...emptyDiscord,
+      permissions: [],
+    })
   }
 
   function openCreatePermission() {
@@ -525,7 +553,7 @@ export default function Permissions() {
   }
 
   function handleRouteKeyDown(
-    event: React.KeyboardEvent<HTMLInputElement>,
+    event: KeyboardEvent<HTMLInputElement>,
     index: number,
   ) {
     if (event.key !== "Enter") {
@@ -533,6 +561,7 @@ export default function Permissions() {
     }
 
     event.preventDefault()
+    event.stopPropagation()
 
     setPermissionDraft((current) => {
       const urls = [...current.urls]
@@ -545,13 +574,14 @@ export default function Permissions() {
       }
     })
 
-    window.setTimeout(() => {
-      const nextInput = document.querySelector<HTMLInputElement>(
-        `[data-route-index="${index + 1}"]`,
-      )
+    requestAnimationFrame(() => {
+      const nextInput =
+        document.querySelector<HTMLInputElement>(
+          `[data-route-index="${index + 1}"]`,
+        )
 
       nextInput?.focus()
-    }, 0)
+    })
   }
 
   function toggleDraftPermission(
@@ -592,15 +622,31 @@ export default function Permissions() {
   async function submitPermission() {
     const key =
       modalMode === "edit" && editingPermissionKey
-        ? editingPermissionKey
+        ? editingPermissionKey.trim().toLowerCase()
         : permissionDraft.key.trim().toLowerCase()
 
     const urls = uniqueStrings(
-      permissionDraft.urls.map((url) => normalizePath(url)),
+      permissionDraft.urls
+        .map(normalizePath)
+        .filter(Boolean),
     )
 
     if (!key) {
       toast.error("Permission key is required.")
+      return
+    }
+
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(key)) {
+      toast.error(
+        "Permission keys may only contain lowercase letters, numbers, hyphens, and underscores.",
+      )
+      return
+    }
+
+    if (key === "permissionadmin") {
+      toast.error(
+        "permissionadmin is controlled by config/admin_permissions.json and cannot be created or edited here.",
+      )
       return
     }
 
@@ -640,6 +686,7 @@ export default function Permissions() {
         toast.success("Permission created.")
       }
 
+      setIsSaving(false)
       closeModal()
       await load()
     } catch (error) {
@@ -648,7 +695,7 @@ export default function Permissions() {
           ? error.message
           : "Failed to save permission.",
       )
-    } finally {
+
       setIsSaving(false)
     }
   }
@@ -718,13 +765,16 @@ export default function Permissions() {
         toast.success("Rank created.")
       }
 
+      setIsSaving(false)
       closeModal()
       await load()
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to save rank.",
+        error instanceof Error
+          ? error.message
+          : "Failed to save rank.",
       )
-    } finally {
+
       setIsSaving(false)
     }
   }
@@ -753,7 +803,9 @@ export default function Permissions() {
       await load()
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to delete rank.",
+        error instanceof Error
+          ? error.message
+          : "Failed to delete rank.",
       )
     }
   }
@@ -784,6 +836,7 @@ export default function Permissions() {
           : "Discord permissions added.",
       )
 
+      setIsSaving(false)
       closeModal()
       await load()
     } catch (error) {
@@ -792,7 +845,7 @@ export default function Permissions() {
           ? error.message
           : "Failed to save Discord permissions.",
       )
-    } finally {
+
       setIsSaving(false)
     }
   }
@@ -847,6 +900,7 @@ export default function Permissions() {
               <h1 className="text-3xl font-bold tracking-tight">
                 Permissions
               </h1>
+
               <p className="text-sm text-muted-foreground">
                 Manage web permissions, ranks and individual Discord access.
               </p>
@@ -965,9 +1019,9 @@ export default function Permissions() {
                             </div>
 
                             <div className="mt-2 flex flex-wrap gap-2">
-                              {permission.urls.map((url) => (
+                              {permission.urls.map((url, index) => (
                                 <span
-                                  key={url}
+                                  key={`${url}-${index}`}
                                   className="rounded-md border border-border bg-background px-2.5 py-1 font-mono text-xs text-muted-foreground"
                                 >
                                   {url}
@@ -1209,10 +1263,11 @@ export default function Permissions() {
           </div>
         </section>
 
-        {/* JSON CONTROLLED CONFIGURATION */}
+        {/* SYSTEM CONFIGURATION */}
         <section className="overflow-hidden rounded-2xl border border-border bg-card">
           <div className="border-b border-border px-6 py-5">
             <h2 className="font-semibold">System Configuration</h2>
+
             <p className="text-sm text-muted-foreground">
               These values are read-only and controlled by the system
               configuration.
@@ -1302,7 +1357,7 @@ export default function Permissions() {
               onChange={(event) =>
                 setPermissionDraft((current) => ({
                   ...current,
-                  key: event.target.value,
+                  key: event.target.value.toLowerCase(),
                 }))
               }
               disabled={modalMode === "edit"}
@@ -1367,7 +1422,10 @@ export default function Permissions() {
 
             <div className="space-y-2">
               {permissionDraft.urls.map((url, index) => (
-                <div key={`${index}-${url}`} className="flex gap-2">
+                <div
+                  key={`route-${index}`}
+                  className="flex items-center gap-2"
+                >
                   <input
                     data-route-index={index}
                     value={url}
@@ -1378,6 +1436,7 @@ export default function Permissions() {
                       handleRouteKeyDown(event, index)
                     }
                     placeholder="/dashboard/example"
+                    autoComplete="off"
                     className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 font-mono text-sm outline-none transition focus:border-blue-500"
                   />
 
@@ -1395,8 +1454,7 @@ export default function Permissions() {
             </div>
 
             <p className="mt-2 text-xs text-muted-foreground">
-              Press Enter inside a route field to create another route.
-              There is no route limit.
+              Press Enter to add another route. You can add unlimited routes.
             </p>
           </div>
         </div>
