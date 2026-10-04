@@ -35,7 +35,10 @@ export function hasPermission(
   permission: string,
 ): boolean {
   if (!user) return false
-  return user.permissions.includes(permission)
+  return (
+    user.permissions.includes("*") ||
+    user.permissions.includes(permission)
+  )
 }
 
 export function hasAnyPermission(
@@ -43,5 +46,9 @@ export function hasAnyPermission(
   permissions: string[],
 ): boolean {
   if (!user) return false
-  return permissions.some((permission) => user.permissions.includes(permission))
+  if (user.permissions.includes("*")) return true
+
+  return permissions.some((permission) =>
+    user.permissions.includes(permission),
+  )
 }
