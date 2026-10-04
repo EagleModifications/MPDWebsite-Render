@@ -1,54 +1,70 @@
 import {
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  Clipboard,
+  ClipboardCheck,
+  Copy,
+  FileInput,
+  FileText,
+  Filter,
+  History,
+  MousePointerClick,
+  Pencil,
+  PlusCircle,
+  RefreshCw,
+  Search,
+  Settings2,
+  Shield,
+  Trash2,
+  UserRound,
+  X,
+} from "lucide-react"
+import {
   useCallback,
   useEffect,
   useMemo,
   useState,
-  type ComponentType,
-  type ReactNode,
+  type MouseEvent,
 } from "react"
-
-import {
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Clipboard,
-  Copy,
-  FileInput,
-  History,
-  ListChecks,
-  Pencil,
-  Plus,
-  RefreshCw,
-  Search,
-  Settings2,
-  Trash2,
-  X,
-} from "lucide-react"
 import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
-type Category = "" | "roster" | "import" | "requirements" | "navigation"
-type Division = "" | "department" | "swat" | "mtf7" | "mcd" | "tru" | "teu" | "sar"
+type Category =
+  | "roster"
+  | "import"
+  | "requirements"
+  | "navigation"
+  | "management"
+  | ""
+
+type Division =
+  | "department"
+  | "swat"
+  | "mtf7"
+  | "mcd"
+  | "tru"
+  | "teu"
+  | "sar"
+  | ""
 
 type ActionLog = {
   id: string
+  entryNumber?: number
   createdAt: string
   userId: string
   userName: string
   username: string
-  avatar?: string | null
   rank: string
   callsign: string
   badgeNumber: string
+  avatar?: string | null
   action: string
-  category: Exclude<Category, "">
+  module?: "promotion" | "activity" | string
+  category: Exclude<Category, ""> | string
   division?: Exclude<Division, ""> | null
   targetUserId?: string | null
   targetName?: string | null
@@ -56,14 +72,6 @@ type ActionLog = {
   summary: string
   details?: Record<string, unknown> | null
   path?: string | null
-}
-
-type RosterMember = {
-  name: string
-  rank: string
-  callsign: string
-  badgeNumber: string
-  discordId: string
 }
 
 type ApiResponse = {
@@ -78,40 +86,99 @@ type ApiResponse = {
   }
 }
 
-type Option = { value: string; label: string }
-
-const categoryOptions: Option[] = [
-  { value: "", label: "All categories" },
-  { value: "requirements", label: "Requirements" },
-  { value: "import", label: "Imports" },
-  { value: "roster", label: "Roster" },
-  { value: "navigation", label: "Navigation" },
-]
-
-const divisionLabels: Record<string, string> = {
-  department: "Department",
-  swat: "SWAT",
-  mtf7: "MTF-7",
-  mcd: "MCD",
-  tru: "TRU",
-  teu: "TEU",
-  sar: "SAR",
+type Option = {
+  value: string
+  label: string
 }
 
-const divisionOptions: Option[] = [
-  { value: "", label: "All divisions" },
-  ...Object.entries(divisionLabels).map(([value, label]) => ({ value, label })),
+const categoryOptions: Option[] = [
+  { value: "", label: "All Categories" },
+  { value: "roster", label: "Roster" },
+  { value: "import", label: "Imports" },
+  { value: "requirements", label: "Requirements" },
+  { value: "navigation", label: "Navigation" },
+  { value: "management", label: "Management" },
 ]
 
-const moduleLabel = () => "Promotion"
+const divisionOptions: Option[] = [
+  { value: "", label: "All Divisions" },
+  { value: "department", label: "Department" },
+  { value: "swat", label: "SWAT" },
+  { value: "mtf7", label: "MTF-7" },
+  { value: "mcd", label: "MCD" },
+  { value: "tru", label: "TRU" },
+  { value: "teu", label: "TEU" },
+  { value: "sar", label: "SAR" },
+]
+
+const fallbackActions = [
+  "view-roster",
+  "change-division",
+  "search-roster",
+  "filter-status",
+  "filter-rank",
+  "clear-filters",
+  "select-member",
+  "select-rank",
+  "select-all-visible",
+  "copy-roster",
+  "copy-selected",
+  "copy-discord-id",
+  "copy-name",
+  "copy-callsign",
+  "copy-badge-number",
+  "refresh-roster",
+  "import-promotion",
+  "save-requirements",
+  "reset-requirements",
+  "create-promotion-list",
+  "submit-promotion-list",
+  "delete-promotion-list",
+  "edit-promotion",
+  "promote-member",
+  "demote-member",
+]
 
 const actionLabel = (value: string) =>
   value
     .replace(/[-_]+/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
 
+const categoryLabel = (value: string) =>
+  categoryOptions.find((item) => item.value === value)?.label ?? actionLabel(value)
+
 const divisionLabel = (value?: string | null) =>
-  value ? divisionLabels[value] ?? actionLabel(value) : "Department"
+  divisionOptions.find((item) => item.value === value)?.label ??
+  (value ? actionLabel(value) : "—")
+
+const formatDateTime = (value: string) => {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown time"
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date)
+}
+
+const formatDetailValue = (value: unknown) => {
+  if (value === null || value === undefined) {
+    return "—"
+  }
+
+  if (typeof value === "string") {
+    return value
+  }
+
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
 
 const getInitials = (value: string) =>
   value
@@ -122,708 +189,1341 @@ const getInitials = (value: string) =>
     .slice(0, 2)
     .toUpperCase() || "U"
 
-const getAvatarUrl = (discordId: string, avatar?: string | null) => {
-  if (!discordId) return undefined
-  if (avatar?.startsWith("http://") || avatar?.startsWith("https://")) return avatar
-  if (avatar) {
-    const extension = avatar.startsWith("a_") ? "gif" : "png"
-    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.${extension}?size=128`
-  }
+const getDefaultAvatar = (discordId: string) => {
   try {
     const index = Number(BigInt(discordId) % 6n)
+
     return `https://cdn.discordapp.com/embed/avatars/${index}.png?size=128`
   } catch {
     return undefined
   }
 }
 
-const relativeTime = (value: string) => {
-  const timestamp = new Date(value).getTime()
-  if (!Number.isFinite(timestamp)) return "Unknown time"
-
-  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000))
-  if (seconds < 10) return "just now"
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days}d ago`
-
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(timestamp)
-}
-
-const formatDateTime = (value: string) => {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "Unknown"
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date)
-}
-
-const dateHeading = (value: string) => {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "UNKNOWN DATE"
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(date).toUpperCase()
-}
-
-function tagClass(type: "division" | "category", value?: string | null) {
-  const key = (value ?? "").toLowerCase()
-  if (type === "division") {
-    if (key === "department") return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-    if (key === "swat" || key === "sar") return "border-blue-500/20 bg-blue-500/5 text-blue-300"
-    if (key === "mcd") return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-    if (key === "tru") return "border-red-500/20 bg-red-500/10 text-red-400"
+const getAvatarUrl = (
+  discordId: string,
+  avatar?: string | null,
+) => {
+  if (!avatar) {
+    return getDefaultAvatar(discordId)
   }
-  if (key === "import" || key === "roster") return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-  return "border-border bg-muted/30 text-muted-foreground"
+
+  if (
+    avatar.startsWith("http://") ||
+    avatar.startsWith("https://")
+  ) {
+    return avatar
+  }
+
+  if (avatar.startsWith("a_")) {
+    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.gif?size=128`
+  }
+
+  return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png?size=128`
 }
 
-function statusLabel(log: ActionLog) {
-  const value = log.action.toLowerCase()
-  if (value.includes("copy")) return "Copied"
-  if (value.includes("select")) return "Selected"
-  if (value.includes("import")) return "Imported"
-  if (value.includes("delete") || value.includes("remove") || value.includes("deselect")) return "Removed"
-  if (value.includes("create") || value.includes("add")) return "Created"
-  return "Updated"
+const getActionIcon = (log: ActionLog) => {
+  const value = `${log.action} ${log.category}`.toLowerCase()
+
+  if (
+    value.includes("copy") ||
+    value.includes("clipboard")
+  ) {
+    return Copy
+  }
+
+  if (
+    value.includes("select") ||
+    value.includes("selected")
+  ) {
+    return MousePointerClick
+  }
+
+  if (
+    value.includes("import")
+  ) {
+    return FileInput
+  }
+
+  if (
+    value.includes("delete") ||
+    value.includes("remove") ||
+    value.includes("reset")
+  ) {
+    return Trash2
+  }
+
+  if (
+    value.includes("create") ||
+    value.includes("add") ||
+    value.includes("submit")
+  ) {
+    return PlusCircle
+  }
+
+  if (
+    value.includes("edit") ||
+    value.includes("change") ||
+    value.includes("update") ||
+    value.includes("promote") ||
+    value.includes("demote")
+  ) {
+    return Pencil
+  }
+
+  if (
+    value.includes("requirement")
+  ) {
+    return ClipboardCheck
+  }
+
+  if (
+    value.includes("management")
+  ) {
+    return Settings2
+  }
+
+  if (
+    value.includes("navigation") ||
+    value.includes("page")
+  ) {
+    return History
+  }
+
+  return Activity
 }
 
-function statusClass(log: ActionLog) {
-  const status = statusLabel(log).toLowerCase()
-  if (status === "created") return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-  if (status === "removed") return "border-red-500/20 bg-red-500/10 text-red-400"
+const getActionIconStyle = (log: ActionLog) => {
+  const value = `${log.action} ${log.category}`.toLowerCase()
+
+  if (
+    value.includes("delete") ||
+    value.includes("remove") ||
+    value.includes("reset")
+  ) {
+    return "border-red-500/20 bg-red-500/10 text-red-400"
+  }
+
+  if (
+    value.includes("create") ||
+    value.includes("add") ||
+    value.includes("submit") ||
+    value.includes("promote")
+  ) {
+    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+  }
+
+  if (
+    value.includes("copy")
+  ) {
+    return "border-violet-500/20 bg-violet-500/10 text-violet-400"
+  }
+
+  if (
+    value.includes("import")
+  ) {
+    return "border-amber-500/20 bg-amber-500/10 text-amber-400"
+  }
+
   return "border-blue-500/20 bg-blue-500/10 text-blue-400"
 }
 
-function getActionIcon(action: string, category: string): ComponentType<{ className?: string }> {
-  const value = `${action} ${category}`.toLowerCase()
-  if (value.includes("copy")) return Copy
-  if (value.includes("select") || value.includes("deselect")) return ListChecks
-  if (value.includes("import")) return FileInput
-  if (value.includes("delete") || value.includes("remove")) return Trash2
-  if (value.includes("create") || value.includes("add")) return Plus
-  if (value.includes("update") || value.includes("edit") || value.includes("requirement")) return Pencil
-  if (value.includes("navigation") || value.includes("change-division")) return Settings2
-  return History
+async function readApiResponse(
+  response: Response,
+): Promise<ApiResponse> {
+  const text = await response.text()
+
+  if (!text.trim()) {
+    throw new Error(
+      `Action logs API returned an empty response (${response.status}).`,
+    )
+  }
+
+  try {
+    return JSON.parse(text) as ApiResponse
+  } catch {
+    if (response.status === 404) {
+      throw new Error(
+        "The promotion action logs endpoint returned 404. The dashboard is now using /api/action-logs?module=promotion.",
+      )
+    }
+
+    throw new Error(
+      `Action logs API returned an invalid response (${response.status}).`,
+    )
+  }
 }
 
-function Tag({ children, className }: { children: ReactNode; className: string }) {
-  return (
-    <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-medium leading-none ${className}`}>
-      {children}
-    </span>
-  )
-}
-
-function Avatar({
+function IdentityCard({
   name,
-  id,
-  avatar,
-  className = "h-6 w-6",
-}: {
-  name: string
-  id?: string
-  avatar?: string | null
-  className?: string
-}) {
-  const url = id ? getAvatarUrl(id, avatar) : undefined
-  return (
-    <span className={`${className} shrink-0 overflow-hidden rounded-full border border-border bg-muted`}>
-      {url ? (
-        <img
-          src={url}
-          alt=""
-          className="h-full w-full object-cover"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-        />
-      ) : (
-        <span className="flex h-full w-full items-center justify-center text-[8px] font-semibold text-muted-foreground">
-          {getInitials(name)}
-        </span>
-      )}
-    </span>
-  )
-}
-
-function CopyMenu({
-  name,
-  id,
+  username,
+  userId,
+  rank,
   callsign,
   badgeNumber,
-  rank,
   avatar,
-  large = false,
+  compact = false,
 }: {
   name: string
-  id?: string | null
+  username?: string
+  userId?: string
+  rank?: string
   callsign?: string
   badgeNumber?: string
-  rank?: string
   avatar?: string | null
-  large?: boolean
+  compact?: boolean
 }) {
-  const display = name.trim() || "Unknown User"
-  const safeId = id?.trim() || ""
-  const safeCallsign = callsign?.trim() || ""
-  const safeBadge = badgeNumber?.trim() || ""
-  const safeRank = rank?.trim() || ""
+  const [open, setOpen] = useState(false)
 
-  const items = [
-    ["discord", "Copy Discord ID", safeId],
-    ["mention", "Copy Discord Mention", safeId ? `<@${safeId}>` : ""],
-    ["name", "Copy Name", display],
-    ["callsign", "Copy Callsign", safeCallsign],
-    ["badge", "Copy Badge Number", safeBadge],
-    ["rank", "Copy Rank", safeRank],
-  ] as const
-
-  const combined = [
-    ["name-discord", "Name + Discord ID", safeId ? `${display} — ${safeId}` : ""],
-    ["callsign-discord", "Callsign + Discord ID", safeCallsign && safeId ? `${safeCallsign} — ${safeId}` : ""],
-    ["callsign-name", "Callsign + Name", safeCallsign ? `${safeCallsign} — ${display}` : ""],
-    ["callsign-badge", "Callsign + Badge Number", safeCallsign && safeBadge ? `${safeCallsign} — ${safeBadge}` : ""],
-    ["badge-name", "Badge Number + Name", safeBadge ? `${safeBadge} — ${display}` : ""],
-    ["badge-discord", "Badge Number + Discord ID", safeBadge && safeId ? `${safeBadge} — ${safeId}` : ""],
-  ] as const
-
-  const copy = async (value: string, label: string) => {
-    if (!value) return
+  const copy = async (
+    value: string,
+    label: string,
+  ) => {
     try {
       await navigator.clipboard.writeText(value)
-      toast.success(`${label} copied`, { description: value })
+      toast.success(`${label} copied`, {
+        description: value,
+      })
     } catch {
       toast.error("Copy failed")
     }
   }
 
+  const avatarUrl = userId
+    ? getAvatarUrl(userId, avatar)
+    : undefined
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          title="Copy options"
-          className="inline-flex max-w-full items-center gap-2 rounded-md bg-transparent py-0.5 text-left outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
+    <div className="relative min-w-0">
+      <button
+        type="button"
+        className={`flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-muted/50 ${
+          compact ? "px-1 py-0.5" : "px-1.5 py-1"
+        }`}
+        onClick={(event) => {
+          event.stopPropagation()
+          setOpen((current) => !current)
+        }}
+      >
+        <div
+          className={`shrink-0 overflow-hidden rounded-full border bg-muted ${
+            compact ? "h-7 w-7" : "h-8 w-8"
+          }`}
         >
-          <Avatar name={display} id={safeId} avatar={avatar} className={large ? "h-10 w-10" : "h-6 w-6"} />
-          <span className={`truncate font-medium text-blue-400 ${large ? "text-sm" : "text-xs"}`}>{display}</span>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="start" sideOffset={4} avoidCollisions={false} className="w-[285px] max-h-80 overflow-y-auto p-1">
-        {items.map(([type, label, value]) => (
-          <DropdownMenuItem key={type} disabled={!value} onClick={() => void copy(value, label)} className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs">
-            <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-            <span>{label}</span>
-          </DropdownMenuItem>
-        ))}
-        <div className="my-0.5 h-px bg-border" />
-        {combined.map(([type, label, value]) => (
-          <DropdownMenuItem key={type} disabled={!value} onClick={() => void copy(value, label)} className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs">
-            <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-            <span>{label}</span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-function FilterSelect({
-  value,
-  options,
-  onChange,
-  ariaLabel,
-  className = "",
-}: {
-  value: string
-  options: Option[]
-  onChange: (value: string) => void
-  ariaLabel: string
-  className?: string
-}) {
-  const selected = options.find((option) => option.value === value) ?? options[0]
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={ariaLabel} className={`inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground outline-none transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-white focus:outline-none ${className}`}>
-          <span className="min-w-0 flex-1 truncate text-left">{selected?.label ?? ariaLabel}</span>
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="start" sideOffset={4} avoidCollisions={false} className="max-h-80 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto p-1">
-        {options.map((option) => (
-          <DropdownMenuItem key={option.value || `all-${ariaLabel}`} onClick={() => onChange(option.value)} className={`h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs ${option.value === value ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/15 focus:text-blue-300" : ""}`}>
-            <span className="min-w-0 flex-1 truncate">{option.label}</span>
-            {option.value === value ? <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-blue-400" /> : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—"
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value)
-  try {
-    return JSON.stringify(value, null, 2)
-  } catch {
-    return String(value)
-  }
-}
-
-function displayChangeValue(value: unknown) {
-  return formatValue(value)
-}
-
-function ChangeList({ changes }: { changes: unknown }) {
-  if (!Array.isArray(changes) || changes.length === 0) return null
-  const visible = changes.slice(0, 120) as Array<Record<string, unknown>>
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-border">
-      {visible.map((change, index) => {
-        const rank = String(change.rank ?? change.name ?? change.discordId ?? `Change ${index + 1}`)
-        return (
-          <div key={`${rank}-${index}`} className="grid gap-4 border-b border-border p-3 last:border-b-0 md:grid-cols-[1.1fr_1fr_1fr]">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{String(change.field ?? change.label ?? change.key ?? (change.rank ? "Rank" : "Change"))}</p>
-              <p className="mt-1 break-words text-xs font-medium text-foreground">{rank}</p>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold">
+              {getInitials(name)}
             </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Old</p>
-              <p className="mt-1 break-words text-xs text-muted-foreground line-through decoration-red-500/70">{displayChangeValue(change.old)}</p>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">New</p>
-              <p className="mt-1 break-words text-xs font-semibold text-emerald-400">{displayChangeValue(change.new)}</p>
-            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 leading-tight">
+          <div className="truncate text-sm font-medium text-blue-400">
+            {name || "Unknown User"}
           </div>
-        )
-      })}
+
+          {username ? (
+            <div className="truncate text-[10px] text-muted-foreground">
+              @{username}
+            </div>
+          ) : null}
+        </div>
+      </button>
+
+      {open ? (
+        <div
+          className="absolute left-0 top-full z-[70] mt-1 w-60 rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="border-b px-3 py-2">
+            <p className="truncate text-sm font-semibold">
+              {name || "Unknown User"}
+            </p>
+
+            {username ? (
+              <p className="truncate text-xs text-muted-foreground">
+                @{username}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-0.5 p-1">
+            {userId ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                onClick={() => void copy(userId, "Discord ID")}
+              >
+                <Clipboard className="h-3.5 w-3.5 text-blue-400" />
+                Copy Discord ID
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+              onClick={() => void copy(name, "Name")}
+            >
+              <UserRound className="h-3.5 w-3.5 text-blue-400" />
+              Copy Name
+            </button>
+
+            {callsign ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                onClick={() => void copy(callsign, "Callsign")}
+              >
+                <Shield className="h-3.5 w-3.5 text-blue-400" />
+                Copy Callsign
+              </button>
+            ) : null}
+
+            {badgeNumber ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                onClick={() => void copy(badgeNumber, "Badge number")}
+              >
+                <ClipboardCheck className="h-3.5 w-3.5 text-blue-400" />
+                Copy Badge Number
+              </button>
+            ) : null}
+
+            {rank ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                onClick={() => void copy(rank, "Rank")}
+              >
+                <Shield className="h-3.5 w-3.5 text-blue-400" />
+                Copy Rank
+              </button>
+            ) : null}
+
+            {name && userId ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                onClick={() =>
+                  void copy(
+                    `${name} (${userId})`,
+                    "Name + Discord ID",
+                  )
+                }
+              >
+                <Copy className="h-3.5 w-3.5 text-blue-400" />
+                Name + Discord ID
+              </button>
+            ) : null}
+
+            {callsign && name ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                onClick={() =>
+                  void copy(
+                    `${callsign} | ${name}`,
+                    "Callsign + Name",
+                  )
+                }
+              >
+                <Copy className="h-3.5 w-3.5 text-blue-400" />
+                Callsign + Name
+              </button>
+            ) : null}
+
+            {badgeNumber && name ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                onClick={() =>
+                  void copy(
+                    `${badgeNumber} | ${name}`,
+                    "Badge number + Name",
+                  )
+                }
+              >
+                <Copy className="h-3.5 w-3.5 text-blue-400" />
+                Badge Number + Name
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
 
-function DetailPanel({
+function TargetIdentity({
   log,
-  actorName,
-  targetName,
 }: {
   log: ActionLog
-  actorName: string
-  targetName: string
 }) {
   const details = log.details ?? {}
-  const additionalDetails = Object.entries(details).filter(([key]) => key !== "changes" && key !== "old" && key !== "new")
+
+  const targetName =
+    log.targetName ||
+    String(
+      details.targetDisplayName ??
+        details.targetName ??
+        details.name ??
+        "",
+    ).trim()
+
+  const targetUserId =
+    log.targetUserId ||
+    String(
+      details.targetDiscordId ??
+        details.targetUserId ??
+        details.discordId ??
+        "",
+    ).trim()
+
+  const targetRank =
+    log.targetRank ||
+    String(details.targetRank ?? "").trim()
+
+  const targetCallsign = String(
+    details.targetCallsign ??
+      details.callsign ??
+      "",
+  ).trim()
+
+  const targetBadge = String(
+    details.targetBadgeNumber ??
+      details.badgeNumber ??
+      "",
+  ).trim()
+
+  const targetAvatar = String(
+    details.targetAvatar ?? "",
+  ).trim()
+
+  if (!targetName && !targetUserId) {
+    return (
+      <span className="text-xs text-muted-foreground">
+        —
+      </span>
+    )
+  }
 
   return (
-    <div className="border-t border-border bg-muted/10 px-4 py-4">
-      <div className="grid gap-4">
-        <ChangeList changes={details.changes} />
+    <IdentityCard
+      name={targetName || targetUserId}
+      userId={targetUserId || undefined}
+      rank={targetRank || undefined}
+      callsign={targetCallsign || undefined}
+      badgeNumber={targetBadge || undefined}
+      avatar={targetAvatar || undefined}
+      compact
+    />
+  )
+}
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Changed by</p>
-            <div className="mt-1">
-              <CopyMenu name={actorName} id={log.userId} callsign={log.callsign} badgeNumber={log.badgeNumber} rank={log.rank} avatar={log.avatar} />
-            </div>
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Entry</p>
-            <p className="mt-1 font-mono text-xs font-medium text-foreground">Promotion Log</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Discord ID</p>
-            <p className="mt-1 break-all text-xs font-medium text-foreground">{log.userId || "—"}</p>
-          </div>
-        </div>
+function ActionIcon({
+  log,
+}: {
+  log: ActionLog
+}) {
+  const Icon = getActionIcon(log)
 
-        {log.targetName || log.targetRank || log.targetUserId ? (
-          <div className="border-t border-border pt-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Target</p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {log.targetName || targetName ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">Name</p>
-                  <div className="mt-1">
-                    <CopyMenu name={targetName || log.targetName || "Unknown User"} id={log.targetUserId} rank={log.targetRank ?? undefined} />
-                  </div>
-                </div>
-              ) : null}
-              {log.targetRank ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">Rank</p>
-                  <p className="mt-1 text-xs font-medium">{log.targetRank}</p>
-                </div>
-              ) : null}
-              {log.targetUserId ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">Discord ID</p>
-                  <p className="mt-1 break-all text-xs font-medium">{log.targetUserId}</p>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-
-        {additionalDetails.length > 0 ? (
-          <div className="border-t border-border pt-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Additional details</p>
-            <div className="divide-y divide-border">
-              {additionalDetails.map(([key, value]) => (
-                <div key={key} className="grid gap-1 py-2 sm:grid-cols-[160px_1fr]">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{actionLabel(key)}</span>
-                  <pre className="m-0 whitespace-pre-wrap break-words font-sans text-xs text-foreground/90">{formatValue(value)}</pre>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Action</p>
-            <p className="mt-1 text-xs font-medium">{actionLabel(log.action)}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Recorded</p>
-            <p className="mt-1 text-xs font-medium">{formatDateTime(log.createdAt)}</p>
-          </div>
-        </div>
-
-        {log.path ? <p className="break-all border-t border-border pt-3 text-[10px] text-muted-foreground">{log.path}</p> : null}
-      </div>
+  return (
+    <div
+      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${getActionIconStyle(
+        log,
+      )}`}
+      title={actionLabel(log.action)}
+    >
+      <Icon className="h-4 w-4" />
     </div>
   )
 }
 
-export default function PromotionLogs() {
+export default function ActionLogs() {
   const [logs, setLogs] = useState<ActionLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
   const [category, setCategory] = useState<Category>("")
   const [division, setDivision] = useState<Division>("")
-  const [actor, setActor] = useState("")
   const [action, setAction] = useState("")
   const [search, setSearch] = useState("")
+  const [from, setFrom] = useState("")
+  const [to, setTo] = useState("")
+
   const [expanded, setExpanded] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
-  const [pages, setPages] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [rosterByDiscord, setRosterByDiscord] = useState<Record<string, RosterMember>>({})
 
-  const loadRoster = useCallback(async (divisionValue: string) => {
-    if (!divisionValue) return
-    try {
-      const response = await fetch(`/api/promotion/roster/${encodeURIComponent(divisionValue)}`, {
-        credentials: "include",
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      })
-      if (!response.ok) return
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    pages: 1,
+  })
 
-      const responseText = await response.text()
-      let data: { success?: boolean; members?: Array<Record<string, unknown>> } = {}
+  const [availableActions, setAvailableActions] =
+    useState<string[]>(fallbackActions)
 
-      try {
-        data = responseText ? JSON.parse(responseText) as typeof data : {}
-      } catch {
-        return
-      }
-
-      if (!data.success || !Array.isArray(data.members)) return
-
-      setRosterByDiscord((current) => {
-        const next = { ...current }
-        for (const member of data.members) {
-          const discordId = String(member.discordId ?? "").trim()
-          if (!discordId) continue
-          next[discordId] = {
-            name: String(member.name ?? "").trim(),
-            rank: String(member.rank ?? "").trim(),
-            callsign: String(member.callsign ?? "").trim(),
-            badgeNumber: String(member.badgeNumber ?? "").trim(),
-            discordId,
-          }
-        }
-        return next
-      })
-    } finally {
-    }
-  }, [])
+  const hasFilters = Boolean(
+    search.trim() ||
+      category ||
+      division ||
+      action ||
+      from ||
+      to,
+  )
 
   const loadLogs = useCallback(async () => {
     setLoading(true)
     setError(null)
+
     try {
-      const params = new URLSearchParams({ page: String(page), limit: String(pageSize) })
-      if (category) params.set("category", category)
-      if (division) params.set("division", division)
-      if (actor) params.set("actor", actor)
-      if (action) params.set("action", action)
-      if (search.trim()) params.set("search", search.trim())
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "50",
 
-      const response = await fetch(`/api/promotion/action-logs?${params.toString()}`, {
-        credentials: "include",
-        cache: "no-store",
-        headers: { Accept: "application/json" },
+        // IMPORTANT:
+        // The working endpoint is /api/action-logs.
+        // Promotion logs are selected through the module query.
+        module: "promotion",
       })
-      const responseText = await response.text()
-      let data: ApiResponse = {}
 
-      try {
-        data = responseText ? JSON.parse(responseText) as ApiResponse : {}
-      } catch {
-        throw new Error(
-          `The promotion action logs API returned an invalid response (${response.status}).`,
+      if (search.trim()) {
+        params.set("search", search.trim())
+      }
+
+      if (category) {
+        params.set("category", category)
+      }
+
+      if (division) {
+        params.set("division", division)
+      }
+
+      if (action) {
+        params.set("action", action)
+      }
+
+      if (from) {
+        params.set(
+          "from",
+          `${from}T00:00:00.000Z`,
         )
       }
+
+      if (to) {
+        params.set(
+          "to",
+          `${to}T23:59:59.999Z`,
+        )
+      }
+
+      const response = await fetch(
+        `/api/action-logs?${params.toString()}`,
+        {
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+          },
+        },
+      )
+
+      const data = await readApiResponse(response)
 
       if (!response.ok || data.success !== true) {
         throw new Error(
-          data.error || `Failed to load promotion action logs (${response.status}).`,
+          data.error ||
+            `Failed to load promotion action logs (${response.status}).`,
         )
       }
 
-      const nextLogs = Array.isArray(data.logs) ? data.logs : []
+      const incoming = Array.isArray(data.logs)
+        ? data.logs
+        : []
+
+      const nextLogs: ActionLog[] = []
+
+      for (const log of incoming) {
+        const previous =
+          nextLogs[nextLogs.length - 1]
+
+        const sameEvent =
+          previous &&
+          previous.userId === log.userId &&
+          previous.action === log.action &&
+          previous.category === log.category &&
+          previous.division === log.division &&
+          previous.targetUserId ===
+            log.targetUserId &&
+          previous.targetName === log.targetName &&
+          previous.summary === log.summary &&
+          Math.abs(
+            new Date(
+              previous.createdAt,
+            ).getTime() -
+              new Date(log.createdAt).getTime(),
+          ) <= 3000
+
+        if (!sameEvent) {
+          nextLogs.push(log)
+        }
+      }
+
       setLogs(nextLogs)
-      setTotal(data.pagination?.total ?? 0)
-      setPages(Math.max(1, data.pagination?.pages ?? 1))
-      if (data.pagination?.page && data.pagination.page !== page) setPage(data.pagination.page)
+
+      setPagination(
+        data.pagination ?? {
+          page,
+          limit: 50,
+          total: nextLogs.length,
+          pages: 1,
+        },
+      )
+
+      setAvailableActions((current) =>
+        Array.from(
+          new Set([
+            ...fallbackActions,
+            ...current,
+            ...nextLogs.map(
+              (log) => log.action,
+            ),
+          ]),
+        ).sort(),
+      )
     } catch (err) {
       setLogs([])
-      setTotal(0)
-      setPages(1)
-      setError(err instanceof Error ? err.message : "Failed to load promotion action logs.")
+      setPagination({
+        page: 1,
+        limit: 50,
+        total: 0,
+        pages: 1,
+      })
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load promotion action logs.",
+      )
     } finally {
       setLoading(false)
     }
-  }, [action, actor, category, division, page, pageSize, search])
+  }, [
+    page,
+    search,
+    category,
+    division,
+    action,
+    from,
+    to,
+  ])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void loadLogs(), search ? 250 : 0)
-    return () => window.clearTimeout(timer)
+    const timer = window.setTimeout(
+      () => {
+        void loadLogs()
+      },
+      search ? 250 : 0,
+    )
+
+    return () => {
+      window.clearTimeout(timer)
+    }
   }, [loadLogs, search])
 
   useEffect(() => {
-    const divisions = new Set(logs.map((log) => log.division || "department"))
-    for (const value of divisions) void loadRoster(value)
-  }, [logs, loadRoster])
-
-  const getActorName = useCallback((log: ActionLog) => {
-    return rosterByDiscord[log.userId]?.name || log.userName || log.username || "Unknown User"
-  }, [rosterByDiscord])
-
-  const getTargetName = useCallback((log: ActionLog) => {
-    return (log.targetUserId ? rosterByDiscord[log.targetUserId]?.name : "") || log.targetName || "Unknown User"
-  }, [rosterByDiscord])
-
-  const actorOptions = useMemo<Option[]>(() => {
-    const map = new Map<string, string>()
-    for (const log of logs) {
-      if (!log.userId) continue
-      map.set(log.userId, getActorName(log))
+    const closeMenus = () => {
+      // Identity menus are self-contained and close when
+      // their parent is clicked again.
     }
-    return [
-      { value: "", label: "Anyone" },
-      ...Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label })),
-    ]
-  }, [getActorName, logs])
 
-  const actionOptions = useMemo<Option[]>(() => {
-    const map = new Map<string, string>()
-    for (const log of logs) if (log.action) map.set(log.action, actionLabel(log.action))
-    return [
-      { value: "", label: "All actions" },
-      ...Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label })),
-    ]
-  }, [logs])
+    window.addEventListener(
+      "scroll",
+      closeMenus,
+      true,
+    )
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, ActionLog[]>()
-    for (const log of logs) {
-      const key = dateHeading(log.createdAt)
-      map.set(key, [...(map.get(key) ?? []), log])
+    return () => {
+      window.removeEventListener(
+        "scroll",
+        closeMenus,
+        true,
+      )
     }
-    return Array.from(map.entries())
-  }, [logs])
+  }, [])
+
+  const actionOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...fallbackActions,
+          ...availableActions,
+        ]),
+      ).sort(),
+    [availableActions],
+  )
 
   const clearFilters = () => {
+    setSearch("")
     setCategory("")
     setDivision("")
-    setActor("")
     setAction("")
-    setSearch("")
+    setFrom("")
+    setTo("")
     setPage(1)
     setExpanded(null)
   }
 
-  const start = total ? (page - 1) * pageSize + 1 : 0
-  const end = total ? Math.min(page * pageSize, total) : 0
-  const hasFilters = Boolean(category || division || actor || action || search)
+  const changeFilter = <T,>(
+    setter: (value: T) => void,
+    value: T,
+  ) => {
+    setter(value)
+    setPage(1)
+    setExpanded(null)
+  }
 
   return (
     <DashboardLayout>
-      <div className="mx-auto w-full max-w-[1120px] px-4 py-5 sm:px-6 lg:px-0">
-        <header className="mb-5 flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/25 bg-blue-500/10">
-              <History className="h-5 w-5 text-blue-400" />
+      <div className="flex min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
+        {/* Header */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
+              <FileText className="h-5 w-5 text-blue-500" />
             </div>
+
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight">Promotion Action Logs</h1>
-                <span className="rounded-full border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">60 days</span>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">A numbered audit trail for promotion roster, import, requirement, selection and management changes. Entries are retained for 60 days.</p>
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+                Promotion Action Logs
+              </h1>
+
+              <p className="truncate text-xs text-muted-foreground sm:text-sm">
+                Promotion Management audit history.
+              </p>
             </div>
           </div>
 
-          <button type="button" onClick={() => void loadLogs()} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5">
-            <RefreshCw className={`h-3.5 w-3.5 text-blue-400 ${loading ? "animate-spin" : ""}`} />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2 self-start"
+            onClick={() => void loadLogs()}
+            disabled={loading}
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                loading ? "animate-spin" : ""
+              }`}
+            />
             Refresh
-          </button>
-        </header>
-
-        <div className="mb-5 flex flex-wrap items-center gap-2">
-          <div className="flex w-full min-w-0 max-w-[430px] flex-1 items-center gap-2 sm:w-auto">
-            <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-400" />
-              <input
-                value={search}
-                onChange={(event) => { setSearch(event.target.value); setPage(1) }}
-                placeholder="Search entries, people, ranks, IDs..."
-                className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
-              />
-            </div>
-          </div>
-
-          <FilterSelect value={actor} options={actorOptions} onChange={(value) => { setActor(value); setPage(1); setExpanded(null) }} ariaLabel="People" className="w-[170px]" />
-          <FilterSelect value={action} options={actionOptions} onChange={(value) => { setAction(value); setPage(1); setExpanded(null) }} ariaLabel="Actions" className="w-[160px]" />
-          <FilterSelect value={category} options={categoryOptions} onChange={(value) => { setCategory(value as Category); setPage(1); setExpanded(null) }} ariaLabel="Categories" className="w-[175px]" />
-          <FilterSelect value={division} options={divisionOptions} onChange={(value) => { setDivision(value as Division); setPage(1); setExpanded(null) }} ariaLabel="Divisions" className="w-[175px]" />
-
-          {hasFilters ? (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 px-1 text-xs font-medium text-white transition-colors hover:text-blue-300"
-            >
-              <X className="h-3.5 w-3.5 text-white" />
-              Clear
-            </button>
-          ) : null}
-
-          <span className="ml-auto text-xs text-muted-foreground">{total.toLocaleString()} {total === 1 ? "change" : "changes"}</span>
+          </Button>
         </div>
 
-        {error ? <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">{error}</div> : null}
-
-        <section>
-          {loading && !logs.length ? (
-            <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
-              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-              Loading promotion action logs...
+        {/* Filters */}
+        <div className="rounded-lg border bg-card p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Filter className="h-3.5 w-3.5 text-blue-500" />
+              Filters
             </div>
-          ) : null}
 
-          {!loading && !logs.length ? (
-            <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
-              <History className="h-8 w-8 text-muted-foreground" />
-              <p className="mt-3 font-medium">No promotion action logs found</p>
-              <p className="mt-1 text-sm text-muted-foreground">Try clearing the filters or perform a promotion dashboard action.</p>
+            <span className="text-[11px] text-muted-foreground">
+              {hasFilters
+                ? `${[
+                    search.trim(),
+                    category,
+                    division,
+                    action,
+                    from,
+                    to,
+                  ].filter(Boolean).length} active`
+                : "None"}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search */}
+            <div className="relative min-w-[220px] flex-1 md:min-w-[280px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+
+              <Input
+                value={search}
+                onChange={(event) =>
+                  changeFilter(
+                    setSearch,
+                    event.target.value,
+                  )
+                }
+                placeholder="Search users, actions, IDs, targets..."
+                className="h-8 pl-8 text-xs"
+              />
             </div>
-          ) : null}
 
-          {grouped.map(([heading, group]) => (
-            <div key={heading} className="mb-6">
-              <div className="mb-2 px-0"><span className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">{heading}</span></div>
-              <div className="space-y-1.5">
-                {group.map((log) => {
-                  const isOpen = expanded === log.id
-                  const globalIndex = (page - 1) * pageSize + logs.indexOf(log)
-                  const entryNumber = Math.max(1, total - globalIndex)
-                  const Icon = getActionIcon(log.action, log.category)
-                  const actorName = getActorName(log)
-                  const targetName = getTargetName(log)
+            {/* Category */}
+            <select
+              value={category}
+              onChange={(event) =>
+                changeFilter(
+                  setCategory,
+                  event.target.value as Category,
+                )
+              }
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            >
+              {categoryOptions.map((item) => (
+                <option
+                  key={item.value || "all"}
+                  value={item.value}
+                >
+                  {item.label}
+                </option>
+              ))}
+            </select>
 
-                  return (
-                    <article key={log.id} className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-blue-500/25 hover:bg-muted/20">
-                      <button
-                        type="button"
-                        onClick={() => setExpanded(isOpen ? null : log.id)}
-                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/20 md:grid-cols-[44px_36px_minmax(165px,0.65fr)_minmax(280px,2fr)_auto] md:items-center"
-                      >
-                        <div className="flex items-center"><span className="font-mono text-[10px] font-semibold text-blue-400">#{entryNumber}</span></div>
+            {/* Division */}
+            <select
+              value={division}
+              onChange={(event) =>
+                changeFilter(
+                  setDivision,
+                  event.target.value as Division,
+                )
+              }
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            >
+              {divisionOptions.map((item) => (
+                <option
+                  key={item.value || "all"}
+                  value={item.value}
+                >
+                  {item.label}
+                </option>
+              ))}
+            </select>
 
-                        <div className="flex h-full items-center justify-center">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-500/25 bg-blue-500/10">
-                            <Icon className="h-4 w-4 text-blue-400" />
+            {/* Action */}
+            <select
+              value={action}
+              onChange={(event) =>
+                changeFilter(
+                  setAction,
+                  event.target.value,
+                )
+              }
+              className="h-8 max-w-[190px] rounded-md border border-input bg-background px-2 text-xs"
+            >
+              <option value="">
+                All Actions
+              </option>
+
+              {actionOptions.map((item) => (
+                <option
+                  key={item}
+                  value={item}
+                >
+                  {actionLabel(item)}
+                </option>
+              ))}
+            </select>
+
+            {/* From */}
+            <Input
+              type="date"
+              value={from}
+              onChange={(event) =>
+                changeFilter(
+                  setFrom,
+                  event.target.value,
+                )
+              }
+              className="h-8 w-[130px] text-xs"
+            />
+
+            {/* To */}
+            <Input
+              type="date"
+              value={to}
+              onChange={(event) =>
+                changeFilter(
+                  setTo,
+                  event.target.value,
+                )
+              }
+              className="h-8 w-[130px] text-xs"
+            />
+
+            {/* Clear is on the right of all filters */}
+            {hasFilters ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
+                onClick={clearFilters}
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            ) : null}
+          </div>
+
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            {pagination.total.toLocaleString()} total
+            logs
+          </div>
+        </div>
+
+        {/* Error */}
+        {error ? (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-sm text-red-400">
+            {error}
+          </div>
+        ) : null}
+
+        {/* Logs */}
+        <div className="overflow-visible rounded-lg border bg-card">
+          {/* Desktop headings */}
+          <div className="hidden border-b bg-muted/20 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground lg:grid lg:grid-cols-[55px_1.45fr_50px_1fr_.75fr_.75fr_1.5fr_125px] lg:items-center lg:gap-3">
+            <span>Entry</span>
+            <span />
+            <span>Icon</span>
+            <span>Changed By</span>
+            <span>Action</span>
+            <span>Division</span>
+            <span>Target</span>
+            <span>Time</span>
+          </div>
+
+          {/* Loading */}
+          {loading ? (
+            <div className="divide-y">
+              {Array.from({ length: 7 }).map(
+                (_, index) => (
+                  <div
+                    key={index}
+                    className="h-16 animate-pulse bg-muted/10"
+                  />
+                ),
+              )}
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="flex min-h-48 flex-col items-center justify-center gap-1 px-4 text-center">
+              <FileText className="h-8 w-8 text-muted-foreground/40" />
+
+              <p className="text-sm font-medium">
+                No promotion action logs found
+              </p>
+
+              <p className="text-xs text-muted-foreground">
+                Try changing your search or filters.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {logs.map((log, index) => {
+                const isExpanded =
+                  expanded === log.id
+
+                const actorName =
+                  log.userName ||
+                  log.username ||
+                  log.userId ||
+                  "Unknown User"
+
+                return (
+                  <div
+                    key={
+                      log.id ||
+                      `${log.createdAt}-${log.userId}-${index}`
+                    }
+                    className="relative"
+                  >
+                    <button
+                      type="button"
+                      className="w-full text-left transition-colors hover:bg-muted/20"
+                      onClick={() =>
+                        setExpanded(
+                          isExpanded
+                            ? null
+                            : log.id,
+                        )
+                      }
+                    >
+                      <div className="grid gap-2 px-3 py-2.5 lg:grid-cols-[55px_1.45fr_50px_1fr_.75fr_.75fr_1.5fr_125px] lg:items-center lg:gap-3">
+                        {/* Entry */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-semibold text-muted-foreground">
+                            {log.entryNumber ??
+                              (pagination.page -
+                                1) *
+                                pagination.limit +
+                                index +
+                                1}
+                          </span>
+
+                          {isExpanded ? (
+                            <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </div>
+
+                        {/* Mobile / desktop actor */}
+                        <div
+                          className="min-w-0"
+                          onClick={(event) =>
+                            event.stopPropagation()
+                          }
+                        >
+                          <IdentityCard
+                            name={actorName}
+                            username={
+                              log.username
+                            }
+                            userId={log.userId}
+                            rank={log.rank}
+                            callsign={
+                              log.callsign
+                            }
+                            badgeNumber={
+                              log.badgeNumber
+                            }
+                            avatar={log.avatar}
+                            compact
+                          />
+                        </div>
+
+                        {/* Action icon */}
+                        <div className="flex">
+                          <ActionIcon log={log} />
+                        </div>
+
+                        {/* Changed by */}
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium sm:text-sm">
+                            {actorName}
+                          </p>
+
+                          <p className="truncate text-[10px] text-muted-foreground">
+                            {log.rank ||
+                              "Rank unavailable"}
+                          </p>
+                        </div>
+
+                        {/* Action */}
+                        <div className="min-w-0">
+                          <span className="truncate text-xs font-semibold sm:text-sm">
+                            {actionLabel(
+                              log.action,
+                            )}
                           </span>
                         </div>
 
-                        <div className="min-w-0">
-                          <CopyMenu name={actorName} id={log.userId} callsign={log.callsign} badgeNumber={log.badgeNumber} rank={log.rank} avatar={log.avatar} large />
+                        {/* Division */}
+                        <span className="w-fit truncate rounded-full border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">
+                          {divisionLabel(
+                            log.division,
+                          )}
+                        </span>
+
+                        {/* Target */}
+                        <div
+                          className="min-w-0"
+                          onClick={(event) =>
+                            event.stopPropagation()
+                          }
+                        >
+                          <div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Changed
+                          </div>
+
+                          <TargetIdentity
+                            log={log}
+                          />
                         </div>
 
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium leading-5 text-foreground">{log.summary}</p>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-                            <span className="text-blue-300/80">{relativeTime(log.createdAt)}</span>
-                            <span className="text-muted-foreground/60">•</span>
-                            <Tag className="border-blue-500/20 bg-blue-500/10 text-blue-400">{moduleLabel()}</Tag>
-                            <Tag className={tagClass("division", log.division)}>{divisionLabel(log.division)}</Tag>
-                            {log.category ? <Tag className={tagClass("category", log.category)}>{actionLabel(log.category)}</Tag> : null}
+                        {/* Time */}
+                        <span className="text-[10px] text-muted-foreground lg:text-right">
+                          {formatDateTime(
+                            log.createdAt,
+                          )}
+                        </span>
+                      </div>
+
+                      {/* Summary row */}
+                      <div className="px-3 pb-2 lg:pl-[108px] lg:pr-4">
+                        <p className="line-clamp-1 text-[11px] text-muted-foreground">
+                          {log.summary}
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Expanded */}
+                    {isExpanded ? (
+                      <div className="border-t bg-muted/5 px-3 py-3">
+                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                          {/* Actor */}
+                          <div className="rounded-md border bg-background/70 px-3 py-2.5">
+                            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              <UserRound className="h-3 w-3" />
+                              Changed By
+                            </div>
+
+                            <IdentityCard
+                              name={actorName}
+                              username={
+                                log.username
+                              }
+                              userId={
+                                log.userId
+                              }
+                              rank={
+                                log.rank
+                              }
+                              callsign={
+                                log.callsign
+                              }
+                              badgeNumber={
+                                log.badgeNumber
+                              }
+                              avatar={
+                                log.avatar
+                              }
+                            />
+                          </div>
+
+                          {/* Action */}
+                          <div className="rounded-md border bg-background/70 px-3 py-2.5">
+                            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              <Activity className="h-3 w-3" />
+                              Action
+                            </div>
+
+                            <div className="grid gap-1 text-xs">
+                              <span>
+                                <b>
+                                  Action:
+                                </b>{" "}
+                                {actionLabel(
+                                  log.action,
+                                )}
+                              </span>
+
+                              <span>
+                                <b>
+                                  Category:
+                                </b>{" "}
+                                {categoryLabel(
+                                  log.category,
+                                )}
+                              </span>
+
+                              <span>
+                                <b>
+                                  Division:
+                                </b>{" "}
+                                {divisionLabel(
+                                  log.division,
+                                )}
+                              </span>
+
+                              <span className="truncate">
+                                <b>
+                                  Page:
+                                </b>{" "}
+                                {log.path ||
+                                  "—"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Target */}
+                          <div className="rounded-md border bg-background/70 px-3 py-2.5">
+                            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              <Shield className="h-3 w-3" />
+                              Changed
+                            </div>
+
+                            <TargetIdentity
+                              log={log}
+                            />
+
+                            {log.targetRank ? (
+                              <p className="mt-1 text-[10px] text-muted-foreground">
+                                Rank:{" "}
+                                <span className="text-foreground">
+                                  {
+                                    log.targetRank
+                                  }
+                                </span>
+                              </p>
+                            ) : null}
+
+                            {log.targetUserId ? (
+                              <p className="mt-1 truncate font-mono text-[9px] text-blue-400/70">
+                                {
+                                  log.targetUserId
+                                }
+                              </p>
+                            ) : null}
+                          </div>
+
+                          {/* Recorded */}
+                          <div className="rounded-md border bg-background/70 px-3 py-2.5">
+                            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              <History className="h-3 w-3" />
+                              Recorded
+                            </div>
+
+                            <p className="text-xs font-medium">
+                              {formatDateTime(
+                                log.createdAt,
+                              )}
+                            </p>
+
+                            {log.entryNumber ? (
+                              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                                Entry #
+                                {
+                                  log.entryNumber
+                                }
+                              </p>
+                            ) : null}
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-end gap-2">
-                          <Tag className={statusClass(log)}>{statusLabel(log)}</Tag>
-                          {isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                        </div>
-                      </button>
+                        {/* Summary */}
+                        <div className="mt-2 rounded-md border bg-background/70 px-3 py-2.5">
+                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Summary
+                          </p>
 
-                      {isOpen ? <DetailPanel log={log} actorName={actorName} targetName={targetName} /> : null}
-                    </article>
-                  )
-                })}
+                          <p className="text-xs leading-5">
+                            {log.summary ||
+                              "No summary available."}
+                          </p>
+                        </div>
+
+                        {/* Details */}
+                        {log.details &&
+                        Object.keys(
+                          log.details,
+                        ).length > 0 ? (
+                          <div className="mt-2 rounded-md border bg-background/70 px-3 py-2.5">
+                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Additional Details
+                            </p>
+
+                            <div className="grid max-h-56 gap-1.5 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
+                              {Object.entries(
+                                log.details,
+                              ).map(
+                                ([
+                                  key,
+                                  value,
+                                ]) => (
+                                  <div
+                                    key={key}
+                                    className="min-w-0 rounded border bg-muted/10 px-2 py-1.5"
+                                  >
+                                    <p className="truncate text-[10px] font-medium text-muted-foreground">
+                                      {actionLabel(
+                                        key,
+                                      )}
+                                    </p>
+
+                                    <pre className="mt-0.5 max-h-24 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4">
+                                      {formatDetailValue(
+                                        value,
+                                      )}
+                                    </pre>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {log.path ? (
+                          <p className="mt-2 break-all border-t border-border pt-2 text-[10px] text-muted-foreground">
+                            {log.path}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!loading &&
+          logs.length > 0 ? (
+            <div className="flex flex-col gap-2 border-t bg-muted/10 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-[11px] text-muted-foreground">
+                Page{" "}
+                {pagination.page} of{" "}
+                {pagination.pages} ·{" "}
+                {pagination.total.toLocaleString()}{" "}
+                logs
+              </span>
+
+              <div className="flex gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={
+                    page <= 1 || loading
+                  }
+                  onClick={() =>
+                    setPage((current) =>
+                      Math.max(
+                        1,
+                        current - 1,
+                      ),
+                    )
+                  }
+                >
+                  Previous
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={
+                    page >=
+                      pagination.pages ||
+                    loading
+                  }
+                  onClick={() =>
+                    setPage((current) =>
+                      Math.min(
+                        pagination.pages,
+                        current + 1,
+                      ),
+                    )
+                  }
+                >
+                  Next
+                </Button>
               </div>
             </div>
-          ))}
-        </section>
-
-        {total > 0 ? (
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>Page {page} of {pages}</span>
-              <FilterSelect value={String(pageSize)} options={[{ value: "25", label: "25 / page" }, { value: "50", label: "50 / page" }, { value: "75", label: "75 / page" }, { value: "100", label: "100 / page" }]} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} ariaLabel="Pages" className="w-[112px]" />
-              <span>{start.toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)} className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-              <button type="button" disabled={page >= pages || loading} onClick={() => setPage((value) => value + 1)} className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
-            </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </DashboardLayout>
   )
