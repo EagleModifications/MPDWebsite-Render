@@ -5,25 +5,17 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react"
 
 import {
-  Activity,
-  ChevronDown,
+    ChevronDown,
   ChevronUp,
   Clipboard,
-  Copy,
-  FileEdit,
-  Filter,
-  History,
+      History,
   RefreshCw,
   Search,
-  Settings2,
-  Shield,
-  Upload,
-  UserCheck,
-  Users,
-  X,
+            X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -237,20 +229,112 @@ const dateHeading = (value: string) => {
     .toUpperCase()
 }
 
-function getLogIcon(log: ActionLog) {
-  const action = log.action.toLowerCase()
+function tagClass(type: "module" | "division" | "category", value?: string | null) {
+  const key = (value ?? "").toLowerCase()
 
-  if (action.includes("copy")) return Copy
-  if (action.includes("select")) return UserCheck
-  if (action.includes("import")) return Upload
-  if (action.includes("requirement")) return Settings2
-  if (action.includes("refresh")) return RefreshCw
-  if (action.includes("filter") || action.includes("search")) return Filter
-  if (log.category === "management") return Shield
-  if (log.category === "roster") return Users
-  if (log.module === "activity") return Activity
+  if (type === "module") {
+    if (key === "promotion") {
+      return "border-violet-500/30 bg-violet-500/10 text-violet-300"
+    }
 
-  return FileEdit
+    if (key === "activity") {
+      return "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+    }
+
+    return "border-slate-500/30 bg-slate-500/10 text-slate-300"
+  }
+
+  if (type === "division") {
+    if (key === "department") {
+      return "border-blue-500/30 bg-blue-500/10 text-blue-300"
+    }
+
+    if (key === "swat") {
+      return "border-indigo-500/30 bg-indigo-500/10 text-indigo-300"
+    }
+
+    if (key === "mtf7") {
+      return "border-amber-500/30 bg-amber-500/10 text-amber-300"
+    }
+
+    if (key === "mcd") {
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+    }
+
+    if (key === "tru") {
+      return "border-rose-500/30 bg-rose-500/10 text-rose-300"
+    }
+
+    if (key === "teu") {
+      return "border-orange-500/30 bg-orange-500/10 text-orange-300"
+    }
+
+    if (key === "sar") {
+      return "border-sky-500/30 bg-sky-500/10 text-sky-300"
+    }
+
+    return "border-slate-500/30 bg-slate-500/10 text-slate-300"
+  }
+
+  if (key === "requirements") {
+    return "border-amber-500/30 bg-amber-500/10 text-amber-300"
+  }
+
+  if (key === "import") {
+    return "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+  }
+
+  if (key === "roster") {
+    return "border-blue-500/30 bg-blue-500/10 text-blue-300"
+  }
+
+  if (key === "management") {
+    return "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300"
+  }
+
+  if (key === "navigation") {
+    return "border-slate-500/30 bg-slate-500/10 text-slate-300"
+  }
+
+  return "border-slate-500/30 bg-slate-500/10 text-slate-300"
+}
+
+function statusClass(log: ActionLog) {
+  const value = statusLabel(log).toLowerCase()
+
+  if (value === "created") {
+    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+  }
+
+  if (value === "removed" || value === "deleted") {
+    return "border-red-500/30 bg-red-500/10 text-red-300"
+  }
+
+  if (value === "copied") {
+    return "border-violet-500/30 bg-violet-500/10 text-violet-300"
+  }
+
+  if (value === "selected") {
+    return "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+  }
+
+  return "border-blue-500/30 bg-blue-500/10 text-blue-300"
+}
+
+function Tag({
+  children,
+  className,
+}: {
+  children: ReactNode
+  className: string
+}) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-medium leading-none ${className}`}
+    >
+      {children}
+    </span>
+  )
 }
 
 function Avatar({
@@ -289,19 +373,27 @@ function Avatar({
 function CopyMenu({
   name,
   id,
+  callsign,
+  badgeNumber,
+  rank,
   avatar,
 }: {
   name: string
   id?: string
+  callsign?: string
+  badgeNumber?: string
+  rank?: string
   avatar?: string | null
 }) {
   const [open, setOpen] = useState(false)
-  const [position, setPosition] = useState({
-    left: 0,
-    top: 0,
-  })
-
+  const [position, setPosition] = useState({ left: 0, top: 0 })
   const ref = useRef<HTMLDivElement>(null)
+
+  const display = name?.trim() || "Unknown User"
+  const safeId = id?.trim() || ""
+  const safeCallsign = callsign?.trim() || ""
+  const safeBadge = badgeNumber?.trim() || ""
+  const safeRank = rank?.trim() || ""
 
   useEffect(() => {
     if (!open) return
@@ -313,17 +405,19 @@ function CopyMenu({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false)
-      }
+      if (event.key === "Escape") setOpen(false)
     }
+
+    const handleScroll = () => setOpen(false)
 
     document.addEventListener("mousedown", handleMouseDown)
     document.addEventListener("keydown", handleKeyDown)
+    window.addEventListener("scroll", handleScroll, true)
 
     return () => {
       document.removeEventListener("mousedown", handleMouseDown)
       document.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("scroll", handleScroll, true)
     }
   }, [open])
 
@@ -332,53 +426,128 @@ function CopyMenu({
 
     try {
       await navigator.clipboard.writeText(value)
-
-      toast.success(`${label} copied`, {
-        description: value,
-      })
-
+      toast.success(`${label} copied`, { description: value })
       setOpen(false)
     } catch {
       toast.error("Copy failed")
     }
   }
 
-  const display = name || "Unknown User"
+  const openMenu = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    const menuWidth = 264
+    const menuHeight = 365
+    const gap = 4
+
+    let left = rect.left
+    let top = rect.bottom + gap
+
+    if (left + menuWidth > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - menuWidth - 8)
+    }
+
+    if (top + menuHeight > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - menuHeight - gap)
+    }
+
+    setPosition({ left, top })
+    setOpen((current) => !current)
+  }
+
+  const openContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const menuWidth = 264
+    const menuHeight = 365
+    const gap = 4
+
+    let left = event.clientX
+    let top = event.clientY + gap
+
+    if (left + menuWidth > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - menuWidth - 8)
+    }
+
+    if (top + menuHeight > window.innerHeight - 8) {
+      top = Math.max(8, event.clientY - menuHeight - gap)
+    }
+
+    setPosition({ left, top })
+    setOpen(true)
+  }
+
+  const items = [
+    {
+      label: "Copy Discord ID",
+      value: safeId,
+      copyLabel: "Discord ID",
+    },
+    {
+      label: "Copy Discord Mention",
+      value: safeId ? `<@${safeId}>` : "",
+      copyLabel: "Discord mention",
+    },
+    {
+      label: "Copy Name",
+      value: display,
+      copyLabel: "Name",
+    },
+    {
+      label: "Copy Callsign",
+      value: safeCallsign,
+      copyLabel: "Callsign",
+    },
+    {
+      label: "Copy Badge Number",
+      value: safeBadge,
+      copyLabel: "Badge number",
+    },
+    {
+      label: "Copy Rank",
+      value: safeRank,
+      copyLabel: "Rank",
+    },
+  ]
+
+  const combined = [
+    {
+      label: "Name + Discord ID",
+      value: safeId ? `${display} — ${safeId}` : "",
+    },
+    {
+      label: "Callsign + Discord ID",
+      value: safeCallsign && safeId ? `${safeCallsign} — ${safeId}` : "",
+    },
+    {
+      label: "Callsign + Name",
+      value: safeCallsign ? `${safeCallsign} — ${display}` : "",
+    },
+    {
+      label: "Callsign + Badge Number",
+      value: safeCallsign && safeBadge ? `${safeCallsign} — ${safeBadge}` : "",
+    },
+    {
+      label: "Badge Number + Name",
+      value: safeBadge ? `${safeBadge} — ${display}` : "",
+    },
+  ]
 
   return (
     <div
       ref={ref}
       className="relative inline-flex min-w-0"
-      onContextMenu={(event: ReactMouseEvent) => {
-        event.preventDefault()
-        event.stopPropagation()
-
-        setPosition({
-          left: event.clientX,
-          top: event.clientY + 4,
-        })
-
-        setOpen(true)
-      }}
+      onContextMenu={openContextMenu}
     >
       <button
         type="button"
-        onClick={(event) => {
-          event.stopPropagation()
-
-          const rect = event.currentTarget.getBoundingClientRect()
-
-          setPosition({
-            left: rect.left,
-            top: rect.bottom + 5,
-          })
-
-          setOpen((current) => !current)
-        }}
+        onClick={openMenu}
         className="inline-flex max-w-full items-center gap-2 rounded-md py-0.5 text-left transition-colors hover:text-blue-400"
+        title="Copy options"
       >
-        <Avatar name={display} id={id ?? ""} avatar={avatar} />
-
+        <Avatar name={display} id={safeId} avatar={avatar} />
         <span className="truncate text-xs font-medium text-blue-400">
           {display}
         </span>
@@ -386,59 +555,39 @@ function CopyMenu({
 
       {open ? (
         <div
-          className="fixed z-[100] min-w-[205px] overflow-hidden rounded-lg border border-border bg-popover p-1 shadow-2xl"
-          style={{
-            left: Math.min(position.left, window.innerWidth - 220),
-            top: Math.min(position.top, window.innerHeight - 190),
-          }}
+          className="fixed z-[200] w-[264px] overflow-hidden rounded-[4px] border border-[#252a31] bg-[#090a0c] p-1 shadow-[0_18px_45px_rgba(0,0,0,0.65)]"
+          style={{ left: position.left, top: position.top }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Copy
+          <div className="max-h-[365px] overflow-y-auto pr-0.5 [scrollbar-width:thin] [scrollbar-color:#30343b_transparent]">
+            {items.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                disabled={!item.value}
+                onClick={() => void copy(item.value, item.copyLabel)}
+                className="flex h-[29px] w-full items-center gap-2 rounded-[3px] px-2.5 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <Clipboard className="h-[15px] w-[15px] shrink-0 text-blue-400" />
+                <span className="truncate">{item.label}</span>
+              </button>
+            ))}
+
+            <div className="mx-1 my-1 border-t border-[#252a31]" />
+
+            {combined.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                disabled={!item.value}
+                onClick={() => void copy(item.value, item.label)}
+                className="flex h-[29px] w-full items-center gap-2 rounded-[3px] px-2.5 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <Clipboard className="h-[15px] w-[15px] shrink-0 text-blue-400" />
+                <span className="truncate">{item.label}</span>
+              </button>
+            ))}
           </div>
-
-          <button
-            type="button"
-            onClick={() => void copy(display, "Name")}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-blue-500/10 hover:text-blue-400"
-          >
-            <Clipboard className="h-3.5 w-3.5 text-blue-400" />
-            Copy name
-          </button>
-
-          <button
-            type="button"
-            disabled={!id}
-            onClick={() => id && void copy(id, "Discord ID")}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-blue-500/10 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Clipboard className="h-3.5 w-3.5 text-blue-400" />
-            Copy Discord ID
-          </button>
-
-          <button
-            type="button"
-            disabled={!id}
-            onClick={() =>
-              id && void copy(`<@${id}>`, "Discord mention")
-            }
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-blue-500/10 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Clipboard className="h-3.5 w-3.5 text-blue-400" />
-            Copy Discord mention
-          </button>
-
-          <button
-            type="button"
-            disabled={!id}
-            onClick={() =>
-              id && void copy(`${display} — ${id}`, "Name and ID")
-            }
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-blue-500/10 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Clipboard className="h-3.5 w-3.5 text-blue-400" />
-            Copy name + ID
-          </button>
         </div>
       ) : null}
     </div>
@@ -468,7 +617,7 @@ function FilterSelect({
         aria-label={ariaLabel}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={`h-10 w-full appearance-none rounded-lg border border-border bg-transparent pr-9 text-xs outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/70 ${
+        className={`h-10 w-full appearance-none rounded-lg border border-[#303744] bg-[#0d1117] pr-9 text-xs outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/70 ${
           Icon ? "pl-9" : "pl-3"
         }`}
       >
@@ -548,7 +697,7 @@ function ChangeList({ changes }: { changes: unknown }) {
           >
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Requirement
+                {change.field || change.label || change.key || (change.rank ? "Rank" : "Change")}
               </p>
 
               <p className="mt-1 break-words text-xs font-medium text-foreground">
@@ -593,7 +742,7 @@ function DetailPanel({ log }: { log: ActionLog }) {
   )
 
   return (
-    <div className="border-t border-border bg-muted/5 px-4 py-4">
+    <div className="border-t border-[#303744] bg-[#0e1219] px-4 py-4">
       <div className="grid gap-4">
         <ChangeList changes={details.changes} />
 
@@ -603,9 +752,16 @@ function DetailPanel({ log }: { log: ActionLog }) {
               Changed by
             </p>
 
-            <p className="mt-1 text-xs font-medium text-blue-400">
-              {log.username || log.userName || "Unknown user"}
-            </p>
+            <div className="mt-1">
+              <CopyMenu
+                name={log.userName || log.username || "Unknown user"}
+                id={log.userId}
+                callsign={log.callsign}
+                badgeNumber={log.badgeNumber}
+                rank={log.rank}
+                avatar={log.avatar}
+              />
+            </div>
           </div>
 
           <div>
@@ -642,9 +798,23 @@ function DetailPanel({ log }: { log: ActionLog }) {
                     Name
                   </p>
 
-                  <p className="mt-1 text-xs font-medium">
-                    {log.targetName}
-                  </p>
+                  <div className="mt-1">
+                    <CopyMenu
+                      name={log.targetName}
+                      id={log.targetUserId}
+                      callsign={String(
+                        details.targetCallsign ??
+                          details.callsign ??
+                          "",
+                      )}
+                      badgeNumber={String(
+                        details.targetBadgeNumber ??
+                          details.badgeNumber ??
+                          "",
+                      )}
+                      rank={log.targetRank}
+                    />
+                  </div>
                 </div>
               ) : null}
 
@@ -741,10 +911,12 @@ export default function ActionLogs() {
   const [category, setCategory] = useState<Category>("")
   const [division, setDivision] = useState<Division>("")
   const [userId, setUserId] = useState("")
+  const [action, setAction] = useState("")
   const [search, setSearch] = useState("")
+  const [showFilters, setShowFilters] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
 
   const [expanded, setExpanded] = useState<string | null>(null)
-
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [pages, setPages] = useState(1)
@@ -764,69 +936,43 @@ export default function ActionLogs() {
       if (category) params.set("category", category)
       if (division) params.set("division", division)
       if (userId) params.set("userId", userId)
+      if (action) params.set("action", action)
       if (search.trim()) params.set("search", search.trim())
 
-      const response = await fetch(
-        `/api/action-logs?${params.toString()}`,
-        {
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            Accept: "application/json",
-          },
-        },
-      )
+      const response = await fetch(`/api/action-logs?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      })
 
       const data = (await response.json()) as ApiResponse
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.error ||
-            `Failed to load action logs (${response.status}).`,
+          data.error || `Failed to load action logs (${response.status}).`,
         )
       }
 
       const nextLogs = Array.isArray(data.logs) ? data.logs : []
-
       setLogs(nextLogs)
       setTotal(data.pagination?.total ?? 0)
-      setPages(data.pagination?.pages ?? 1)
+      setPages(Math.max(1, data.pagination?.pages ?? 1))
 
-      if (
-        data.pagination?.page &&
-        data.pagination.page !== page
-      ) {
+      if (data.pagination?.page && data.pagination.page !== page) {
         setPage(data.pagination.page)
       }
     } catch (err) {
       setLogs([])
       setTotal(0)
       setPages(1)
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load action logs.",
-      )
+      setError(err instanceof Error ? err.message : "Failed to load action logs.")
     } finally {
       setLoading(false)
     }
-  }, [
-    category,
-    division,
-    module,
-    page,
-    pageSize,
-    search,
-    userId,
-  ])
+  }, [action, category, division, module, page, pageSize, search, userId])
 
   useEffect(() => {
-    const timer = window.setTimeout(
-      () => void loadLogs(),
-      search ? 250 : 0,
-    )
-
+    const timer = window.setTimeout(() => void loadLogs(), search ? 250 : 0)
     return () => window.clearTimeout(timer)
   }, [loadLogs, search])
 
@@ -835,25 +981,30 @@ export default function ActionLogs() {
 
     for (const log of logs) {
       if (!log.userId) continue
-
-      const label =
-        log.userName ||
-        log.username ||
-        log.userId
-
-      map.set(log.userId, label)
+      map.set(log.userId, log.userName || log.username || log.userId)
     }
 
     return [
-      { value: "", label: "All users" },
+      { value: "", label: "Anyone" },
       ...Array.from(map.entries())
-        .sort((a, b) =>
-          a[1].localeCompare(b[1]),
-        )
-        .map(([value, label]) => ({
-          value,
-          label,
-        })),
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([value, label]) => ({ value, label })),
+    ]
+  }, [logs])
+
+  const actionOptions = useMemo<Option[]>(() => {
+    const map = new Map<string, string>()
+
+    for (const log of logs) {
+      if (!log.action) continue
+      map.set(log.action, actionLabel(log.action))
+    }
+
+    return [
+      { value: "", label: "All actions" },
+      ...Array.from(map.entries())
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([value, label]) => ({ value, label })),
     ]
   }, [logs])
 
@@ -863,7 +1014,6 @@ export default function ActionLogs() {
     for (const log of logs) {
       const key = dateHeading(log.createdAt)
       const current = map.get(key) ?? []
-
       current.push(log)
       map.set(key, current)
     }
@@ -875,6 +1025,7 @@ export default function ActionLogs() {
     setCategory("")
     setDivision("")
     setUserId("")
+    setAction("")
     setSearch("")
     setPage(1)
     setExpanded(null)
@@ -886,45 +1037,38 @@ export default function ActionLogs() {
     setExpanded(null)
   }
 
-  const start = total
-    ? (page - 1) * pageSize + 1
-    : 0
+  const start = total ? (page - 1) * pageSize + 1 : 0
+  const end = total ? Math.min(page * pageSize, total) : 0
+  const hasFilters = Boolean(category || division || userId || action || search)
+  const activeFilterCount = [category, division, userId, action, search].filter(Boolean).length
 
-  const end = total
-    ? Math.min(page * pageSize, total)
-    : 0
-
-  const hasFilters = Boolean(
-    category ||
-      division ||
-      userId ||
-      search,
-  )
+  const statusLabel = (log: ActionLog) => {
+    const value = log.action.toLowerCase()
+    if (value.includes("copy")) return "Copied"
+    if (value.includes("select")) return "Selected"
+    if (value.includes("import")) return "Imported"
+    if (value.includes("delete") || value.includes("remove")) return "Removed"
+    if (value.includes("create") || value.includes("add")) return "Created"
+    return "Updated"
+  }
 
   return (
     <DashboardLayout>
-      <div className="mx-auto w-full max-w-[1120px] px-4 py-6 sm:px-6 lg:px-0">
-        {/* Header */}
-        <header className="mb-6 flex items-start justify-between gap-4">
+      <div className="mx-auto w-full max-w-[1120px] px-4 py-5 sm:px-6 lg:px-0">
+        <header className="mb-5 flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/25 bg-blue-500/10">
               <History className="h-5 w-5 text-blue-400" />
             </div>
-
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight">
-                  Action Logs
-                </h1>
-
-                <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
-                  60 days
+                <h1 className="text-xl font-semibold tracking-tight">Action Logs</h1>
+                <span className="rounded-full border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
+                  Persistent
                 </span>
               </div>
-
               <p className="mt-1 text-sm text-muted-foreground">
-                Every change your command team has made. Older
-                entries aren't kept here.
+                A permanent, numbered audit trail for roster, import, requirement, selection and management changes.
               </p>
             </div>
           </div>
@@ -932,36 +1076,26 @@ export default function ActionLogs() {
           <button
             type="button"
             onClick={() => void loadLogs()}
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-transparent px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[#303744] bg-[#0d1117] px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
           >
-            <RefreshCw
-              className={`h-3.5 w-3.5 text-blue-400 ${
-                loading ? "animate-spin" : ""
-              }`}
-            />
-
+            <RefreshCw className={`h-3.5 w-3.5 text-blue-400 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
         </header>
 
-        {/* Module tabs */}
+        {/* Module tabs: intentionally flat, matching the reference layout. */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {moduleOptions.map((option) => {
             const active = module === option.value
-
             return (
               <button
                 key={option.value || "all"}
                 type="button"
-                onClick={() =>
-                  selectModule(
-                    option.value as Module,
-                  )
-                }
-                className={`h-9 rounded-lg px-3.5 text-xs font-medium transition-colors ${
+                onClick={() => selectModule(option.value as Module)}
+                className={`h-8 rounded-lg border px-3 text-xs font-medium transition-all ${
                   active
-                    ? "border border-blue-500/60 bg-blue-500/10 text-blue-400"
-                    : "border border-border bg-transparent text-muted-foreground hover:border-blue-500/30 hover:bg-blue-500/5 hover:text-foreground"
+                    ? "border-fuchsia-600/80 bg-fuchsia-600/10 text-fuchsia-400"
+                    : "border-[#303744] bg-[#0d1117] text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
                 }`}
               >
                 {option.label}
@@ -970,23 +1104,84 @@ export default function ActionLogs() {
           })}
         </div>
 
-        {/* Search + filters — deliberately no surrounding box */}
-        <section className="mb-4">
-          <div className="grid gap-2 md:grid-cols-[minmax(240px,1fr)_170px_170px_170px_170px_auto]">
-            <div className="relative min-w-0">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        {/* Reference-style filter row: no card/background around the controls. */}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <FilterSelect
+            value={userId}
+            options={userOptions}
+            onChange={(value) => {
+              setUserId(value)
+              setPage(1)
+              setExpanded(null)
+            }}
+            ariaLabel="User"
+            className="w-[208px]"
+          />
 
-              <input
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value)
-                  setPage(1)
-                }}
-                placeholder="Search entries, people, ranks, IDs..."
-                className="h-10 w-full rounded-lg border border-border bg-transparent pl-9 pr-3 text-xs outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/60"
-              />
-            </div>
+          <FilterSelect
+            value={action}
+            options={actionOptions}
+            onChange={(value) => {
+              setAction(value)
+              setPage(1)
+              setExpanded(null)
+            }}
+            ariaLabel="Action"
+            className="w-[160px]"
+          />
 
+          <button
+            type="button"
+            onClick={() => setShowFilters((value) => !value)}
+            className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${
+              showFilters || activeFilterCount
+                ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
+                : "border-[#303744] bg-[#0d1117] text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
+            }`}
+          >
+            Filters
+            {activeFilterCount > 0 ? (
+              <span className="rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] text-blue-400">
+                {activeFilterCount}
+              </span>
+            ) : null}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowSearch((value) => !value)}
+            className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${
+              showSearch || search
+                ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
+                : "border-[#303744] bg-[#0d1117] text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
+            }`}
+          >
+            Search
+          </button>
+
+          <span className="ml-auto text-xs text-muted-foreground">
+            {total.toLocaleString()} {total === 1 ? "change" : "changes"}
+          </span>
+        </div>
+
+        {showSearch ? (
+          <div className="mb-4 relative max-w-[620px]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              autoFocus
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setPage(1)
+              }}
+              placeholder="Search entries, people, ranks, IDs..."
+              className="h-9 w-full rounded-lg border border-[#303744] bg-[#0d1117] pl-9 pr-3 text-xs outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
+            />
+          </div>
+        ) : null}
+
+        {showFilters ? (
+          <div className="mb-5 flex flex-wrap items-center gap-2 border-b border-border pb-4">
             <FilterSelect
               value={category}
               options={categoryOptions}
@@ -996,8 +1191,8 @@ export default function ActionLogs() {
                 setExpanded(null)
               }}
               ariaLabel="Category"
+              className="w-[170px]"
             />
-
             <FilterSelect
               value={division}
               options={divisionOptions}
@@ -1007,55 +1202,20 @@ export default function ActionLogs() {
                 setExpanded(null)
               }}
               ariaLabel="Division"
+              className="w-[170px]"
             />
-
-            <FilterSelect
-              value={userId}
-              options={userOptions}
-              onChange={(value) => {
-                setUserId(value)
-                setPage(1)
-                setExpanded(null)
-              }}
-              icon={Users}
-              ariaLabel="User"
-            />
-
-            <FilterSelect
-              value=""
-              options={[
-                { value: "", label: "All actions" },
-              ]}
-              onChange={() => {
-                // Reserved for future action-level filtering.
-              }}
-              ariaLabel="Action"
-            />
-
             {hasFilters ? (
               <button
                 type="button"
                 onClick={clearFilters}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs text-muted-foreground transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#303744] px-3 text-xs text-muted-foreground transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
-                Clear
+                Clear filters
               </button>
             ) : null}
           </div>
-
-          <div className="mt-3 flex items-center justify-between gap-3 border-b border-border pb-3 text-[11px] text-muted-foreground">
-            <span>
-              {total.toLocaleString()} entries
-            </span>
-
-            <span>
-              {total
-                ? `Showing ${start.toLocaleString()}–${end.toLocaleString()}`
-                : "Showing 0–0"}
-            </span>
-          </div>
-        </section>
+        ) : null}
 
         {error ? (
           <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
@@ -1063,23 +1223,18 @@ export default function ActionLogs() {
           </div>
         ) : null}
 
-        {/* Logs */}
         <section>
           {loading && !logs.length ? (
-            <div className="flex min-h-[300px] items-center justify-center text-sm text-muted-foreground">
+            <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
               <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
               Loading action logs...
             </div>
           ) : null}
 
           {!loading && !logs.length ? (
-            <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
+            <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
               <History className="h-8 w-8 text-muted-foreground" />
-
-              <p className="mt-3 font-medium">
-                No action logs found
-              </p>
-
+              <p className="mt-3 font-medium">No action logs found</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Try clearing the filters or perform a dashboard action.
               </p>
@@ -1088,106 +1243,90 @@ export default function ActionLogs() {
 
           {grouped.map(([heading, group]) => (
             <div key={heading} className="mb-6">
-              <div className="mb-2">
+              <div className="mb-2 px-0">
                 <span className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
                   {heading}
                 </span>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {group.map((log) => {
-                  const Icon = getLogIcon(log)
                   const isOpen = expanded === log.id
 
                   return (
                     <article
                       key={log.id}
-                      className="overflow-hidden rounded-lg border border-border bg-transparent transition-colors hover:border-blue-500/30"
+                      className="overflow-hidden rounded-xl border border-[#303744] bg-[#11151d] transition-colors hover:border-[#3d4758] hover:bg-[#131821]"
                     >
                       <button
                         type="button"
-                        onClick={() =>
-                          setExpanded(
-                            isOpen ? null : log.id,
-                          )
-                        }
-                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-blue-500/[0.025] md:grid-cols-[50px_42px_minmax(150px,0.7fr)_minmax(280px,2fr)_auto] md:items-center"
+                        onClick={() => setExpanded(isOpen ? null : log.id)}
+                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.025] md:grid-cols-[44px_minmax(165px,0.65fr)_minmax(280px,2fr)_auto] md:items-center"
                       >
-                        <div className="font-mono text-xs font-bold text-blue-400">
-                          #{log.entryNumber}
-                        </div>
-
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-500/30 bg-blue-500/10">
-                          <Icon className="h-4 w-4 text-blue-400" />
+                        <div className="flex items-center">
+                          <span className="font-mono text-[10px] font-semibold text-blue-400">
+                            #{log.entryNumber}
+                          </span>
                         </div>
 
                         <div className="min-w-0">
                           <CopyMenu
-                            name={
-                              log.userName ||
-                              log.username ||
-                              "Unknown User"
-                            }
+                            name={log.userName || log.username || "Unknown User"}
                             id={log.userId}
+                            callsign={log.callsign}
+                            badgeNumber={log.badgeNumber}
+                            rank={log.rank}
                             avatar={log.avatar}
                           />
-
                           <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <span>
-                              {log.rank ||
-                                "Unknown rank"}
-                            </span>
-
+                            <span>{log.rank || "Unknown rank"}</span>
                             {log.callsign ? (
                               <>
                                 <span>•</span>
-                                <span>
-                                  {log.callsign}
-                                </span>
+                                <span>{log.callsign}</span>
                               </>
                             ) : null}
                           </div>
                         </div>
 
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[9px] font-semibold text-blue-400">
-                              {moduleLabel(log.module)}
-                            </span>
-
-                            <span className="rounded-full border border-border px-2 py-0.5 text-[9px] text-muted-foreground">
-                              {divisionLabel(
-                                log.division,
-                              )}
-                            </span>
-                          </div>
-
-                          <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                          <p className="truncate text-sm font-medium leading-5 text-foreground">
                             {log.summary}
                           </p>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+                            <span className="text-blue-300/80">{relativeTime(log.createdAt)}</span>
 
-                          <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                            {actionLabel(log.action)}{" "}
-                            · {relativeTime(log.createdAt)}
-                          </p>
+                            <span className="text-muted-foreground/60">•</span>
+
+                            <Tag className={tagClass("module", log.module)}>
+                              {moduleLabel(log.module)}
+                            </Tag>
+
+                            <Tag className={tagClass("division", log.division)}>
+                              {divisionLabel(log.division)}
+                            </Tag>
+
+                            {log.category ? (
+                              <Tag className={tagClass("category", log.category)}>
+                                {actionLabel(log.category)}
+                              </Tag>
+                            ) : null}
+                          </div>
                         </div>
 
-                        <div className="flex items-center justify-end gap-3">
-                          <span className="hidden rounded-full border border-blue-500/40 px-2 py-0.5 text-[9px] font-semibold text-blue-400 lg:inline-flex">
-                            Updated
-                          </span>
-
+                        <div className="flex items-center justify-end gap-2">
+                          <Tag className={statusClass(log)}>
+                            {statusLabel(log)}
+                          </Tag>
                           {isOpen ? (
-                            <ChevronUp className="h-4 w-4 text-blue-400" />
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
                           ) : (
                             <ChevronDown className="h-4 w-4 text-muted-foreground" />
                           )}
                         </div>
                       </button>
 
-                      {isOpen ? (
-                        <DetailPanel log={log} />
-                      ) : null}
+                      {isOpen ? <DetailPanel log={log} /> : null}
                     </article>
                   )
                 })}
@@ -1196,60 +1335,40 @@ export default function ActionLogs() {
           ))}
         </section>
 
-        {/* Pagination */}
         {total > 0 ? (
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>
-                Page {page} of {pages}
-              </span>
-
+              <span>Page {page} of {pages}</span>
               <select
                 value={pageSize}
                 onChange={(event) => {
-                  setPageSize(
-                    Number(event.target.value),
-                  )
+                  setPageSize(Number(event.target.value))
                   setPage(1)
                 }}
-                className="h-8 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-blue-500/60"
+                className="h-8 rounded-md border border-[#303744] bg-[#0d1117] px-2 text-xs outline-none focus:border-blue-500/60"
               >
-                <option value={25}>
-                  25 / page
-                </option>
-                <option value={50}>
-                  50 / page
-                </option>
-                <option value={75}>
-                  75 / page
-                </option>
-                <option value={100}>
-                  100 / page
-                </option>
+                <option value={25}>25 / page</option>
+                <option value={50}>50 / page</option>
+                <option value={75}>75 / page</option>
+                <option value={100}>100 / page</option>
               </select>
+              <span>{start.toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()}</span>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 disabled={page <= 1 || loading}
-                onClick={() =>
-                  setPage((value) => value - 1)
-                }
-                className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => setPage((value) => value - 1)}
+                className="h-8 rounded-md border border-[#303744] px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Previous
               </button>
-
               <button
                 type="button"
-                disabled={
-                  page >= pages || loading
-                }
-                onClick={() =>
-                  setPage((value) => value + 1)
-                }
-                className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={page >= pages || loading}
+                onClick={() => setPage((value) => value + 1)}
+                className="h-8 rounded-md border border-[#303744] px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Next
               </button>
