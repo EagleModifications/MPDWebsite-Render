@@ -3,14 +3,14 @@
 @import "@fontsource-variable/geist";
 
 /* =========================================================
-   DARK MODE
-   Tailwind v4 uses the .dark class on <html>
+DARK MODE
+Tailwind v4 uses the .dark class on <html>
 ========================================================= */
 
 @custom-variant dark (&:is(.dark *));
 
 /* =========================================================
-   THEME TOKENS
+THEME TOKENS
 ========================================================= */
 
 @theme inline {
@@ -70,7 +70,7 @@
 }
 
 /* =========================================================
-   LIGHT MODE
+LIGHT MODE
 ========================================================= */
 
 :root {
@@ -128,7 +128,7 @@
 }
 
 /* =========================================================
-   DARK MODE
+DARK MODE
 ========================================================= */
 
 .dark {
@@ -184,7 +184,7 @@
 }
 
 /* =========================================================
-   BASE
+BASE
 ========================================================= */
 
 @layer base {
@@ -198,15 +198,15 @@
     @apply font-sans;
 
     min-height: 100%;
-
     background-color: var(--background);
     color: var(--foreground);
 
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
+
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-
-    user-select: none;
-    -webkit-user-select: none;
   }
 
   body {
@@ -216,8 +216,9 @@
     background-color: var(--background);
     color: var(--foreground);
 
-    user-select: none;
-    -webkit-user-select: none;
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
   }
 
   #root {
@@ -226,61 +227,29 @@
     background-color: var(--background);
     color: var(--foreground);
 
-    user-select: none;
-    -webkit-user-select: none;
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
   }
 
-  /*
-   * Hide the native browser cursor.
-   *
-   * CustomCursor provides the visible cursor.
-   */
-  html,
-  body,
-  #root,
-  *,
-  *::before,
-  *::after {
-    cursor: none !important;
-  }
-
-  /*
-   * Inputs still allow normal text selection.
-   */
+  button,
+  a,
   input,
   textarea,
-  [contenteditable="true"] {
-    user-select: text;
-    -webkit-user-select: text;
+  select {
+    font: inherit;
   }
 
-  /*
-   * Remove mobile tap highlight.
-   */
   button,
   a {
     -webkit-tap-highlight-color: transparent;
   }
 
-  /*
-   * Prevent dragging images/icons.
-   */
-  img,
-  svg {
-    -webkit-user-drag: none;
-  }
-
-  /*
-   * Text selection.
-   */
   ::selection {
-    background-color: #3b82f6;
-    color: #ffffff;
+    background-color: var(--primary);
+    color: var(--primary-foreground);
   }
 
-  /*
-   * Scrollbars.
-   */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -301,46 +270,7 @@
 }
 
 /* =========================================================
-   CUSTOM CURSOR
-========================================================= */
-
-.custom-cursor {
-  position: fixed;
-
-  width: 20px;
-  height: 24px;
-
-  pointer-events: none;
-
-  /*
-   * Higher than the notification toaster.
-   */
-  z-index: 2147483647 !important;
-
-  transform: translate(-1px, -1px);
-
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-
-  color: #ffffff;
-
-  will-change: left, top;
-}
-
-.custom-cursor svg {
-  display: block;
-
-  width: 20px;
-  height: 24px;
-
-  fill: #ffffff;
-
-  color: #ffffff;
-}
-
-/* =========================================================
-   THEME TRANSITIONS
+THEME TRANSITIONS
 ========================================================= */
 
 html,
@@ -352,82 +282,15 @@ body,
 }
 
 /* =========================================================
-   SONNER
+UTILITY HELPERS
 ========================================================= */
 
-/*
- * ONLY minimal Sonner styling lives here.
- *
- * Sonner itself controls:
- *
- * - collapsed stacking
- * - toast transforms
- * - hover expansion
- * - toast positioning
- * - toast height
- * - toast animation
- *
- * Do NOT override those properties.
- */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
 
-[data-sonner-toaster] {
-  z-index: 2147483646 !important;
-}
-
-/*
- * Keep the close button in the top-right corner.
- */
-[data-sonner-toast] {
-  position: relative !important;
-
-  padding-right: 44px !important;
-}
-
-[data-sonner-toast] [data-close-button],
-[data-sonner-toast][data-styled="true"] [data-close-button] {
-  position: absolute !important;
-
-  top: 8px !important;
-  right: 8px !important;
-  left: auto !important;
-  bottom: auto !important;
-
-  width: 20px !important;
-  height: 20px !important;
-
-  margin: 0 !important;
-  padding: 0 !important;
-
-  transform: none !important;
-  translate: none !important;
-
-  z-index: 100 !important;
-
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-
-  border-radius: 6px !important;
-}
-
-[data-sonner-toast] [data-close-button]:hover,
-[data-sonner-toast] [data-close-button]:focus,
-[data-sonner-toast] [data-close-button]:active {
-  transform: none !important;
-  translate: none !important;
-}
-
-/* =========================================================
-   MOBILE / TOUCH DEVICES
-========================================================= */
-
-@media (pointer: coarse) {
-  html,
-  body,
-  #root,
-  *,
-  *::before,
-  *::after {
-    cursor: auto !important;
+  .text-pretty {
+    text-wrap: pretty;
   }
 }
