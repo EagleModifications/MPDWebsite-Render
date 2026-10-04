@@ -42,6 +42,53 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { getSession, type User } from "@/lib/auth"
 
+type YouTubeQuality = "highres" | "hd2160" | "hd1440" | "hd1080" | "hd720" | "large" | "medium" | "small" | "tiny" | "auto"
+
+type YouTubePlayerInstance = {
+  playVideo: () => void
+  pauseVideo: () => void
+  mute: () => void
+  unMute: () => void
+  isMuted: () => boolean
+  setVolume: (value: number) => void
+  getVolume: () => number
+  seekTo: (seconds: number, allowSeekAhead?: boolean) => void
+  getCurrentTime: () => number
+  getDuration: () => number
+  setPlaybackRate: (rate: number) => void
+  getPlaybackRate: () => number
+  getAvailableQualityLevels: () => string[]
+  setPlaybackQuality: (quality: string) => void
+  destroy: () => void
+}
+
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (
+        element: HTMLElement,
+        options: {
+          videoId: string
+          playerVars?: Record<string, string | number>
+          events?: {
+            onReady?: (event: { target: YouTubePlayerInstance }) => void
+            onStateChange?: (event: { target: YouTubePlayerInstance; data: number }) => void
+            onPlaybackQualityChange?: (event: { target: YouTubePlayerInstance; data: string }) => void
+          }
+        },
+      ) => YouTubePlayerInstance
+      PlayerState: {
+        ENDED: number
+        PLAYING: number
+        PAUSED: number
+        BUFFERING: number
+        CUED: number
+      }
+    }
+    onYouTubeIframeAPIReady?: () => void
+  }
+}
+
 type GalleryMediaType = "image" | "video"
 
 type GalleryMedia = {
@@ -2486,11 +2533,21 @@ export default function Gallery() {
                     )
                   }
 
+                  if (getYouTubeVideoId(currentMedia.url)) {
+                    return (
+                      <CustomYouTubePlayer
+                        videoId={getYouTubeVideoId(currentMedia.url) || ""}
+                        title={viewer.item.title}
+                        sourceUrl={currentMedia.url}
+                      />
+                    )
+                  }
+
                   if (embedUrl) {
                     return (
                       <div className="relative aspect-video w-full max-w-5xl overflow-hidden rounded-xl bg-black shadow-2xl">
                         <iframe
-                          src={embedUrl}
+                          src={embedUrl.replace("muted=1", "muted=0")}
                           title={viewer.item.title}
                           className="h-full w-full border-0"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -2549,6 +2606,35 @@ function formatVideoTime(value: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`
 }
 
+function qualityLabel(value: string) {
+  const labels: Record<string, string> = {
+    highres: "2160p+",
+    hd2160: "2160p",
+    hd1440: "1440p",
+    hd1080: "1080p",
+    hd720: "720p",
+    large: "480p",
+    medium: "360p",
+    small: "240p",
+    tiny: "144p",
+    auto: "Auto",
+  }
+  return labels[value] || value
+}
+
+function useDocumentCursorFix(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return
+    const previous = document.documentElement.style.cursor
+    document.documentElement.style.cursor = "default"
+    document.body.style.cursor = "default"
+    return () => {
+      document.documentElement.style.cursor = previous
+      document.body.style.cursor = ""
+    }
+  }, [enabled])
+}
+
 function CustomVideoPlayer({
   src,
   poster,
@@ -2560,8 +2646,9 @@ function CustomVideoPlayer({
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const settingsRef = useRef<HTMLDivElement | null>(null)
   const [playing, setPlaying] = useState(false)
-  const [muted, setMuted] = useState(true)
+  const [muted, setMuted] = useState(false)
   const [volume, setVolume] = useState(1)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -2570,10 +2657,11 @@ function CustomVideoPlayer({
   const [fullscreen, setFullscreen] = useState(false)
   const [buffered, setBuffered] = useState(0)
 
+  useDocumentCursorFix(fullscreen)
+
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-
     video.volume = volume
     video.muted = muted
     video.playbackRate = speed
@@ -2581,64 +2669,38 @@ function CustomVideoPlayer({
 
   useEffect(() => {
     const onFullscreenChange = () => {
-      const video = videoRef.current
-      const isFullscreen = document.fullscreenElement === containerRef.current
-
-      setFullscreen(isFullscreen)
-
-      if (!video) return
-
-      // Videos stay silent while viewed normally. Entering fullscreen
-      // intentionally enables audio; leaving fullscreen mutes again.
-      if (isFullscreen) {
-        video.muted = false
-        video.volume = volume || 1
-        setMuted(false)
-        if (video.paused) {
-          void video.play().catch(() => {})
-        }
-      } else {
-        video.muted = true
-        setMuted(true)
-      }
+      setFullscreen(document.fullscreenElement === containerRef.current)
     }
-
     document.addEventListener("fullscreenchange", onFullscreenChange)
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange)
-  }, [volume])
+  }, [])
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (!settingsRef.current?.contains(event.target as Node)) {
+        setSettingsOpen(false)
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown)
+    return () => document.removeEventListener("pointerdown", onPointerDown)
+  }, [])
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-
-    // Autoplay is intentionally silent so browsers allow it.
-    video.muted = true
-    setMuted(true)
-
-    void video.play().then(() => {
-      setPlaying(true)
-    }).catch(() => {
-      setPlaying(false)
-    })
+    // Viewer opens from a user click, so do not force mute here.
+    video.muted = false
+    setMuted(false)
+    void video.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
   }, [src])
 
-  useEffect(() => {
-    return () => {
-      const video = videoRef.current
-      if (video) video.pause()
-    }
-  }, [])
+  useEffect(() => () => videoRef.current?.pause(), [])
 
   async function togglePlay() {
     const video = videoRef.current
     if (!video) return
-
     if (video.paused || video.ended) {
-      try {
-        await video.play()
-      } catch {
-        // Browser autoplay/user-gesture restrictions can reject play().
-      }
+      try { await video.play() } catch {}
     } else {
       video.pause()
     }
@@ -2647,9 +2709,7 @@ function CustomVideoPlayer({
   function handleTimeUpdate() {
     const video = videoRef.current
     if (!video) return
-
     setCurrentTime(video.currentTime)
-
     if (video.duration > 0 && video.buffered.length > 0) {
       const end = video.buffered.end(video.buffered.length - 1)
       setBuffered(Math.min(100, (end / video.duration) * 100))
@@ -2672,31 +2732,19 @@ function CustomVideoPlayer({
   async function toggleFullscreen() {
     const container = containerRef.current
     if (!container) return
-
     try {
-      if (document.fullscreenElement === container) {
-        await document.exitFullscreen()
-      } else {
-        await container.requestFullscreen()
-      }
-    } catch {
-      // Fullscreen can be blocked by the browser or iframe/container policy.
-    }
+      if (document.fullscreenElement === container) await document.exitFullscreen()
+      else await container.requestFullscreen()
+    } catch {}
   }
 
   async function togglePictureInPicture() {
     const video = videoRef.current
     if (!video) return
-
     try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture()
-      } else if (document.pictureInPictureEnabled && "requestPictureInPicture" in video) {
-        await video.requestPictureInPicture()
-      }
-    } catch {
-      // Picture-in-picture is not supported by every browser/video source.
-    }
+      if (document.pictureInPictureElement) await document.exitPictureInPicture()
+      else if (document.pictureInPictureEnabled && "requestPictureInPicture" in video) await video.requestPictureInPicture()
+    } catch {}
   }
 
   function downloadVideo() {
@@ -2713,7 +2761,9 @@ function CustomVideoPlayer({
   return (
     <div
       ref={containerRef}
-      className="group relative flex h-full max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-black shadow-2xl"
+      className="group relative flex h-full max-h-full w-full max-w-5xl cursor-default flex-col overflow-hidden rounded-xl bg-black shadow-2xl"
+      onMouseDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
       onDoubleClick={toggleFullscreen}
     >
       <div className="relative min-h-0 flex-1 bg-black">
@@ -2722,19 +2772,15 @@ function CustomVideoPlayer({
           src={src}
           poster={poster}
           playsInline
-          preload="metadata"
-          className="h-full w-full object-contain"
+          preload="auto"
+          className="h-full w-full cursor-default object-contain"
           onLoadedMetadata={(event) => {
             const video = event.currentTarget
             setDuration(video.duration || 0)
             setVolume(video.volume || 1)
-            video.muted = true
-            setMuted(true)
-            void video.play().then(() => {
-              setPlaying(true)
-            }).catch(() => {
-              setPlaying(false)
-            })
+            video.muted = false
+            setMuted(false)
+            void video.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
           }}
           onTimeUpdate={handleTimeUpdate}
           onProgress={handleTimeUpdate}
@@ -2743,7 +2789,6 @@ function CustomVideoPlayer({
           onEnded={() => setPlaying(false)}
           onClick={togglePlay}
         />
-
         <button
           type="button"
           className="absolute inset-0 m-auto flex h-16 w-16 items-center justify-center rounded-full bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
@@ -2754,12 +2799,10 @@ function CustomVideoPlayer({
         </button>
       </div>
 
-      <div className="relative z-10 border-t border-white/10 bg-black/95 px-3 pb-3 pt-2 text-white">
+      <div className="relative z-10 border-t border-white/10 bg-black/95 px-3 pb-3 pt-2 text-white" onMouseDown={(event) => event.stopPropagation()}>
         <div className="relative mb-2 h-1.5 w-full rounded-full bg-white/15">
-          <div
-            className="pointer-events-none absolute left-0 top-0 h-full rounded-full bg-white/30"
-            style={{ width: `${buffered}%` }}
-          />
+          <div className="pointer-events-none absolute left-0 top-0 h-full rounded-full bg-blue-500" style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }} />
+          <div className="pointer-events-none absolute left-0 top-0 h-full rounded-full bg-white/20" style={{ width: `${buffered}%` }} />
           <input
             type="range"
             min={0}
@@ -2773,121 +2816,241 @@ function CustomVideoPlayer({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={togglePlay}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label={playing ? "Pause" : "Play"}
-          >
+          <button type="button" onClick={togglePlay} className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10" aria-label={playing ? "Pause" : "Play"}>
             {playing ? <Pause className="h-4 w-4" fill="currentColor" /> : <Play className="h-4 w-4" fill="currentColor" />}
           </button>
 
           <div className="hidden items-center gap-1 sm:flex">
-            <button
-              type="button"
-              onClick={() => changeVolume(muted ? volume || 1 : 0)}
-              className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 hover:text-white"
-              aria-label={muted ? "Unmute" : "Mute"}
-            >
+            <button type="button" onClick={() => changeVolume(muted ? volume || 1 : 0)} className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10" aria-label={muted ? "Unmute" : "Mute"}>
               {muted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={muted ? 0 : volume}
-              onChange={(event) => changeVolume(Number(event.target.value))}
-              className="w-20 cursor-pointer accent-blue-500"
-              aria-label="Volume"
-            />
+            <div className="relative h-1.5 w-20 rounded-full bg-white/15">
+              <div className="pointer-events-none absolute left-0 top-0 h-full rounded-full bg-blue-500" style={{ width: `${muted ? 0 : volume * 100}%` }} />
+              <input type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} onChange={(event) => changeVolume(Number(event.target.value))} className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent accent-blue-500" aria-label="Volume" />
+            </div>
           </div>
 
-          <span className="ml-1 min-w-[82px] text-[11px] tabular-nums text-white/65">
-            {formatVideoTime(currentTime)} / {formatVideoTime(duration)}
-          </span>
+          <span className="ml-1 min-w-[82px] text-[11px] tabular-nums text-white/65">{formatVideoTime(currentTime)} / {formatVideoTime(duration)}</span>
 
           <div className="ml-auto flex items-center gap-1">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setSettingsOpen((value) => !value)}
-                className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 hover:text-white"
-                aria-label="Video settings"
-                aria-expanded={settingsOpen}
-              >
+            <div ref={settingsRef} className="relative" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setSettingsOpen((value) => !value) }} className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10" aria-label="Video settings" aria-expanded={settingsOpen}>
                 <Settings2 className="h-4 w-4" />
               </button>
-
               {settingsOpen && (
-                <div className="absolute bottom-11 right-0 w-52 overflow-hidden rounded-xl border border-white/10 bg-black/95 p-2 shadow-2xl backdrop-blur-md">
-                  <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/45">
-                    Playback
-                  </div>
+                <div className="absolute bottom-11 right-0 z-50 w-56 overflow-hidden rounded-xl border border-white/10 bg-black/95 p-2 shadow-2xl backdrop-blur-md" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+                  <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/45">Playback speed</div>
                   <div className="grid grid-cols-3 gap-1">
                     {[0.5, 1, 1.25, 1.5, 1.75, 2].map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => {
-                          setSpeed(value)
-                          setSettingsOpen(false)
-                        }}
-                        className={`rounded-md px-2 py-1.5 text-[11px] transition-colors ${speed === value ? "bg-blue-500/20 text-blue-400" : "text-white/75 hover:bg-white/10 hover:text-white"}`}
-                      >
-                        {value}x
-                      </button>
+                      <button key={value} type="button" onClick={() => { setSpeed(value); setSettingsOpen(false) }} className={`rounded-md px-2 py-1.5 text-[11px] ${speed === value ? "bg-blue-500/20 text-blue-400" : "text-white/75 hover:bg-white/10 hover:text-white"}`}>{value}x</button>
                     ))}
                   </div>
-
                   <div className="mt-2 border-t border-white/10 pt-2">
-                    <div className="flex items-center justify-between px-2 py-1.5">
-                      <span className="flex items-center gap-2 text-xs text-white/75">
-                        <Gauge className="h-3.5 w-3.5" />
-                        Quality
-                      </span>
-                      <span className="text-[11px] text-white/45">Auto</span>
-                    </div>
+                    <div className="flex items-center justify-between px-2 py-1.5 text-xs text-white/70"><span className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5" />Quality</span><span className="text-[11px] text-white/45">Original</span></div>
+                    <p className="px-2 pb-1 text-[10px] leading-4 text-white/40">This video is stored as one source file, so there are no alternate quality streams.</p>
                   </div>
                 </div>
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={togglePictureInPicture}
-              className="hidden h-9 w-9 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 hover:text-white sm:flex"
-              aria-label="Picture in picture"
-              title="Picture in picture"
-            >
-              <PictureInPicture2 className="h-4 w-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={downloadVideo}
-              className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 hover:text-white"
-              aria-label="Download video"
-              title="Download"
-            >
-              <Download className="h-4 w-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 hover:text-white"
-              aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}
-              title={fullscreen ? "Exit fullscreen" : "Fullscreen"}
-            >
-              <Maximize2 className="h-4 w-4" />
-            </button>
+            <button type="button" onClick={togglePictureInPicture} className="hidden h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10 sm:flex" aria-label="Picture in picture" title="Picture in picture"><PictureInPicture2 className="h-4 w-4" /></button>
+            <button type="button" onClick={downloadVideo} className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10" aria-label="Download video" title="Download"><Download className="h-4 w-4" /></button>
+            <button type="button" onClick={toggleFullscreen} className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10" aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"} title={fullscreen ? "Exit fullscreen" : "Fullscreen"}><Maximize2 className="h-4 w-4" /></button>
           </div>
         </div>
+        <div className="mt-1 truncate px-1 text-[10px] text-white/40">{title}</div>
+      </div>
+    </div>
+  )
+}
 
-        <div className="mt-1 truncate px-1 text-[10px] text-white/40">
-          {title}
+function CustomYouTubePlayer({
+  videoId,
+  title,
+  sourceUrl,
+}: {
+  videoId: string
+  title: string
+  sourceUrl: string
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const settingsRef = useRef<HTMLDivElement | null>(null)
+  const playerRef = useRef<YouTubePlayerInstance | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const [muted, setMuted] = useState(false)
+  const [volume, setVolume] = useState(1)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [speed, setSpeed] = useState(1)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [quality, setQuality] = useState<YouTubeQuality>("auto")
+  const [qualities, setQualities] = useState<string[]>([])
+
+  useDocumentCursorFix(fullscreen)
+
+  useEffect(() => {
+    const onFullscreenChange = () => setFullscreen(document.fullscreenElement === containerRef.current)
+    document.addEventListener("fullscreenchange", onFullscreenChange)
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange)
+  }, [])
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (!settingsRef.current?.contains(event.target as Node)) setSettingsOpen(false)
+    }
+    document.addEventListener("pointerdown", onPointerDown)
+    return () => document.removeEventListener("pointerdown", onPointerDown)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadApi = () => new Promise<void>((resolve) => {
+      if (window.YT?.Player) { resolve(); return }
+      const previous = window.onYouTubeIframeAPIReady
+      window.onYouTubeIframeAPIReady = () => { previous?.(); resolve() }
+      if (!document.getElementById("youtube-iframe-api")) {
+        const script = document.createElement("script")
+        script.id = "youtube-iframe-api"
+        script.src = "https://www.youtube.com/iframe_api"
+        document.head.appendChild(script)
+      }
+    })
+
+    void loadApi().then(() => {
+      if (cancelled || !hostRef.current || !window.YT?.Player) return
+      const player = new window.YT.Player(hostRef.current, {
+        videoId,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          rel: 0,
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: (event) => {
+            playerRef.current = event.target
+            event.target.setVolume(100)
+            event.target.unMute()
+            setMuted(false)
+            setVolume(1)
+            setDuration(event.target.getDuration() || 0)
+            setQualities(event.target.getAvailableQualityLevels?.() || [])
+            event.target.setPlaybackRate(1)
+            event.target.playVideo()
+          },
+          onStateChange: (event) => {
+            const state = event.data
+            const yt = window.YT?.PlayerState
+            setPlaying(state === yt?.PLAYING)
+          },
+          onPlaybackQualityChange: (event) => setQuality((event.data as YouTubeQuality) || "auto"),
+        },
+      })
+      playerRef.current = player
+    })
+
+    return () => {
+      cancelled = true
+      playerRef.current?.destroy()
+      playerRef.current = null
+    }
+  }, [videoId])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const player = playerRef.current
+      if (!player) return
+      setCurrentTime(player.getCurrentTime?.() || 0)
+      setDuration(player.getDuration?.() || 0)
+    }, 250)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  async function toggleFullscreen() {
+    const container = containerRef.current
+    if (!container) return
+    try {
+      if (document.fullscreenElement === container) await document.exitFullscreen()
+      else await container.requestFullscreen()
+    } catch {}
+  }
+
+  function togglePlay() {
+    const player = playerRef.current
+    if (!player) return
+    if (playing) player.pauseVideo()
+    else player.playVideo()
+  }
+
+  function seek(value: number) {
+    playerRef.current?.seekTo(value, true)
+    setCurrentTime(value)
+  }
+
+  function changeVolume(value: number) {
+    const next = Math.max(0, Math.min(1, value))
+    setVolume(next)
+    setMuted(next === 0)
+    const player = playerRef.current
+    if (!player) return
+    player.setVolume(next * 100)
+    if (next === 0) player.mute()
+    else player.unMute()
+  }
+
+  function setPlaybackSpeed(value: number) {
+    setSpeed(value)
+    playerRef.current?.setPlaybackRate(value)
+    setSettingsOpen(false)
+  }
+
+  function setPlaybackQuality(value: string) {
+    const next = (value || "auto") as YouTubeQuality
+    setQuality(next)
+    playerRef.current?.setPlaybackQuality(next === "auto" ? "default" : next)
+    setSettingsOpen(false)
+  }
+
+  function openOriginal() {
+    window.open(sourceUrl, "_blank", "noopener,noreferrer")
+  }
+
+  const progress = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0
+  const qualityOptions = qualities.length ? ["auto", ...qualities.filter((item) => item !== "auto")] : ["auto"]
+
+  return (
+    <div ref={containerRef} className="group relative flex aspect-video h-full max-h-full w-full max-w-5xl cursor-default flex-col overflow-hidden rounded-xl bg-black shadow-2xl" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onDoubleClick={toggleFullscreen}>
+      <div ref={hostRef} className="min-h-0 flex-1 bg-black [&>iframe]:h-full [&>iframe]:w-full" />
+      <div className="relative z-10 border-t border-white/10 bg-black/95 px-3 pb-3 pt-2 text-white" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="relative mb-2 h-1.5 w-full rounded-full bg-white/15">
+          <div className="pointer-events-none absolute left-0 top-0 h-full rounded-full bg-blue-500" style={{ width: `${progress}%` }} />
+          <input type="range" min={0} max={duration || 0} step={0.01} value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent accent-blue-500" aria-label="Video progress" />
         </div>
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={togglePlay} className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10" aria-label={playing ? "Pause" : "Play"}>{playing ? <Pause className="h-4 w-4" fill="currentColor" /> : <Play className="h-4 w-4" fill="currentColor" />}</button>
+          <button type="button" onClick={() => changeVolume(muted ? volume || 1 : 0)} className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10" aria-label={muted ? "Unmute" : "Mute"}>{muted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
+          <div className="relative h-1.5 w-20 rounded-full bg-white/15"><div className="pointer-events-none absolute left-0 top-0 h-full rounded-full bg-blue-500" style={{ width: `${muted ? 0 : volume * 100}%` }} /><input type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} onChange={(event) => changeVolume(Number(event.target.value))} className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent accent-blue-500" aria-label="Volume" /></div>
+          <span className="ml-1 min-w-[82px] text-[11px] tabular-nums text-white/65">{formatVideoTime(currentTime)} / {formatVideoTime(duration)}</span>
+          <div className="ml-auto flex items-center gap-1">
+            <div ref={settingsRef} className="relative" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setSettingsOpen((value) => !value) }} className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10" aria-label="Video settings" aria-expanded={settingsOpen}><Settings2 className="h-4 w-4" /></button>
+              {settingsOpen && <div className="absolute bottom-11 right-0 z-50 w-56 overflow-hidden rounded-xl border border-white/10 bg-black/95 p-2 shadow-2xl backdrop-blur-md" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+                <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/45">Playback speed</div>
+                <div className="grid grid-cols-3 gap-1">{[0.5, 1, 1.25, 1.5, 1.75, 2].map((value) => <button key={value} type="button" onClick={() => setPlaybackSpeed(value)} className={`rounded-md px-2 py-1.5 text-[11px] ${speed === value ? "bg-blue-500/20 text-blue-400" : "text-white/75 hover:bg-white/10 hover:text-white"}`}>{value}x</button>)}</div>
+                <div className="mt-2 border-t border-white/10 pt-2"><div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/45">Quality</div><div className="grid grid-cols-3 gap-1">{qualityOptions.map((value) => <button key={value} type="button" onClick={() => setPlaybackQuality(value)} className={`rounded-md px-2 py-1.5 text-[11px] ${quality === value ? "bg-blue-500/20 text-blue-400" : "text-white/75 hover:bg-white/10 hover:text-white"}`}>{qualityLabel(value)}</button>)}</div></div>
+              </div>}
+            </div>
+            <button type="button" onClick={openOriginal} className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10" aria-label="Open original video" title="Open original video"><Download className="h-4 w-4" /></button>
+            <button type="button" onClick={toggleFullscreen} className="flex h-9 w-9 items-center justify-center rounded-md text-white/90 hover:bg-white/10" aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"} title={fullscreen ? "Exit fullscreen" : "Fullscreen"}><Maximize2 className="h-4 w-4" /></button>
+          </div>
+        </div>
+        <div className="mt-1 truncate px-1 text-[10px] text-white/40">{title}</div>
       </div>
     </div>
   )
