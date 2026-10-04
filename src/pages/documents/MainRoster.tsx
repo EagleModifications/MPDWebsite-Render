@@ -9,7 +9,6 @@ import {
 import {
   Award,
   Car,
-  CheckCircle2,
   ChevronDown,
   ClipboardList,
   FileText,
@@ -36,17 +35,6 @@ type SheetKey =
   | "vehicle-roster"
   | "uniform-roster"
 
-type Cell = {
-  value: string
-}
-
-type Merge = {
-  startRow: number
-  endRow: number
-  startColumn: number
-  endColumn: number
-}
-
 type Sheet = {
   key: string
   name: string
@@ -56,10 +44,6 @@ type Sheet = {
   rawRows: string[][]
   rowCount: number
   columnCount: number
-  sheetRowCount?: number
-  sheetColumnCount?: number
-  merges?: Merge[]
-  cells?: Cell[][]
 }
 
 type ApiResponse = {
@@ -74,6 +58,59 @@ type Page = {
   icon: LucideIcon
 }
 
+type DepartmentRow = {
+  callsign: string
+  badgeNumber: string
+  name: string
+  rank: string
+  jobDescription: string
+  timeInDept: string
+  timeInRank: string
+  status: string
+  discordId: string
+  hoursThisMonth: string
+}
+
+type EmployeeRow = {
+  badgeNumber: string
+  name: string
+  discordId: string
+  departmentStatus: string
+  rank: string
+  timezone: string
+  joinDeptDate: string
+  promoDate: string
+  strike1: string
+  strike2: string
+  callsign: string
+  timeInDept: string
+  terminated: string
+  loa: string
+  resigned: string
+  thisMonthHours: string
+  lastMonthHours: string
+}
+
+type VehicleRow = {
+  rank: string
+  vehicleName: string
+  spawncode: string
+  requiredExtras: string
+  livery: string
+  windowTint: string
+  turbo: string
+  slicktopOptional: string
+  unmarkedAllowed: string
+}
+
+type UniformRow = {
+  rank: string
+  className: string
+  sharedOutfitCode: string
+}
+
+type ColumnDefinition = readonly [string, readonly string[]]
+
 const pages: Page[] = [
   { id: "home", label: "Home", icon: FileSpreadsheet },
   { id: "department-roster", label: "Department Roster", icon: Shield },
@@ -82,76 +119,87 @@ const pages: Page[] = [
   { id: "uniform-roster", label: "Uniform Roster", icon: Shirt },
 ]
 
-const DEPARTMENT_COLUMNS = [
-  ["Callsign", "Callsign"],
-  ["Badge Number", "Badge Number"],
-  ["Name", "Name"],
-  ["Rank", "Rank"],
-  ["Job Description", "Job Description"],
-  ["Time in Dept", "Time in Dept"],
-  ["Time in Rank", "Time in Rank"],
-  ["Status", "Status"],
-  ["Discord ID", "Discord ID"],
-  ["Hours This Month", "Hours This Month"],
-] as const
-
-const EMPLOYEE_COLUMNS = [
-  ["Badge Number", ["Badge Number"]],
-  ["Name", ["Name", "Names"]],
-  ["Discord ID", ["Discord ID"]],
-  ["Department Status", ["Department Status", "Status"]],
+const DEPARTMENT_COLUMNS: ColumnDefinition[] = [
+  ["Callsign", ["Callsign"]],
+  ["Badge Number", ["Badge Number", "Badge"]],
+  ["Name", ["Name"]],
   ["Rank", ["Rank"]],
-  ["Timezone", ["Timezone"]],
-  ["Join Dept Date", ["Join Dept Date", "Join Dept Date Format"]],
-  ["Promo Date", ["Promo Date", "Promo Date Format"]],
+  ["Job Description", ["Job Description", "Job"]],
+  ["Time in Dept", ["Time in Dept", "Time in Department"]],
+  ["Time in Rank", ["Time in Rank"]],
+  ["Status", ["Status", "Department Status"]],
+  ["Discord ID", ["Discord ID", "Discord"]],
+  ["Hours This Month", ["Hours This Month", "This Month's Hours", "This Month Hours"]],
+]
+
+const EMPLOYEE_COLUMNS: ColumnDefinition[] = [
+  ["Badge Number", ["Badge Number", "Badge"]],
+  ["Name", ["Name", "Names"]],
+  ["Discord ID", ["Discord ID", "Discord"]],
+  ["Department Status", ["Department Status", "Dept Status", "Status"]],
+  ["Rank", ["Rank"]],
+  ["Timezone", ["Timezone", "Time Zone"]],
+  ["Join Dept Date", ["Join Dept Date", "Join Department Date"]],
+  ["Promo Date", ["Promo Date", "Promotion Date"]],
   ["Strike 1", ["Strike 1"]],
   ["Strike 2", ["Strike 2"]],
   ["Callsign", ["Callsign", "Callsigns"]],
-  ["Time in Dept", ["Time in Dept"]],
+  ["Time in Dept", ["Time in Dept", "Time in Department"]],
   ["Terminated", ["Terminated"]],
-  ["LOA", ["LOA"]],
+  ["LOA", ["LOA", "Leave of Absence"]],
   ["Resigned", ["Resigned"]],
   ["This Month's Hours", ["This Month's Hours", "This Month Hours", "This Month's Dept. Hours"]],
-  ["Last Month's Hours", ["Last Month's Hours", "Last Month Hours"]],
-] as const
+  ["Last Month's Hours", ["Last Month's Hours", "Last Month Hours", "Last Month's Dept. Hours"]],
+]
 
-const VEHICLE_COLUMNS = [
-  ["Vehicle Name", ["Vehicle Name"]],
-  ["Spawncode", ["Spawncode"]],
-  ["Required Extras", ["Required Extras"]],
+const VEHICLE_COLUMNS: ColumnDefinition[] = [
+  ["Vehicle Name", ["Vehicle Name", "Vehicle"]],
+  ["Spawncode", ["Spawncode", "Spawn Code"]],
+  ["Required Extras", ["Required Extras", "Extras"]],
   ["Livery", ["Livery"]],
   ["Window Tint", ["Window Tint", "Window Ting"]],
   ["Turbo", ["Turbo"]],
-  ["Slicktop Optional", ["Slicktop Optional"]],
-  ["Unmarked Allowed", ["Unmarked Allowed"]],
-] as const
+  ["Slicktop Optional", ["Slicktop Optional", "Slicktop"]],
+  ["Unmarked Allowed", ["Unmarked Allowed", "Unmarked"]],
+]
 
-const UNIFORM_COLUMNS = [
+const UNIFORM_COLUMNS: ColumnDefinition[] = [
   ["Class", ["Class"]],
-  ["Shared Outfit Code", ["Shared Outfit Code"]],
+  ["Shared Outfit Code", ["Shared Outfit Code", "Outfit Code", "Shared Code"]],
+]
+
+const HOME_CARDS = [
+  { title: "This Month's Dept. Hours", icon: RefreshCw, kind: "hours" },
+  { title: "Documents", icon: FileText, kind: "documents" },
+  { title: "Statistics", icon: Award, kind: "statistics" },
+  { title: "Chief Of Police", icon: Shield, kind: "leadership" },
+  { title: "Deputy Chief Of Police", icon: Shield, kind: "leadership" },
+  { title: "Assistant Chief Of Police", icon: Shield, kind: "leadership" },
+  { title: "Chief Of Staff", icon: Shield, kind: "leadership" },
+  { title: "FTD & Subdivisions", icon: Users, kind: "subdivisions" },
+  { title: "Metro PD Founders", icon: Shield, kind: "founders" },
 ] as const
 
 function clean(value: unknown): string {
-  if (value === null || value === undefined) return ""
-  return String(value).trim()
+  return value === null || value === undefined ? "" : String(value).trim()
 }
 
 function display(value: unknown): string {
-  const valueText = clean(value)
-  return valueText && valueText !== "-" && valueText !== "—" ? valueText : "—"
+  const text = clean(value)
+  return !text || text === "-" || text === "—" ? "—" : text
 }
 
 function normalize(value: unknown): string {
   return clean(value).toLowerCase().replace(/[^a-z0-9]+/g, "")
 }
 
-function truthy(value: unknown): boolean {
+function isTrue(value: string): boolean {
   return ["true", "yes", "y", "1", "on", "active"].includes(normalize(value))
 }
 
-function uniqueInSheetOrder(values: string[]): string[] {
-  const seen = new Set<string>()
+function uniqueInOrder(values: string[]): string[] {
   const result: string[] = []
+  const seen = new Set<string>()
 
   for (const value of values) {
     const text = clean(value)
@@ -164,257 +212,127 @@ function uniqueInSheetOrder(values: string[]): string[] {
   return result
 }
 
-function StatusBadge({ value }: { value: string }) {
-  const normalized = normalize(value)
-  const positive = ["active", "current", "approved", "compliant", "yes", "true"].includes(normalized)
-  const negative = ["inactive", "terminated", "resigned", "suspended", "no", "false"].includes(normalized)
-  const leave = ["loa", "leave", "leaveofabsence"].includes(normalized)
-
-  if (!positive && !negative && !leave) return <span>{display(value)}</span>
-
-  return (
-    <span
-      className={[
-        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold",
-        positive
-          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-          : leave
-            ? "border-amber-500/20 bg-amber-500/10 text-amber-400"
-            : "border-red-500/20 bg-red-500/10 text-red-400",
-      ].join(" ")}
-    >
-      {positive ? <CheckCircle2 className="h-3 w-3" /> : null}
-      {display(value)}
-    </span>
-  )
+function rowValues(sheet: Sheet, rowIndex: number): string[] {
+  const row = sheet.rawRows[rowIndex] ?? []
+  return Array.from({ length: sheet.columnCount }, (_, index) => clean(row[index]))
 }
 
-function BooleanBadge({ value }: { value: string }) {
-  if (!clean(value)) return <span>—</span>
+function findHeader(sheet: Sheet, definitions: ColumnDefinition[], minimumMatches: number) {
+  let best: { row: number; indexes: number[]; score: number } | null = null
 
-  return (
-    <span
-      className={truthy(value)
-        ? "inline-flex rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-400"
-        : "inline-flex rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-semibold text-muted-foreground"}
-    >
-      {truthy(value) ? "Yes" : "No"}
-    </span>
-  )
-}
+  for (let rowIndex = 0; rowIndex < sheet.rawRows.length; rowIndex += 1) {
+    const values = rowValues(sheet, rowIndex).map(normalize)
+    const indexes = definitions.map(([, aliases]) => {
+      for (const alias of aliases) {
+        const index = values.indexOf(normalize(alias))
+        if (index >= 0) return index
+      }
+      return -1
+    })
+    const score = indexes.filter((index) => index >= 0).length
 
-function TableShell({ children }: { children: ReactNode }) {
-  return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full min-w-max border-collapse text-xs">{children}</table>
-    </div>
-  )
-}
-
-function TableHead({ children }: { children: ReactNode }) {
-  return (
-    <thead className="border-b border-border bg-muted/30">
-      <tr>{children}</tr>
-    </thead>
-  )
-}
-
-function Th({ children }: { children: ReactNode }) {
-  return (
-    <th className="whitespace-nowrap px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-      {children}
-    </th>
-  )
-}
-
-function Td({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <td className={`whitespace-nowrap border-b border-border px-3 py-3 align-middle ${className}`}>
-      {children}
-    </td>
-  )
-}
-
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="flex min-h-52 flex-col items-center justify-center p-10 text-center">
-      <ClipboardList className="h-7 w-7 text-muted-foreground" />
-      <p className="mt-3 text-sm text-muted-foreground">{message}</p>
-    </div>
-  )
-}
-
-function LoadingState() {
-  return (
-    <div className="flex min-h-64 flex-col items-center justify-center p-10 text-center">
-      <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
-      <p className="mt-3 text-sm text-muted-foreground">Loading roster data...</p>
-    </div>
-  )
-}
-
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="flex min-h-64 flex-col items-center justify-center p-10 text-center">
-      <XCircle className="h-7 w-7 text-red-500" />
-      <p className="mt-3 text-sm font-semibold">Failed to load Main Roster</p>
-      <p className="mt-1 max-w-xl text-xs text-muted-foreground">{message}</p>
-      <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onRetry}>
-        Try Again
-      </Button>
-    </div>
-  )
-}
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  value: string
-  options: string[]
-  onChange: (value: string) => void
-}) {
-  return (
-    <div className="relative min-w-[165px]">
-      <Filter className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-full appearance-none rounded-md border border-input bg-background pl-8 pr-8 text-xs outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-      >
-        <option value="">All {label}</option>
-        {options.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-    </div>
-  )
-}
-
-function rowValues(sheet: Sheet, row: number): string[] {
-  const width = Math.max(sheet.columnCount, sheet.headers.length, sheet.cells?.[row]?.length ?? 0)
-  return Array.from({ length: width }, (_, column) => {
-    const direct = clean(sheet.cells?.[row]?.[column]?.value)
-    if (direct) return direct
-
-    const merge = (sheet.merges ?? []).find(
-      (item) =>
-        row >= item.startRow &&
-        row < item.endRow &&
-        column >= item.startColumn &&
-        column < item.endColumn,
-    )
-
-    if (merge) return clean(sheet.cells?.[merge.startRow]?.[merge.startColumn]?.value)
-    return clean(sheet.rows[row]?.[column])
-  })
-}
-
-function findHeaderRow(sheet: Sheet, required: string[]): { row: number; indexes: Record<string, number> } | null {
-  const wanted = required.map(normalize)
-
-  for (let row = 0; row < sheet.rowCount; row += 1) {
-    const values = rowValues(sheet, row).map(normalize)
-    const indexes: Record<string, number> = {}
-
-    for (const item of wanted) {
-      const index = values.indexOf(item)
-      if (index !== -1) indexes[item] = index
-    }
-
-    if (wanted.every((item) => indexes[item] !== undefined)) {
-      return { row, indexes }
+    if (!best || score > best.score) {
+      best = { row: rowIndex, indexes, score }
     }
   }
 
-  return null
+  if (!best || best.score < minimumMatches) return null
+  return best
 }
 
-function extractTable(
-  sheet: Sheet,
-  definitions: readonly (readonly [string, readonly string[]])[],
-  required: string[],
-) {
-  const header = findHeaderRow(sheet, required)
+function extractRows(sheet: Sheet, definitions: ColumnDefinition[], minimumMatches = Math.ceil(definitions.length * 0.6)) {
+  const header = findHeader(sheet, definitions, minimumMatches)
+  if (!header) return [] as string[][]
 
-  if (!header) {
-    return { headers: definitions.map((item) => item[0]), rows: [] as string[][] }
-  }
+  const result: string[][] = []
 
-  const indexes = definitions.map((definition) => {
-    for (const alias of definition[1]) {
-      const index = header.indexes[normalize(alias)]
-      if (index !== undefined) return index
-    }
-    return -1
-  })
-
-  const rows: string[][] = []
-
-  for (let row = header.row + 1; row < sheet.rowCount; row += 1) {
-    const values = rowValues(sheet, row)
-    const selected = indexes.map((index) => index >= 0 ? clean(values[index]) : "")
+  for (let rowIndex = header.row + 1; rowIndex < sheet.rawRows.length; rowIndex += 1) {
+    const source = rowValues(sheet, rowIndex)
+    const selected = header.indexes.map((index) => (index >= 0 ? clean(source[index]) : ""))
     if (!selected.some(Boolean)) continue
 
     const normalized = selected.map(normalize)
-    if (normalized.includes("callsign") || normalized.includes("badgenumber") || normalized.includes("sharedoutfitcode")) continue
+    const headerWords = definitions.map(([label]) => normalize(label))
+    if (headerWords.filter((word) => normalized.includes(word)).length >= Math.min(3, definitions.length)) continue
 
-    rows.push(selected)
+    result.push(selected)
   }
 
-  return { headers: definitions.map((item) => item[0]), rows }
+  return result
 }
 
-function extractRankedRows(
-  sheet: Sheet,
-  columns: readonly (readonly [string, readonly string[]])[],
-) {
-  const required = ["rank", ...columns.map((column) => normalize(column[1][0]))]
-  const header = findHeaderRow(sheet, required)
-  if (!header) return [] as { rank: string; rows: string[][] }[]
+function getValue(row: string[], columns: ColumnDefinition[], label: string): string {
+  const index = columns.findIndex(([column]) => column === label)
+  return index >= 0 ? clean(row[index]) : ""
+}
 
-  const rankIndex = header.indexes.rank
-  const columnIndexes = columns.map((column) => {
-    for (const alias of column[1]) {
-      const index = header.indexes[normalize(alias)]
-      if (index !== undefined) return index
-    }
-    return -1
-  })
+function parseDepartment(sheet: Sheet): DepartmentRow[] {
+  return extractRows(sheet, DEPARTMENT_COLUMNS, 6).map((row) => ({
+    callsign: getValue(row, DEPARTMENT_COLUMNS, "Callsign"),
+    badgeNumber: getValue(row, DEPARTMENT_COLUMNS, "Badge Number"),
+    name: getValue(row, DEPARTMENT_COLUMNS, "Name"),
+    rank: getValue(row, DEPARTMENT_COLUMNS, "Rank"),
+    jobDescription: getValue(row, DEPARTMENT_COLUMNS, "Job Description"),
+    timeInDept: getValue(row, DEPARTMENT_COLUMNS, "Time in Dept"),
+    timeInRank: getValue(row, DEPARTMENT_COLUMNS, "Time in Rank"),
+    status: getValue(row, DEPARTMENT_COLUMNS, "Status"),
+    discordId: getValue(row, DEPARTMENT_COLUMNS, "Discord ID"),
+    hoursThisMonth: getValue(row, DEPARTMENT_COLUMNS, "Hours This Month"),
+  }))
+}
 
-  const sections: { rank: string; rows: string[][] }[] = []
+function parseEmployees(sheet: Sheet): EmployeeRow[] {
+  return extractRows(sheet, EMPLOYEE_COLUMNS, 10).map((row) => ({
+    badgeNumber: getValue(row, EMPLOYEE_COLUMNS, "Badge Number"),
+    name: getValue(row, EMPLOYEE_COLUMNS, "Name"),
+    discordId: getValue(row, EMPLOYEE_COLUMNS, "Discord ID"),
+    departmentStatus: getValue(row, EMPLOYEE_COLUMNS, "Department Status"),
+    rank: getValue(row, EMPLOYEE_COLUMNS, "Rank"),
+    timezone: getValue(row, EMPLOYEE_COLUMNS, "Timezone"),
+    joinDeptDate: getValue(row, EMPLOYEE_COLUMNS, "Join Dept Date"),
+    promoDate: getValue(row, EMPLOYEE_COLUMNS, "Promo Date"),
+    strike1: getValue(row, EMPLOYEE_COLUMNS, "Strike 1"),
+    strike2: getValue(row, EMPLOYEE_COLUMNS, "Strike 2"),
+    callsign: getValue(row, EMPLOYEE_COLUMNS, "Callsign"),
+    timeInDept: getValue(row, EMPLOYEE_COLUMNS, "Time in Dept"),
+    terminated: getValue(row, EMPLOYEE_COLUMNS, "Terminated"),
+    loa: getValue(row, EMPLOYEE_COLUMNS, "LOA"),
+    resigned: getValue(row, EMPLOYEE_COLUMNS, "Resigned"),
+    thisMonthHours: getValue(row, EMPLOYEE_COLUMNS, "This Month's Hours"),
+    lastMonthHours: getValue(row, EMPLOYEE_COLUMNS, "Last Month's Hours"),
+  }))
+}
+
+function parseRankedRows(sheet: Sheet, definitions: ColumnDefinition[]): string[][] {
+  const rankDefinition: ColumnDefinition = ["Rank", ["Rank"]]
+  const allDefinitions = [rankDefinition, ...definitions]
+  const header = findHeader(sheet, allDefinitions, Math.max(2, Math.ceil(allDefinitions.length * 0.55)))
+  if (!header) return []
+
+  const result: string[][] = []
   let currentRank = ""
 
-  for (let row = header.row + 1; row < sheet.rowCount; row += 1) {
-    const values = rowValues(sheet, row)
-    const normalized = values.map(normalize)
-    if (["rank", ...columns.map((column) => normalize(column[0]))].every((item) => normalized.includes(item))) continue
+  for (let rowIndex = header.row + 1; rowIndex < sheet.rawRows.length; rowIndex += 1) {
+    const source = rowValues(sheet, rowIndex)
+    const rank = header.indexes[0] >= 0 ? clean(source[header.indexes[0]]) : ""
+    if (rank) currentRank = rank
 
-    const explicitRank = clean(values[rankIndex])
-    if (explicitRank) currentRank = explicitRank
-
-    const selected = columnIndexes.map((index) => index >= 0 ? clean(values[index]) : "")
+    const selected = header.indexes.slice(1).map((index) => (index >= 0 ? clean(source[index]) : ""))
     if (!currentRank || !selected.some(Boolean)) continue
 
-    let section = sections.find((item) => normalize(item.rank) === normalize(currentRank))
-    if (!section) {
-      section = { rank: currentRank, rows: [] }
-      sections.push(section)
-    }
-    section.rows.push(selected)
+    const normalized = selected.map(normalize)
+    if (normalized.includes("vehiclename") || normalized.includes("classname") || normalized.includes("sharedoutfitcode")) continue
+
+    result.push([currentRank, ...selected])
   }
 
-  return sections
+  return result
 }
 
-function findCell(sheet: Sheet, text: string) {
-  const wanted = normalize(text)
+function findCell(sheet: Sheet, label: string): { row: number; column: number } | null {
+  const wanted = normalize(label)
 
-  for (let row = 0; row < sheet.rowCount; row += 1) {
+  for (let row = 0; row < sheet.rawRows.length; row += 1) {
     const values = rowValues(sheet, row)
     for (let column = 0; column < values.length; column += 1) {
       if (normalize(values[column]) === wanted) return { row, column }
@@ -424,16 +342,22 @@ function findCell(sheet: Sheet, text: string) {
   return null
 }
 
-function nearbyValues(sheet: Sheet, row: number, column: number, rowRadius: number, columnRadius: number): string[] {
+function nearby(sheet: Sheet, position: { row: number; column: number }, rowRadius: number, columnRadius: number): string[] {
   const values: string[] = []
   const seen = new Set<string>()
 
-  for (let currentRow = Math.max(0, row - 1); currentRow <= Math.min(sheet.rowCount - 1, row + rowRadius); currentRow += 1) {
-    const rowData = rowValues(sheet, currentRow)
-    for (let currentColumn = Math.max(0, column - columnRadius); currentColumn <= Math.min(rowData.length - 1, column + columnRadius); currentColumn += 1) {
-      const value = clean(rowData[currentColumn])
-      if (!value || seen.has(value)) continue
-      seen.add(value)
+  const startRow = Math.max(0, position.row)
+  const endRow = Math.min(sheet.rawRows.length - 1, position.row + rowRadius)
+  const startColumn = Math.max(0, position.column - columnRadius)
+  const endColumn = Math.min(sheet.columnCount - 1, position.column + columnRadius)
+
+  for (let row = startRow; row <= endRow; row += 1) {
+    const rowData = rowValues(sheet, row)
+    for (let column = startColumn; column <= endColumn; column += 1) {
+      const value = clean(rowData[column])
+      const key = normalize(value)
+      if (!value || seen.has(key)) continue
+      seen.add(key)
       values.push(value)
     }
   }
@@ -441,20 +365,19 @@ function nearbyValues(sheet: Sheet, row: number, column: number, rowRadius: numb
   return values
 }
 
-function HomeCard({
-  title,
-  icon: Icon,
-  children,
-  className = "",
-}: {
-  title: string
-  icon: LucideIcon
-  children: ReactNode
-  className?: string
-}) {
+function homeValues(sheet: Sheet, title: string, rowRadius: number, columnRadius: number): string[] {
+  const position = findCell(sheet, title)
+  if (!position) return []
+
+  return nearby(sheet, position, rowRadius, columnRadius).filter(
+    (value) => normalize(value) !== normalize(title),
+  )
+}
+
+function HomeCard({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: ReactNode }) {
   return (
-    <section className={`overflow-hidden rounded-xl border border-border bg-card shadow-sm ${className}`}>
-      <div className="flex items-center gap-2 border-b border-border bg-muted/20 px-4 py-3">
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex items-center gap-2.5 border-b border-border bg-muted/20 px-4 py-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
           <Icon className="h-4 w-4 text-blue-500" />
         </div>
@@ -466,95 +389,52 @@ function HomeCard({
 }
 
 function HomeView({ sheet }: { sheet: Sheet }) {
-  const leadershipTitles = [
-    "Chief of Police",
-    "Deputy Chief of Police",
-    "Assistant Chief of Police",
-    "Chief of Staff",
-    "Colonel",
-  ]
+  const hours = homeValues(sheet, "This Month's Dept. Hours", 5, 5)
+  const documents = uniqueInOrder(homeValues(sheet, "Documents", 10, 8))
+  const statistics = uniqueInOrder(homeValues(sheet, "Statistics", 12, 8))
+  const subdivisions = uniqueInOrder(homeValues(sheet, "FTD & Subdivisions", 30, 8))
+  const founders = uniqueInOrder(homeValues(sheet, "Metro PD Founders", 15, 8))
 
-  const hoursPosition = findCell(sheet, "This Month's Dept. Hours")
-  const documentsPosition = findCell(sheet, "Documents")
-  const statisticsPosition = findCell(sheet, "Statistics")
-  const ftdPosition = findCell(sheet, "FTD & Subdivisions")
-  const foundersPosition = findCell(sheet, "Metro PD Founders")
-
-  const hours = hoursPosition
-    ? nearbyValues(sheet, hoursPosition.row + 1, hoursPosition.column, 4, 4).find((value) => normalize(value) !== normalize("This Month's Dept. Hours")) ?? ""
-    : ""
-
-  const documents = documentsPosition
-    ? nearbyValues(sheet, documentsPosition.row, documentsPosition.column, 8, 8).filter((value) => normalize(value) !== normalize("Documents"))
-    : []
-
-  const statistics = statisticsPosition
-    ? nearbyValues(sheet, statisticsPosition.row + 1, statisticsPosition.column, 12, 8).filter((value) => normalize(value) !== normalize("Statistics"))
-    : []
-
-  const leadership = leadershipTitles.map((title) => {
-    const position = findCell(sheet, title)
-    const values = position
-      ? nearbyValues(sheet, position.row, position.column, 4, 6).filter((value) => normalize(value) !== normalize(title))
-      : []
-    return { title, values }
-  })
-
-  const subdivisions = ftdPosition
-    ? nearbyValues(sheet, ftdPosition.row + 1, ftdPosition.column, 30, 8).filter((value) => normalize(value) !== normalize("FTD & Subdivisions"))
-    : []
-
-  const founders = foundersPosition
-    ? nearbyValues(sheet, foundersPosition.row + 1, foundersPosition.column, 12, 8).filter((value) => normalize(value) !== normalize("Metro PD Founders"))
-    : []
-
-  const unique = (items: string[]) => items.filter((value, index) => items.indexOf(value) === index)
+  const leadership = HOME_CARDS.filter((card) => card.kind === "leadership").map((card) => ({
+    ...card,
+    values: uniqueInOrder(homeValues(sheet, card.title, 5, 7)),
+  }))
 
   return (
-    <div className="grid gap-4 xl:grid-cols-3">
+    <div className="grid gap-4 p-4 xl:grid-cols-3">
       <div className="space-y-4">
         <HomeCard title="This Month's Dept. Hours" icon={RefreshCw}>
-          <div className="text-3xl font-bold tracking-tight">{display(hours)}</div>
-          <p className="mt-1 text-xs text-muted-foreground">Current department activity hours.</p>
+          <p className="text-3xl font-bold tracking-tight">{display(hours[0])}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Current department hours from the MPD Home sheet.</p>
         </HomeCard>
 
         <HomeCard title="Documents" icon={FileText}>
           <div className="space-y-2">
-            {unique(documents).slice(0, 10).map((value) => (
-              <div key={value} className="rounded-lg border border-border bg-muted/10 px-3 py-2 text-sm">
-                {value}
-              </div>
-            ))}
-            {!documents.length ? <p className="text-sm text-muted-foreground">No documents found.</p> : null}
+            {documents.length ? documents.slice(0, 12).map((value) => (
+              <div key={value} className="rounded-lg border border-border bg-muted/10 px-3 py-2 text-sm">{value}</div>
+            )) : <p className="text-sm text-muted-foreground">No document data found.</p>}
           </div>
         </HomeCard>
 
         <HomeCard title="Statistics" icon={Award}>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-            {unique(statistics).filter((value) => /\d/.test(value)).slice(0, 12).map((value) => (
-              <div key={value} className="rounded-lg border border-border px-3 py-2 text-sm font-medium">
-                {value}
-              </div>
-            ))}
-            {!statistics.some((value) => /\d/.test(value)) ? <p className="text-sm text-muted-foreground">No statistics found.</p> : null}
+            {statistics.length ? statistics.slice(0, 16).map((value) => (
+              <div key={value} className="rounded-lg border border-border px-3 py-2 text-sm font-medium">{value}</div>
+            )) : <p className="text-sm text-muted-foreground">No statistics found.</p>}
           </div>
         </HomeCard>
       </div>
 
       <div className="space-y-4">
-        {leadership.map(({ title, values }) => (
-          <HomeCard key={title} title={title} icon={Shield}>
+        {leadership.map(({ title, icon, values }) => (
+          <HomeCard key={title} title={title} icon={icon}>
             {values.length ? (
               <div className="space-y-2">
-                {unique(values).slice(0, 6).map((value, index) => (
-                  <div key={`${title}-${value}`} className={index === 0 ? "text-sm font-semibold" : "text-sm text-muted-foreground"}>
-                    {value}
-                  </div>
+                {values.slice(0, 8).map((value, index) => (
+                  <div key={`${title}-${value}`} className={index === 0 ? "text-sm font-semibold" : "text-sm text-muted-foreground"}>{value}</div>
                 ))}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No data found.</p>
-            )}
+            ) : <p className="text-sm text-muted-foreground">No data found.</p>}
           </HomeCard>
         ))}
       </div>
@@ -562,23 +442,17 @@ function HomeView({ sheet }: { sheet: Sheet }) {
       <div className="space-y-4">
         <HomeCard title="FTD & Subdivisions" icon={Users}>
           <div className="space-y-1.5">
-            {unique(subdivisions).slice(0, 40).map((value) => (
-              <div key={value} className="rounded-md border border-border px-3 py-2 text-xs">
-                {value}
-              </div>
-            ))}
-            {!subdivisions.length ? <p className="text-sm text-muted-foreground">No subdivision data found.</p> : null}
+            {subdivisions.length ? subdivisions.slice(0, 40).map((value) => (
+              <div key={value} className="rounded-md border border-border px-3 py-2 text-xs">{value}</div>
+            )) : <p className="text-sm text-muted-foreground">No subdivision data found.</p>}
           </div>
         </HomeCard>
 
         <HomeCard title="Metro PD Founders" icon={Shield}>
           <div className="space-y-2">
-            {unique(founders).slice(0, 20).map((value) => (
-              <div key={value} className="rounded-lg border border-border bg-muted/10 px-3 py-2 text-sm">
-                {value}
-              </div>
-            ))}
-            {!founders.length ? <p className="text-sm text-muted-foreground">No founder data found.</p> : null}
+            {founders.length ? founders.slice(0, 20).map((value) => (
+              <div key={value} className="rounded-lg border border-border bg-muted/10 px-3 py-2 text-sm">{value}</div>
+            )) : <p className="text-sm text-muted-foreground">No founder data found.</p>}
           </div>
         </HomeCard>
       </div>
@@ -586,358 +460,219 @@ function HomeView({ sheet }: { sheet: Sheet }) {
   )
 }
 
-function DepartmentTable({ rows }: { rows: string[][] }) {
+function TableShell({ children }: { children: ReactNode }) {
+  return <div className="w-full overflow-x-auto"><table className="w-full min-w-max border-collapse text-xs">{children}</table></div>
+}
+
+function TableHead({ children }: { children: ReactNode }) {
+  return <thead className="border-b border-border bg-muted/30"><tr>{children}</tr></thead>
+}
+
+function Th({ children }: { children: ReactNode }) {
+  return <th className="whitespace-nowrap px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{children}</th>
+}
+
+function Td({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <td className={`whitespace-nowrap border-b border-border px-3 py-3 text-center align-middle ${className}`}>{children}</td>
+}
+
+function StatusBadge({ value }: { value: string }) {
+  const normalized = normalize(value)
+  const positive = ["active", "current", "approved", "compliant"].includes(normalized)
+  const negative = ["inactive", "terminated", "resigned", "suspended"].includes(normalized)
+  const leave = ["loa", "leave", "leaveofabsence"].includes(normalized)
+
+  if (!positive && !negative && !leave) return <span>{display(value)}</span>
+
+  return <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold ${positive ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : leave ? "border-amber-500/20 bg-amber-500/10 text-amber-400" : "border-red-500/20 bg-red-500/10 text-red-400"}`}>{display(value)}</span>
+}
+
+function BooleanBadge({ value }: { value: string }) {
+  if (!clean(value)) return <span>—</span>
+  return <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${isTrue(value) ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "border-border bg-muted/40 text-muted-foreground"}`}>{isTrue(value) ? "Yes" : "No"}</span>
+}
+
+function EmptyState({ message }: { message: string }) {
+  return <div className="flex min-h-64 flex-col items-center justify-center p-10 text-center"><ClipboardList className="h-7 w-7 text-muted-foreground" /><p className="mt-3 text-sm text-muted-foreground">{message}</p></div>
+}
+
+function LoadingState() {
+  return <div className="flex min-h-64 flex-col items-center justify-center p-10 text-center"><RefreshCw className="h-6 w-6 animate-spin text-blue-500" /><p className="mt-3 text-sm text-muted-foreground">Loading roster data...</p></div>
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <div className="flex min-h-64 flex-col items-center justify-center p-10 text-center"><XCircle className="h-7 w-7 text-red-500" /><p className="mt-3 text-sm font-semibold">Failed to load Main Roster</p><p className="mt-1 max-w-xl text-xs text-muted-foreground">{message}</p><Button type="button" variant="outline" size="sm" className="mt-4" onClick={onRetry}>Try Again</Button></div>
+}
+
+function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return <div className="relative min-w-[165px]"><Filter className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><select value={value} onChange={(event) => onChange(event.target.value)} className="h-9 w-full appearance-none rounded-md border border-input bg-background pl-8 pr-8 text-xs outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"><option value="">All {label}</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /></div>
+}
+
+function DepartmentTable({ rows }: { rows: DepartmentRow[] }) {
   if (!rows.length) return <EmptyState message="No Department Roster records match your filters." />
-
-  return (
-    <TableShell>
-      <TableHead>
-        {DEPARTMENT_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}
-      </TableHead>
-      <tbody>
-        {rows.map((row, rowIndex) => (
-          <tr key={`${rowIndex}-${row.join("|")}`} className="transition-colors hover:bg-muted/20">
-            {row.map((value, index) => (
-              <Td key={`${rowIndex}-${index}`} className={index === 0 || index === 2 ? "font-medium" : ""}>
-                {index === 7 ? <StatusBadge value={value} /> : index === 8 ? <span className="font-mono text-[11px]">{display(value)}</span> : display(value)}
-              </Td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </TableShell>
-  )
+  return <TableShell><TableHead>{DEPARTMENT_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}</TableHead><tbody>{rows.map((row, index) => <tr key={`${row.badgeNumber || row.discordId || row.name}-${index}`} className="transition-colors hover:bg-muted/20"><Td className="font-semibold">{display(row.callsign)}</Td><Td>{display(row.badgeNumber)}</Td><Td className="font-medium">{display(row.name)}</Td><Td>{display(row.rank)}</Td><Td className="max-w-sm whitespace-normal text-left">{display(row.jobDescription)}</Td><Td>{display(row.timeInDept)}</Td><Td>{display(row.timeInRank)}</Td><Td><StatusBadge value={row.status} /></Td><Td className="font-mono text-[10px]">{display(row.discordId)}</Td><Td>{display(row.hoursThisMonth)}</Td></tr>)}</tbody></TableShell>
 }
 
-function EmployeeTable({ rows }: { rows: string[][] }) {
+function EmployeeTable({ rows }: { rows: EmployeeRow[] }) {
   if (!rows.length) return <EmptyState message="No Employee Database records match your filters." />
-
-  return (
-    <TableShell>
-      <TableHead>
-        {EMPLOYEE_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}
-      </TableHead>
-      <tbody>
-        {rows.map((row, rowIndex) => (
-          <tr key={`${rowIndex}-${row.join("|")}`} className="transition-colors hover:bg-muted/20">
-            {row.map((value, index) => (
-              <Td key={`${rowIndex}-${index}`} className={index === 0 || index === 1 || index === 10 ? "font-medium" : ""}>
-                {index >= 8 && index <= 9 ? <BooleanBadge value={value} /> : index >= 12 && index <= 14 ? <BooleanBadge value={value} /> : index === 2 ? <span className="font-mono text-[11px]">{display(value)}</span> : index === 3 ? <StatusBadge value={value} /> : display(value)}
-              </Td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </TableShell>
-  )
+  return <TableShell><TableHead>{EMPLOYEE_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}</TableHead><tbody>{rows.map((row, index) => <tr key={`${row.badgeNumber || row.discordId || row.name}-${index}`} className="transition-colors hover:bg-muted/20"><Td className="font-semibold">{display(row.badgeNumber)}</Td><Td className="font-medium">{display(row.name)}</Td><Td className="font-mono text-[10px]">{display(row.discordId)}</Td><Td><StatusBadge value={row.departmentStatus} /></Td><Td>{display(row.rank)}</Td><Td>{display(row.timezone)}</Td><Td>{display(row.joinDeptDate)}</Td><Td>{display(row.promoDate)}</Td><Td><BooleanBadge value={row.strike1} /></Td><Td><BooleanBadge value={row.strike2} /></Td><Td className="font-semibold">{display(row.callsign)}</Td><Td>{display(row.timeInDept)}</Td><Td><BooleanBadge value={row.terminated} /></Td><Td><BooleanBadge value={row.loa} /></Td><Td><BooleanBadge value={row.resigned} /></Td><Td>{display(row.thisMonthHours)}</Td><Td>{display(row.lastMonthHours)}</Td></tr>)}</tbody></TableShell>
 }
 
-function VehicleView({ sheet }: { sheet: Sheet }) {
-  const sections = useMemo(() => extractRankedRows(sheet, VEHICLE_COLUMNS), [sheet])
-
-  if (!sections.length) return <EmptyState message="No Vehicle Roster data found." />
-
-  return (
-    <div className="space-y-4">
-      {sections.map((section) => (
-        <section key={section.rank} className="overflow-hidden rounded-xl border border-border bg-card">
-          <div className="flex items-center gap-2 border-b border-border bg-muted/20 px-4 py-3">
-            <Car className="h-4 w-4 text-blue-500" />
-            <h3 className="text-sm font-semibold">{section.rank}</h3>
-            <span className="ml-auto text-xs text-muted-foreground">{section.rows.length} vehicles</span>
-          </div>
-          <TableShell>
-            <TableHead>{VEHICLE_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}</TableHead>
-            <tbody>
-              {section.rows.map((row, rowIndex) => (
-                <tr key={`${rowIndex}-${row.join("|")}`} className="hover:bg-muted/20">
-                  {row.map((value, index) => (
-                    <Td key={`${rowIndex}-${index}`} className={index === 1 ? "font-mono text-[11px]" : ""}>
-                      {index >= 5 ? <BooleanBadge value={value} /> : display(value)}
-                    </Td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </TableShell>
-        </section>
-      ))}
-    </div>
-  )
+function RankSection({ rank, children }: { rank: string; children: ReactNode }) {
+  return <section className="overflow-hidden rounded-xl border border-border bg-card"><div className="flex items-center gap-2.5 border-b border-border bg-muted/20 px-4 py-3"><div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10"><Shield className="h-4 w-4 text-blue-500" /></div><h3 className="text-sm font-semibold">{display(rank)}</h3></div>{children}</section>
 }
 
-function UniformView({ sheet }: { sheet: Sheet }) {
-  const sections = useMemo(() => {
-    const header = findHeaderRow(sheet, ["rank", "class", "sharedoutfitcode"])
-    if (!header) return [] as { rank: string; rows: string[][] }[]
+function VehicleSections({ rows }: { rows: VehicleRow[] }) {
+  const groups = useMemo(() => {
+    const map = new Map<string, VehicleRow[]>()
+    for (const row of rows) { const rank = row.rank || "Unassigned"; const list = map.get(rank) ?? []; list.push(row); map.set(rank, list) }
+    return Array.from(map.entries())
+  }, [rows])
 
-    const sections: { rank: string; rows: string[][] }[] = []
-    let currentRank = ""
-    const rankIndex = header.indexes.rank
-    const classIndex = header.indexes.class
-    const outfitIndex = header.indexes.sharedoutfitcode
+  if (!rows.length) return <EmptyState message="No Vehicle Roster records were found." />
 
-    for (let row = header.row + 1; row < sheet.rowCount; row += 1) {
-      const values = rowValues(sheet, row)
-      const normalized = values.map(normalize)
-      if (["rank", "class", "sharedoutfitcode"].every((value) => normalized.includes(value))) continue
+  return <div className="space-y-4 p-4">{groups.map(([rank, vehicles]) => <RankSection key={rank} rank={rank}><TableShell><TableHead>{VEHICLE_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}</TableHead><tbody>{vehicles.map((vehicle, index) => <tr key={`${vehicle.spawncode || vehicle.vehicleName}-${index}`} className="transition-colors hover:bg-muted/20"><Td className="font-medium">{display(vehicle.vehicleName)}</Td><Td className="font-mono text-[10px]">{display(vehicle.spawncode)}</Td><Td>{display(vehicle.requiredExtras)}</Td><Td>{display(vehicle.livery)}</Td><Td>{display(vehicle.windowTint)}</Td><Td><BooleanBadge value={vehicle.turbo} /></Td><Td><BooleanBadge value={vehicle.slicktopOptional} /></Td><Td><BooleanBadge value={vehicle.unmarkedAllowed} /></Td></tr>)}</tbody></TableShell></RankSection>)}</div>
+}
 
-      const explicitRank = clean(values[rankIndex])
-      if (explicitRank) currentRank = explicitRank
+function UniformSections({ rows }: { rows: UniformRow[] }) {
+  const groups = useMemo(() => {
+    const map = new Map<string, UniformRow[]>()
+    for (const row of rows) { const rank = row.rank || "Unassigned"; const list = map.get(rank) ?? []; list.push(row); map.set(rank, list) }
+    return Array.from(map.entries())
+  }, [rows])
 
-      const classValue = clean(values[classIndex])
-      const outfit = clean(values[outfitIndex])
-      if (!currentRank || (!classValue && !outfit)) continue
+  if (!rows.length) return <EmptyState message="No Uniform Roster records were found." />
 
-      let section = sections.find((item) => normalize(item.rank) === normalize(currentRank))
-      if (!section) {
-        section = { rank: currentRank, rows: [] }
-        sections.push(section)
-      }
-      section.rows.push([classValue, outfit])
-    }
+  return <div className="space-y-4 p-4">{groups.map(([rank, uniforms]) => <RankSection key={rank} rank={rank}><TableShell><TableHead><Th>Rank</Th>{UNIFORM_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}</TableHead><tbody>{uniforms.map((uniform, index) => <tr key={`${uniform.sharedOutfitCode || uniform.className}-${index}`} className="transition-colors hover:bg-muted/20"><Td className="font-medium">{display(uniform.rank)}</Td><Td>{display(uniform.className)}</Td><Td className="font-mono text-[10px]">{display(uniform.sharedOutfitCode)}</Td></tr>)}</tbody></TableShell></RankSection>)}</div>
+}
 
-    return sections
-  }, [sheet])
+function countCards(department: DepartmentRow[], employees: EmployeeRow[], vehicles: VehicleRow[], uniforms: UniformRow[]) {
+  return [
+    { label: "Department", value: department.length, icon: Shield },
+    { label: "Employees", value: employees.length, icon: Users },
+    { label: "Vehicles", value: vehicles.length, icon: Car },
+    { label: "Uniforms", value: uniforms.length, icon: Shirt },
+  ]
+}
 
-  if (!sections.length) return <EmptyState message="No Uniform Roster data found." />
-
-  return (
-    <div className="space-y-4">
-      {sections.map((section) => (
-        <section key={section.rank} className="overflow-hidden rounded-xl border border-border bg-card">
-          <div className="flex items-center gap-2 border-b border-border bg-muted/20 px-4 py-3">
-            <Shirt className="h-4 w-4 text-blue-500" />
-            <h3 className="text-sm font-semibold">{section.rank}</h3>
-            <span className="ml-auto text-xs text-muted-foreground">{section.rows.length} uniforms</span>
-          </div>
-          <TableShell>
-            <TableHead>
-              <Th>Rank</Th>
-              {UNIFORM_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}
-            </TableHead>
-            <tbody>
-              {section.rows.map((row, rowIndex) => (
-                <tr key={`${rowIndex}-${row.join("|")}`} className="hover:bg-muted/20">
-                  <Td className="font-medium">{display(section.rank)}</Td>
-                  <Td>{display(row[0])}</Td>
-                  <Td className="font-mono text-[11px]">{display(row[1])}</Td>
-                </tr>
-              ))}
-            </tbody>
-          </TableShell>
-        </section>
-      ))}
-    </div>
-  )
+function StatCards({ cards }: { cards: ReturnType<typeof countCards> }) {
+  return <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map(({ label, value, icon: Icon }) => <div key={label} className="rounded-xl border border-border bg-card p-4 shadow-sm"><div className="flex items-center justify-between"><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p><Icon className="h-4 w-4 text-blue-500" /></div><p className="mt-2 text-2xl font-bold">{value.toLocaleString()}</p></div>)}</div>
 }
 
 export default function MainRoster() {
   const [page, setPage] = useState<SheetKey>("home")
-  const [sheet, setSheet] = useState<Sheet | null>(null)
+  const [sheets, setSheets] = useState<Partial<Record<SheetKey, Sheet>>>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState("")
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [rankFilter, setRankFilter] = useState("")
 
   const pageInfo = pages.find((item) => item.id === page) ?? pages[0]
   const PageIcon = pageInfo.icon
+  const sheet = sheets[page]
 
-  const loadSheet = useCallback(
-    async (selectedPage: SheetKey, forceRefresh = false) => {
-      setLoading(true)
-      setError("")
+  const loadSheet = useCallback(async (selectedPage: SheetKey, showLoading = true, forceRefresh = false) => {
+    if (showLoading) setLoading(true)
+    setError(null)
 
-      try {
-        const query = forceRefresh ? "?refresh=1" : ""
-        const response = await fetch(`/api/main-roster/${selectedPage}${query}`, {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-          headers: { Accept: "application/json" },
-        })
+    try {
+      const query = forceRefresh ? "?refresh=1" : ""
+      const response = await fetch(`/api/main-roster/${selectedPage}${query}`, { method: "GET", credentials: "include", cache: "no-store", headers: { Accept: "application/json" } })
+      const data = (await response.json().catch(() => null)) as ApiResponse | null
 
-        const data = (await response.json().catch(() => null)) as ApiResponse | null
-        if (!response.ok || !data?.success || !data.sheet) {
-          throw new Error(data?.error || `Failed to load ${pageInfo.label}.`)
-        }
-
-        setSheet(data.sheet)
-      } catch (loadError) {
-        const message = loadError instanceof Error ? loadError.message : `Failed to load ${pageInfo.label}.`
-        setError(message)
-      } finally {
-        setLoading(false)
+      if (!response.ok || !data?.success || !data.sheet) {
+        throw new Error(data?.error || `Failed to load ${pageInfo.label} (${response.status}).`)
       }
-    },
-    [pageInfo.label],
-  )
+
+      setSheets((current) => ({ ...current, [selectedPage]: data.sheet as Sheet }))
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : `Failed to load ${pageInfo.label}.`
+      setError(message)
+      if (showLoading) toast.error("Failed to load Main Roster", { description: message })
+    } finally {
+      setLoading(false)
+    }
+  }, [pageInfo.label])
 
   useEffect(() => {
     setSearch("")
     setStatusFilter("")
     setRankFilter("")
-    void loadSheet(page, false)
-  }, [loadSheet, page])
+    void loadSheet(page, true, false)
+  }, [page, loadSheet])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      void loadSheet(page, false)
+      void loadSheet(page, false, false)
     }, 30 * 60 * 1000)
-
     return () => window.clearInterval(interval)
-  }, [loadSheet, page])
+  }, [page, loadSheet])
 
   const refresh = useCallback(async () => {
     if (refreshing) return
     setRefreshing(true)
     try {
-      await loadSheet(page, true)
-      toast.success("Main Roster refreshed", {
-        description: `${pageInfo.label} was refreshed from the roster data source.`,
-      })
+      await loadSheet(page, false, true)
+      toast.success("Main Roster refreshed", { description: `Latest ${pageInfo.label} data loaded from Google Sheets.` })
     } finally {
       setRefreshing(false)
     }
   }, [loadSheet, page, pageInfo.label, refreshing])
 
-  const departmentTable = useMemo(() => {
-    if (!sheet || page !== "department-roster") return { rows: [], allRows: [] as string[][] }
-    const extracted = extractTable(
-      sheet,
-      DEPARTMENT_COLUMNS.map(([label, alias]) => [label, [alias]] as const),
-      ["Callsign", "Badge Number", "Name", "Rank", "Status"],
-    )
+  const departmentRows = useMemo(() => parseDepartment(sheets["department-roster"] ?? ({ rawRows: [], columnCount: 0 } as Sheet)), [sheets])
+  const employeeRows = useMemo(() => parseEmployees(sheets["employee-database"] ?? ({ rawRows: [], columnCount: 0 } as Sheet)), [sheets])
+  const vehicleRows = useMemo(() => parseRankedRows(sheets["vehicle-roster"] ?? ({ rawRows: [], columnCount: 0 } as Sheet), VEHICLE_COLUMNS).map((row) => ({ rank: row[0], vehicleName: row[1], spawncode: row[2], requiredExtras: row[3], livery: row[4], windowTint: row[5], turbo: row[6], slicktopOptional: row[7], unmarkedAllowed: row[8] })), [sheets])
+  const uniformRows = useMemo(() => parseRankedRows(sheets["uniform-roster"] ?? ({ rawRows: [], columnCount: 0 } as Sheet), UNIFORM_COLUMNS).map((row) => ({ rank: row[0], className: row[1], sharedOutfitCode: row[2] })), [sheets])
 
-    const query = normalize(search)
-    const rankIndex = 3
-    const statusIndex = 7
+  const statusOptions = useMemo(() => uniqueInOrder(departmentRows.map((row) => row.status)), [departmentRows])
+  const departmentRankOptions = useMemo(() => uniqueInOrder(departmentRows.map((row) => row.rank)), [departmentRows])
+  const employeeRankOptions = useMemo(() => uniqueInOrder(employeeRows.map((row) => row.rank)), [employeeRows])
 
-    const rows = extracted.rows.filter((row) => {
-      const matchesSearch = !query || row.some((value) => normalize(value).includes(query))
-      const matchesStatus = !statusFilter || normalize(row[statusIndex]) === normalize(statusFilter)
-      const matchesRank = !rankFilter || normalize(row[rankIndex]) === normalize(rankFilter)
+  const filteredDepartmentRows = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return departmentRows.filter((row) => {
+      const matchesSearch = !query || [row.callsign, row.badgeNumber, row.name, row.rank, row.jobDescription, row.status, row.discordId, row.hoursThisMonth].some((value) => clean(value).toLowerCase().includes(query))
+      const matchesStatus = !statusFilter || normalize(row.status) === normalize(statusFilter)
+      const matchesRank = !rankFilter || normalize(row.rank) === normalize(rankFilter)
       return matchesSearch && matchesStatus && matchesRank
     })
+  }, [departmentRows, search, statusFilter, rankFilter])
 
-    return { rows, allRows: extracted.rows }
-  }, [page, rankFilter, search, sheet, statusFilter])
-
-  const employeeTable = useMemo(() => {
-    if (!sheet || page !== "employee-database") return { rows: [], allRows: [] as string[][] }
-    const extracted = extractTable(sheet, EMPLOYEE_COLUMNS, ["Badge Number", "Name", "Rank"])
-    const query = normalize(search)
-    const rankIndex = 4
-
-    const rows = extracted.rows.filter((row) => {
-      const matchesSearch = !query || row.some((value) => normalize(value).includes(query))
-      const matchesRank = !rankFilter || normalize(row[rankIndex]) === normalize(rankFilter)
+  const filteredEmployeeRows = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return employeeRows.filter((row) => {
+      const matchesSearch = !query || [row.badgeNumber, row.name, row.discordId, row.departmentStatus, row.rank, row.timezone, row.joinDeptDate, row.promoDate, row.callsign, row.timeInDept, row.thisMonthHours, row.lastMonthHours].some((value) => clean(value).toLowerCase().includes(query))
+      const matchesRank = !rankFilter || normalize(row.rank) === normalize(rankFilter)
       return matchesSearch && matchesRank
     })
+  }, [employeeRows, search, rankFilter])
 
-    return { rows, allRows: extracted.rows }
-  }, [page, rankFilter, search, sheet])
-
-  const statusOptions = useMemo(() => {
-    if (!sheet || page !== "department-roster") return []
-    return uniqueInSheetOrder(departmentTable.allRows.map((row) => row[7] ?? ""))
-  }, [departmentTable.allRows, page, sheet])
-
-  const rankOptions = useMemo(() => {
-    if (!sheet || page === "home" || page === "vehicle-roster" || page === "uniform-roster") return []
-    const source = page === "department-roster" ? departmentTable.allRows : employeeTable.allRows
-    const rankIndex = page === "department-roster" ? 3 : 4
-    return uniqueInSheetOrder(source.map((row) => row[rankIndex] ?? ""))
-  }, [departmentTable.allRows, employeeTable.allRows, page, sheet])
-
-  const count = page === "department-roster"
-    ? departmentTable.rows.length
-    : page === "employee-database"
-      ? employeeTable.rows.length
-      : sheet?.rowCount ?? 0
+  const counts = countCards(departmentRows, employeeRows, vehicleRows, uniformRows)
 
   return (
     <DashboardLayout>
-      <div className="min-w-0 space-y-6 overflow-x-hidden">
-        <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div className="flex min-h-full min-w-0 flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-6">
+        <div className="flex shrink-0 flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10">
-              <ClipboardList className="h-5 w-5 text-blue-500" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-3xl font-bold tracking-tight">Main Roster</h1>
-              <p className="mt-1 text-sm text-muted-foreground">Metro Police Department master roster and operational data.</p>
-            </div>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10"><ClipboardList className="h-5 w-5 text-blue-500" /></div>
+            <div className="min-w-0"><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Main Roster</h1><p className="text-sm text-muted-foreground">Metro Police Department master roster and operational data.</p></div>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => void refresh()} disabled={refreshing || loading} className="w-fit gap-2"><RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />{refreshing ? "Refreshing..." : "Refresh"}</Button>
+        </div>
+
+        <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div className="inline-flex min-w-full items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1 sm:min-w-0">{pages.map((item) => { const active = item.id === page; const Icon = item.icon; return <button key={item.id} type="button" onClick={() => { setPage(item.id); setSearch(""); setStatusFilter(""); setRankFilter("") }} className={active ? "shrink-0 rounded-md bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-500 shadow-sm sm:px-4 sm:text-sm" : "shrink-0 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground sm:px-4 sm:text-sm"}><Icon className="mr-1.5 inline h-3.5 w-3.5" />{item.label}</button> })}</div></div>
+
+        {page !== "home" && <StatCards cards={counts} />}
+
+        <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-border p-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10"><PageIcon className="h-4 w-4 text-blue-500" /></div><div><h2 className="text-base font-semibold">{pageInfo.label}</h2><p className="text-xs text-muted-foreground">Data is read directly from the configured Google Sheet.</p></div></div>
+            {(page === "department-roster" || page === "employee-database") && <div className="flex w-full flex-col gap-2 xl:w-auto xl:flex-row"><div className="relative w-full xl:w-80"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${pageInfo.label.toLowerCase()}...`} className="pl-9" /></div>{page === "department-roster" ? <><FilterSelect label="Status" value={statusFilter} options={statusOptions} onChange={setStatusFilter} /><FilterSelect label="Rank" value={rankFilter} options={departmentRankOptions} onChange={setRankFilter} /></> : <FilterSelect label="Rank" value={rankFilter} options={employeeRankOptions} onChange={setRankFilter} />}</div>}
           </div>
 
-          <Button type="button" variant="outline" size="sm" onClick={() => void refresh()} disabled={refreshing || loading} className="w-fit gap-2">
-            <RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </Button>
-        </header>
-
-        <nav className="flex w-full gap-2 overflow-x-auto pb-1">
-          {pages.map((item) => {
-            const Icon = item.icon
-            const active = item.id === page
-            return (
-              <Button key={item.id} type="button" variant={active ? "default" : "outline"} size="sm" onClick={() => setPage(item.id)} className="shrink-0 gap-2">
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Button>
-            )
-          })}
-        </nav>
-
-        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-border p-5 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-                <PageIcon className="h-4 w-4 text-blue-500" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold">{pageInfo.label}</h2>
-                <p className="text-xs text-muted-foreground">{count.toLocaleString()} {count === 1 ? "record" : "records"}</p>
-              </div>
-            </div>
-
-            {(page === "department-roster" || page === "employee-database") ? (
-              <div className="flex w-full flex-col gap-2 xl:w-auto xl:flex-row">
-                <div className="relative w-full xl:w-80">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${pageInfo.label.toLowerCase()}...`} className="pl-9" />
-                </div>
-                {page === "department-roster" ? (
-                  <>
-                    <FilterSelect label="Status" value={statusFilter} options={statusOptions} onChange={setStatusFilter} />
-                    <FilterSelect label="Ranks" value={rankFilter} options={rankOptions} onChange={setRankFilter} />
-                  </>
-                ) : (
-                  <FilterSelect label="Ranks" value={rankFilter} options={rankOptions} onChange={setRankFilter} />
-                )}
-              </div>
-            ) : null}
-          </div>
-
-          {loading ? (
-            <LoadingState />
-          ) : error ? (
-            <ErrorState message={error} onRetry={() => void loadSheet(page, false)} />
-          ) : !sheet ? (
-            <EmptyState message="No roster data is available." />
-          ) : page === "home" ? (
-            <div className="p-5"><HomeView sheet={sheet} /></div>
-          ) : page === "department-roster" ? (
-            <DepartmentTable rows={departmentTable.rows} />
-          ) : page === "employee-database" ? (
-            <EmployeeTable rows={employeeTable.rows} />
-          ) : page === "vehicle-roster" ? (
-            <div className="p-5"><VehicleView sheet={sheet} /></div>
-          ) : (
-            <div className="p-5"><UniformView sheet={sheet} /></div>
-          )}
+          {loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={() => void loadSheet(page, true, false)} /> : !sheet ? <EmptyState message="No roster data is available." /> : page === "home" ? <HomeView sheet={sheet} /> : page === "department-roster" ? <DepartmentTable rows={filteredDepartmentRows} /> : page === "employee-database" ? <EmployeeTable rows={filteredEmployeeRows} /> : page === "vehicle-roster" ? <VehicleSections rows={vehicleRows} /> : <UniformSections rows={uniformRows} />}
         </section>
       </div>
     </DashboardLayout>
