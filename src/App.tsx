@@ -304,7 +304,6 @@ function PageProtection() {
 ========================================================= */
 
 export default function App() {
-  useSiteProtection()
 
   return (
     <BrowserRouter>
