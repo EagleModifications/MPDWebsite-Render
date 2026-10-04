@@ -1,13 +1,18 @@
-import { useEffect } from "react"
-
 import {
   BrowserRouter,
+  Navigate,
   Route,
   Routes,
 } from "react-router-dom"
 
-import Notifications from "@/components/Notifications"
-import CustomCursor from "@/components/CustomCursor"
+import {
+  CheckCircle2,
+  Info,
+  AlertTriangle,
+  XCircle,
+} from "lucide-react"
+
+import { Toaster } from "@/components/ui/sonner"
 
 import Home from "@/pages/Home"
 import SignIn from "@/pages/SignIn"
@@ -55,109 +60,11 @@ import PromotionRequirementsSWAT from "@/pages/dashboard/promotion/requirements/
 import PromotionRequirementsTEU from "@/pages/dashboard/promotion/requirements/TEU"
 import PromotionRequirementsTRU from "@/pages/dashboard/promotion/requirements/TRU"
 
-/* =========================================================
-   APP PROTECTION
-========================================================= */
-
-function useSiteProtection() {
-  useEffect(() => {
-    /*
-     * Disable right-click context menu.
-     */
-    const handleContextMenu = (event: MouseEvent) => {
-      event.preventDefault()
-    }
-
-    /*
-     * Disable common browser developer-tool shortcuts.
-     *
-     * This is only a client-side deterrent and is NOT
-     * a security mechanism.
-     */
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase()
-
-      const isF12 = event.key === "F12"
-
-      const isDeveloperTools =
-        event.ctrlKey &&
-        event.shiftKey &&
-        (key === "i" || key === "j" || key === "c")
-
-      const isViewSource =
-        event.ctrlKey &&
-        key === "u"
-
-      if (
-        isF12 ||
-        isDeveloperTools ||
-        isViewSource
-      ) {
-        event.preventDefault()
-        event.stopPropagation()
-      }
-    }
-
-    /*
-     * Prevent normal page content from being dragged.
-     */
-    const handleDragStart = (event: DragEvent) => {
-      event.preventDefault()
-    }
-
-    document.addEventListener(
-      "contextmenu",
-      handleContextMenu,
-    )
-
-    document.addEventListener(
-      "keydown",
-      handleKeyDown,
-      true,
-    )
-
-    document.addEventListener(
-      "dragstart",
-      handleDragStart,
-    )
-
-    return () => {
-      document.removeEventListener(
-        "contextmenu",
-        handleContextMenu,
-      )
-
-      document.removeEventListener(
-        "keydown",
-        handleKeyDown,
-        true,
-      )
-
-      document.removeEventListener(
-        "dragstart",
-        handleDragStart,
-      )
-    }
-  }, [])
-}
-
-/* =========================================================
-   APP
-========================================================= */
-
 export default function App() {
-  useSiteProtection()
-
   return (
     <BrowserRouter>
-      {/* ===================================================
-          ROUTES
-      =================================================== */}
-
       <Routes>
-        {/* =================================================
-            PUBLIC
-        ================================================= */}
+        {/* Public */}
 
         <Route
           path="/"
@@ -194,36 +101,24 @@ export default function App() {
           element={<MainRoster />}
         />
 
-        {/* =================================================
-            DASHBOARD
-        ================================================= */}
+        {/* Dashboards */}
 
         <Route
           path="/dashboard"
           element={<Dashboard />}
         />
 
-        {/* =================================================
-            ACTIVITY ROSTER
-        ================================================= */}
-
         <Route
           path="/dashboard/activity/activityroster"
           element={<ActivityRoster />}
         />
-
-        {/* =================================================
-            PROMOTION ROSTER
-        ================================================= */}
 
         <Route
           path="/dashboard/promotion/promotionroster"
           element={<PromotionRoster />}
         />
 
-        {/* =================================================
-            ACTIVITY IMPORTS
-        ================================================= */}
+        {/* Activity Imports */}
 
         <Route
           path="/dashboard/activity/department-import"
@@ -260,9 +155,7 @@ export default function App() {
           element={<ActivityImportTRU />}
         />
 
-        {/* =================================================
-            PROMOTION IMPORTS
-        ================================================= */}
+        {/* Promotion Imports */}
 
         <Route
           path="/dashboard/promotion/department-import"
@@ -299,9 +192,7 @@ export default function App() {
           element={<PromotionImportTRU />}
         />
 
-        {/* =================================================
-            ACTIVITY REQUIREMENTS
-        ================================================= */}
+        {/* Activity Requirements */}
 
         <Route
           path="/dashboard/activity/department-requirements"
@@ -338,9 +229,7 @@ export default function App() {
           element={<ActivityRequirementsTRU />}
         />
 
-        {/* =================================================
-            PROMOTION REQUIREMENTS
-        ================================================= */}
+        {/* Promotion Requirements */}
 
         <Route
           path="/dashboard/promotion/department-requirements"
@@ -377,27 +266,39 @@ export default function App() {
           element={<PromotionRequirementsTRU />}
         />
 
-        {/* =================================================
-            FINAL FALLBACK
-        ================================================= */}
+        {/* Fallback */}
 
         <Route
           path="*"
-          element={<NotFound />}
+          element={
+            <Navigate
+              to="/"
+              replace
+            />
+          }
         />
       </Routes>
 
-      {/* ===================================================
-          GLOBAL NOTIFICATIONS
-      =================================================== */}
+      {/* Global notifications */}
 
-      <Notifications />
-
-      {/* ===================================================
-          CUSTOM CURSOR
-      =================================================== */}
-
-      <CustomCursor />
+      <Toaster
+        position="top-right"
+        theme="system"
+        closeButton
+        icons={{
+          success: <CheckCircle2 className="size-5 shrink-0 text-green-500" />,
+          info: <Info className="size-5 shrink-0 text-blue-500" />,
+          warning: <AlertTriangle className="size-5 shrink-0 text-yellow-500" />,
+          error: <XCircle className="size-5 shrink-0 text-red-500" />,
+        }}
+        toastOptions={{
+          classNames: {
+            toast: "bg-background text-foreground border-border",
+            title: "text-foreground",
+            description: "text-muted-foreground",
+          },
+        }}
+      />
     </BrowserRouter>
   )
 }
