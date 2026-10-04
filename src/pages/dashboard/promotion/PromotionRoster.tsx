@@ -24,7 +24,7 @@ import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
 import GoogleRosterRefresh from "@/components/dashboard/GoogleRosterRefresh"
-import { logPromotionAction } from "@/lib/promotionActionLog"
+import { logPromotionAction } from "@/lib/actionLog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
