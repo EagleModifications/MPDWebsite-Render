@@ -12,15 +12,22 @@ import {
     ChevronDown,
   ChevronUp,
   Clipboard,
-      History,
+  History,
   RefreshCw,
   Search,
   Users,
+  UserRound,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type Module = "" | "promotion" | "activity"
 type Category =
@@ -66,6 +73,13 @@ type ActionLog = {
   summary: string
   details?: Record<string, unknown>
   path?: string
+}
+
+type DiscordProfile = {
+  id: string
+  username?: string
+  displayName?: string
+  avatar?: string | null
 }
 
 type ApiResponse = {
@@ -148,21 +162,19 @@ const getAvatarUrl = (discordId: string, avatar?: string | null) => {
     return avatar
   }
 
-  if (avatar?.startsWith("a_")) {
-    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.gif?size=64`
-  }
-
   if (avatar) {
-    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png?size=64`
+    const extension = avatar.startsWith("a_") ? "gif" : "png"
+    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.${extension}?size=128`
   }
 
   try {
     const index = Number(BigInt(discordId) % 6n)
-    return `https://cdn.discordapp.com/embed/avatars/${index}.png?size=64`
+    return `https://cdn.discordapp.com/embed/avatars/${index}.png?size=128`
   } catch {
     return undefined
   }
 }
+
 
 const relativeTime = (value: string) => {
   const timestamp = new Date(value).getTime()
@@ -360,18 +372,19 @@ function Avatar({
   avatar?: string | null
   className?: string
 }) {
-  const url = getAvatarUrl(id, avatar)
+  const [failed, setFailed] = useState(false)
+  const url = failed ? getAvatarUrl(id) : getAvatarUrl(id, avatar)
 
   return (
-    <span
-      className={`${className} shrink-0 overflow-hidden rounded-full border border-border bg-muted`}
-    >
+    <span className={`${className} shrink-0 overflow-hidden rounded-full border border-border bg-muted`}>
       {url ? (
         <img
           src={url}
           alt=""
           className="h-full w-full object-cover"
           loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
         />
       ) : (
         <span className="flex h-full w-full items-center justify-center text-[8px] font-semibold text-muted-foreground">
@@ -381,6 +394,7 @@ function Avatar({
     </span>
   )
 }
+
 
 function CopyMenu({
   name,
@@ -397,212 +411,84 @@ function CopyMenu({
   rank?: string
   avatar?: string | null
 }) {
-  const [open, setOpen] = useState(false)
-  const [position, setPosition] = useState({ left: 0, top: 0 })
-  const ref = useRef<HTMLDivElement>(null)
-
   const display = name?.trim() || "Unknown User"
   const safeId = id?.trim() || ""
   const safeCallsign = callsign?.trim() || ""
   const safeBadge = badgeNumber?.trim() || ""
   const safeRank = rank?.trim() || ""
 
-  useEffect(() => {
-    if (!open) return
+  const items = [
+    ["discord", "Copy Discord ID", safeId],
+    ["discord-mention", "Copy Discord Mention", safeId ? `<@${safeId}>` : ""],
+    ["name", "Copy Name", display],
+    ["callsign", "Copy Callsign", safeCallsign],
+    ["badge", "Copy Badge Number", safeBadge],
+    ["rank", "Copy Rank", safeRank],
+  ] as const
 
-    const handleMouseDown = (event: MouseEvent) => {
-      if (!ref.current?.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false)
-    }
-
-    const handleScroll = () => setOpen(false)
-
-    document.addEventListener("mousedown", handleMouseDown)
-    document.addEventListener("keydown", handleKeyDown)
-    window.addEventListener("scroll", handleScroll, true)
-
-    return () => {
-      document.removeEventListener("mousedown", handleMouseDown)
-      document.removeEventListener("keydown", handleKeyDown)
-      window.removeEventListener("scroll", handleScroll, true)
-    }
-  }, [open])
+  const combined = [
+    ["name-discord", "Name + Discord ID", safeId ? `${display} — ${safeId}` : ""],
+    ["callsign-discord", "Callsign + Discord ID", safeCallsign && safeId ? `${safeCallsign} — ${safeId}` : ""],
+    ["callsign-name", "Callsign + Name", safeCallsign ? `${safeCallsign} — ${display}` : ""],
+    ["callsign-badge", "Callsign + Badge Number", safeCallsign && safeBadge ? `${safeCallsign} — ${safeBadge}` : ""],
+    ["badge-name", "Badge Number + Name", safeBadge ? `${safeBadge} — ${display}` : ""],
+    ["badge-discord", "Badge Number + Discord ID", safeBadge && safeId ? `${safeBadge} — ${safeId}` : ""],
+  ] as const
 
   const copy = async (value: string, label: string) => {
     if (!value) return
-
     try {
       await navigator.clipboard.writeText(value)
       toast.success(`${label} copied`, { description: value })
-      setOpen(false)
     } catch {
       toast.error("Copy failed")
     }
   }
 
-  const openMenu = (event: ReactMouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation()
-
-    const rect = event.currentTarget.getBoundingClientRect()
-    const menuWidth = 264
-    const menuHeight = 365
-    const gap = 4
-
-    let left = rect.left
-    let top = rect.bottom + gap
-
-    if (left + menuWidth > window.innerWidth - 8) {
-      left = Math.max(8, window.innerWidth - menuWidth - 8)
-    }
-
-    if (top + menuHeight > window.innerHeight - 8) {
-      top = Math.max(8, rect.top - menuHeight - gap)
-    }
-
-    setPosition({ left, top })
-    setOpen((current) => !current)
-  }
-
-  const openContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-
-    const menuWidth = 264
-    const menuHeight = 365
-    const gap = 4
-
-    let left = event.clientX
-    let top = event.clientY + gap
-
-    if (left + menuWidth > window.innerWidth - 8) {
-      left = Math.max(8, window.innerWidth - menuWidth - 8)
-    }
-
-    if (top + menuHeight > window.innerHeight - 8) {
-      top = Math.max(8, event.clientY - menuHeight - gap)
-    }
-
-    setPosition({ left, top })
-    setOpen(true)
-  }
-
-  const items = [
-    {
-      label: "Copy Discord ID",
-      value: safeId,
-      copyLabel: "Discord ID",
-    },
-    {
-      label: "Copy Discord Mention",
-      value: safeId ? `<@${safeId}>` : "",
-      copyLabel: "Discord mention",
-    },
-    {
-      label: "Copy Name",
-      value: display,
-      copyLabel: "Name",
-    },
-    {
-      label: "Copy Callsign",
-      value: safeCallsign,
-      copyLabel: "Callsign",
-    },
-    {
-      label: "Copy Badge Number",
-      value: safeBadge,
-      copyLabel: "Badge number",
-    },
-    {
-      label: "Copy Rank",
-      value: safeRank,
-      copyLabel: "Rank",
-    },
-  ]
-
-  const combined = [
-    {
-      label: "Name + Discord ID",
-      value: safeId ? `${display} — ${safeId}` : "",
-    },
-    {
-      label: "Callsign + Discord ID",
-      value: safeCallsign && safeId ? `${safeCallsign} — ${safeId}` : "",
-    },
-    {
-      label: "Callsign + Name",
-      value: safeCallsign ? `${safeCallsign} — ${display}` : "",
-    },
-    {
-      label: "Callsign + Badge Number",
-      value: safeCallsign && safeBadge ? `${safeCallsign} — ${safeBadge}` : "",
-    },
-    {
-      label: "Badge Number + Name",
-      value: safeBadge ? `${safeBadge} — ${display}` : "",
-    },
-  ]
-
   return (
-    <div
-      ref={ref}
-      className="relative inline-flex min-w-0"
-      onContextMenu={openContextMenu}
-    >
-      <button
-        type="button"
-        onClick={openMenu}
-        className="inline-flex max-w-full items-center gap-2 rounded-md py-0.5 text-left transition-colors hover:text-blue-400"
-        title="Copy options"
-      >
-        <Avatar name={display} id={safeId} avatar={avatar} />
-        <span className="truncate text-xs font-medium text-blue-400">
-          {display}
-        </span>
-      </button>
-
-      {open ? (
-        <div
-          className="fixed z-[200] w-[264px] overflow-hidden rounded-[4px] border border-border bg-popover p-1 shadow-[0_18px_45px_rgba(0,0,0,0.65)]"
-          style={{ left: position.left, top: position.top }}
-          onClick={(event) => event.stopPropagation()}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          title="Copy options"
+          className="inline-flex max-w-full items-center gap-2 rounded-md bg-transparent py-0.5 text-left outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
         >
-          <div className="max-h-[365px] overflow-y-auto pr-0.5 [scrollbar-width:thin] [scrollbar-color:hsl(var(--border)_transparent)]">
-            {items.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                disabled={!item.value}
-                onClick={() => void copy(item.value, item.copyLabel)}
-                className="flex h-[29px] w-full items-center gap-2 rounded-[3px] px-2.5 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-muted/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
-              >
-                <Clipboard className="h-[15px] w-[15px] shrink-0 text-blue-400" />
-                <span className="truncate">{item.label}</span>
-              </button>
-            ))}
-
-            <div className="mx-1 my-1 border-t border-border" />
-
-            {combined.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                disabled={!item.value}
-                onClick={() => void copy(item.value, item.label)}
-                className="flex h-[29px] w-full items-center gap-2 rounded-[3px] px-2.5 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-muted/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
-              >
-                <Clipboard className="h-[15px] w-[15px] shrink-0 text-blue-400" />
-                <span className="truncate">{item.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
+          <Avatar name={display} id={safeId} avatar={avatar} />
+          <span className="truncate text-xs font-medium text-blue-400">{display}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side="bottom"
+        align="start"
+        sideOffset={4}
+        avoidCollisions={false}
+        className="w-[285px] max-h-80 overflow-y-auto p-1"
+      >
+        {items.map(([type, label, value]) => (
+          <DropdownMenuItem
+            key={type}
+            disabled={!value}
+            onClick={() => void copy(value, label)}
+            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+          >
+            <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+            <span>{label}</span>
+          </DropdownMenuItem>
+        ))}
+        <div className="my-0.5 h-px bg-border" />
+        {combined.map(([type, label, value]) => (
+          <DropdownMenuItem
+            key={type}
+            disabled={!value}
+            onClick={() => void copy(value, label)}
+            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+          >
+            <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+            <span>{label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -621,34 +507,43 @@ function FilterSelect({
   ariaLabel: string
   className?: string
 }) {
-  return (
-    <div className={`relative min-w-0 ${className}`}>
-      {Icon ? (
-        <Icon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-blue-400" />
-      ) : null}
+  const selected = options.find((option) => option.value === value) ?? options[0]
 
-      <select
-        aria-label={ariaLabel}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={`h-10 w-full appearance-none rounded-lg border border-border bg-card pr-9 text-xs outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/70 ${
-          Icon ? "pl-9" : "pl-3"
-        }`}
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          className={`inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground outline-none transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-white focus:outline-none ${className}`}
+        >
+          {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-blue-400" /> : null}
+          <span className="min-w-0 flex-1 truncate text-left">{selected?.label ?? ariaLabel}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side="bottom"
+        align="start"
+        sideOffset={4}
+        avoidCollisions={false}
+        className="max-h-80 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto p-1"
       >
         {options.map((option) => (
-          <option
+          <DropdownMenuItem
             key={option.value || `all-${ariaLabel}`}
-            value={option.value}
+            onClick={() => onChange(option.value)}
+            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
           >
-            {option.label}
-          </option>
+            {option.value === value ? <span className="h-1.5 w-1.5 rounded-full bg-blue-400" /> : <span className="h-1.5 w-1.5" />}
+            <span>{option.label}</span>
+          </DropdownMenuItem>
         ))}
-      </select>
-
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-    </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
+
 
 function formatValue(value: unknown): string {
   if (value === null || value === undefined || value === "") {
@@ -927,14 +822,43 @@ export default function ActionLogs() {
   const [userId, setUserId] = useState("")
   const [action, setAction] = useState("")
   const [search, setSearch] = useState("")
-  const [showFilters, setShowFilters] = useState(false)
-  const [showSearch, setShowSearch] = useState(false)
 
   const [expanded, setExpanded] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [pages, setPages] = useState(1)
   const [total, setTotal] = useState(0)
+  const [profiles, setProfiles] = useState<Record<string, DiscordProfile>>({})
+  const profilesRef = useRef<Record<string, DiscordProfile>>({})
+  const profileLoadingRef = useRef<Set<string>>(new Set())
+
+  const loadProfile = useCallback(async (discordId: string) => {
+    if (!discordId || profilesRef.current[discordId] || profileLoadingRef.current.has(discordId)) return
+    profileLoadingRef.current.add(discordId)
+    try {
+      const response = await fetch(`/api/promotion/discord-profile/${encodeURIComponent(discordId)}`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      })
+      if (!response.ok) return
+      const data = (await response.json()) as { success?: boolean; profile?: DiscordProfile }
+      if (data.success && data.profile) {
+        profilesRef.current[discordId] = data.profile
+        setProfiles((current) => ({ ...current, [discordId]: data.profile! }))
+      }
+    } catch {
+      // Stored log identity remains usable if Discord cannot be reached.
+    } finally {
+      profileLoadingRef.current.delete(discordId)
+    }
+  }, [])
+
+  useEffect(() => {
+    for (const discordId of new Set(logs.map((log) => log.userId).filter(Boolean))) {
+      void loadProfile(discordId)
+    }
+  }, [logs, loadProfile])
 
   const loadLogs = useCallback(async () => {
     setLoading(true)
@@ -1082,8 +1006,8 @@ export default function ActionLogs() {
             onClick={() => void loadLogs()}
             className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
           >
-            <RefreshCw className={`h-3.5 w-3.5 text-blue-400 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            <RefreshCw className={`h-3.5 w-3.5 text-white ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Refreshing" : "Refresh"}
           </button>
         </header>
 
@@ -1108,118 +1032,69 @@ export default function ActionLogs() {
           })}
         </div>
 
-        {/* Reference-style filter row: no card/background around the controls. */}
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <FilterSelect
-            value={userId}
-            options={userOptions}
-            onChange={(value) => {
-              setUserId(value)
-              setPage(1)
-              setExpanded(null)
-            }}
-            ariaLabel="User"
-            className="w-[208px]"
-          />
-
-          <FilterSelect
-            value={action}
-            options={actionOptions}
-            onChange={(value) => {
-              setAction(value)
-              setPage(1)
-              setExpanded(null)
-            }}
-            ariaLabel="Action"
-            className="w-[160px]"
-          />
-
-          <button
-            type="button"
-            onClick={() => setShowFilters((value) => !value)}
-            className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${
-              showFilters || activeFilterCount
-                ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
-                : "border-border bg-card text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
-            }`}
-          >
-            Filters
-            {activeFilterCount > 0 ? (
-              <span className="rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] text-blue-400">
-                {activeFilterCount}
-              </span>
-            ) : null}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowSearch((value) => !value)}
-            className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${
-              showSearch || search
-                ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
-                : "border-border bg-card text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
-            }`}
-          >
-            Search
-          </button>
-
-          <span className="ml-auto text-xs text-muted-foreground">
-            {total.toLocaleString()} {total === 1 ? "change" : "changes"}
-          </span>
-        </div>
-
-        {showSearch ? (
-          <div className="mb-4 relative max-w-[620px]">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        {/* Search and filters stay visible at all times. */}
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <div className="relative w-full min-w-[220px] max-w-[430px] sm:w-[360px]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-400" />
             <input
-              autoFocus
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value)
                 setPage(1)
               }}
               placeholder="Search entries, people, ranks, IDs..."
-              className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-xs outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
+              className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
             />
           </div>
-        ) : null}
 
-        {showFilters ? (
-          <div className="mb-5 flex flex-wrap items-center gap-2 border-b border-border pb-4">
-            <FilterSelect
-              value={category}
-              options={categoryOptions}
-              onChange={(value) => {
-                setCategory(value as Category)
-                setPage(1)
-                setExpanded(null)
-              }}
-              ariaLabel="Category"
-              className="w-[170px]"
-            />
-            <FilterSelect
-              value={division}
-              options={divisionOptions}
-              onChange={(value) => {
-                setDivision(value as Division)
-                setPage(1)
-                setExpanded(null)
-              }}
-              ariaLabel="Division"
-              className="w-[170px]"
-            />
-            {hasFilters ? (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs text-muted-foreground transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
-              >
-                <X className="h-3.5 w-3.5" />
-                Clear filters
-              </button>
-            ) : null}
-          </div>
-        ) : null}
+          <FilterSelect
+            value={userId}
+            options={userOptions}
+            onChange={(value) => { setUserId(value); setPage(1); setExpanded(null) }}
+            icon={UserRound}
+            ariaLabel="People"
+            className="w-[170px]"
+          />
+          <FilterSelect
+            value={action}
+            options={actionOptions}
+            onChange={(value) => { setAction(value); setPage(1); setExpanded(null) }}
+            icon={History}
+            ariaLabel="Actions"
+            className="w-[160px]"
+          />
+          <FilterSelect
+            value={category}
+            options={categoryOptions}
+            onChange={(value) => { setCategory(value as Category); setPage(1); setExpanded(null) }}
+            icon={Clipboard}
+            ariaLabel="Categories"
+            className="w-[175px]"
+          />
+          <FilterSelect
+            value={division}
+            options={divisionOptions}
+            onChange={(value) => { setDivision(value as Division); setPage(1); setExpanded(null) }}
+            icon={Users}
+            ariaLabel="Divisions"
+            className="w-[175px]"
+          />
+
+          {hasFilters ? (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex h-9 items-center gap-1.5 px-2 text-xs font-medium text-white transition-colors hover:text-blue-300"
+            >
+              <X className="h-3.5 w-3.5 text-white" />
+              Clear
+            </button>
+          ) : null}
+
+          <span className="ml-auto text-xs text-muted-foreground">
+            {total.toLocaleString()} {total === 1 ? "change" : "changes"}
+          </span>
+        </div>
 
         {error ? (
           <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
@@ -1275,22 +1150,13 @@ export default function ActionLogs() {
 
                         <div className="min-w-0">
                           <CopyMenu
-                            name={log.userName || log.username || "Unknown User"}
+                            name={profiles[log.userId]?.displayName || log.userName || log.username || "Unknown User"}
                             id={log.userId}
                             callsign={log.callsign}
                             badgeNumber={log.badgeNumber}
                             rank={log.rank}
-                            avatar={log.avatar}
+                            avatar={profiles[log.userId]?.avatar || log.avatar}
                           />
-                          <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <span>{log.rank || "Unknown rank"}</span>
-                            {log.callsign ? (
-                              <>
-                                <span>•</span>
-                                <span>{log.callsign}</span>
-                              </>
-                            ) : null}
-                          </div>
                         </div>
 
                         <div className="min-w-0">
@@ -1343,19 +1209,21 @@ export default function ActionLogs() {
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>Page {page} of {pages}</span>
-              <select
-                value={pageSize}
-                onChange={(event) => {
-                  setPageSize(Number(event.target.value))
+              <FilterSelect
+                value={String(pageSize)}
+                options={[
+                  { value: "25", label: "25 / page" },
+                  { value: "50", label: "50 / page" },
+                  { value: "75", label: "75 / page" },
+                  { value: "100", label: "100 / page" },
+                ]}
+                onChange={(value) => {
+                  setPageSize(Number(value))
                   setPage(1)
                 }}
-                className="h-8 rounded-md border border-border bg-card px-2 text-xs outline-none focus:border-blue-500/60"
-              >
-                <option value={25}>25 / page</option>
-                <option value={50}>50 / page</option>
-                <option value={75}>75 / page</option>
-                <option value={100}>100 / page</option>
-              </select>
+                ariaLabel="Pages"
+                className="w-[112px]"
+              />
               <span>{start.toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()}</span>
             </div>
 
