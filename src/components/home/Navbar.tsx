@@ -287,22 +287,24 @@ export default function Navbar() {
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
-          {visibleItems.map((item) => (
-            <NavLink
-              key={item.href}
-              to={item.href}
-              className={({ isActive }) =>
-                [
-                  "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-foreground/10 text-foreground"
-                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
-                ].join(" ")
-              }
-            >
-              {item.name}
-            </NavLink>
-          ))}
+          {visibleItems
+            .filter((item) => item.name !== "Dashboard")
+            .map((item) => (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                className={({ isActive }) =>
+                  [
+                    "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                  ].join(" ")
+                }
+              >
+                {item.name}
+              </NavLink>
+            ))}
 
           {hasDocuments && (
             <div
@@ -320,6 +322,7 @@ export default function Navbar() {
                 ].join(" ")}
               >
                 Documents
+
                 <ChevronDown
                   className={[
                     "h-4 w-4 transition-transform duration-200",
@@ -469,6 +472,25 @@ export default function Navbar() {
               )}
             </div>
           )}
+
+          {visibleItems
+            .filter((item) => item.name === "Dashboard")
+            .map((item) => (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                className={({ isActive }) =>
+                  [
+                    "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                  ].join(" ")
+                }
+              >
+                {item.name}
+              </NavLink>
+            ))}
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
@@ -476,20 +498,15 @@ export default function Navbar() {
 
           {user ? (
             <Button
+              asChild
               variant="ghost"
               size="sm"
-              onClick={async () => {
-                await fetch("/api/auth/logout", {
-                  method: "POST",
-                  credentials: "include",
-                })
-
-                window.location.href = "/signed-out?logout=true"
-              }}
               className="gap-2"
             >
-              <LogOut className="h-4 w-4" />
-              Sign Out
+              <a href="/api/auth/logout">
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </a>
             </Button>
           ) : (
             <Button
@@ -702,21 +719,15 @@ export default function Navbar() {
             <div className="mt-2 flex items-center justify-between border-t border-border/50 pt-3">
               {user ? (
                 <Button
+                  asChild
                   variant="ghost"
                   size="sm"
-                  onClick={async () => {
-                    await fetch("/api/auth/logout", {
-                      method: "POST",
-                      credentials: "include",
-                    })
-
-                    window.location.href =
-                      "/signed-out?logout=true"
-                  }}
                   className="gap-2"
                 >
-                  <LogOut className="h-4 w-4" />
-                  Logout
+                  <a href="/api/auth/logout">
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </a>
                 </Button>
               ) : (
                 <Button
