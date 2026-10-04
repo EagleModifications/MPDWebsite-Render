@@ -10,7 +10,6 @@ import {
 import {
   Activity,
   ArrowRight,
-  Check,
   Clipboard,
   Copy,
   FileEdit,
