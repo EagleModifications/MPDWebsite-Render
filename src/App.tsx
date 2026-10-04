@@ -198,32 +198,32 @@ export default function App() {
         />
 
         <Route
-          path="/documents/mainroster"
+          path="/documents/rosters/mainroster"
           element={<MainRoster />}
         />
 
         <Route
-          path="/documents/swatroster"
+          path="/documents/rosters/swatroster"
           element={<SWATRoster />}
         />
 
         <Route
-          path="/documents/mcdroster"
+          path="/documents/rosters/mcdroster"
           element={<MCDRoster />}
         />
 
         <Route
-          path="/documents/truroster"
+          path="/documents/rosters/truroster"
           element={<TRURoster />}
         />
 
         <Route
-          path="/documents/FTDroster"
+          path="/documents/rosters/FTDroster"
           element={<FTDRoster />}
         />
 
         <Route
-          path="/documents/globalsop"
+          path="/documents/sops/globalsop"
           element={<GlobalSOP />}
         />
 
