@@ -23,7 +23,7 @@ import {
 
 import { hasPermission } from "./permissions/permissions"
 import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
-import { registerPromotionActionLogRoutes } from "./promotion/actionLogs"
+import { logAction, registerActionLogRoutes } from "./actionLogs"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
@@ -3538,6 +3538,23 @@ async function handleActivityImport(
       },
     )
 
+    logAction(user, {
+      module: "activity",
+      action: "import-activity",
+      status: "imported",
+      division,
+      summary:
+        `${division.toUpperCase()} activity import updated ` +
+        `${hours.length} members.`,
+      details: {
+        added,
+        updated,
+        imported: rows.length,
+        totalMembers: hours.length,
+      },
+      path: req.path,
+    })
+
     return res.json({
       success: true,
 
@@ -3715,6 +3732,23 @@ async function handlePromotionImport(
         points,
       },
     )
+
+    logAction(user, {
+      module: "promotion",
+      action: "import-promotion",
+      status: "imported",
+      division,
+      summary:
+        `${division.toUpperCase()} promotion import updated ` +
+        `${points.length} members.`,
+      details: {
+        added,
+        updated,
+        imported: rows.length,
+        totalMembers: points.length,
+      },
+      path: req.path,
+    })
 
     return res.json({
       success: true,
@@ -3905,6 +3939,36 @@ async function handleActivityRequirementsSave(
         requirements,
       )
 
+    logAction(user, {
+      module: "activity",
+      action: "update-requirements",
+      status: "updated",
+      division,
+      summary:
+        `${division.toUpperCase()} activity requirements were updated.`,
+      details: {
+        ranksConfigured:
+          Object.keys(
+            requirements,
+          ).length,
+        ranks: Object.values(
+          requirements,
+        ).map((item) => ({
+          rank:
+            item.rankName ||
+            item.rankId,
+          hours: item.hours,
+          timeInRankDays:
+            item.timeInRankDays,
+          trainingLogs:
+            item.trainingLogs,
+          recruitmentLogs:
+            item.recruitmentLogs,
+        })),
+      },
+      path: req.path,
+    })
+
     return res.json({
       success: true,
 
@@ -4059,6 +4123,30 @@ async function handlePromotionRequirementsSave(
         division,
         requirements,
       )
+
+    logAction(user, {
+      module: "promotion",
+      action: "update-requirements",
+      status: "updated",
+      division,
+      summary:
+        `${division.toUpperCase()} promotion requirements were updated.`,
+      details: {
+        ranksConfigured:
+          Object.keys(
+            requirements,
+          ).length,
+        ranks: Object.values(
+          requirements,
+        ).map((item) => ({
+          rank:
+            item.rankName ||
+            item.rankId,
+          points: item.points,
+        })),
+      },
+      path: req.path,
+    })
 
     return res.json({
       success: true,
@@ -4333,8 +4421,8 @@ export function createApp() {
   // These must be registered before the React fallback so /api/admin/*
   // requests are handled by Express instead of becoming 404 responses.
   registerPermissionAdminRoutes(app)
-  // Promotion Action Logs API. The action-log module has no Google roster-sync dependency.
-  registerPromotionActionLogRoutes(app)
+  // Action Logs API. Logs are kept in-memory for the last 14 days.
+  registerActionLogRoutes(app)
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
