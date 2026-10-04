@@ -1,36 +1,36 @@
 import type { Express, Request, Response } from "express"
 
-import { getMongoDb } from "../../src/lib/mongodb"
+import { getRequestUser } from "../auth/session"
 import {
   ensurePermissionStore,
   getAdminRanks,
+  getDiscordPermissionDocuments,
+  getPermissionDefinitions,
+  getPermissionStore,
+  getProtectedAdminUrls,
+  getSuperAdminDiscordIds,
+  getRankPermissionDocuments,
   hasPermission,
   isAdminRank,
   isSuperAdmin,
-  type DiscordPermissionDocument,
-  type PermissionDocument,
-  type RankPermissionDocument,
+  PERMISSION_ADMIN,
+  PERMISSIONS_COLLECTION,
+  savePermissionStore,
+  uniqueStrings,
+  type PermissionDefinition,
+  type PermissionStoreDocument,
 } from "./permissions"
-import { getRequestUser } from "../auth/session"
-
-const PERMISSIONS = "permissionDefinitions"
-const RANKS = "rankPermissions"
-const DISCORD = "discordPermissionOverrides"
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
-function uniqueStrings(values: unknown): string[] {
-  if (!Array.isArray(values)) return []
-
-  return Array.from(
-    new Set(values.map(clean).filter(Boolean)),
-  )
+function validPermissionKey(value: string): boolean {
+  return /^[a-z0-9][a-z0-9_-]*$/.test(value)
 }
 
-function validPermissionKey(value: string) {
-  return /^[a-z0-9][a-z0-9_-]*$/.test(value)
+function validDiscordId(value: string): boolean {
+  return /^\d{17,20}$/.test(value)
 }
 
 async function requirePermissionAdmin(
@@ -44,7 +44,7 @@ async function requirePermissionAdmin(
     return null
   }
 
-  if (!hasPermission(user, "permissionadmin")) {
+  if (!hasPermission(user, PERMISSION_ADMIN)) {
     res.status(403).json({
       error: "You do not have permission to manage permissions.",
     })
@@ -64,25 +64,15 @@ export function registerPermissionAdminRoutes(app: Express) {
       const user = await requirePermissionAdmin(req, res)
       if (!user) return
 
-      const db = await getMongoDb()
-
-      const [permissions, ranks, discordOverrides] = await Promise.all([
-        db.collection<PermissionDocument>(PERMISSIONS)
-          .find({})
-          .sort({ key: 1 })
-          .toArray(),
-        db.collection<RankPermissionDocument>(RANKS)
-          .find({})
-          .sort({ rank: 1 })
-          .toArray(),
-        db.collection<DiscordPermissionDocument>(DISCORD)
-          .find({})
-          .sort({ discordId: 1 })
-          .toArray(),
+      const [definitions, ranks, discord] = await Promise.all([
+        getPermissionDefinitions(),
+        getRankPermissionDocuments(),
+        getDiscordPermissionDocuments(),
       ])
 
       return res.json({
-        permissions: permissions.map((item) => ({
+        success: true,
+        permissions: definitions.map((item) => ({
           key: item.key,
           name: item.name ?? item.key,
           description: item.description ?? "",
@@ -93,12 +83,14 @@ export function registerPermissionAdminRoutes(app: Express) {
           permissions: uniqueStrings(item.permissions),
           isAdminRank: isAdminRank(item.rank),
         })),
-        discordOverrides: discordOverrides.map((item) => ({
+        discordPermissions: discord.map((item) => ({
           discordId: item.discordId,
           permissions: uniqueStrings(item.permissions),
           isSuperAdmin: isSuperAdmin(item.discordId),
         })),
         adminRanks: getAdminRanks(),
+        superAdminDiscordIds: getSuperAdminDiscordIds(),
+        protectedUrls: getProtectedAdminUrls(),
         currentUser: {
           discordId: user.discordId,
           rank: user.rank,
@@ -125,7 +117,14 @@ export function registerPermissionAdminRoutes(app: Express) {
 
       if (!key || !validPermissionKey(key)) {
         return res.status(400).json({
-          error: "Permission keys may only contain lowercase letters, numbers, hyphens, and underscores.",
+          error:
+            "Permission keys may only contain lowercase letters, numbers, hyphens, and underscores.",
+        })
+      }
+
+      if (key === PERMISSION_ADMIN) {
+        return res.status(400).json({
+          error: `${PERMISSION_ADMIN} is a protected system permission and is controlled by admin_permissions.json.`,
         })
       }
 
@@ -133,26 +132,27 @@ export function registerPermissionAdminRoutes(app: Express) {
         return res.status(400).json({ error: "Add at least one URL." })
       }
 
-      const db = await getMongoDb()
-      const existing = await db
-        .collection<PermissionDocument>(PERMISSIONS)
-        .findOne({ key })
-
-      if (existing) {
-        return res.status(409).json({ error: "That permission already exists." })
+      const store = await getPermissionStore()
+      if (store.definitions.some((item) => item.key === key)) {
+        return res.status(409).json({
+          error: "That permission already exists.",
+        })
       }
 
-      const now = new Date()
-      await db.collection<PermissionDocument>(PERMISSIONS).insertOne({
+      const permission: PermissionDefinition = {
         key,
         name,
         description,
         urls,
-        createdAt: now,
-        updatedAt: now,
-      })
+      }
 
-      return res.status(201).json({ success: true })
+      store.definitions.push(permission)
+      await savePermissionStore(store)
+
+      return res.status(201).json({
+        success: true,
+        permission,
+      })
     } catch (error) {
       console.error("POST /api/admin/permissions failed:", error)
       return res.status(500).json({ error: "Failed to create permission." })
@@ -173,24 +173,32 @@ export function registerPermissionAdminRoutes(app: Express) {
         return res.status(400).json({ error: "Invalid permission data." })
       }
 
-      const db = await getMongoDb()
-      const result = await db.collection<PermissionDocument>(PERMISSIONS).updateOne(
-        { key },
-        {
-          $set: {
-            name,
-            description,
-            urls,
-            updatedAt: new Date(),
-          },
-        },
-      )
+      if (key === PERMISSION_ADMIN) {
+        return res.status(400).json({
+          error: `${PERMISSION_ADMIN} is a protected system permission and is controlled by admin_permissions.json.`,
+        })
+      }
 
-      if (!result.matchedCount) {
+      const store = await getPermissionStore()
+      const index = store.definitions.findIndex((item) => item.key === key)
+
+      if (index < 0) {
         return res.status(404).json({ error: "Permission not found." })
       }
 
-      return res.json({ success: true })
+      store.definitions[index] = {
+        key,
+        name,
+        description,
+        urls,
+      }
+
+      await savePermissionStore(store)
+
+      return res.json({
+        success: true,
+        permission: store.definitions[index],
+      })
     } catch (error) {
       console.error("PUT /api/admin/permissions failed:", error)
       return res.status(500).json({ error: "Failed to update permission." })
@@ -204,31 +212,30 @@ export function registerPermissionAdminRoutes(app: Express) {
 
       const key = clean(req.params.key).toLowerCase()
 
-      // permissionadmin is virtual and must never be created/deleted from Mongo.
-      if (key === "permissionadmin") {
+      if (key === PERMISSION_ADMIN) {
         return res.status(400).json({
-          error: "permissionadmin is a protected system permission.",
+          error: `${PERMISSION_ADMIN} is a protected system permission.`,
         })
       }
 
-      const db = await getMongoDb()
-      const result = await db
-        .collection<PermissionDocument>(PERMISSIONS)
-        .deleteOne({ key })
+      const store = await getPermissionStore()
+      const exists = store.definitions.some((item) => item.key === key)
 
-      if (!result.deletedCount) {
+      if (!exists) {
         return res.status(404).json({ error: "Permission not found." })
       }
 
-      await db.collection<RankPermissionDocument>(RANKS).updateMany(
-        {},
-        { $pull: { permissions: key } },
-      )
-      await db.collection<DiscordPermissionDocument>(DISCORD).updateMany(
-        {},
-        { $pull: { permissions: key } },
-      )
+      store.definitions = store.definitions.filter((item) => item.key !== key)
+      store.ranks = store.ranks.map((item) => ({
+        ...item,
+        permissions: item.permissions.filter((permission) => permission !== key),
+      }))
+      store.discord = store.discord.map((item) => ({
+        ...item,
+        permissions: item.permissions.filter((permission) => permission !== key),
+      }))
 
+      await savePermissionStore(store)
       return res.json({ success: true })
     } catch (error) {
       console.error("DELETE /api/admin/permissions failed:", error)
@@ -248,24 +255,22 @@ export function registerPermissionAdminRoutes(app: Express) {
         return res.status(400).json({ error: "Rank name is required." })
       }
 
-      const db = await getMongoDb()
-      const existing = await db
-        .collection<RankPermissionDocument>(RANKS)
-        .findOne({ rank })
-
-      if (existing) {
+      const store = await getPermissionStore()
+      if (store.ranks.some((item) => item.rank.toLowerCase() === rank.toLowerCase())) {
         return res.status(409).json({ error: "That rank already exists." })
       }
 
-      const now = new Date()
-      await db.collection<RankPermissionDocument>(RANKS).insertOne({
-        rank,
-        permissions,
-        createdAt: now,
-        updatedAt: now,
-      })
+      store.ranks.push({ rank, permissions })
+      await savePermissionStore(store)
 
-      return res.status(201).json({ success: true })
+      return res.status(201).json({
+        success: true,
+        rank: {
+          rank,
+          permissions,
+          isAdminRank: isAdminRank(rank),
+        },
+      })
     } catch (error) {
       console.error("POST /api/admin/ranks failed:", error)
       return res.status(500).json({ error: "Failed to create rank." })
@@ -285,42 +290,39 @@ export function registerPermissionAdminRoutes(app: Express) {
         return res.status(400).json({ error: "Rank name is required." })
       }
 
-      // Admin status is deliberately controlled only by admin_permissions.json.
-      // Do not allow the admin page to rename/remove the security bootstrap rank.
-      if (isAdminRank(oldRank) && newRank !== oldRank) {
+      if (isAdminRank(oldRank) && newRank.toLowerCase() !== oldRank.toLowerCase()) {
         return res.status(400).json({
-          error: "Admin ranks are controlled by config/admin_permissions.json and cannot be renamed here.",
+          error:
+            "Admin ranks are controlled by config/admin_permissions.json and cannot be renamed here.",
         })
       }
 
-      const db = await getMongoDb()
-      const update: Record<string, unknown> = {
-        permissions,
-        updatedAt: new Date(),
-      }
-
-      if (newRank !== oldRank) {
-        const duplicate = await db
-          .collection<RankPermissionDocument>(RANKS)
-          .findOne({ rank: newRank })
-
-        if (duplicate) {
-          return res.status(409).json({ error: "That rank already exists." })
-        }
-
-        update.rank = newRank
-      }
-
-      const result = await db.collection<RankPermissionDocument>(RANKS).updateOne(
-        { rank: oldRank },
-        { $set: update },
+      const store = await getPermissionStore()
+      const index = store.ranks.findIndex(
+        (item) => item.rank.toLowerCase() === oldRank.toLowerCase(),
       )
 
-      if (!result.matchedCount) {
+      if (index < 0) {
         return res.status(404).json({ error: "Rank not found." })
       }
 
-      return res.json({ success: true })
+      const duplicate = store.ranks.some(
+        (item, itemIndex) =>
+          itemIndex !== index &&
+          item.rank.toLowerCase() === newRank.toLowerCase(),
+      )
+
+      if (duplicate) {
+        return res.status(409).json({ error: "That rank already exists." })
+      }
+
+      store.ranks[index] = {
+        rank: newRank,
+        permissions,
+      }
+
+      await savePermissionStore(store)
+      return res.json({ success: true, rank: store.ranks[index] })
     } catch (error) {
       console.error("PUT /api/admin/ranks failed:", error)
       return res.status(500).json({ error: "Failed to update rank." })
@@ -336,19 +338,22 @@ export function registerPermissionAdminRoutes(app: Express) {
 
       if (isAdminRank(rank)) {
         return res.status(400).json({
-          error: "Admin ranks are controlled by config/admin_permissions.json and cannot be deleted here.",
+          error:
+            "Admin ranks are controlled by config/admin_permissions.json and cannot be deleted here.",
         })
       }
 
-      const db = await getMongoDb()
-      const result = await db
-        .collection<RankPermissionDocument>(RANKS)
-        .deleteOne({ rank })
+      const store = await getPermissionStore()
+      const before = store.ranks.length
+      store.ranks = store.ranks.filter(
+        (item) => item.rank.toLowerCase() !== rank.toLowerCase(),
+      )
 
-      if (!result.deletedCount) {
+      if (store.ranks.length === before) {
         return res.status(404).json({ error: "Rank not found." })
       }
 
+      await savePermissionStore(store)
       return res.json({ success: true })
     } catch (error) {
       console.error("DELETE /api/admin/ranks failed:", error)
@@ -364,36 +369,39 @@ export function registerPermissionAdminRoutes(app: Express) {
       const discordId = clean(req.body?.discordId)
       const permissions = uniqueStrings(req.body?.permissions)
 
-      if (!/^\d{17,20}$/.test(discordId)) {
+      if (!validDiscordId(discordId)) {
         return res.status(400).json({ error: "Enter a valid Discord user ID." })
       }
 
-      // Super admins are controlled exclusively by JSON and cannot be changed here.
       if (isSuperAdmin(discordId)) {
         return res.status(400).json({
-          error: "That Discord ID is a Super Admin and is controlled by config/admin_permissions.json.",
+          error:
+            "That Discord ID is a Super Admin and is controlled by config/admin_permissions.json.",
         })
       }
 
-      const db = await getMongoDb()
-      const now = new Date()
-
-      await db.collection<DiscordPermissionDocument>(DISCORD).updateOne(
-        { discordId },
-        {
-          $set: {
-            permissions,
-            updatedAt: now,
-          },
-          $setOnInsert: {
-            discordId,
-            createdAt: now,
-          },
-        },
-        { upsert: true },
+      const store = await getPermissionStore()
+      const existing = store.discord.findIndex(
+        (item) => item.discordId === discordId,
       )
 
-      return res.json({ success: true })
+      const entry = { discordId, permissions }
+
+      if (existing >= 0) {
+        store.discord[existing] = entry
+      } else {
+        store.discord.push(entry)
+      }
+
+      await savePermissionStore(store)
+
+      return res.json({
+        success: true,
+        discordPermission: {
+          ...entry,
+          isSuperAdmin: false,
+        },
+      })
     } catch (error) {
       console.error("POST /api/admin/discord-permissions failed:", error)
       return res.status(500).json({ error: "Failed to save Discord permissions." })
@@ -409,23 +417,30 @@ export function registerPermissionAdminRoutes(app: Express) {
 
       if (isSuperAdmin(discordId)) {
         return res.status(400).json({
-          error: "Super Admin Discord IDs are controlled by config/admin_permissions.json.",
+          error:
+            "Super Admin Discord IDs are controlled by config/admin_permissions.json.",
         })
       }
 
-      const db = await getMongoDb()
-      const result = await db
-        .collection<DiscordPermissionDocument>(DISCORD)
-        .deleteOne({ discordId })
+      const store = await getPermissionStore()
+      const before = store.discord.length
+      store.discord = store.discord.filter(
+        (item) => item.discordId !== discordId,
+      )
 
-      if (!result.deletedCount) {
-        return res.status(404).json({ error: "Discord override not found." })
+      if (store.discord.length === before) {
+        return res.status(404).json({
+          error: "Discord permissions not found.",
+        })
       }
 
+      await savePermissionStore(store)
       return res.json({ success: true })
     } catch (error) {
       console.error("DELETE /api/admin/discord-permissions failed:", error)
-      return res.status(500).json({ error: "Failed to remove Discord permissions." })
+      return res.status(500).json({
+        error: "Failed to remove Discord permissions.",
+      })
     }
   })
 }
