@@ -246,6 +246,7 @@ export default function ActionLogs() {
 
       setContextMenu(null)
     },
+    [],
   )
 
   const loadLogs = useCallback(async () => {
@@ -378,6 +379,7 @@ export default function ActionLogs() {
     setFrom("")
     setTo("")
     setPage(1)
+    setExpanded(null)
   }
 
   const openContextMenu = (
