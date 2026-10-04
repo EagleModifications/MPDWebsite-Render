@@ -569,6 +569,7 @@ export default function PromotionRoster() {
 
     if (member) {
       logAction({
+        module: "promotion",
         action: wasSelected ? "deselect-member" : "select-member",
         category: "roster",
         division,
@@ -620,6 +621,7 @@ export default function PromotionRoster() {
     )
 
     logAction({
+      module: "promotion",
       action: "select-rank",
       category: "roster",
       division,
@@ -683,6 +685,7 @@ export default function PromotionRoster() {
     }
 
     logAction({
+      module: "promotion",
       action: allSelected ? "deselect-all-visible" : "select-all-visible",
       category: "roster",
       division,
@@ -874,6 +877,7 @@ export default function PromotionRoster() {
       )
 
       logAction({
+        module: "promotion",
         action: "copy-roster",
         category: "roster",
         division,
@@ -919,6 +923,7 @@ export default function PromotionRoster() {
     setSelectedCopied(false)
 
     logAction({
+      module: "promotion",
       action: "filter-status",
       category: "roster",
       division,
@@ -935,6 +940,7 @@ export default function PromotionRoster() {
     )
 
     logAction({
+      module: "promotion",
       action: "filter-status",
       category: "roster",
       division,
@@ -947,6 +953,7 @@ export default function PromotionRoster() {
   const clearStatuses = () => {
     setStatusFilters([])
     logAction({
+      module: "promotion",
       action: "clear-status-filters",
       category: "roster",
       division,
@@ -981,6 +988,7 @@ export default function PromotionRoster() {
     })
 
     logAction({
+      module: "promotion",
       action: "filter-rank",
       category: "roster",
       division,
@@ -995,6 +1003,7 @@ export default function PromotionRoster() {
   const selectAllRanks = () => {
     setRankFilters([...rankOptions])
     logAction({
+      module: "promotion",
       action: "filter-rank",
       category: "roster",
       division,
@@ -1007,6 +1016,7 @@ export default function PromotionRoster() {
   const clearRanks = () => {
     setRankFilters([])
     logAction({
+      module: "promotion",
       action: "clear-rank-filters",
       category: "roster",
       division,
@@ -1026,6 +1036,7 @@ export default function PromotionRoster() {
     setSelectedCopied(false)
 
     logAction({
+      module: "promotion",
       action: "clear-filters",
       category: "roster",
       division,
@@ -1063,6 +1074,7 @@ export default function PromotionRoster() {
       await navigator.clipboard.writeText(member.discordId)
 
       logAction({
+        module: "promotion",
         action: "copy-discord-id",
         category: "roster",
         division,
@@ -1132,6 +1144,7 @@ export default function PromotionRoster() {
                       }
 
                       logAction({
+                        module: "promotion",
                         action: "change-division",
                         category: "navigation",
                         division: item.id,
@@ -1520,6 +1533,22 @@ export default function PromotionRoster() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Clear Filters */}
+
+            {hasFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="gap-2"
+              >
+                <X className="h-4 w-4" />
+
+                Clear
+              </Button>
+            )}
+
             {/* Selected Copy Actions */}
 
             {selectedIds.length > 0 && (
@@ -1758,21 +1787,6 @@ export default function PromotionRoster() {
               </DropdownMenu>
             )}
 
-            {/* Clear Filters */}
-
-            {hasFilters && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="shrink-0 gap-2"
-              >
-                <X className="h-4 w-4" />
-                Clear
-              </Button>
-            )}
-
             {/* Google Sheets Refresh */}
 
             <GoogleRosterRefresh
@@ -1784,38 +1798,14 @@ export default function PromotionRoster() {
 
           {/* Active Filters */}
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Filter className="h-3.5 w-3.5" />
+          {(statusFilters.length > 0 ||
+            rankFilters.length > 0) && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Filter className="h-3.5 w-3.5" />
 
-              Filters:
-            </div>
-
-            {search.trim() ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("")
-                  setSelectedCopied(false)
-                }}
-                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
-                title="Clear search filter"
-              >
-                <Search className="h-3 w-3 shrink-0" />
-                <span className="max-w-[280px] truncate">
-                  Search: {search.trim()}
-                </span>
-                <X className="h-3 w-3 shrink-0" />
-              </button>
-            ) : null}
-
-            {statusFilters.length === 0 &&
-              rankFilters.length === 0 &&
-              !search.trim() && (
-                <span className="rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                  None
-                </span>
-              )}
+                Active filters:
+              </div>
 
               {statusFilters.map(
                 (status) => {
@@ -1867,7 +1857,8 @@ export default function PromotionRoster() {
                   </button>
                 ),
               )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Error */}
