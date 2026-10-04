@@ -77,6 +77,9 @@ type CopyType =
   | "callsign-name-discord"
   | "callsign-badge-discord"
   | "name-badge-discord"
+  | "callsign-badge-name"
+  | "callsign-badge-name-discord"
+  | "name-rank-discord"
   | "full"
 
 const divisions: {
@@ -816,6 +819,27 @@ export default function PromotionRoster() {
         )
         break
 
+      case "callsign-badge-name":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.badgeNumber} — ${member.name}`,
+        )
+        break
+
+      case "callsign-badge-name-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.badgeNumber} — ${member.name} — ${member.discordId}`,
+        )
+        break
+
+      case "name-rank-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.name} — ${member.rank} — ${member.discordId}`,
+        )
+        break
+
       case "full":
         values = selectedMembers.map(
           (member) => {
@@ -880,6 +904,10 @@ export default function PromotionRoster() {
         "callsign-name-discord": "Callsign + Name + Discord ID",
         "callsign-badge-discord": "Callsign + Badge Number + Discord ID",
         "name-badge-discord": "Name + Badge Number + Discord ID",
+        "callsign-badge-name": "Callsign + Badge Number + Name",
+        "callsign-badge-name-discord":
+          "Callsign + Badge Number + Name + Discord ID",
+        "name-rank-discord": "Name + Rank + Discord ID",
         full: "Full Roster",
       }
 
@@ -1776,6 +1804,42 @@ export default function PromotionRoster() {
                       Name + Badge + Discord
                     </DropdownMenuItem>
 
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "callsign-badge-name",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Callsign + Badge + Name
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "callsign-badge-name-discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Callsign + Badge + Name + Discord
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "name-rank-discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Name + Rank + Discord
+                    </DropdownMenuItem>
+
                     <div className="my-1 h-px bg-border" />
 
                     <DropdownMenuItem
@@ -1961,9 +2025,9 @@ export default function PromotionRoster() {
                     <col className="w-[7%]" />
                   </colgroup>
 
-                  <thead className="sticky top-0 z-30 bg-card">
-                    <tr className="border-b bg-muted/30 text-center">
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center">
+                  <thead className="sticky top-0 z-40 bg-card">
+                    <tr className="border-b bg-card text-center">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center shadow-[0_1px_0_hsl(var(--border))]">
                         <div className="flex justify-center">
                           <Checkbox
                             checked={
@@ -1977,57 +2041,57 @@ export default function PromotionRoster() {
                         </div>
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Callsign
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Badge
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Name
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Rank
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Discord ID
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         <span className="block truncate">
                           Time in Dept
                         </span>
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         <span className="block truncate">
                           Time in Rank
                         </span>
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         <span className="block truncate">
                           Required Time in Rank
                         </span>
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Required Logs
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Required Hours
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Hours
                       </th>
 
-                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Status
                       </th>
                     </tr>
@@ -2141,7 +2205,7 @@ export default function PromotionRoster() {
                                     title={
                                       member.discordId
                                     }
-                                    className="mx-auto block max-w-full truncate rounded-md px-1.5 py-1 font-mono text-[10px] text-blue-400"
+                                    className="mx-auto block max-w-full truncate bg-transparent px-1.5 py-1 font-mono text-[10px] text-blue-400 outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
                                   >
                                     {
                                       member.discordId
@@ -2475,7 +2539,7 @@ export default function PromotionRoster() {
                                 <DropdownMenuTrigger asChild>
                                   <button
                                     type="button"
-                                    className="min-w-0 max-w-[calc(100%-60px)] truncate rounded-md px-2 py-1 font-mono text-[11px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+                                    className="min-w-0 max-w-[calc(100%-60px)] truncate bg-transparent px-2 py-1 font-mono text-[11px] text-blue-400 outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
                                   >
                                     {
                                       member.discordId
