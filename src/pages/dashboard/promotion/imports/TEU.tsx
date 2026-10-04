@@ -13,7 +13,6 @@ import {
 } from "lucide-react"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
-import { logPromotionAction } from "@/lib/promotionActionLog"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 
@@ -26,8 +25,6 @@ type ImportResult = {
   imported?: number
   totalMembers?: number
 }
-
-const PROMOTION_LOG_DIVISION = "teu" as const
 
 const IMPORT_ENDPOINT =
   "/api/import/promotion/teu"
@@ -87,15 +84,6 @@ export default function TEUImport() {
   }
 
   function clearAllData() {
-    if (hasData) {
-      logPromotionAction({
-        action: "clear-import-data",
-        category: "import",
-        division: PROMOTION_LOG_DIVISION,
-        summary: `Cleared ${PROMOTION_LOG_DIVISION.toUpperCase()} promotion import data.`,
-      })
-    }
-
     setPasteData("")
     setFileName("")
     setFile(null)
@@ -113,14 +101,6 @@ export default function TEUImport() {
       )
 
       setCopiedCommand(commandId)
-
-      logPromotionAction({
-        action: "copy-import-command",
-        category: "import",
-        division: PROMOTION_LOG_DIVISION,
-        summary: `Copied a promotion import command for ${PROMOTION_LOG_DIVISION}.`,
-        details: { commandId },
-      })
 
       window.setTimeout(() => {
         setCopiedCommand((current) =>
@@ -354,21 +334,6 @@ export default function TEUImport() {
             "TEU promotion data was imported successfully.",
         },
       )
-
-      logPromotionAction({
-        action: "import-promotion",
-        category: "import",
-        division: PROMOTION_LOG_DIVISION,
-        summary: `Imported ${PROMOTION_LOG_DIVISION.toUpperCase()} promotion data.`,
-        details: {
-          source: file && !pasteData.trim() ? "file" : "paste",
-          fileName: fileName || undefined,
-          resultMessage: result?.message || undefined,
-          added: result?.added ?? result?.imported ?? undefined,
-          updated: result?.updated ?? undefined,
-          totalMembers: result?.totalMembers ?? undefined,
-        },
-      })
 
       setPasteData("")
       setFileName("")
