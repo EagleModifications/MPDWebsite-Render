@@ -504,6 +504,9 @@ export default function Gallery() {
   const [uploadProgress, setUploadProgress] =
     useState<number | null>(null)
 
+  const [savingStage, setSavingStage] =
+    useState<"upload" | "import" | "save" | null>(null)
+
   const [deletingId, setDeletingId] =
     useState<string | null>(null)
 
@@ -939,6 +942,7 @@ export default function Gallery() {
       formData.append("files", file, file.name)
     }
 
+    setSavingStage("upload")
     setUploadProgress(0)
 
     const result = await new Promise<{
@@ -1040,6 +1044,7 @@ export default function Gallery() {
     }
 
     setSaving(true)
+    setSavingStage("save")
     setUploadProgress(null)
 
     try {
@@ -1069,6 +1074,48 @@ export default function Gallery() {
           continue
         }
 
+        // YouTube/Vimeo URLs are imported server-side into GridFS before
+        // the gallery document is saved. After this point they are treated
+        // exactly like a normal uploaded video file.
+        if (
+          item.source === "url" &&
+          item.type === "video" &&
+          (Boolean(getYouTubeVideoId(item.url)) ||
+            Boolean(getVimeoVideoId(item.url)))
+        ) {
+          setSavingStage("import")
+          setUploadProgress(0)
+
+          const importResponse = await fetch(
+            "/api/gallery/import-url",
+            {
+              method: "POST",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                url: item.url,
+              }),
+            },
+          )
+
+          const importData = await importResponse
+            .json()
+            .catch(() => ({}))
+
+          if (!importResponse.ok || !importData.item) {
+            throw new Error(
+              importData.error ||
+                "Failed to import the video URL.",
+            )
+          }
+
+          media.push(importData.item as GalleryMedia)
+          setUploadProgress(100)
+          continue
+        }
+
         media.push({
           id: item.id,
           type: item.type,
@@ -1081,6 +1128,9 @@ export default function Gallery() {
             item.storageId,
         })
       }
+
+      setSavingStage("save")
+      setUploadProgress(null)
 
       const response =
         await fetch(
@@ -1159,6 +1209,7 @@ export default function Gallery() {
       )
     } finally {
       setSaving(false)
+      setSavingStage(null)
       setUploadProgress(null)
     }
   }
@@ -2416,9 +2467,11 @@ export default function Gallery() {
                 disabled={saving}
               >
                 {saving
-                  ? uploadProgress !== null && uploadProgress < 100
+                  ? savingStage === "upload" && uploadProgress !== null && uploadProgress < 100
                     ? `Uploading ${uploadProgress}%...`
-                    : "Saving..."
+                    : savingStage === "import"
+                      ? "Importing video..."
+                      : "Saving..."
                   : editingItem
                     ? "Save Changes"
                     : "Create Gallery"}
@@ -3136,9 +3189,12 @@ function GalleryMediaCollage({
                   onClick={() => onClick(visible[3])}
                 />
                 <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center text-white">
-                  <Images className="h-7 w-7" />
-                  <span className="mt-1 text-sm font-semibold">
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
+                    <Images className="h-3.5 w-3.5" />
+                  </span>
+
+                  <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
                     +{extraCount} {extraCount === 1 ? "image/video" : "images/videos"}
                   </span>
                 </div>
