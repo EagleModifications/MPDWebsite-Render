@@ -15,8 +15,6 @@ import {
   History,
   RefreshCw,
   Search,
-  Users,
-  UserRound,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
