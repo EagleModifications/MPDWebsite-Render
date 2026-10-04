@@ -278,6 +278,91 @@ type PromotionRequirementsDocument =
     updatedAt?: Date
   }
 
+type RequirementChange = {
+  rank: string
+  old: Record<string, unknown>
+  new: Record<string, unknown>
+}
+
+function buildActivityRequirementChanges(
+  oldRequirements: ActivityRequirements["requirements"],
+  newRequirements: ActivityRequirements["requirements"],
+): RequirementChange[] {
+  const ids = new Set([
+    ...Object.keys(oldRequirements),
+    ...Object.keys(newRequirements),
+  ])
+
+  return Array.from(ids)
+    .map((rankId) => {
+      const oldValue = oldRequirements[rankId]
+      const newValue = newRequirements[rankId]
+      const oldHours = Number(oldValue?.hours ?? 0)
+      const newHours = Number(newValue?.hours ?? 0)
+
+      if (oldHours === newHours) return null
+
+      return {
+        rank: newValue?.rankName || oldValue?.rankName || rankId,
+        old: { hours: oldHours },
+        new: { hours: newHours },
+      }
+    })
+    .filter((value): value is RequirementChange => Boolean(value))
+}
+
+function buildPromotionRequirementChanges(
+  oldRequirements: PromotionRequirements["requirements"],
+  newRequirements: PromotionRequirements["requirements"],
+): RequirementChange[] {
+  const ids = new Set([
+    ...Object.keys(oldRequirements),
+    ...Object.keys(newRequirements),
+  ])
+
+  return Array.from(ids)
+    .map((rankId) => {
+      const oldValue = oldRequirements[rankId]
+      const newValue = newRequirements[rankId]
+      const oldPoints = Number(oldValue?.points ?? 0)
+      const newPoints = Number(newValue?.points ?? 0)
+
+      if (oldPoints === newPoints) return null
+
+      return {
+        rank: newValue?.rankName || oldValue?.rankName || rankId,
+        old: { points: oldPoints },
+        new: { points: newPoints },
+      }
+    })
+    .filter((value): value is RequirementChange => Boolean(value))
+}
+
+function requirementChangeSummary(
+  division: string,
+  changes: RequirementChange[],
+  label: "hours" | "points",
+): string {
+  const displayDivision = division === "department"
+    ? "Department"
+    : division.toUpperCase()
+
+  if (!changes.length) {
+    return `${displayDivision} requirements saved with no changes.`
+  }
+
+  const visible = changes.slice(0, 4).map((change) => {
+    const next = Number(change.new[label] ?? 0)
+    return `${change.rank} → ${next} ${label}`
+  })
+
+  if (changes.length > visible.length) {
+    visible.push(`+${changes.length - visible.length} more`)
+  }
+
+  return visible.join(" • ")
+}
+
 /* ─────────────────────────────────────────────
    Events
 ───────────────────────────────────────────── */
@@ -2798,60 +2883,19 @@ async function readActivityRequirements(
         item.hours ?? 0,
       )
 
-    const timeInRankDays =
-      Number(
-        item.timeInRankDays ?? 0,
-      )
-
-    const trainingLogs =
-      Number(
-        item.trainingLogs ?? 0,
-      )
-
-    const recruitmentLogs =
-      Number(
-        item.recruitmentLogs ?? 0,
-      )
+    const timeInRankDays = Number(item.timeInRankDays ?? 0)
+    const trainingLogs = Number(item.trainingLogs ?? 0)
+    const recruitmentLogs = Number(item.recruitmentLogs ?? 0)
 
     requirements[
       cleanRankId
     ] = {
-      rankId:
-        cleanRankId,
-
+      rankId: cleanRankId,
       rankName,
-
-      hours:
-        Number.isFinite(hours)
-          ? Math.max(
-              0,
-              Math.floor(hours),
-            )
-          : 0,
-
-      timeInRankDays:
-        Number.isFinite(timeInRankDays)
-          ? Math.max(
-              0,
-              Math.floor(timeInRankDays),
-            )
-          : 0,
-
-      trainingLogs:
-        Number.isFinite(trainingLogs)
-          ? Math.max(
-              0,
-              Math.floor(trainingLogs),
-            )
-          : 0,
-
-      recruitmentLogs:
-        Number.isFinite(recruitmentLogs)
-          ? Math.max(
-              0,
-              Math.floor(recruitmentLogs),
-            )
-          : 0,
+      hours: Number.isFinite(hours) ? Math.max(0, Math.floor(hours)) : 0,
+      timeInRankDays: Number.isFinite(timeInRankDays) ? Math.max(0, Math.floor(timeInRankDays)) : 0,
+      trainingLogs: Number.isFinite(trainingLogs) ? Math.max(0, Math.floor(trainingLogs)) : 0,
+      recruitmentLogs: Number.isFinite(recruitmentLogs) ? Math.max(0, Math.floor(recruitmentLogs)) : 0,
     }
   }
 
@@ -2937,73 +2981,20 @@ async function writeActivityRequirements(
       existingRequirement?.rankName ||
       cleanRankId
 
-    const hours =
-      Number(
-        input.hours ??
-          existingRequirement?.hours ??
-          0,
-      )
-
-    const timeInRankDays =
-      Number(
-        input.timeInRankDays ??
-          existingRequirement?.timeInRankDays ??
-          0,
-      )
-
-    const trainingLogs =
-      Number(
-        input.trainingLogs ??
-          existingRequirement?.trainingLogs ??
-          0,
-      )
-
-    const recruitmentLogs =
-      Number(
-        input.recruitmentLogs ??
-          existingRequirement?.recruitmentLogs ??
-          0,
-      )
+    const hours = Number(input.hours ?? existingRequirement?.hours ?? 0)
+    const timeInRankDays = Number(input.timeInRankDays ?? existingRequirement?.timeInRankDays ?? 0)
+    const trainingLogs = Number(input.trainingLogs ?? existingRequirement?.trainingLogs ?? 0)
+    const recruitmentLogs = Number(input.recruitmentLogs ?? existingRequirement?.recruitmentLogs ?? 0)
 
     normalizedRequirements[
       cleanRankId
     ] = {
-      rankId:
-        cleanRankId,
-
+      rankId: cleanRankId,
       rankName,
-
-      hours:
-        Number.isFinite(hours)
-          ? Math.max(
-              0,
-              Math.floor(hours),
-            )
-          : 0,
-
-      timeInRankDays:
-        Number.isFinite(timeInRankDays)
-          ? Math.max(
-              0,
-              Math.floor(timeInRankDays),
-            )
-          : 0,
-
-      trainingLogs:
-        Number.isFinite(trainingLogs)
-          ? Math.max(
-              0,
-              Math.floor(trainingLogs),
-            )
-          : 0,
-
-      recruitmentLogs:
-        Number.isFinite(recruitmentLogs)
-          ? Math.max(
-              0,
-              Math.floor(recruitmentLogs),
-            )
-          : 0,
+      hours: Number.isFinite(hours) ? Math.max(0, Math.floor(hours)) : 0,
+      timeInRankDays: Number.isFinite(timeInRankDays) ? Math.max(0, Math.floor(timeInRankDays)) : 0,
+      trainingLogs: Number.isFinite(trainingLogs) ? Math.max(0, Math.floor(trainingLogs)) : 0,
+      recruitmentLogs: Number.isFinite(recruitmentLogs) ? Math.max(0, Math.floor(recruitmentLogs)) : 0,
     }
   }
 
@@ -3496,6 +3487,7 @@ async function handleActivityImport(
 
     let added = 0
     let updated = 0
+    const changes: Array<Record<string, unknown>> = []
 
     for (
       const [
@@ -3503,20 +3495,18 @@ async function handleActivityImport(
         hours,
       ] of rows
     ) {
-      if (
-        hoursByDiscordId.has(
-          discordId,
-        )
-      ) {
+      const previousHours = hoursByDiscordId.get(discordId)
+      if (previousHours !== undefined) {
         updated++
+        if (previousHours !== hours) {
+          changes.push({ discordId, old: previousHours, new: hours })
+        }
       } else {
         added++
+        changes.push({ discordId, old: null, new: hours })
       }
 
-      hoursByDiscordId.set(
-        discordId,
-        hours,
-      )
+      hoursByDiscordId.set(discordId, hours)
     }
 
     const hours =
@@ -3538,22 +3528,21 @@ async function handleActivityImport(
       },
     )
 
-    logAction(user, {
+    await logAction(user, {
       module: "activity",
       action: "import-activity",
-      status: "imported",
+      category: "import",
       division,
-      summary:
-        `${division.toUpperCase()} activity import updated ` +
-        `${hours.length} members.`,
+      summary: `${division === "department" ? "Department" : division.toUpperCase()} activity import updated ${changes.length} values.`,
       details: {
+        changes: changes.slice(0, 120),
         added,
         updated,
         imported: rows.length,
         totalMembers: hours.length,
       },
       path: req.path,
-    })
+    }) .catch((error) => console.error("[action-log] Failed to persist audit entry:", error))
 
     return res.json({
       success: true,
@@ -3691,6 +3680,7 @@ async function handlePromotionImport(
 
     let added = 0
     let updated = 0
+    const changes: Array<Record<string, unknown>> = []
 
     for (
       const [
@@ -3698,20 +3688,18 @@ async function handlePromotionImport(
         points,
       ] of rows
     ) {
-      if (
-        pointsByDiscordId.has(
-          discordId,
-        )
-      ) {
+      const previousPoints = pointsByDiscordId.get(discordId)
+      if (previousPoints !== undefined) {
         updated++
+        if (previousPoints !== points) {
+          changes.push({ discordId, old: previousPoints, new: points })
+        }
       } else {
         added++
+        changes.push({ discordId, old: null, new: points })
       }
 
-      pointsByDiscordId.set(
-        discordId,
-        points,
-      )
+      pointsByDiscordId.set(discordId, points)
     }
 
     const points =
@@ -3733,22 +3721,21 @@ async function handlePromotionImport(
       },
     )
 
-    logAction(user, {
+    await logAction(user, {
       module: "promotion",
       action: "import-promotion",
-      status: "imported",
+      category: "import",
       division,
-      summary:
-        `${division.toUpperCase()} promotion import updated ` +
-        `${points.length} members.`,
+      summary: `${division === "department" ? "Department" : division.toUpperCase()} promotion import updated ${changes.length} values.`,
       details: {
+        changes: changes.slice(0, 120),
         added,
         updated,
         imported: rows.length,
         totalMembers: points.length,
       },
       path: req.path,
-    })
+    }) .catch((error) => console.error("[action-log] Failed to persist audit entry:", error))
 
     return res.json({
       success: true,
@@ -3860,27 +3847,16 @@ async function handleActivityRequirementsSave(
           recruitmentLogs?: unknown
         }
 
-      const hours =
-        Number(input.hours ?? 0)
-
-      const timeInRankDays =
-        Number(input.timeInRankDays ?? 0)
-
-      const trainingLogs =
-        Number(input.trainingLogs ?? 0)
-
-      const recruitmentLogs =
-        Number(input.recruitmentLogs ?? 0)
+      const hours = Number(input.hours ?? 0)
+      const timeInRankDays = Number(input.timeInRankDays ?? 0)
+      const trainingLogs = Number(input.trainingLogs ?? 0)
+      const recruitmentLogs = Number(input.recruitmentLogs ?? 0)
 
       if (
-        !Number.isFinite(hours) ||
-        hours < 0 ||
-        !Number.isFinite(timeInRankDays) ||
-        timeInRankDays < 0 ||
-        !Number.isFinite(trainingLogs) ||
-        trainingLogs < 0 ||
-        !Number.isFinite(recruitmentLogs) ||
-        recruitmentLogs < 0
+        !Number.isFinite(hours) || hours < 0 ||
+        !Number.isFinite(timeInRankDays) || timeInRankDays < 0 ||
+        !Number.isFinite(trainingLogs) || trainingLogs < 0 ||
+        !Number.isFinite(recruitmentLogs) || recruitmentLogs < 0
       ) {
         return res.status(400).json({
           success: false,
@@ -3918,56 +3894,30 @@ async function handleActivityRequirementsSave(
 
         rankName,
 
-        hours:
-          Math.floor(hours),
-
-        timeInRankDays:
-          Math.floor(timeInRankDays),
-
-        trainingLogs:
-          Math.floor(trainingLogs),
-
-        recruitmentLogs:
-          Math.floor(recruitmentLogs),
+        hours: Math.floor(hours),
+        timeInRankDays: Math.floor(timeInRankDays),
+        trainingLogs: Math.floor(trainingLogs),
+        recruitmentLogs: Math.floor(recruitmentLogs),
       }
     }
 
-    const saved =
-      await writeActivityRequirements(
-        userId,
-        division,
-        requirements,
-      )
+    const previous = await readActivityRequirements(userId, division)
+    const saved = await writeActivityRequirements(userId, division, requirements)
+    const changes = buildActivityRequirementChanges(previous.requirements, saved.requirements)
 
-    logAction(user, {
+    await logAction(user, {
       module: "activity",
       action: "update-requirements",
-      status: "updated",
+      category: "requirements",
       division,
-      summary:
-        `${division.toUpperCase()} activity requirements were updated.`,
+      summary: requirementChangeSummary(division, changes, "hours"),
       details: {
-        ranksConfigured:
-          Object.keys(
-            requirements,
-          ).length,
-        ranks: Object.values(
-          requirements,
-        ).map((item) => ({
-          rank:
-            item.rankName ||
-            item.rankId,
-          hours: item.hours,
-          timeInRankDays:
-            item.timeInRankDays,
-          trainingLogs:
-            item.trainingLogs,
-          recruitmentLogs:
-            item.recruitmentLogs,
-        })),
+        changes,
+        changedRanks: changes.length,
+        totalRanks: Object.keys(saved.requirements).length,
       },
       path: req.path,
-    })
+    }) .catch((error) => console.error("[action-log] Failed to persist audit entry:", error))
 
     return res.json({
       success: true,
@@ -4117,36 +4067,23 @@ async function handlePromotionRequirementsSave(
       }
     }
 
-    const saved =
-      await writePromotionRequirements(
-        userId,
-        division,
-        requirements,
-      )
+    const previous = await readPromotionRequirements(userId, division)
+    const saved = await writePromotionRequirements(userId, division, requirements)
+    const changes = buildPromotionRequirementChanges(previous.requirements, saved.requirements)
 
-    logAction(user, {
+    await logAction(user, {
       module: "promotion",
       action: "update-requirements",
-      status: "updated",
+      category: "requirements",
       division,
-      summary:
-        `${division.toUpperCase()} promotion requirements were updated.`,
+      summary: requirementChangeSummary(division, changes, "points"),
       details: {
-        ranksConfigured:
-          Object.keys(
-            requirements,
-          ).length,
-        ranks: Object.values(
-          requirements,
-        ).map((item) => ({
-          rank:
-            item.rankName ||
-            item.rankId,
-          points: item.points,
-        })),
+        changes,
+        changedRanks: changes.length,
+        totalRanks: Object.keys(saved.requirements).length,
       },
       path: req.path,
-    })
+    }) .catch((error) => console.error("[action-log] Failed to persist audit entry:", error))
 
     return res.json({
       success: true,
