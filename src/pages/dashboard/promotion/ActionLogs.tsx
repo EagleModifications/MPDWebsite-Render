@@ -10,6 +10,7 @@ import {
 import {
     ChevronDown,
   ChevronUp,
+  Check,
   Clipboard,
   History,
   RefreshCw,
@@ -402,6 +403,7 @@ function CopyMenu({
   badgeNumber,
   rank,
   avatar,
+  large = false,
 }: {
   name: string
   id?: string
@@ -409,6 +411,7 @@ function CopyMenu({
   badgeNumber?: string
   rank?: string
   avatar?: string | null
+  large?: boolean
 }) {
   const display = name?.trim() || "Unknown User"
   const safeId = id?.trim() || ""
@@ -452,8 +455,15 @@ function CopyMenu({
           title="Copy options"
           className="inline-flex max-w-full items-center gap-2 rounded-md bg-transparent py-0.5 text-left outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
         >
-          <Avatar name={display} id={safeId} avatar={avatar} />
-          <span className="truncate text-xs font-medium text-blue-400">{display}</span>
+          <Avatar
+            name={display}
+            id={safeId}
+            avatar={avatar}
+            className={large ? "h-10 w-10" : "h-6 w-6"}
+          />
+          <span className={`truncate font-medium text-blue-400 ${large ? "text-sm" : "text-xs"}`}>
+            {display}
+          </span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -516,7 +526,6 @@ function FilterSelect({
           aria-label={ariaLabel}
           className={`inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground outline-none transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-white focus:outline-none ${className}`}
         >
-          {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-blue-400" /> : null}
           <span className="min-w-0 flex-1 truncate text-left">{selected?.label ?? ariaLabel}</span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         </button>
@@ -532,10 +541,16 @@ function FilterSelect({
           <DropdownMenuItem
             key={option.value || `all-${ariaLabel}`}
             onClick={() => onChange(option.value)}
-            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+            className={`h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs ${
+              option.value === value
+                ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/15 focus:text-blue-300"
+                : ""
+            }`}
           >
-            {option.value === value ? <span className="h-1.5 w-1.5 rounded-full bg-blue-400" /> : <span className="h-1.5 w-1.5" />}
-            <span>{option.label}</span>
+            <span className="min-w-0 flex-1 truncate">{option.label}</span>
+            {option.value === value ? (
+              <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-blue-400" />
+            ) : null}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -639,7 +654,13 @@ function ChangeList({ changes }: { changes: unknown }) {
   )
 }
 
-function DetailPanel({ log }: { log: ActionLog }) {
+function DetailPanel({
+  log,
+  profile,
+}: {
+  log: ActionLog
+  profile?: DiscordProfile
+}) {
   const details = log.details ?? {}
 
   const additionalDetails = Object.entries(details).filter(
@@ -662,12 +683,12 @@ function DetailPanel({ log }: { log: ActionLog }) {
 
             <div className="mt-1">
               <CopyMenu
-                name={log.userName || log.username || "Unknown user"}
+                name={profile?.displayName || log.userName || log.username || "Unknown user"}
                 id={log.userId}
                 callsign={log.callsign}
                 badgeNumber={log.badgeNumber}
                 rank={log.rank}
-                avatar={log.avatar}
+                avatar={profile?.avatar || log.avatar}
               />
             </div>
           </div>
@@ -1154,6 +1175,7 @@ export default function ActionLogs() {
                             badgeNumber={log.badgeNumber}
                             rank={log.rank}
                             avatar={profiles[log.userId]?.avatar || log.avatar}
+                            large
                           />
                         </div>
 
@@ -1194,7 +1216,12 @@ export default function ActionLogs() {
                         </div>
                       </button>
 
-                      {isOpen ? <DetailPanel log={log} /> : null}
+                      {isOpen ? (
+                        <DetailPanel
+                          log={log}
+                          profile={profiles[log.userId]}
+                        />
+                      ) : null}
                     </article>
                   )
                 })}
