@@ -284,6 +284,10 @@ export default function Navbar() {
             alt="Metro Police Department"
             className="h-11 w-auto"
           />
+
+          <span className="text-lg font-semibold tracking-tight text-foreground">
+            Metro Police Department
+          </span>
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
