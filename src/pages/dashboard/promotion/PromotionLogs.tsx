@@ -8,13 +8,23 @@ import {
 } from "react"
 
 import {
-    ChevronDown,
-  ChevronUp,
+  Activity,
   Check,
+  ChevronDown,
+  ChevronUp,
   Clipboard,
+  ClipboardCheck,
+  Copy,
+  FileDown,
   History,
+  MousePointerClick,
+  Navigation,
+  Pencil,
+  Plus,
   RefreshCw,
   Search,
+  Settings2,
+  Trash2,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -28,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 type Module = "" | "promotion" | "activity"
+
 type Category =
   | ""
   | "roster"
@@ -162,17 +173,18 @@ const getAvatarUrl = (discordId: string, avatar?: string | null) => {
 
   if (avatar) {
     const extension = avatar.startsWith("a_") ? "gif" : "png"
+
     return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.${extension}?size=128`
   }
 
   try {
     const index = Number(BigInt(discordId) % 6n)
+
     return `https://cdn.discordapp.com/embed/avatars/${index}.png?size=128`
   } catch {
     return undefined
   }
 }
-
 
 const relativeTime = (value: string) => {
   const timestamp = new Date(value).getTime()
@@ -190,12 +202,15 @@ const relativeTime = (value: string) => {
   if (seconds < 60) return `${seconds}s ago`
 
   const minutes = Math.floor(seconds / 60)
+
   if (minutes < 60) return `${minutes}m ago`
 
   const hours = Math.floor(minutes / 60)
+
   if (hours < 24) return `${hours}h ago`
 
   const days = Math.floor(hours / 24)
+
   if (days < 30) return `${days}d ago`
 
   return new Intl.DateTimeFormat(undefined, {
@@ -240,7 +255,10 @@ const dateHeading = (value: string) => {
     .toUpperCase()
 }
 
-function tagClass(type: "module" | "division" | "category", value?: string | null) {
+function tagClass(
+  type: "module" | "division" | "category",
+  value?: string | null,
+) {
   const key = (value ?? "").toLowerCase()
 
   if (type === "module") {
@@ -318,6 +336,7 @@ function statusLabel(log: ActionLog) {
   if (value.includes("import")) return "Imported"
   if (value.includes("delete") || value.includes("remove")) return "Removed"
   if (value.includes("create") || value.includes("add")) return "Created"
+
   return "Updated"
 }
 
@@ -341,6 +360,105 @@ function statusClass(log: ActionLog) {
   }
 
   return "border-blue-500/20 bg-blue-500/10 text-blue-400"
+}
+
+/*
+ * Action icon shown between the entry number and profile.
+ *
+ * Each type has:
+ * - its own icon
+ * - its own colour
+ * - its own subtle boxed background
+ */
+function ActionIcon({
+  log,
+  small = false,
+}: {
+  log: ActionLog
+  small?: boolean
+}) {
+  const action = `${log.action} ${log.summary}`.toLowerCase()
+  const category = (log.category ?? "").toLowerCase()
+
+  let Icon = Activity
+  let className =
+    "border-border bg-muted/30 text-muted-foreground"
+
+  if (
+    action.includes("copy") ||
+    action.includes("clipboard")
+  ) {
+    Icon = Copy
+    className =
+      "border-blue-500/25 bg-blue-500/10 text-blue-400"
+  } else if (
+    action.includes("select") ||
+    action.includes("selection")
+  ) {
+    Icon = MousePointerClick
+    className =
+      "border-violet-500/25 bg-violet-500/10 text-violet-400"
+  } else if (
+    action.includes("import") ||
+    category === "import"
+  ) {
+    Icon = FileDown
+    className =
+      "border-cyan-500/25 bg-cyan-500/10 text-cyan-400"
+  } else if (
+    action.includes("delete") ||
+    action.includes("remove")
+  ) {
+    Icon = Trash2
+    className =
+      "border-red-500/25 bg-red-500/10 text-red-400"
+  } else if (
+    action.includes("create") ||
+    action.includes("created") ||
+    action.includes("add")
+  ) {
+    Icon = Plus
+    className =
+      "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
+  } else if (
+    action.includes("update") ||
+    action.includes("edit") ||
+    action.includes("change")
+  ) {
+    Icon = Pencil
+    className =
+      "border-amber-500/25 bg-amber-500/10 text-amber-400"
+  } else if (category === "requirements") {
+    Icon = ClipboardCheck
+    className =
+      "border-indigo-500/25 bg-indigo-500/10 text-indigo-400"
+  } else if (category === "management") {
+    Icon = Settings2
+    className =
+      "border-orange-500/25 bg-orange-500/10 text-orange-400"
+  } else if (category === "navigation") {
+    Icon = Navigation
+    className =
+      "border-slate-500/25 bg-slate-500/10 text-slate-400"
+  } else if (category === "roster") {
+    Icon = Clipboard
+    className =
+      "border-blue-500/25 bg-blue-500/10 text-blue-400"
+  }
+
+  return (
+    <span
+      title={actionLabel(log.action)}
+      className={`inline-flex shrink-0 items-center justify-center rounded-md border ${
+        small ? "h-7 w-7" : "h-8 w-8"
+      } ${className}`}
+    >
+      <Icon
+        className={small ? "h-3.5 w-3.5" : "h-4 w-4"}
+        strokeWidth={2}
+      />
+    </span>
+  )
 }
 
 function Tag({
@@ -371,10 +489,15 @@ function Avatar({
   className?: string
 }) {
   const [failed, setFailed] = useState(false)
-  const url = failed ? getAvatarUrl(id) : getAvatarUrl(id, avatar)
+
+  const url = failed
+    ? getAvatarUrl(id)
+    : getAvatarUrl(id, avatar)
 
   return (
-    <span className={`${className} shrink-0 overflow-hidden rounded-full border border-border bg-muted`}>
+    <span
+      className={`${className} shrink-0 overflow-hidden rounded-full border border-border bg-muted`}
+    >
       {url ? (
         <img
           src={url}
@@ -392,7 +515,6 @@ function Avatar({
     </span>
   )
 }
-
 
 function CopyMenu({
   name,
@@ -419,7 +541,11 @@ function CopyMenu({
 
   const items = [
     ["discord", "Copy Discord ID", safeId],
-    ["discord-mention", "Copy Discord Mention", safeId ? `<@${safeId}>` : ""],
+    [
+      "discord-mention",
+      "Copy Discord Mention",
+      safeId ? `<@${safeId}>` : "",
+    ],
     ["name", "Copy Name", display],
     ["callsign", "Copy Callsign", safeCallsign],
     ["badge", "Copy Badge Number", safeBadge],
@@ -427,19 +553,53 @@ function CopyMenu({
   ] as const
 
   const combined = [
-    ["name-discord", "Name + Discord ID", safeId ? `${display} — ${safeId}` : ""],
-    ["callsign-discord", "Callsign + Discord ID", safeCallsign && safeId ? `${safeCallsign} — ${safeId}` : ""],
-    ["callsign-name", "Callsign + Name", safeCallsign ? `${safeCallsign} — ${display}` : ""],
-    ["callsign-badge", "Callsign + Badge Number", safeCallsign && safeBadge ? `${safeCallsign} — ${safeBadge}` : ""],
-    ["badge-name", "Badge Number + Name", safeBadge ? `${safeBadge} — ${display}` : ""],
-    ["badge-discord", "Badge Number + Discord ID", safeBadge && safeId ? `${safeBadge} — ${safeId}` : ""],
+    [
+      "name-discord",
+      "Name + Discord ID",
+      safeId ? `${display} — ${safeId}` : "",
+    ],
+    [
+      "callsign-discord",
+      "Callsign + Discord ID",
+      safeCallsign && safeId
+        ? `${safeCallsign} — ${safeId}`
+        : "",
+    ],
+    [
+      "callsign-name",
+      "Callsign + Name",
+      safeCallsign ? `${safeCallsign} — ${display}` : "",
+    ],
+    [
+      "callsign-badge",
+      "Callsign + Badge Number",
+      safeCallsign && safeBadge
+        ? `${safeCallsign} — ${safeBadge}`
+        : "",
+    ],
+    [
+      "badge-name",
+      "Badge Number + Name",
+      safeBadge ? `${safeBadge} — ${display}` : "",
+    ],
+    [
+      "badge-discord",
+      "Badge Number + Discord ID",
+      safeBadge && safeId
+        ? `${safeBadge} — ${safeId}`
+        : "",
+    ],
   ] as const
 
   const copy = async (value: string, label: string) => {
     if (!value) return
+
     try {
       await navigator.clipboard.writeText(value)
-      toast.success(`${label} copied`, { description: value })
+
+      toast.success(`${label} copied`, {
+        description: value,
+      })
     } catch {
       toast.error("Copy failed")
     }
@@ -459,11 +619,17 @@ function CopyMenu({
             avatar={avatar}
             className={large ? "h-10 w-10" : "h-6 w-6"}
           />
-          <span className={`truncate font-medium text-blue-400 ${large ? "text-sm" : "text-xs"}`}>
+
+          <span
+            className={`truncate font-medium text-blue-400 ${
+              large ? "text-sm" : "text-xs"
+            }`}
+          >
             {display}
           </span>
         </button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent
         side="bottom"
         align="start"
@@ -482,7 +648,9 @@ function CopyMenu({
             <span>{label}</span>
           </DropdownMenuItem>
         ))}
+
         <div className="my-0.5 h-px bg-border" />
+
         {combined.map(([type, label, value]) => (
           <DropdownMenuItem
             key={type}
@@ -512,7 +680,9 @@ function FilterSelect({
   ariaLabel: string
   className?: string
 }) {
-  const selected = options.find((option) => option.value === value) ?? options[0]
+  const selected =
+    options.find((option) => option.value === value) ??
+    options[0]
 
   return (
     <DropdownMenu>
@@ -522,10 +692,14 @@ function FilterSelect({
           aria-label={ariaLabel}
           className={`inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground outline-none transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-white focus:outline-none ${className}`}
         >
-          <span className="min-w-0 flex-1 truncate text-left">{selected?.label ?? ariaLabel}</span>
+          <span className="min-w-0 flex-1 truncate text-left">
+            {selected?.label ?? ariaLabel}
+          </span>
+
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent
         side="bottom"
         align="start"
@@ -543,7 +717,10 @@ function FilterSelect({
                 : ""
             }`}
           >
-            <span className="min-w-0 flex-1 truncate">{option.label}</span>
+            <span className="min-w-0 flex-1 truncate">
+              {option.label}
+            </span>
+
             {option.value === value ? (
               <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-blue-400" />
             ) : null}
@@ -554,9 +731,12 @@ function FilterSelect({
   )
 }
 
-
 function formatValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
     return "—"
   }
 
@@ -576,7 +756,11 @@ function formatValue(value: unknown): string {
 }
 
 function displayChangeValue(value: unknown) {
-  if (value === null || value === undefined || value === "") {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
     return "—"
   }
 
@@ -616,7 +800,12 @@ function ChangeList({ changes }: { changes: unknown }) {
           >
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {String(change.field ?? change.label ?? change.key ?? (change.rank ? "Rank" : "Change"))}
+                {String(
+                  change.field ??
+                    change.label ??
+                    change.key ??
+                    (change.rank ? "Rank" : "Change"),
+                )}
               </p>
 
               <p className="mt-1 break-words text-xs font-medium text-foreground">
@@ -679,7 +868,12 @@ function DetailPanel({
 
             <div className="mt-1">
               <CopyMenu
-                name={profile?.displayName || log.userName || log.username || "Unknown user"}
+                name={
+                  profile?.displayName ||
+                  log.userName ||
+                  log.username ||
+                  "Unknown user"
+                }
                 id={log.userId}
                 callsign={log.callsign}
                 badgeNumber={log.badgeNumber}
@@ -710,7 +904,9 @@ function DetailPanel({
           </div>
         </div>
 
-        {log.targetName || log.targetRank || log.targetUserId ? (
+        {log.targetName ||
+        log.targetRank ||
+        log.targetUserId ? (
           <div className="border-t border-border pt-4">
             <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Target
@@ -844,34 +1040,70 @@ export default function ActionLogs() {
   const [pageSize, setPageSize] = useState(25)
   const [pages, setPages] = useState(1)
   const [total, setTotal] = useState(0)
-  const [profiles, setProfiles] = useState<Record<string, DiscordProfile>>({})
-  const profilesRef = useRef<Record<string, DiscordProfile>>({})
-  const profileLoadingRef = useRef<Set<string>>(new Set())
 
-  const loadProfile = useCallback(async (discordId: string) => {
-    if (!discordId || profilesRef.current[discordId] || profileLoadingRef.current.has(discordId)) return
-    profileLoadingRef.current.add(discordId)
-    try {
-      const response = await fetch(`/api/promotion/discord-profile/${encodeURIComponent(discordId)}`, {
-        credentials: "include",
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      })
-      if (!response.ok) return
-      const data = (await response.json()) as { success?: boolean; profile?: DiscordProfile }
-      if (data.success && data.profile) {
-        profilesRef.current[discordId] = data.profile
-        setProfiles((current) => ({ ...current, [discordId]: data.profile! }))
+  const [profiles, setProfiles] =
+    useState<Record<string, DiscordProfile>>({})
+
+  const profilesRef =
+    useRef<Record<string, DiscordProfile>>({})
+
+  const profileLoadingRef =
+    useRef<Set<string>>(new Set())
+
+  const loadProfile = useCallback(
+    async (discordId: string) => {
+      if (
+        !discordId ||
+        profilesRef.current[discordId] ||
+        profileLoadingRef.current.has(discordId)
+      ) {
+        return
       }
-    } catch {
-      // Stored log identity remains usable if Discord cannot be reached.
-    } finally {
-      profileLoadingRef.current.delete(discordId)
-    }
-  }, [])
+
+      profileLoadingRef.current.add(discordId)
+
+      try {
+        const response = await fetch(
+          `/api/promotion/discord-profile/${encodeURIComponent(
+            discordId,
+          )}`,
+          {
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              Accept: "application/json",
+            },
+          },
+        )
+
+        if (!response.ok) return
+
+        const data = (await response.json()) as {
+          success?: boolean
+          profile?: DiscordProfile
+        }
+
+        if (data.success && data.profile) {
+          profilesRef.current[discordId] = data.profile
+
+          setProfiles((current) => ({
+            ...current,
+            [discordId]: data.profile!,
+          }))
+        }
+      } catch {
+        // Stored log identity remains usable if Discord cannot be reached.
+      } finally {
+        profileLoadingRef.current.delete(discordId)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
-    for (const discordId of new Set(logs.map((log) => log.userId).filter(Boolean))) {
+    for (const discordId of new Set(
+      logs.map((log) => log.userId).filter(Boolean),
+    )) {
       void loadProfile(discordId)
     }
   }, [logs, loadProfile])
@@ -891,42 +1123,76 @@ export default function ActionLogs() {
       if (division) params.set("division", division)
       if (userId) params.set("userId", userId)
       if (action) params.set("action", action)
-      if (search.trim()) params.set("search", search.trim())
+      if (search.trim()) {
+        params.set("search", search.trim())
+      }
 
-      const response = await fetch(`/api/action-logs?${params.toString()}`, {
-        credentials: "include",
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      })
+      const response = await fetch(
+        `/api/action-logs?${params.toString()}`,
+        {
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+          },
+        },
+      )
 
       const data = (await response.json()) as ApiResponse
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.error || `Failed to load promotion logs (${response.status}).`,
+          data.error ||
+            `Failed to load promotion logs (${response.status}).`,
         )
       }
 
-      const nextLogs = Array.isArray(data.logs) ? data.logs : []
+      const nextLogs = Array.isArray(data.logs)
+        ? data.logs
+        : []
+
       setLogs(nextLogs)
       setTotal(data.pagination?.total ?? 0)
-      setPages(Math.max(1, data.pagination?.pages ?? 1))
+      setPages(
+        Math.max(1, data.pagination?.pages ?? 1),
+      )
 
-      if (data.pagination?.page && data.pagination.page !== page) {
+      if (
+        data.pagination?.page &&
+        data.pagination.page !== page
+      ) {
         setPage(data.pagination.page)
       }
     } catch (err) {
       setLogs([])
       setTotal(0)
       setPages(1)
-      setError(err instanceof Error ? err.message : "Failed to load promotion logs.")
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load promotion logs.",
+      )
     } finally {
       setLoading(false)
     }
-  }, [action, category, division, module, page, pageSize, search, userId])
+  }, [
+    action,
+    category,
+    division,
+    module,
+    page,
+    pageSize,
+    search,
+    userId,
+  ])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void loadLogs(), search ? 250 : 0)
+    const timer = window.setTimeout(
+      () => void loadLogs(),
+      search ? 250 : 0,
+    )
+
     return () => window.clearTimeout(timer)
   }, [loadLogs, search])
 
@@ -935,14 +1201,25 @@ export default function ActionLogs() {
 
     for (const log of logs) {
       if (!log.userId) continue
-      map.set(log.userId, log.userName || log.username || log.userId)
+
+      map.set(
+        log.userId,
+        log.userName ||
+          log.username ||
+          log.userId,
+      )
     }
 
     return [
       { value: "", label: "Anyone" },
       ...Array.from(map.entries())
-        .sort((a, b) => a[1].localeCompare(b[1]))
-        .map(([value, label]) => ({ value, label })),
+        .sort((a, b) =>
+          a[1].localeCompare(b[1]),
+        )
+        .map(([value, label]) => ({
+          value,
+          label,
+        })),
     ]
   }, [logs])
 
@@ -951,14 +1228,23 @@ export default function ActionLogs() {
 
     for (const log of logs) {
       if (!log.action) continue
-      map.set(log.action, actionLabel(log.action))
+
+      map.set(
+        log.action,
+        actionLabel(log.action),
+      )
     }
 
     return [
       { value: "", label: "All actions" },
       ...Array.from(map.entries())
-        .sort((a, b) => a[1].localeCompare(b[1]))
-        .map(([value, label]) => ({ value, label })),
+        .sort((a, b) =>
+          a[1].localeCompare(b[1]),
+        )
+        .map(([value, label]) => ({
+          value,
+          label,
+        })),
     ]
   }, [logs])
 
@@ -968,6 +1254,7 @@ export default function ActionLogs() {
     for (const log of logs) {
       const key = dateHeading(log.createdAt)
       const current = map.get(key) ?? []
+
       current.push(log)
       map.set(key, current)
     }
@@ -991,9 +1278,21 @@ export default function ActionLogs() {
     setExpanded(null)
   }
 
-  const start = total ? (page - 1) * pageSize + 1 : 0
-  const end = total ? Math.min(page * pageSize, total) : 0
-  const hasFilters = Boolean(category || division || userId || action || search)
+  const start = total
+    ? (page - 1) * pageSize + 1
+    : 0
+
+  const end = total
+    ? Math.min(page * pageSize, total)
+    : 0
+
+  const hasFilters = Boolean(
+    category ||
+      division ||
+      userId ||
+      action ||
+      search,
+  )
 
   return (
     <DashboardLayout>
@@ -1003,15 +1302,22 @@ export default function ActionLogs() {
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/25 bg-blue-500/10">
               <History className="h-5 w-5 text-blue-400" />
             </div>
+
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight">Promotion Logs</h1>
+                <h1 className="text-xl font-semibold tracking-tight">
+                  Promotion Logs
+                </h1>
+
                 <span className="rounded-full border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
                   60 days
                 </span>
               </div>
+
               <p className="mt-1 text-sm text-muted-foreground">
-                A numbered audit trail for roster, import, requirement, selection and management changes. Entries are retained for 60 days.
+                A numbered audit trail for roster, import,
+                requirement, selection and management
+                changes. Entries are retained for 60 days.
               </p>
             </div>
           </div>
@@ -1021,20 +1327,29 @@ export default function ActionLogs() {
             onClick={() => void loadLogs()}
             className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
           >
-            <RefreshCw className={`h-3.5 w-3.5 text-white ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-3.5 w-3.5 text-white ${
+                loading ? "animate-spin" : ""
+              }`}
+            />
+
             {loading ? "Refreshing" : "Refresh"}
           </button>
         </header>
 
-        {/* Module tabs: intentionally flat, matching the reference layout. */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {moduleOptions.map((option) => {
             const active = module === option.value
+
             return (
               <button
                 key={option.value || "all"}
                 type="button"
-                onClick={() => selectModule(option.value as Module)}
+                onClick={() =>
+                  selectModule(
+                    option.value as Module,
+                  )
+                }
                 className={`h-8 rounded-lg border px-3 text-xs font-medium transition-all ${
                   active
                     ? "border-blue-500/60 bg-blue-500/10 text-blue-400"
@@ -1047,11 +1362,11 @@ export default function ActionLogs() {
           })}
         </div>
 
-        {/* Search and filters stay visible at all times. */}
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <div className="flex w-full min-w-0 max-w-[430px] flex-1 items-center gap-2 sm:w-auto">
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-400" />
+
               <input
                 value={search}
                 onChange={(event) => {
@@ -1078,34 +1393,54 @@ export default function ActionLogs() {
           <FilterSelect
             value={userId}
             options={userOptions}
-            onChange={(value) => { setUserId(value); setPage(1); setExpanded(null) }}
+            onChange={(value) => {
+              setUserId(value)
+              setPage(1)
+              setExpanded(null)
+            }}
             ariaLabel="People"
             className="w-[170px]"
           />
+
           <FilterSelect
             value={action}
             options={actionOptions}
-            onChange={(value) => { setAction(value); setPage(1); setExpanded(null) }}
+            onChange={(value) => {
+              setAction(value)
+              setPage(1)
+              setExpanded(null)
+            }}
             ariaLabel="Actions"
             className="w-[160px]"
           />
+
           <FilterSelect
             value={category}
             options={categoryOptions}
-            onChange={(value) => { setCategory(value as Category); setPage(1); setExpanded(null) }}
+            onChange={(value) => {
+              setCategory(value as Category)
+              setPage(1)
+              setExpanded(null)
+            }}
             ariaLabel="Categories"
             className="w-[175px]"
           />
+
           <FilterSelect
             value={division}
             options={divisionOptions}
-            onChange={(value) => { setDivision(value as Division); setPage(1); setExpanded(null) }}
+            onChange={(value) => {
+              setDivision(value as Division)
+              setPage(1)
+              setExpanded(null)
+            }}
             ariaLabel="Divisions"
             className="w-[175px]"
           />
 
           <span className="ml-auto text-xs text-muted-foreground">
-            {total.toLocaleString()} {total === 1 ? "change" : "changes"}
+            {total.toLocaleString()}{" "}
+            {total === 1 ? "change" : "changes"}
           </span>
         </div>
 
@@ -1126,9 +1461,14 @@ export default function ActionLogs() {
           {!loading && !logs.length ? (
             <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
               <History className="h-8 w-8 text-muted-foreground" />
-              <p className="mt-3 font-medium">No promotion logs found</p>
+
+              <p className="mt-3 font-medium">
+                No promotion logs found
+              </p>
+
               <p className="mt-1 text-sm text-muted-foreground">
-                Try clearing the filters or perform a dashboard action.
+                Try clearing the filters or perform a
+                dashboard action.
               </p>
             </div>
           ) : null}
@@ -1152,56 +1492,110 @@ export default function ActionLogs() {
                     >
                       <button
                         type="button"
-                        onClick={() => setExpanded(isOpen ? null : log.id)}
-                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/20 md:grid-cols-[44px_minmax(165px,0.65fr)_minmax(280px,2fr)_auto] md:items-center"
+                        onClick={() =>
+                          setExpanded(
+                            isOpen ? null : log.id,
+                          )
+                        }
+                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/20 md:grid-cols-[44px_40px_minmax(165px,0.65fr)_minmax(280px,2fr)_auto] md:items-center"
                       >
+                        {/* Entry number */}
                         <div className="flex items-center">
                           <span className="font-mono text-[10px] font-semibold text-blue-400">
                             #{log.entryNumber}
                           </span>
                         </div>
 
+                        {/* NEW: action icon */}
+                        <div className="flex items-center">
+                          <ActionIcon log={log} />
+                        </div>
+
+                        {/* Profile */}
                         <div className="min-w-0">
                           <CopyMenu
-                            name={profiles[log.userId]?.displayName || log.userName || log.username || "Unknown User"}
+                            name={
+                              profiles[log.userId]
+                                ?.displayName ||
+                              log.userName ||
+                              log.username ||
+                              "Unknown User"
+                            }
                             id={log.userId}
                             callsign={log.callsign}
-                            badgeNumber={log.badgeNumber}
+                            badgeNumber={
+                              log.badgeNumber
+                            }
                             rank={log.rank}
-                            avatar={profiles[log.userId]?.avatar || log.avatar}
+                            avatar={
+                              profiles[log.userId]
+                                ?.avatar ||
+                              log.avatar
+                            }
                             large
                           />
                         </div>
 
+                        {/* Summary */}
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium leading-5 text-foreground">
                             {log.summary}
                           </p>
+
                           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-                            <span className="text-blue-300/80">{relativeTime(log.createdAt)}</span>
+                            <span className="text-blue-300/80">
+                              {relativeTime(
+                                log.createdAt,
+                              )}
+                            </span>
 
-                            <span className="text-muted-foreground/60">•</span>
+                            <span className="text-muted-foreground/60">
+                              •
+                            </span>
 
-                            <Tag className={tagClass("module", log.module)}>
+                            <Tag
+                              className={tagClass(
+                                "module",
+                                log.module,
+                              )}
+                            >
                               {moduleLabel(log.module)}
                             </Tag>
 
-                            <Tag className={tagClass("division", log.division)}>
-                              {divisionLabel(log.division)}
+                            <Tag
+                              className={tagClass(
+                                "division",
+                                log.division,
+                              )}
+                            >
+                              {divisionLabel(
+                                log.division,
+                              )}
                             </Tag>
 
                             {log.category ? (
-                              <Tag className={tagClass("category", log.category)}>
-                                {actionLabel(log.category)}
+                              <Tag
+                                className={tagClass(
+                                  "category",
+                                  log.category,
+                                )}
+                              >
+                                {actionLabel(
+                                  log.category,
+                                )}
                               </Tag>
                             ) : null}
                           </div>
                         </div>
 
+                        {/* Status */}
                         <div className="flex items-center justify-end gap-2">
-                          <Tag className={statusClass(log)}>
+                          <Tag
+                            className={statusClass(log)}
+                          >
                             {statusLabel(log)}
                           </Tag>
+
                           {isOpen ? (
                             <ChevronUp className="h-4 w-4 text-muted-foreground" />
                           ) : (
@@ -1213,7 +1607,9 @@ export default function ActionLogs() {
                       {isOpen ? (
                         <DetailPanel
                           log={log}
-                          profile={profiles[log.userId]}
+                          profile={
+                            profiles[log.userId]
+                          }
                         />
                       ) : null}
                     </article>
@@ -1227,14 +1623,29 @@ export default function ActionLogs() {
         {total > 0 ? (
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>Page {page} of {pages}</span>
+              <span>
+                Page {page} of {pages}
+              </span>
+
               <FilterSelect
                 value={String(pageSize)}
                 options={[
-                  { value: "25", label: "25 / page" },
-                  { value: "50", label: "50 / page" },
-                  { value: "75", label: "75 / page" },
-                  { value: "100", label: "100 / page" },
+                  {
+                    value: "25",
+                    label: "25 / page",
+                  },
+                  {
+                    value: "50",
+                    label: "50 / page",
+                  },
+                  {
+                    value: "75",
+                    label: "75 / page",
+                  },
+                  {
+                    value: "100",
+                    label: "100 / page",
+                  },
                 ]}
                 onChange={(value) => {
                   setPageSize(Number(value))
@@ -1243,22 +1654,34 @@ export default function ActionLogs() {
                 ariaLabel="Pages"
                 className="w-[112px]"
               />
-              <span>{start.toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()}</span>
+
+              <span>
+                {start.toLocaleString()}–
+                {end.toLocaleString()} of{" "}
+                {total.toLocaleString()}
+              </span>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 disabled={page <= 1 || loading}
-                onClick={() => setPage((value) => value - 1)}
+                onClick={() =>
+                  setPage((value) => value - 1)
+                }
                 className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Previous
               </button>
+
               <button
                 type="button"
-                disabled={page >= pages || loading}
-                onClick={() => setPage((value) => value + 1)}
+                disabled={
+                  page >= pages || loading
+                }
+                onClick={() =>
+                  setPage((value) => value + 1)
+                }
                 className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Next
