@@ -46,10 +46,37 @@ export function logPromotionAction(
         input.path ??
         `${window.location.pathname}${window.location.search}`,
     }),
-  }).catch((error) => {
-    console.warn(
-      "Promotion action logging failed:",
-      error,
-    )
   })
+    .then(async (response) => {
+      if (response.ok) {
+        return
+      }
+
+      let message = `HTTP ${response.status}`
+
+      try {
+        const data = (await response.json()) as {
+          error?: string
+        }
+
+        if (data.error) {
+          message = data.error
+        }
+      } catch {
+        // Keep the HTTP status when the API did not return JSON.
+      }
+
+      console.warn(
+        "Promotion action logging failed:",
+        message,
+        input,
+      )
+    })
+    .catch((error) => {
+      console.warn(
+        "Promotion action logging failed:",
+        error,
+        input,
+      )
+    })
 }
