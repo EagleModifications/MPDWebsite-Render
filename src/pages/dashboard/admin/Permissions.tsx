@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import {
+  ChevronDown,
+  ChevronUp,
   Plus,
   RotateCcw,
   Save,
@@ -70,6 +73,7 @@ export default function Permissions() {
   const [protectedUrls, setProtectedUrls] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const navigate = useNavigate()
 
   const [newPermission, setNewPermission] = useState<Permission>(emptyPermission)
   const [newRank, setNewRank] = useState("")
@@ -83,6 +87,31 @@ export default function Permissions() {
   async function load() {
     try {
       setIsLoading(true)
+
+      // This check protects the PAGE route. It does not protect or intercept
+      // any API route. The admin API below remains authenticated separately.
+      const pageCheck = await fetch(
+        `/api/auth/check?url=${encodeURIComponent(window.location.pathname)}`,
+        {
+          credentials: "include",
+          cache: "no-store",
+        },
+      )
+
+      if (pageCheck.status === 401) {
+        navigate("/login", { replace: true })
+        return
+      }
+
+      if (pageCheck.status === 403) {
+        navigate("/dashboard", { replace: true })
+        return
+      }
+
+      if (!pageCheck.ok) {
+        throw new Error(`Failed to verify page access (${pageCheck.status}).`)
+      }
+
       const response = await fetch("/api/admin/permissions", {
         credentials: "include",
         cache: "no-store",
@@ -111,7 +140,7 @@ export default function Permissions() {
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [navigate])
 
   async function request(
     url: string,
