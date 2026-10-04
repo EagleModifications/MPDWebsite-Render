@@ -104,7 +104,7 @@ const sopItems: NavItem[] = [
   {
     name: "FTD SOPs",
     href: "/documents/sops/ftd-sops",
-    permission: "documents",
+    permission: "ftddocuments",
   },
   {
     name: "Global SOPs",
@@ -113,42 +113,27 @@ const sopItems: NavItem[] = [
   },
 ]
 
-const commandItems: NavItem[] = [
-  {
-    name: "Command SOPs",
-    href: "/documents/command/sops",
-    permission: "commanddocuments",
-  },
-  {
-    name: "Command Roster",
-    href: "/documents/command/roster",
-    permission: "commanddocuments",
-  },
-  {
-    name: "Command Guidelines",
-    href: "/documents/command/guidelines",
-    permission: "commanddocuments",
-  },
-]
+const supervisorItem: NavItem = {
+  name: "Supervisor",
+  href: "/documents/supervisor/supervisor-docs",
+  permission: "supervisordocuments",
+}
+
+const commandItem: NavItem = {
+  name: "Command",
+  href: "/documents/command/command-docs",
+  permission: "commanddocuments",
+}
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const [documentsOpen, setDocumentsOpen] =
-    useState(false)
+  const [documentsOpen, setDocumentsOpen] = useState(false)
+  const [rostersOpen, setRostersOpen] = useState(false)
+  const [sopsOpen, setSopsOpen] = useState(false)
 
-  const [rostersOpen, setRostersOpen] =
-    useState(false)
-
-  const [sopsOpen, setSopsOpen] =
-    useState(false)
-
-  const [commandOpen, setCommandOpen] =
-    useState(false)
-
-  const documentsRef =
-    useRef<HTMLDivElement>(null)
+  const documentsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     getSession().then(setUser)
@@ -161,16 +146,10 @@ export default function Navbar() {
       }
     }
 
-    window.addEventListener(
-      "resize",
-      handleResize,
-    )
+    window.addEventListener("resize", handleResize)
 
     return () => {
-      window.removeEventListener(
-        "resize",
-        handleResize,
-      )
+      window.removeEventListener("resize", handleResize)
     }
   }, [])
 
@@ -179,9 +158,7 @@ export default function Navbar() {
       return
     }
 
-    const handlePointerDown = (
-      event: PointerEvent,
-    ) => {
+    const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node
 
       if (
@@ -191,7 +168,6 @@ export default function Navbar() {
         setDocumentsOpen(false)
         setRostersOpen(false)
         setSopsOpen(false)
-        setCommandOpen(false)
       }
     }
 
@@ -222,37 +198,29 @@ export default function Navbar() {
     }
 
     if (Array.isArray(item.permission)) {
-      return item.permission.some(
-        (permission) =>
-          hasPermission(user, permission),
+      return item.permission.some((permission) =>
+        hasPermission(user, permission),
       )
     }
 
-    return hasPermission(
-      user,
-      item.permission,
-    )
+    return hasPermission(user, item.permission)
   }
 
-  const visibleItems =
-    navItems.filter(canViewItem)
+  const visibleItems = navItems.filter(canViewItem)
 
-  const visibleRosters =
-    rosterItems.filter(canViewItem)
+  const visibleRosters = rosterItems.filter(canViewItem)
+  const visibleSops = sopItems.filter(canViewItem)
 
-  const visibleSops =
-    sopItems.filter(canViewItem)
-
-  const visibleCommand =
-    commandItems.filter(canViewItem)
+  const canViewSupervisor = canViewItem(supervisorItem)
+  const canViewCommand = canViewItem(commandItem)
 
   const hasDocuments =
     visibleRosters.length > 0 ||
     visibleSops.length > 0 ||
-    visibleCommand.length > 0
+    canViewSupervisor ||
+    canViewCommand
 
-  const currentPath =
-    window.location.pathname
+  const currentPath = window.location.pathname
 
   const documentsActive =
     visibleRosters.some(
@@ -261,9 +229,8 @@ export default function Navbar() {
     visibleSops.some(
       (item) => currentPath === item.href,
     ) ||
-    visibleCommand.some(
-      (item) => currentPath === item.href,
-    )
+    currentPath.startsWith("/documents/supervisor") ||
+    currentPath.startsWith("/documents/command")
 
   const rostersActive =
     visibleRosters.some(
@@ -275,89 +242,68 @@ export default function Navbar() {
       (item) => currentPath === item.href,
     )
 
+  const supervisorActive =
+    currentPath.startsWith("/documents/supervisor")
+
+  const commandActive =
+    currentPath.startsWith("/documents/command")
+
   const closeMobileMenu = () => {
     setMobileOpen(false)
     setDocumentsOpen(false)
     setRostersOpen(false)
     setSopsOpen(false)
-    setCommandOpen(false)
   }
 
   const toggleDocuments = () => {
     setDocumentsOpen((open) => !open)
     setRostersOpen(false)
     setSopsOpen(false)
-    setCommandOpen(false)
   }
 
   const toggleRosters = () => {
     setRostersOpen((open) => !open)
     setSopsOpen(false)
-    setCommandOpen(false)
   }
 
   const toggleSops = () => {
     setSopsOpen((open) => !open)
     setRostersOpen(false)
-    setCommandOpen(false)
-  }
-
-  const toggleCommand = () => {
-    setCommandOpen((open) => !open)
-    setRostersOpen(false)
-    setSopsOpen(false)
   }
 
   return (
     <header className="absolute left-0 top-0 z-50 w-full">
-      <div className="mx-auto flex min-h-20 w-full items-center px-4 sm:px-6 lg:px-10">
-        {/* LEFT — Logo */}
-        <div className="flex min-w-0 flex-1 items-center">
-          <Link
-            to="/"
-            onClick={closeMobileMenu}
-            className="flex min-w-0 items-center gap-2.5 sm:gap-3"
-          >
-            <img
-              src="/logo.png"
-              alt="Metro Police Department"
-              className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
-            />
+      <div className="mx-auto flex h-20 max-w-[1600px] items-center justify-between px-6 lg:px-8">
+        <Link
+          to="/"
+          className="flex items-center gap-3"
+          onClick={closeMobileMenu}
+        >
+          <img
+            src="/logo.png"
+            alt="Metro Police Department"
+            className="h-11 w-auto"
+          />
+        </Link>
 
-            <span className="max-w-[180px] truncate text-sm font-bold text-foreground sm:max-w-none sm:text-lg">
-              Metro Police Department
-            </span>
-          </Link>
-        </div>
+        <nav className="hidden items-center gap-1 md:flex">
+          {visibleItems.map((item) => (
+            <NavLink
+              key={item.href}
+              to={item.href}
+              className={({ isActive }) =>
+                [
+                  "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-foreground/10 text-foreground"
+                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                ].join(" ")
+              }
+            >
+              {item.name}
+            </NavLink>
+          ))}
 
-        {/* DESKTOP — Navigation */}
-        <nav className="hidden items-center justify-center gap-7 whitespace-nowrap px-6 text-sm md:flex lg:gap-8">
-          {visibleItems
-            .filter(
-              (item) => item.name !== "Dashboard",
-            )
-            .map((item) => (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                end={item.href === "/"}
-                className={({ isActive }) =>
-                  `
-                    font-medium
-                    transition-colors
-                    ${
-                      isActive
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }
-                  `
-                }
-              >
-                {item.name}
-              </NavLink>
-            ))}
-
-          {/* DOCUMENTS */}
           {hasDocuments && (
             <div
               ref={documentsRef}
@@ -366,365 +312,211 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={toggleDocuments}
-                className={`
-                  flex items-center gap-1.5
-                  font-medium
-                  transition-colors
-                  ${
-                    documentsActive ||
-                    documentsOpen
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }
-                `}
-                aria-expanded={documentsOpen}
-                aria-haspopup="menu"
+                className={[
+                  "flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                  documentsActive || documentsOpen
+                    ? "bg-foreground/10 text-foreground"
+                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                ].join(" ")}
               >
-                <span>Documents</span>
-
+                Documents
                 <ChevronDown
-                  className={`
-                    h-4 w-4
-                    transition-transform duration-200
-                    ${
-                      documentsOpen
-                        ? "rotate-180"
-                        : ""
-                    }
-                  `}
+                  className={[
+                    "h-4 w-4 transition-transform duration-200",
+                    documentsOpen ? "rotate-180" : "",
+                  ].join(" ")}
                 />
               </button>
 
               {documentsOpen && (
-                <div
-                  className="
-                    absolute left-1/2 top-full mt-3
-                    min-w-[240px]
-                    -translate-x-1/2
-                    overflow-hidden
-                    rounded-xl
-                    border border-border
-                    bg-background/95
-                    p-1.5
-                    shadow-xl
-                    backdrop-blur-md
-                  "
-                  role="menu"
-                >
-                  {/* ROSTERS */}
+                <div className="absolute left-0 top-full mt-2 w-64 rounded-xl border border-border/60 bg-background/95 p-2 shadow-xl backdrop-blur-xl">
                   {visibleRosters.length > 0 && (
-                    <div>
+                    <div className="relative">
                       <button
                         type="button"
                         onClick={toggleRosters}
-                        className={`
-                          flex w-full items-center justify-between
-                          rounded-lg px-3 py-2.5
-                          text-sm font-medium
-                          transition-colors
-                          ${
-                            rostersActive ||
-                            rostersOpen
-                              ? "bg-foreground/10 text-foreground"
-                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                          }
-                        `}
-                        aria-expanded={rostersOpen}
+                        className={[
+                          "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                          rostersActive || rostersOpen
+                            ? "bg-foreground/10 text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                        ].join(" ")}
                       >
                         <span>Rosters</span>
 
                         <ChevronDown
-                          className={`
-                            h-4 w-4
-                            transition-transform duration-200
-                            ${
-                              rostersOpen
-                                ? "rotate-180"
-                                : ""
-                            }
-                          `}
+                          className={[
+                            "h-4 w-4 transition-transform duration-200",
+                            rostersOpen ? "rotate-180" : "",
+                          ].join(" ")}
                         />
                       </button>
 
                       {rostersOpen && (
-                        <div className="ml-2 border-l border-border pl-2">
-                          {visibleRosters.map(
-                            (item) => (
-                              <NavLink
-                                key={item.href}
-                                to={item.href}
-                                onClick={() =>
-                                  setDocumentsOpen(
-                                    false,
-                                  )
-                                }
-                                className={({
-                                  isActive,
-                                }) =>
-                                  `
-                                    block rounded-lg px-3 py-2.5
-                                    text-sm font-medium
-                                    transition-colors
-                                    ${
-                                      isActive
-                                        ? "bg-foreground/10 text-foreground"
-                                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                                    }
-                                  `
-                                }
-                                role="menuitem"
-                              >
-                                {item.name}
-                              </NavLink>
-                            ),
-                          )}
+                        <div className="mt-1 space-y-1 border-l border-border/60 pl-2">
+                          {visibleRosters.map((item) => (
+                            <NavLink
+                              key={item.href}
+                              to={item.href}
+                              onClick={() => {
+                                setDocumentsOpen(false)
+                                setRostersOpen(false)
+                              }}
+                              className={({ isActive }) =>
+                                [
+                                  "block rounded-lg px-3 py-2 text-sm transition-colors",
+                                  isActive
+                                    ? "bg-foreground/10 font-medium text-foreground"
+                                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                                ].join(" ")
+                              }
+                            >
+                              {item.name}
+                            </NavLink>
+                          ))}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* SOPs */}
                   {visibleSops.length > 0 && (
-                    <div>
+                    <div className="relative">
                       <button
                         type="button"
                         onClick={toggleSops}
-                        className={`
-                          flex w-full items-center justify-between
-                          rounded-lg px-3 py-2.5
-                          text-sm font-medium
-                          transition-colors
-                          ${
-                            sopsActive ||
-                            sopsOpen
-                              ? "bg-foreground/10 text-foreground"
-                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                          }
-                        `}
-                        aria-expanded={sopsOpen}
+                        className={[
+                          "mt-1 flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                          sopsActive || sopsOpen
+                            ? "bg-foreground/10 text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                        ].join(" ")}
                       >
                         <span>SOPs</span>
 
                         <ChevronDown
-                          className={`
-                            h-4 w-4
-                            transition-transform duration-200
-                            ${
-                              sopsOpen
-                                ? "rotate-180"
-                                : ""
-                            }
-                          `}
+                          className={[
+                            "h-4 w-4 transition-transform duration-200",
+                            sopsOpen ? "rotate-180" : "",
+                          ].join(" ")}
                         />
                       </button>
 
                       {sopsOpen && (
-                        <div className="ml-2 border-l border-border pl-2">
-                          {visibleSops.map(
-                            (item) => (
-                              <NavLink
-                                key={item.href}
-                                to={item.href}
-                                onClick={() =>
-                                  setDocumentsOpen(
-                                    false,
-                                  )
-                                }
-                                className={({
-                                  isActive,
-                                }) =>
-                                  `
-                                    block rounded-lg px-3 py-2.5
-                                    text-sm font-medium
-                                    transition-colors
-                                    ${
-                                      isActive
-                                        ? "bg-foreground/10 text-foreground"
-                                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                                    }
-                                  `
-                                }
-                                role="menuitem"
-                              >
-                                {item.name}
-                              </NavLink>
-                            ),
-                          )}
+                        <div className="mt-1 space-y-1 border-l border-border/60 pl-2">
+                          {visibleSops.map((item) => (
+                            <NavLink
+                              key={item.href}
+                              to={item.href}
+                              onClick={() => {
+                                setDocumentsOpen(false)
+                                setSopsOpen(false)
+                              }}
+                              className={({ isActive }) =>
+                                [
+                                  "block rounded-lg px-3 py-2 text-sm transition-colors",
+                                  isActive
+                                    ? "bg-foreground/10 font-medium text-foreground"
+                                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                                ].join(" ")
+                              }
+                            >
+                              {item.name}
+                            </NavLink>
+                          ))}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* COMMAND */}
-                  {visibleCommand.length > 0 && (
-                    <div>
-                      <button
-                        type="button"
-                        onClick={toggleCommand}
-                        className={`
-                          flex w-full items-center justify-between
-                          rounded-lg px-3 py-2.5
-                          text-sm font-medium
-                          transition-colors
-                          ${
-                            commandOpen
-                              ? "bg-foreground/10 text-foreground"
-                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                          }
-                        `}
-                        aria-expanded={commandOpen}
-                      >
-                        <span>Command</span>
+                  {canViewSupervisor && (
+                    <NavLink
+                      to={supervisorItem.href}
+                      onClick={() => {
+                        setDocumentsOpen(false)
+                        setRostersOpen(false)
+                        setSopsOpen(false)
+                      }}
+                      className={[
+                        "mt-1 block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        supervisorActive
+                          ? "bg-foreground/10 text-foreground"
+                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      Supervisor
+                    </NavLink>
+                  )}
 
-                        <ChevronDown
-                          className={`
-                            h-4 w-4
-                            transition-transform duration-200
-                            ${
-                              commandOpen
-                                ? "rotate-180"
-                                : ""
-                            }
-                          `}
-                        />
-                      </button>
-
-                      {commandOpen && (
-                        <div className="ml-2 border-l border-border pl-2">
-                          {visibleCommand.map(
-                            (item) => (
-                              <NavLink
-                                key={item.href}
-                                to={item.href}
-                                onClick={() =>
-                                  setDocumentsOpen(
-                                    false,
-                                  )
-                                }
-                                className={({
-                                  isActive,
-                                }) =>
-                                  `
-                                    block rounded-lg px-3 py-2.5
-                                    text-sm font-medium
-                                    transition-colors
-                                    ${
-                                      isActive
-                                        ? "bg-foreground/10 text-foreground"
-                                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                                    }
-                                  `
-                                }
-                                role="menuitem"
-                              >
-                                {item.name}
-                              </NavLink>
-                            ),
-                          )}
-                        </div>
-                      )}
-                    </div>
+                  {canViewCommand && (
+                    <NavLink
+                      to={commandItem.href}
+                      onClick={() => {
+                        setDocumentsOpen(false)
+                        setRostersOpen(false)
+                        setSopsOpen(false)
+                      }}
+                      className={[
+                        "mt-1 block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        commandActive
+                          ? "bg-foreground/10 text-foreground"
+                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      Command
+                    </NavLink>
                   )}
                 </div>
               )}
             </div>
           )}
-
-          {/* DASHBOARD */}
-          {visibleItems
-            .filter(
-              (item) => item.name === "Dashboard",
-            )
-            .map((item) => (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                end={item.href === "/"}
-                className={({ isActive }) =>
-                  `
-                    font-medium
-                    transition-colors
-                    ${
-                      isActive
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }
-                  `
-                }
-              >
-                {item.name}
-              </NavLink>
-            ))}
         </nav>
 
-        {/* RIGHT — Desktop */}
-        <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 md:flex lg:gap-4">
+        <div className="hidden items-center gap-2 md:flex">
           <ThemeToggle />
 
           {user ? (
             <Button
-              variant="outline"
-              className="
-                h-8
-                gap-2
-                border-border
-                bg-transparent
-                px-3
-                text-xs
-                text-foreground
-                transition-all
-                hover:border-foreground
-                hover:bg-foreground/10
-                hover:text-foreground
-              "
-              onClick={() => {
-                window.location.href =
-                  "/api/auth/logout"
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                await fetch("/api/auth/logout", {
+                  method: "POST",
+                  credentials: "include",
+                })
+
+                window.location.href = "/signed-out?logout=true"
               }}
+              className="gap-2"
             >
               <LogOut className="h-4 w-4" />
-              <span>Sign Out</span>
+              Logout
             </Button>
           ) : (
             <Button
               asChild
-              className="
-                h-8
-                gap-2
-                border-border
-                bg-foreground
-                px-3
-                text-xs
-                text-background
-                transition-all
-                hover:bg-foreground/85
-                hover:text-background
-              "
+              variant="ghost"
+              size="sm"
+              className="gap-2"
             >
-              <Link to="/sign-in">
+              <Link to="/login">
                 <LogIn className="h-4 w-4" />
-                <span>Sign In</span>
+                Login
               </Link>
             </Button>
           )}
         </div>
 
-        {/* MOBILE — Theme + Menu */}
         <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
 
           <Button
             variant="ghost"
             size="icon"
+            onClick={() => setMobileOpen((open) => !open)}
             aria-label={
               mobileOpen
                 ? "Close menu"
                 : "Open menu"
-            }
-            aria-expanded={mobileOpen}
-            className="h-9 w-9"
-            onClick={() =>
-              setMobileOpen((open) => !open)
             }
           >
             {mobileOpen ? (
@@ -736,352 +528,213 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* MOBILE MENU */}
       {mobileOpen && (
-        <div className="mx-4 mt-1 overflow-hidden rounded-xl border border-border bg-background/95 shadow-lg backdrop-blur-md md:hidden">
-          <nav className="flex flex-col p-2">
-            {visibleItems
-              .filter(
-                (item) => item.name !== "Dashboard",
-              )
-              .map((item) => (
-                <NavLink
-                  key={item.href}
-                  to={item.href}
-                  end={item.href === "/"}
-                  onClick={closeMobileMenu}
-                  className={({ isActive }) =>
-                    `
-                      rounded-lg px-4 py-3
-                      text-sm font-medium
-                      transition-colors
-                      ${
-                        isActive
-                          ? "bg-foreground/10 text-foreground"
-                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                      }
-                    `
-                  }
-                >
-                  {item.name}
-                </NavLink>
-              ))}
+        <div className="border-t border-border/50 bg-background/95 px-6 py-4 shadow-xl backdrop-blur-xl md:hidden">
+          <nav className="mx-auto flex max-w-[1600px] flex-col gap-1">
+            {visibleItems.map((item) => (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                onClick={closeMobileMenu}
+                className={({ isActive }) =>
+                  [
+                    "rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                  ].join(" ")
+                }
+              >
+                {item.name}
+              </NavLink>
+            ))}
 
-            {/* MOBILE DOCUMENTS */}
             {hasDocuments && (
-              <div>
+              <div className="mt-1">
                 <button
                   type="button"
                   onClick={toggleDocuments}
-                  className={`
-                    flex w-full items-center justify-between
-                    rounded-lg px-4 py-3
-                    text-left text-sm font-medium
-                    transition-colors
-                    ${
-                      documentsActive ||
-                      documentsOpen
-                        ? "bg-foreground/10 text-foreground"
-                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                    }
-                  `}
-                  aria-expanded={documentsOpen}
+                  className={[
+                    "flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                    documentsActive || documentsOpen
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                  ].join(" ")}
                 >
                   <span>Documents</span>
 
                   <ChevronDown
-                    className={`
-                      h-4 w-4
-                      transition-transform duration-200
-                      ${
-                        documentsOpen
-                          ? "rotate-180"
-                          : ""
-                      }
-                    `}
+                    className={[
+                      "h-4 w-4 transition-transform duration-200",
+                      documentsOpen ? "rotate-180" : "",
+                    ].join(" ")}
                   />
                 </button>
 
                 {documentsOpen && (
-                  <div className="ml-3 border-l border-border pl-2">
-                    {/* MOBILE ROSTERS */}
+                  <div className="mt-1 space-y-1 pl-3">
                     {visibleRosters.length > 0 && (
                       <div>
                         <button
                           type="button"
                           onClick={toggleRosters}
-                          className={`
-                            flex w-full items-center justify-between
-                            rounded-lg px-4 py-2.5
-                            text-left text-sm font-medium
-                            transition-colors
-                            ${
-                              rostersActive ||
-                              rostersOpen
-                                ? "bg-foreground/10 text-foreground"
-                                : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                            }
-                          `}
-                          aria-expanded={rostersOpen}
+                          className={[
+                            "flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                            rostersActive || rostersOpen
+                              ? "bg-foreground/10 text-foreground"
+                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                          ].join(" ")}
                         >
                           <span>Rosters</span>
 
                           <ChevronDown
-                            className={`
-                              h-4 w-4
-                              transition-transform duration-200
-                              ${
-                                rostersOpen
-                                  ? "rotate-180"
-                                  : ""
-                              }
-                            `}
+                            className={[
+                              "h-4 w-4 transition-transform duration-200",
+                              rostersOpen ? "rotate-180" : "",
+                            ].join(" ")}
                           />
                         </button>
 
                         {rostersOpen && (
-                          <div className="ml-3 border-l border-border pl-2">
-                            {visibleRosters.map(
-                              (item) => (
-                                <NavLink
-                                  key={item.href}
-                                  to={item.href}
-                                  onClick={
-                                    closeMobileMenu
-                                  }
-                                  className={({
-                                    isActive,
-                                  }) =>
-                                    `
-                                      block rounded-lg px-4 py-2.5
-                                      text-sm font-medium
-                                      transition-colors
-                                      ${
-                                        isActive
-                                          ? "bg-foreground/10 text-foreground"
-                                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                                      }
-                                    `
-                                  }
-                                >
-                                  {item.name}
-                                </NavLink>
-                              ),
-                            )}
+                          <div className="mt-1 space-y-1 border-l border-border/60 pl-3">
+                            {visibleRosters.map((item) => (
+                              <NavLink
+                                key={item.href}
+                                to={item.href}
+                                onClick={closeMobileMenu}
+                                className={({ isActive }) =>
+                                  [
+                                    "block rounded-lg px-3 py-2 text-sm transition-colors",
+                                    isActive
+                                      ? "bg-foreground/10 font-medium text-foreground"
+                                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                                  ].join(" ")
+                                }
+                              >
+                                {item.name}
+                              </NavLink>
+                            ))}
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* MOBILE SOPs */}
                     {visibleSops.length > 0 && (
                       <div>
                         <button
                           type="button"
                           onClick={toggleSops}
-                          className={`
-                            flex w-full items-center justify-between
-                            rounded-lg px-4 py-2.5
-                            text-left text-sm font-medium
-                            transition-colors
-                            ${
-                              sopsActive ||
-                              sopsOpen
-                                ? "bg-foreground/10 text-foreground"
-                                : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                            }
-                          `}
-                          aria-expanded={sopsOpen}
+                          className={[
+                            "flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                            sopsActive || sopsOpen
+                              ? "bg-foreground/10 text-foreground"
+                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                          ].join(" ")}
                         >
                           <span>SOPs</span>
 
                           <ChevronDown
-                            className={`
-                              h-4 w-4
-                              transition-transform duration-200
-                              ${
-                                sopsOpen
-                                  ? "rotate-180"
-                                  : ""
-                              }
-                            `}
+                            className={[
+                              "h-4 w-4 transition-transform duration-200",
+                              sopsOpen ? "rotate-180" : "",
+                            ].join(" ")}
                           />
                         </button>
 
                         {sopsOpen && (
-                          <div className="ml-3 border-l border-border pl-2">
-                            {visibleSops.map(
-                              (item) => (
-                                <NavLink
-                                  key={item.href}
-                                  to={item.href}
-                                  onClick={
-                                    closeMobileMenu
-                                  }
-                                  className={({
-                                    isActive,
-                                  }) =>
-                                    `
-                                      block rounded-lg px-4 py-2.5
-                                      text-sm font-medium
-                                      transition-colors
-                                      ${
-                                        isActive
-                                          ? "bg-foreground/10 text-foreground"
-                                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                                      }
-                                    `
-                                  }
-                                >
-                                  {item.name}
-                                </NavLink>
-                              ),
-                            )}
+                          <div className="mt-1 space-y-1 border-l border-border/60 pl-3">
+                            {visibleSops.map((item) => (
+                              <NavLink
+                                key={item.href}
+                                to={item.href}
+                                onClick={closeMobileMenu}
+                                className={({ isActive }) =>
+                                  [
+                                    "block rounded-lg px-3 py-2 text-sm transition-colors",
+                                    isActive
+                                      ? "bg-foreground/10 font-medium text-foreground"
+                                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                                  ].join(" ")
+                                }
+                              >
+                                {item.name}
+                              </NavLink>
+                            ))}
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* MOBILE COMMAND */}
-                    {visibleCommand.length > 0 && (
-                      <div>
-                        <button
-                          type="button"
-                          onClick={toggleCommand}
-                          className={`
-                            flex w-full items-center justify-between
-                            rounded-lg px-4 py-2.5
-                            text-left text-sm font-medium
-                            transition-colors
-                            ${
-                              commandOpen
-                                ? "bg-foreground/10 text-foreground"
-                                : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                            }
-                          `}
-                          aria-expanded={commandOpen}
-                        >
-                          <span>Command</span>
+                    {canViewSupervisor && (
+                      <NavLink
+                        to={supervisorItem.href}
+                        onClick={closeMobileMenu}
+                        className={[
+                          "block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                          supervisorActive
+                            ? "bg-foreground/10 text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                        ].join(" ")}
+                      >
+                        Supervisor
+                      </NavLink>
+                    )}
 
-                          <ChevronDown
-                            className={`
-                              h-4 w-4
-                              transition-transform duration-200
-                              ${
-                                commandOpen
-                                  ? "rotate-180"
-                                  : ""
-                              }
-                            `}
-                          />
-                        </button>
-
-                        {commandOpen && (
-                          <div className="ml-3 border-l border-border pl-2">
-                            {visibleCommand.map(
-                              (item) => (
-                                <NavLink
-                                  key={item.href}
-                                  to={item.href}
-                                  onClick={
-                                    closeMobileMenu
-                                  }
-                                  className={({
-                                    isActive,
-                                  }) =>
-                                    `
-                                      block rounded-lg px-4 py-2.5
-                                      text-sm font-medium
-                                      transition-colors
-                                      ${
-                                        isActive
-                                          ? "bg-foreground/10 text-foreground"
-                                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                                      }
-                                    `
-                                  }
-                                >
-                                  {item.name}
-                                </NavLink>
-                              ),
-                            )}
-                          </div>
-                        )}
-                      </div>
+                    {canViewCommand && (
+                      <NavLink
+                        to={commandItem.href}
+                        onClick={closeMobileMenu}
+                        className={[
+                          "block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                          commandActive
+                            ? "bg-foreground/10 text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                        ].join(" ")}
+                      >
+                        Command
+                      </NavLink>
                     )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* MOBILE DASHBOARD */}
-            {visibleItems
-              .filter(
-                (item) => item.name === "Dashboard",
-              )
-              .map((item) => (
-                <NavLink
-                  key={item.href}
-                  to={item.href}
-                  end={item.href === "/"}
-                  onClick={closeMobileMenu}
-                  className={({ isActive }) =>
-                    `
-                      rounded-lg px-4 py-3
-                      text-sm font-medium
-                      transition-colors
-                      ${
-                        isActive
-                          ? "bg-foreground/10 text-foreground"
-                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                      }
-                    `
-                  }
+            <div className="mt-2 flex items-center justify-between border-t border-border/50 pt-3">
+              {user ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    await fetch("/api/auth/logout", {
+                      method: "POST",
+                      credentials: "include",
+                    })
+
+                    window.location.href =
+                      "/signed-out?logout=true"
+                  }}
+                  className="gap-2"
                 >
-                  {item.name}
-                </NavLink>
-              ))}
-
-            <div className="my-1 h-px bg-border" />
-
-            {user ? (
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href =
-                    "/api/auth/logout"
-                }}
-                className="
-                  flex w-full items-center gap-3
-                  rounded-lg px-4 py-3
-                  text-left text-sm font-medium
-                  text-muted-foreground
-                  transition-colors
-                  hover:bg-foreground/5
-                  hover:text-foreground
-                "
-              >
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </button>
-            ) : (
-              <Link
-                to="/sign-in"
-                onClick={closeMobileMenu}
-                className="
-                  flex items-center gap-3
-                  rounded-lg px-4 py-3
-                  text-sm font-medium
-                  text-muted-foreground
-                  transition-colors
-                  hover:bg-foreground/5
-                  hover:text-foreground
-                "
-              >
-                <LogIn className="h-4 w-4" />
-                Sign In
-              </Link>
-            )}
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Button>
+              ) : (
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Link
+                    to="/login"
+                    onClick={closeMobileMenu}
+                  >
+                    <LogIn className="h-4 w-4" />
+                    Login
+                  </Link>
+                </Button>
+              )}
+            </div>
           </nav>
         </div>
       )}
