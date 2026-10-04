@@ -677,7 +677,7 @@ const galleryCategoryClasses: Record<
     "!border-blue-500/50 !bg-blue-500/10 !text-blue-500 dark:!border-blue-400/50 dark:!bg-blue-500/10 dark:!text-blue-400",
 
   Fleet:
-    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    "!border-amber-500/50 !bg-amber-500/25 !text-amber-700 dark:!border-amber-400/50 dark:!bg-amber-500/20 dark:!text-amber-300",
 }
 
 function formatEventDate(date: string) {
