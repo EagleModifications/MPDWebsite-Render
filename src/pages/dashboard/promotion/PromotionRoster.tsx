@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent,
 } from "react"
 
 import {
@@ -24,7 +25,6 @@ import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
 import GoogleRosterRefresh from "@/components/dashboard/GoogleRosterRefresh"
-import { logPromotionAction } from "@/lib/promotionActionLog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -353,7 +353,11 @@ export default function PromotionRoster() {
     useState(false)
 
   const [openDiscordMenu, setOpenDiscordMenu] =
-    useState<string | null>(null)
+    useState<{
+      discordId: string
+      x: number
+      y: number
+    } | null>(null)
 
   const [discordContextMenu, setDiscordContextMenu] =
     useState<DiscordContextMenu>(null)
@@ -366,9 +370,6 @@ export default function PromotionRoster() {
 
   const shiftSelectingRef =
     useRef(false)
-
-  const searchLogTimeoutRef =
-    useRef<number | null>(null)
 
   const loadDiscordProfile = useCallback(
     async (discordId: string) => {
@@ -444,6 +445,30 @@ export default function PromotionRoster() {
       }
     },
     [discordProfileLoading, discordProfiles],
+  )
+
+  const preloadDiscordProfiles = useCallback(
+    async (rosterMembers: PromotionRosterMember[]) => {
+      const ids = rosterMembers
+        .map((member) => member.discordId)
+        .filter(Boolean)
+        .filter((id, index, array) => array.indexOf(id) === index)
+        .slice(0, 25)
+
+      // Only preload the first visible page worth of profiles.
+      // Remaining rows load on hover/click so the roster does not fire
+      // hundreds of Discord API requests at once.
+      for (let index = 0; index < ids.length; index += 5) {
+        const batch = ids.slice(index, index + 5)
+
+        await Promise.allSettled(
+          batch.map((discordId) =>
+            loadDiscordProfile(discordId),
+          ),
+        )
+      }
+    },
+    [loadDiscordProfile],
   )
 
   /* ─────────────────────────────────────────────
@@ -580,17 +605,9 @@ export default function PromotionRoster() {
 
         setMembers(roster)
         setSelectedIds([])
-        setSelectedCopied(false)
 
-        logPromotionAction({
-          action: "view-roster",
-          category: "roster",
-          division,
-          summary: `Viewed the ${division} promotion roster.`,
-          details: {
-            memberCount: roster.length,
-          },
-        })
+        void preloadDiscordProfiles(roster)
+        setSelectedCopied(false)
       } catch (err) {
         const message =
           err instanceof Error
@@ -610,7 +627,7 @@ export default function PromotionRoster() {
         setLoading(false)
       }
     },
-    [division],
+    [division, preloadDiscordProfiles],
   )
 
   useEffect(() => {
@@ -731,49 +748,6 @@ export default function PromotionRoster() {
     rankFilters,
   ])
 
-  useEffect(() => {
-    if (searchLogTimeoutRef.current !== null) {
-      window.clearTimeout(
-        searchLogTimeoutRef.current,
-      )
-    }
-
-    const query = search.trim()
-
-    if (!query) {
-      searchLogTimeoutRef.current = null
-      return
-    }
-
-    searchLogTimeoutRef.current = window.setTimeout(() => {
-      logPromotionAction({
-        action: "search-roster",
-        category: "roster",
-        division,
-        summary: `Searched the ${division} promotion roster for "${query}".`,
-        details: {
-          query,
-          resultCount: filteredMembers.length,
-        },
-      })
-
-      searchLogTimeoutRef.current = null
-    }, 700)
-
-    return () => {
-      if (searchLogTimeoutRef.current !== null) {
-        window.clearTimeout(
-          searchLogTimeoutRef.current,
-        )
-        searchLogTimeoutRef.current = null
-      }
-    }
-  }, [
-    search,
-    division,
-    filteredMembers.length,
-  ])
-
   /* ─────────────────────────────────────────────
      Statistics
   ───────────────────────────────────────────── */
@@ -823,28 +797,6 @@ export default function PromotionRoster() {
     )
 
     setSelectedCopied(false)
-
-    const member = members.find(
-      (item) => item.discordId === discordId,
-    )
-
-    if (member) {
-      const wasSelected = selectedIds.includes(
-        discordId,
-      )
-
-      logPromotionAction({
-        action: wasSelected
-          ? "deselect-member"
-          : "select-member",
-        category: "roster",
-        division,
-        targetUserId: member.discordId,
-        targetName: member.name,
-        targetRank: member.rank,
-        summary: `${wasSelected ? "Deselected" : "Selected"} ${member.name} in the ${division} promotion roster.`,
-      })
-    }
   }
 
   const selectRankMembers = (
@@ -885,17 +837,6 @@ export default function PromotionRoster() {
     )
 
     setSelectedCopied(false)
-
-    logPromotionAction({
-      action: "select-rank",
-      category: "roster",
-      division,
-      targetRank: member.rank,
-      summary: `Selected ${rankIds.length} ${member.rank} members in the ${division} promotion roster.`,
-      details: {
-        count: rankIds.length,
-      },
-    })
   }
 
   const handleMemberSelection = (
@@ -950,18 +891,6 @@ export default function PromotionRoster() {
     }
 
     setSelectedCopied(false)
-
-    logPromotionAction({
-      action: allSelected
-        ? "deselect-all-visible"
-        : "select-all-visible",
-      category: "roster",
-      division,
-      summary: `${allSelected ? "Deselected" : "Selected"} all ${visibleIds.length} visible members in the ${division} promotion roster.`,
-      details: {
-        count: visibleIds.length,
-      },
-    })
   }
 
   /* ─────────────────────────────────────────────
@@ -1133,20 +1062,6 @@ export default function PromotionRoster() {
 
       setSelectedCopied(true)
 
-      logPromotionAction({
-        action: "copy-roster",
-        category: "roster",
-        division,
-        summary: `Copied ${selectedMembers.length} selected members from the ${division} promotion roster.`,
-        details: {
-          copyType: type,
-          count: selectedMembers.length,
-          memberIds: selectedMembers.map(
-            (member) => member.discordId,
-          ),
-        },
-      })
-
       toast.success(
         "Copied successfully",
         {
@@ -1181,8 +1096,6 @@ export default function PromotionRoster() {
   const toggleStatusFilter = (
     status: Status,
   ) => {
-    const wasActive = statusFilters.includes(status)
-
     setStatusFilters((current) =>
       current.includes(status)
         ? current.filter(
@@ -1192,17 +1105,6 @@ export default function PromotionRoster() {
     )
 
     setSelectedCopied(false)
-
-    logPromotionAction({
-      action: "filter-status",
-      category: "roster",
-      division,
-      summary: `${wasActive ? "Removed" : "Added"} ${getStatusLabel(status)} status filter on the ${division} promotion roster.`,
-      details: {
-        status,
-        enabled: !wasActive,
-      },
-    })
   }
 
   const selectAllStatuses = () => {
@@ -1213,30 +1115,11 @@ export default function PromotionRoster() {
     )
 
     setSelectedCopied(false)
-
-    logPromotionAction({
-      action: "filter-status",
-      category: "roster",
-      division,
-      summary: `Selected all status filters on the ${division} promotion roster.`,
-      details: {
-        statuses: statusOptions.map(
-          (status) => status.id,
-        ),
-      },
-    })
   }
 
   const clearStatuses = () => {
     setStatusFilters([])
     setSelectedCopied(false)
-
-    logPromotionAction({
-      action: "clear-status-filters",
-      category: "roster",
-      division,
-      summary: `Cleared status filters on the ${division} promotion roster.`,
-    })
   }
 
   /* ─────────────────────────────────────────────
@@ -1246,12 +1129,6 @@ export default function PromotionRoster() {
   const toggleRankFilter = (
     rank: string,
   ) => {
-    const wasActive = rankFilters.some(
-      (item) =>
-        normalizeRank(item) ===
-        normalizeRank(rank),
-    )
-
     setRankFilters((current) => {
       const exists = current.some(
         (item) =>
@@ -1271,45 +1148,16 @@ export default function PromotionRoster() {
     })
 
     setSelectedCopied(false)
-
-    logPromotionAction({
-      action: "filter-rank",
-      category: "roster",
-      division,
-      targetRank: rank,
-      summary: `${wasActive ? "Removed" : "Added"} ${rank} rank filter on the ${division} promotion roster.`,
-      details: {
-        rank,
-        enabled: !wasActive,
-      },
-    })
   }
 
   const selectAllRanks = () => {
     setRankFilters([...rankOptions])
     setSelectedCopied(false)
-
-    logPromotionAction({
-      action: "filter-rank",
-      category: "roster",
-      division,
-      summary: `Selected all rank filters on the ${division} promotion roster.`,
-      details: {
-        ranks: rankOptions,
-      },
-    })
   }
 
   const clearRanks = () => {
     setRankFilters([])
     setSelectedCopied(false)
-
-    logPromotionAction({
-      action: "clear-rank-filters",
-      category: "roster",
-      division,
-      summary: `Cleared rank filters on the ${division} promotion roster.`,
-    })
   }
 
   /* ─────────────────────────────────────────────
@@ -1317,21 +1165,10 @@ export default function PromotionRoster() {
   ───────────────────────────────────────────── */
 
   const clearFilters = () => {
-    if (!hasFilters) {
-      return
-    }
-
     setSearch("")
     setStatusFilters([])
     setRankFilters([])
     setSelectedCopied(false)
-
-    logPromotionAction({
-      action: "clear-filters",
-      category: "roster",
-      division,
-      summary: `Cleared all filters on the ${division} promotion roster.`,
-    })
   }
 
   const allVisibleSelected =
@@ -1356,6 +1193,51 @@ export default function PromotionRoster() {
 
   const selectedRankCount =
     rankFilters.length
+
+  const toggleDiscordProfileMenu = (
+    member: PromotionRosterMember,
+    event: MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    setDiscordContextMenu(null)
+
+    const current = openDiscordMenu
+
+    if (current?.discordId === member.discordId) {
+      setOpenDiscordMenu(null)
+      return
+    }
+
+    void loadDiscordProfile(member.discordId)
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    const menuWidth = 288
+    const menuHeight = 122
+    const edge = 8
+
+    let x = rect.left
+    let y = rect.bottom + 8
+
+    if (x + menuWidth > window.innerWidth - edge) {
+      x = window.innerWidth - menuWidth - edge
+    }
+
+    x = Math.max(edge, x)
+
+    if (y + menuHeight > window.innerHeight - edge) {
+      y = rect.top - menuHeight - 8
+    }
+
+    y = Math.max(edge, y)
+
+    setOpenDiscordMenu({
+      discordId: member.discordId,
+      x,
+      y,
+    })
+  }
 
   const copyDiscordId = async (
     member: PromotionRosterMember,
@@ -1427,17 +1309,6 @@ export default function PromotionRoster() {
                       ) {
                         return
                       }
-
-                      logPromotionAction({
-                        action: "change-division",
-                        category: "navigation",
-                        division: item.id,
-                        summary: `Switched Promotion Roster from ${divisions.find((entry) => entry.id === division)?.label ?? division} to ${item.label}.`,
-                        details: {
-                          fromDivision: division,
-                          toDivision: item.id,
-                        },
-                      })
 
                       setDivision(item.id)
                       setSearch("")
@@ -2074,16 +1945,9 @@ export default function PromotionRoster() {
             {/* Google Sheets Refresh */}
 
             <GoogleRosterRefresh
-              onRefreshed={() => {
-                logPromotionAction({
-                  action: "refresh-roster",
-                  category: "roster",
-                  division,
-                  summary: `Refreshed the ${division} promotion roster from Google Sheets.`,
-                })
-
-                void loadRoster(false)
-              }}
+              onRefreshed={() =>
+                loadRoster(false)
+              }
             />
           </div>
 
@@ -2278,7 +2142,7 @@ export default function PromotionRoster() {
                       </th>
 
                       <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
-                        Discord ID
+                        Discord Username
                       </th>
 
                       <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
@@ -2416,123 +2280,53 @@ export default function PromotionRoster() {
                             {/* Discord / User */}
 
                             <td className="relative overflow-visible px-2 py-3 text-center align-middle">
-                              <button
-                                type="button"
-                                title={`${member.name} (${member.discordId})`}
-                                className="mx-auto block max-w-full truncate rounded-md px-1.5 py-1 text-[10px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  setDiscordContextMenu(null)
-                                  setOpenDiscordMenu((current) =>
-                                    current === member.discordId
-                                      ? null
-                                      : member.discordId,
-                                  )
-                                }}
-                                onContextMenu={(event) => {
-                                  event.preventDefault()
-                                  event.stopPropagation()
-                                  setOpenDiscordMenu(null)
-                                  setDiscordContextMenu({
-                                    discordId: member.discordId,
-                                    name: member.name,
-                                    x: event.clientX,
-                                    y: event.clientY,
-                                  })
-                                }}
-                              >
-                                <span className="font-medium">
-                                  {member.name}
-                                </span>{" "}
-                                <span>({member.discordId})</span>
-                              </button>
+                              {(() => {
+                                const profile =
+                                  discordProfiles[member.discordId]
 
-                              {openDiscordMenu === member.discordId && (
-                                <div
-                                  className="absolute right-2 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-xl"
-                                  onClick={(event) => event.stopPropagation()}
-                                  onContextMenu={(event) => event.preventDefault()}
-                                >
-                                  {(() => {
-                                    const profile =
-                                      discordProfiles[member.discordId]
+                                const username =
+                                  profile?.username ||
+                                  "Username unavailable"
 
-                                    const displayName =
-                                      profile?.displayName ||
-                                      member.name ||
-                                      "Discord User"
-
-                                    const username =
-                                      profile?.username ||
-                                      "Username unavailable"
-
-                                    const avatar =
-                                      getDiscordAvatarUrl(
-                                        member.discordId,
-                                        profile?.avatar,
-                                      ) ||
-                                      getDiscordDefaultAvatarUrl(
+                                return (
+                                  <button
+                                    type="button"
+                                    title={`${username} (${member.discordId})`}
+                                    className="mx-auto block max-w-full rounded-md px-1.5 py-1 text-left text-[10px] transition-colors hover:bg-blue-500/10"
+                                    onMouseEnter={() =>
+                                      void loadDiscordProfile(
                                         member.discordId,
                                       )
-
-                                    const initials =
-                                      getDiscordInitials(
-                                        displayName,
-                                        username,
+                                    }
+                                    onClick={(event) =>
+                                      toggleDiscordProfileMenu(
+                                        member,
+                                        event,
                                       )
+                                    }
+                                    onContextMenu={(event) => {
+                                      event.preventDefault()
+                                      event.stopPropagation()
+                                      setOpenDiscordMenu(null)
+                                      setDiscordContextMenu({
+                                        discordId: member.discordId,
+                                        name: member.name,
+                                        x: event.clientX,
+                                        y: event.clientY,
+                                      })
+                                    }}
+                                  >
+                                    <span className="block max-w-[150px] truncate font-medium text-blue-400 hover:text-blue-300">
+                                      {username}
+                                    </span>
+                                    <span className="block truncate font-mono text-[9px] text-muted-foreground">
+                                      ({member.discordId})
+                                    </span>
+                                  </button>
+                                )
+                              })()}
 
-                                    const profileLoading =
-                                      discordProfileLoading[
-                                        member.discordId
-                                      ]
-
-                                    return (
-                                      <>
-                                        <div className="flex items-center gap-3 border-b px-3 py-3">
-                                          <Avatar className="h-11 w-11 shrink-0 rounded-full">
-                                            <AvatarImage
-                                              src={avatar}
-                                              alt={displayName}
-                                            />
-                                            <AvatarFallback>
-                                              {initials}
-                                            </AvatarFallback>
-                                          </Avatar>
-
-                                          <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-semibold">
-                                              {profileLoading
-                                                ? "Loading profile..."
-                                                : displayName}
-                                            </p>
-                                            <p className="truncate text-xs text-muted-foreground">
-                                              {profileLoading
-                                                ? "Fetching Discord information"
-                                                : `@${username}`}
-                                            </p>
-                                            <p className="mt-0.5 truncate font-mono text-[10px] text-blue-400">
-                                              {member.discordId}
-                                            </p>
-                                          </div>
-                                        </div>
-
-                                        <div className="p-1">
-                                          <button
-                                            type="button"
-                                            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
-                                            onClick={() =>
-                                              void copyDiscordId(member)
-                                            }
-                                          >
-                                            <Copy className="h-4 w-4 text-blue-400" />
-                                            Copy ID
-                                          </button>
-                                        </div>
-                                      </>
-                                    )
-                                  })()}
-                                </div>
-                              )}
+                              
                             </td>
 
                             {/* Time in Department */}
@@ -2849,24 +2643,17 @@ export default function PromotionRoster() {
                                   type="button"
                                   title={`${member.name} (${member.discordId})`}
                                   className="min-w-0 max-w-full truncate rounded-md px-2 py-1 text-left text-[11px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    setDiscordContextMenu(null)
-                                    setOpenDiscordMenu((current) => {
-                                      const next =
-                                        current === member.discordId
-                                          ? null
-                                          : member.discordId
-
-                                      if (next) {
-                                        void loadDiscordProfile(
-                                          member.discordId,
-                                        )
-                                      }
-
-                                      return next
-                                    })
-                                  }}
+                                  onMouseEnter={() =>
+                                    void loadDiscordProfile(
+                                      member.discordId,
+                                    )
+                                  }
+                                  onClick={(event) =>
+                                    toggleDiscordProfileMenu(
+                                      member,
+                                      event,
+                                    )
+                                  }
                                   onContextMenu={(event) => {
                                     event.preventDefault()
                                     event.stopPropagation()
@@ -2879,98 +2666,16 @@ export default function PromotionRoster() {
                                     })
                                   }}
                                 >
-                                  <span className="font-medium">
-                                    {member.name}
+                                  <span className="font-medium text-blue-400">
+                                    {discordProfiles[member.discordId]?.username ||
+                                      "Username unavailable"}
                                   </span>{" "}
-                                  <span>({member.discordId})</span>
+                                  <span className="font-mono text-[10px] text-muted-foreground">
+                                    ({member.discordId})
+                                  </span>
                                 </button>
 
-                                {openDiscordMenu === member.discordId && (
-                                  <div
-                                    className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-xl"
-                                    onClick={(event) => event.stopPropagation()}
-                                    onContextMenu={(event) => event.preventDefault()}
-                                  >
-                                    {(() => {
-                                      const profile =
-                                        discordProfiles[member.discordId]
-
-                                      const displayName =
-                                        profile?.displayName ||
-                                        member.name ||
-                                        "Discord User"
-
-                                      const username =
-                                        profile?.username ||
-                                        "Username unavailable"
-
-                                      const avatar =
-                                        getDiscordAvatarUrl(
-                                          member.discordId,
-                                          profile?.avatar,
-                                        ) ||
-                                        getDiscordDefaultAvatarUrl(
-                                          member.discordId,
-                                        )
-
-                                      const initials =
-                                        getDiscordInitials(
-                                          displayName,
-                                          username,
-                                        )
-
-                                      const profileLoading =
-                                        discordProfileLoading[
-                                          member.discordId
-                                        ]
-
-                                      return (
-                                        <>
-                                          <div className="flex items-center gap-3 border-b px-3 py-3">
-                                            <Avatar className="h-11 w-11 shrink-0 rounded-full">
-                                              <AvatarImage
-                                                src={avatar}
-                                                alt={displayName}
-                                              />
-                                              <AvatarFallback>
-                                                {initials}
-                                              </AvatarFallback>
-                                            </Avatar>
-
-                                            <div className="min-w-0 flex-1">
-                                              <p className="truncate text-sm font-semibold">
-                                                {profileLoading
-                                                  ? "Loading profile..."
-                                                  : displayName}
-                                              </p>
-                                              <p className="truncate text-xs text-muted-foreground">
-                                                {profileLoading
-                                                  ? "Fetching Discord information"
-                                                  : `@${username}`}
-                                              </p>
-                                              <p className="mt-0.5 truncate font-mono text-[10px] text-blue-400">
-                                                {member.discordId}
-                                              </p>
-                                            </div>
-                                          </div>
-
-                                          <div className="p-1">
-                                            <button
-                                              type="button"
-                                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
-                                              onClick={() =>
-                                                void copyDiscordId(member)
-                                              }
-                                            >
-                                              <Copy className="h-4 w-4 text-blue-400" />
-                                              Copy ID
-                                            </button>
-                                          </div>
-                                        </>
-                                      )
-                                    })()}
-                                  </div>
-                                )}
+                                
                               </div>
                             </div>
                           </div>
@@ -2983,6 +2688,103 @@ export default function PromotionRoster() {
             </>
           )}
         </div>
+        {openDiscordMenu && (() => {
+          const member = members.find(
+            (item) =>
+              item.discordId ===
+              openDiscordMenu.discordId,
+          )
+
+          if (!member) {
+            return null
+          }
+
+          const profile =
+            discordProfiles[member.discordId]
+
+          const displayName =
+            profile?.displayName ||
+            "Discord User"
+
+          const username =
+            profile?.username ||
+            "Username unavailable"
+
+          const avatar =
+            getDiscordAvatarUrl(
+              member.discordId,
+              profile?.avatar,
+            ) ||
+            getDiscordDefaultAvatarUrl(
+              member.discordId,
+            )
+
+          const initials =
+            getDiscordInitials(
+              displayName,
+              username,
+            )
+
+          const profileLoading =
+            discordProfileLoading[
+              member.discordId
+            ]
+
+          return (
+            <div
+              className="fixed z-[110] w-72 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-xl"
+              style={{
+                left: openDiscordMenu.x,
+                top: openDiscordMenu.y,
+              }}
+              onClick={(event) =>
+                event.stopPropagation()
+              }
+              onContextMenu={(event) =>
+                event.preventDefault()
+              }
+            >
+              <div className="flex items-center gap-3 px-3 py-3">
+                <Avatar className="h-11 w-11 shrink-0 rounded-full">
+                  <AvatarImage
+                    src={avatar}
+                    alt={displayName}
+                  />
+                  <AvatarFallback>
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">
+                    {profileLoading
+                      ? "Loading profile..."
+                      : displayName}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {profileLoading
+                      ? "Fetching Discord information"
+                      : username}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t p-1">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                  onClick={() =>
+                    void copyDiscordId(member)
+                  }
+                >
+                  <Copy className="h-4 w-4 text-blue-400" />
+                  Copy User ID
+                </button>
+              </div>
+            </div>
+          )
+        })()}
+
         {discordContextMenu && (
           <div
             className="fixed z-[100] w-52 overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl"
@@ -3009,7 +2811,7 @@ export default function PromotionRoster() {
               }}
             >
               <Copy className="h-4 w-4 text-blue-400" />
-              Copy ID
+              Copy User ID
             </button>
           </div>
         )}
