@@ -596,7 +596,7 @@ function homeValues(
 
 function HomeCard({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: ReactNode }) {
   return (
-    <section className="min-w-0 w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div className="flex items-center gap-2.5 border-b border-border bg-muted/20 px-4 py-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
           <Icon className="h-4 w-4 text-blue-500" />
@@ -621,8 +621,8 @@ function HomeView({ sheet }: { sheet: Sheet }) {
   }))
 
   return (
-    <div className="grid min-w-0 w-full grid-cols-1 gap-4 overflow-x-hidden p-4 xl:grid-cols-3">
-      <div className="min-w-0 space-y-4">
+    <div className="grid gap-4 p-4 xl:grid-cols-3">
+      <div className="space-y-4">
         <HomeCard title="This Month's Dept. Hours" icon={RefreshCw}>
           <p className="text-3xl font-bold tracking-tight">{display(hours[0])}</p>
           <p className="mt-1 text-xs text-muted-foreground">Current department hours from the MPD Home sheet.</p>
@@ -645,7 +645,7 @@ function HomeView({ sheet }: { sheet: Sheet }) {
         </HomeCard>
       </div>
 
-      <div className="min-w-0 space-y-4">
+      <div className="space-y-4">
         {leadership.map(({ title, icon, values }) => (
           <HomeCard key={title} title={title} icon={icon}>
             {values.length ? (
@@ -659,7 +659,7 @@ function HomeView({ sheet }: { sheet: Sheet }) {
         ))}
       </div>
 
-      <div className="min-w-0 space-y-4">
+      <div className="space-y-4">
         <HomeCard title="1N-05" icon={Shield}>
           <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-center text-sm font-semibold">
             Vacant
@@ -667,16 +667,16 @@ function HomeView({ sheet }: { sheet: Sheet }) {
         </HomeCard>
 
         <HomeCard title="FTD & Subdivisions" icon={Users}>
-          <div className="min-w-0 w-full overflow-hidden rounded-md border border-blue-950/70 bg-muted/10">
+          <div className="overflow-hidden rounded-md border border-blue-950/70 bg-muted/10">
             {subdivisionSections.map((section) => (
               <div key={section.title}>
                 <div className="border-b border-blue-950/70 bg-muted/70 px-3 py-2 text-center text-xs font-bold">
                   {section.title}
                 </div>
                 {section.rows.map(([label, value]) => (
-                  <div key={`${section.title}-${label}`} className="grid min-w-0 grid-cols-[76px_minmax(0,1fr)] border-b border-blue-950/70 last:border-b-0">
+                  <div key={`${section.title}-${label}`} className="grid grid-cols-[88px_minmax(0,1fr)] border-b border-blue-950/70 last:border-b-0">
                     <div className="border-r border-blue-950/70 px-2 py-1.5 text-center text-xs font-medium">{label}</div>
-                    <div className="min-w-0 break-words px-2 py-1.5 text-center text-xs">{display(value)}</div>
+                    <div className="px-2 py-1.5 text-center text-xs">{display(value)}</div>
                   </div>
                 ))}
               </div>
@@ -920,8 +920,6 @@ export default function MainRoster() {
 
   useEffect(() => {
     setSearch("")
-    setStatusFilter("")
-    setRankFilter("")
     void loadSheet(page, true, false)
   }, [page, loadSheet])
 
