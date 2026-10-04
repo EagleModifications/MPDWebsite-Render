@@ -292,9 +292,6 @@ export default function Permissions() {
 
   const [discordDraft, setDiscordDraft] =
     useState<DiscordPermission>(emptyDiscord)
-  const [editingDiscordId, setEditingDiscordId] = useState<string | null>(
-    null,
-  )
 
   const [expandedPermissions, setExpandedPermissions] = useState<Set<string>>(
     new Set(),
@@ -375,7 +372,6 @@ export default function Permissions() {
     setEditingRankName(null)
 
     setDiscordDraft(emptyDiscord)
-    setEditingDiscordId(null)
   }
 
   function openCreatePermission() {
@@ -431,7 +427,6 @@ export default function Permissions() {
   function openCreateDiscord() {
     setModalKind("discord")
     setModalMode("create")
-    setEditingDiscordId(null)
 
     setDiscordDraft({
       discordId: "",
@@ -450,7 +445,6 @@ export default function Permissions() {
 
     setModalKind("discord")
     setModalMode("edit")
-    setEditingDiscordId(entry.discordId)
 
     setDiscordDraft({
       discordId: entry.discordId,
