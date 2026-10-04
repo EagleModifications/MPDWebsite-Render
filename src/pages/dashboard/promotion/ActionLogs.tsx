@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type MouseEvent as ReactMouseEvent,
 } from "react"
 import {
   Activity,
@@ -82,6 +83,7 @@ type ApiResponse = {
 type DropdownOption = {
   value: string
   label: string
+  className?: string
 }
 
 const moduleOptions = [
@@ -311,16 +313,29 @@ function CopyIdentity({
   className?: string
 }) {
   const [open, setOpen] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<"left" | "cursor">("left")
+  const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 })
   const ref = useRef<HTMLDivElement>(null)
   const displayName = name || "Unknown User"
+  const identity = id ? `${displayName} (${id})` : displayName
 
   useEffect(() => {
     if (!open) return
+
     const handlePointer = (event: MouseEvent) => {
       if (!ref.current?.contains(event.target as Node)) setOpen(false)
     }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false)
+    }
+
     document.addEventListener("mousedown", handlePointer)
-    return () => document.removeEventListener("mousedown", handlePointer)
+    document.addEventListener("keydown", handleEscape)
+    return () => {
+      document.removeEventListener("mousedown", handlePointer)
+      document.removeEventListener("keydown", handleEscape)
+    }
   }, [open])
 
   const copy = async (value: string, label: string) => {
@@ -334,49 +349,87 @@ function CopyIdentity({
     }
   }
 
+  const openLeftMenu = () => {
+    setMenuPosition("left")
+    setOpen((current) => !current)
+  }
+
+  const openContextMenu = (event: ReactMouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setMenuPosition("cursor")
+    setCursorPosition({ x: event.clientX, y: event.clientY })
+    setOpen(true)
+  }
+
   return (
-    <div ref={ref} className={`relative min-w-0 ${className}`}>
+    <div
+      ref={ref}
+      className={`relative inline-flex min-w-0 ${className}`}
+      onContextMenu={openContextMenu}
+    >
       <button
         type="button"
-        className="inline-flex max-w-full items-center gap-1.5 rounded-md text-left transition-colors hover:bg-muted/40"
+        className="inline-flex max-w-full items-center gap-1.5 rounded-md text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-500/50"
         onClick={(event) => {
           event.stopPropagation()
-          setOpen((current) => !current)
+          openLeftMenu()
         }}
-        title="Copy options"
+        title="Click or right-click for copy options"
       >
         <Avatar name={displayName} id={id ?? ""} avatar={avatar} />
-        <span className="truncate text-xs font-medium text-blue-400 hover:text-blue-300">
-          {displayName}
-          {id ? <span className="text-muted-foreground"> ({id})</span> : null}
+        <span className="truncate text-xs font-medium text-blue-400 transition-colors hover:text-blue-300">
+          {identity}
         </span>
-        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 min-w-[170px] overflow-hidden rounded-lg border border-border bg-popover p-1 shadow-xl">
+        <div
+          className="fixed z-[100] min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover p-1 shadow-2xl"
+          style={
+            menuPosition === "cursor"
+              ? { left: cursorPosition.x, top: cursorPosition.y }
+              : undefined
+          }
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.stopPropagation()}
+        >
+          <div className="px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Copy
+          </div>
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-foreground hover:bg-muted"
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-foreground hover:bg-blue-500/10 hover:text-blue-400"
             onClick={(event) => {
               event.stopPropagation()
               void copy(displayName, "Name")
             }}
           >
-            <Clipboard className="h-3.5 w-3.5 text-muted-foreground" />
+            <Clipboard className="h-3.5 w-3.5 text-blue-400" />
             Copy name
           </button>
           <button
             type="button"
             disabled={!id}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-foreground hover:bg-blue-500/10 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
             onClick={(event) => {
               event.stopPropagation()
               if (id) void copy(id, "Discord ID")
             }}
           >
-            <Clipboard className="h-3.5 w-3.5 text-muted-foreground" />
+            <Clipboard className="h-3.5 w-3.5 text-blue-400" />
             Copy Discord ID
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-foreground hover:bg-blue-500/10 hover:text-blue-400"
+            onClick={(event) => {
+              event.stopPropagation()
+              void copy(identity, "Name and ID")
+            }}
+          >
+            <Clipboard className="h-3.5 w-3.5 text-blue-400" />
+            Copy name and ID
           </button>
         </div>
       )}
@@ -436,7 +489,11 @@ function Dropdown({
                   setOpen(false)
                 }}
                 className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs transition-colors ${
-                  active ? "bg-blue-500/10 text-blue-400" : "text-foreground hover:bg-muted"
+                  active
+                    ? "bg-blue-500/10 text-blue-400"
+                    : option.className
+                      ? `${option.className} hover:brightness-110`
+                      : "text-foreground hover:bg-muted"
                 }`}
               >
                 <span>{option.label}</span>
@@ -455,7 +512,7 @@ function PageSizeDropdown({ value, onChange }: { value: number; onChange: (value
     <Dropdown
       value={String(value)}
       onChange={(next) => onChange(Number(next))}
-      className="w-[112px]"
+      className="w-[132px]"
       options={[25, 50, 75, 100].map((size) => ({ value: String(size), label: `${size} per page` }))}
     />
   )
@@ -626,7 +683,11 @@ export default function ActionLogs() {
 
     return [
       { value: "", label: "All actions" },
-      ...values.map((value) => ({ value, label: actionLabel(value) })),
+      ...values.map((value) => ({
+        value,
+        label: actionLabel(value),
+        className: actionClasses[value] ?? "border-slate-500/30 bg-slate-500/10 text-slate-400",
+      })),
     ]
   }, [logs])
 
@@ -687,8 +748,12 @@ export default function ActionLogs() {
                 }}
                 className={
                   module === item.value
-                    ? "rounded-md border border-purple-500/60 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-300"
-                    : "rounded-md border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                    ? item.value === "promotion"
+                      ? "rounded-md border border-violet-500/60 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-300 shadow-[0_0_0_1px_rgba(139,92,246,0.06)]"
+                      : item.value === "activity"
+                        ? "rounded-md border border-emerald-500/60 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 shadow-[0_0_0_1px_rgba(16,185,129,0.06)]"
+                        : "rounded-md border border-blue-500/60 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-300"
+                    : "rounded-md border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted/40 hover:text-foreground"
                 }
               >
                 {item.label}
@@ -826,7 +891,13 @@ export default function ActionLogs() {
                                 <CopyIdentity name={log.userName || log.username || "Unknown User"} id={log.userId} avatar={log.avatar} />
                                 <span className="text-muted-foreground">·</span>
                                 <span className="text-muted-foreground">{relativeTime(log.createdAt)}</span>
-                                <span className={`rounded-full border px-1.5 py-0.5 text-[9px] ${actionClasses[log.action] ?? "border-border bg-muted/30 text-muted-foreground"}`}>
+                                <span
+                                  className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium ${
+                                    log.module === "promotion"
+                                      ? "border-violet-500/30 bg-violet-500/10 text-violet-300"
+                                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                  }`}
+                                >
                                   {moduleLabel}
                                 </span>
                                 <span className={`rounded-full border px-1.5 py-0.5 text-[9px] ${divisionClasses[log.division ?? "department"]}`}>
