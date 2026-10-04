@@ -650,12 +650,23 @@ const ambientDots: AmbientDot[] = [
 ]
 
 const galleryTagClasses: Record<GalleryTag, string> = {
-  Dept: "!border-blue-500/50 !bg-blue-500/15 !text-blue-700 dark:!border-blue-400/50 dark:!bg-blue-500/25 dark:!text-blue-300",
-  SWAT: "!border-slate-500/60 !bg-slate-900/10 !text-slate-900 dark:!border-slate-400/50 dark:!bg-slate-800 dark:!text-white",
-  "MTF-7": "!border-blue-600/45 !bg-blue-700/10 !text-blue-800 dark:!border-blue-500/50 dark:!bg-blue-900/60 dark:!text-blue-200",
-  MCD: "!border-blue-950/60 !bg-blue-950/15 !text-blue-950 dark:!border-blue-800/70 dark:!bg-blue-950/90 dark:!text-blue-100",
-  TRU: "!border-yellow-500/50 !bg-yellow-500/15 !text-yellow-700 dark:!border-yellow-400/50 dark:!bg-yellow-500/20 dark:!text-yellow-300",
-  SAR: "!border-red-500/50 !bg-red-500/15 !text-red-700 dark:!border-red-400/50 dark:!bg-red-500/20 dark:!text-red-300",
+  Dept:
+    "border-blue-400/40 bg-blue-500/20 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.14)]",
+
+  SWAT:
+    "border-slate-400/30 bg-slate-800/70 text-slate-100 shadow-[0_0_12px_rgba(148,163,184,0.08)]",
+
+  "MTF-7":
+    "border-sky-400/35 bg-sky-900/45 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.1)]",
+
+  MCD:
+    "border-blue-900/70 bg-blue-950/90 text-blue-300 shadow-[0_0_12px_rgba(30,64,175,0.12)]",
+
+  TRU:
+    "border-yellow-400/40 bg-yellow-500/15 text-yellow-300 shadow-[0_0_12px_rgba(234,179,8,0.1)]",
+
+  SAR:
+    "border-red-400/40 bg-red-500/15 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.1)]",
 }
 
 const galleryCategoryClasses: Record<
@@ -663,10 +674,10 @@ const galleryCategoryClasses: Record<
   string
 > = {
   Community:
-    "border-blue-400/30 bg-blue-950/80 text-blue-300",
+    "!border-blue-500/50 !bg-blue-500/10 !text-blue-500 dark:!border-blue-400/50 dark:!bg-blue-500/10 dark:!text-blue-400",
 
   Fleet:
-    "border-white/15 bg-black/75 text-white",
+    "!border-yellow-500/50 !bg-yellow-500/10 !text-yellow-500 dark:!border-yellow-500/50 dark:!bg-yellow-500/10 dark:!text-yellow-400",
 }
 
 function formatEventDate(date: string) {
@@ -1038,7 +1049,7 @@ export default function Home() {
 
         <div className="absolute right-[8%] top-[48%] h-[400px] w-[400px] rounded-full bg-blue-600/[0.018] blur-[140px]" />
 
-        {/* Fixed stars — they twinkle/blink but never move */}
+        {/* Moving / blinking stars */}
         {visibleDots.map((dot, index) => (
           <span
             key={index}
@@ -1595,28 +1606,26 @@ export default function Home() {
       {/* =========================================================== */}
       <style>{`
         /*
-         * Each star:
-         * - slowly drifts around the page
-         * - fades in/out
-         * - slightly changes scale
-         * - has its own delay + duration
-         *
-         * This makes the field feel randomized instead of
-         * having every dot move at the same time.
+         * Fixed star field.
+         * Stars never translate or drift; they only twinkle in place.
          */
         @keyframes mpd-star-twinkle {
-          0%, 100% {
+          0%,
+          100% {
             opacity: 0.18;
             transform: scale(0.72);
           }
+
           35% {
             opacity: 0.45;
             transform: scale(0.9);
           }
+
           50% {
             opacity: 1;
             transform: scale(1.35);
           }
+
           65% {
             opacity: 0.5;
             transform: scale(0.95);
@@ -1631,10 +1640,12 @@ export default function Home() {
         }
 
         @keyframes mpd-arrow-bounce-real {
-          0%, 100% {
+          0%,
+          100% {
             transform: translateY(0);
             opacity: 0.45;
           }
+
           50% {
             transform: translateY(10px);
             opacity: 1;
@@ -1645,7 +1656,6 @@ export default function Home() {
           animation: mpd-arrow-bounce-real 1.1s ease-in-out infinite;
           will-change: transform, opacity;
         }
-
       `}</style>
     </div>
   )
