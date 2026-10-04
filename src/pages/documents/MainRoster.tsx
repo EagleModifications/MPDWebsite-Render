@@ -59,6 +59,7 @@ type Page = {
 }
 
 type DepartmentRow = {
+  section: string
   callsign: string
   badgeNumber: string
   name: string
@@ -72,6 +73,7 @@ type DepartmentRow = {
 }
 
 type EmployeeRow = {
+  section: string
   badgeNumber: string
   name: string
   discordId: string
@@ -266,41 +268,173 @@ function getValue(row: string[], columns: ColumnDefinition[], label: string): st
   return index >= 0 ? clean(row[index]) : ""
 }
 
+const SECTION_LABELS = new Set([
+  "normalnonsupervisor",
+  "nonsupervisor",
+  "trialsupervisor",
+  "supervisors",
+  "triallowcommand",
+  "lowcommand",
+  "trialhighcommand",
+  "highcommand",
+  "patrol",
+  "cadets",
+  "cadet",
+])
+
+function isSectionLabel(value: string): boolean {
+  const normalized = normalize(value)
+  if (!normalized) return false
+  if (SECTION_LABELS.has(normalized)) return true
+  return normalized.includes("command") || normalized.includes("supervisor")
+}
+
+function getSectionColumn(sheet: Sheet): number {
+  const headers = sheet.headers.map(normalize)
+  for (const alias of ["Section", "Division", "Department", "Command"]) {
+    const index = headers.indexOf(normalize(alias))
+    if (index >= 0) return index
+  }
+  return -1
+}
+
+function isOnlySectionRow(row: string[], identityIndexes: number[]): string {
+  const populated = row
+    .map((value, index) => ({ value: clean(value), index }))
+    .filter((item) => item.value)
+
+  if (populated.length !== 1) return ""
+  if (identityIndexes.includes(populated[0].index)) return ""
+
+  return isSectionLabel(populated[0].value) ? populated[0].value : ""
+}
+
 function parseDepartment(sheet: Sheet): DepartmentRow[] {
-  return extractRows(sheet, DEPARTMENT_COLUMNS, 6).map((row) => ({
-    callsign: getValue(row, DEPARTMENT_COLUMNS, "Callsign"),
-    badgeNumber: getValue(row, DEPARTMENT_COLUMNS, "Badge Number"),
-    name: getValue(row, DEPARTMENT_COLUMNS, "Name"),
-    rank: getValue(row, DEPARTMENT_COLUMNS, "Rank"),
-    jobDescription: getValue(row, DEPARTMENT_COLUMNS, "Job Description"),
-    timeInDept: getValue(row, DEPARTMENT_COLUMNS, "Time in Dept"),
-    timeInRank: getValue(row, DEPARTMENT_COLUMNS, "Time in Rank"),
-    status: getValue(row, DEPARTMENT_COLUMNS, "Status"),
-    discordId: getValue(row, DEPARTMENT_COLUMNS, "Discord ID"),
-    hoursThisMonth: getValue(row, DEPARTMENT_COLUMNS, "Hours This Month"),
-  }))
+  const header = findHeader(sheet, DEPARTMENT_COLUMNS, 6)
+  if (!header) return []
+
+  const sectionColumn = getSectionColumn(sheet)
+  const identityIndexes = [
+    header.indexes[0],
+    header.indexes[1],
+    header.indexes[2],
+    header.indexes[8],
+  ].filter((index) => index >= 0)
+
+  const result: DepartmentRow[] = []
+  let currentSection = ""
+
+  for (let rowIndex = header.row + 1; rowIndex < sheet.rawRows.length; rowIndex += 1) {
+    const source = rowValues(sheet, rowIndex)
+    if (!source.some(Boolean)) continue
+
+    const explicitSection =
+      sectionColumn >= 0 ? clean(source[sectionColumn]) : ""
+
+    if (explicitSection) currentSection = explicitSection
+
+    const sectionRow = isOnlySectionRow(source, identityIndexes)
+    if (sectionRow) {
+      currentSection = sectionRow
+      continue
+    }
+
+    const selected = header.indexes.map((index) =>
+      index >= 0 ? clean(source[index]) : "",
+    )
+
+    if (!selected.some(Boolean)) continue
+
+    const normalized = selected.map(normalize)
+    const headerWords = DEPARTMENT_COLUMNS.map(([label]) => normalize(label))
+    if (headerWords.filter((word) => normalized.includes(word)).length >= 4) {
+      continue
+    }
+
+    const row: DepartmentRow = {
+      section: currentSection,
+      callsign: getValue(selected, DEPARTMENT_COLUMNS, "Callsign"),
+      badgeNumber: getValue(selected, DEPARTMENT_COLUMNS, "Badge Number"),
+      name: getValue(selected, DEPARTMENT_COLUMNS, "Name"),
+      rank: getValue(selected, DEPARTMENT_COLUMNS, "Rank"),
+      jobDescription: getValue(selected, DEPARTMENT_COLUMNS, "Job Description"),
+      timeInDept: getValue(selected, DEPARTMENT_COLUMNS, "Time in Dept"),
+      timeInRank: getValue(selected, DEPARTMENT_COLUMNS, "Time in Rank"),
+      status: getValue(selected, DEPARTMENT_COLUMNS, "Status"),
+      discordId: getValue(selected, DEPARTMENT_COLUMNS, "Discord ID"),
+      hoursThisMonth: getValue(selected, DEPARTMENT_COLUMNS, "Hours This Month"),
+    }
+
+    if (row.callsign || row.badgeNumber || row.name || row.discordId) {
+      result.push(row)
+    }
+  }
+
+  return result
 }
 
 function parseEmployees(sheet: Sheet): EmployeeRow[] {
-  return extractRows(sheet, EMPLOYEE_COLUMNS, 10).map((row) => ({
-    badgeNumber: getValue(row, EMPLOYEE_COLUMNS, "Badge Number"),
-    name: getValue(row, EMPLOYEE_COLUMNS, "Name"),
-    discordId: getValue(row, EMPLOYEE_COLUMNS, "Discord ID"),
-    departmentStatus: getValue(row, EMPLOYEE_COLUMNS, "Department Status"),
-    rank: getValue(row, EMPLOYEE_COLUMNS, "Rank"),
-    timezone: getValue(row, EMPLOYEE_COLUMNS, "Timezone"),
-    joinDeptDate: getValue(row, EMPLOYEE_COLUMNS, "Join Dept Date"),
-    promoDate: getValue(row, EMPLOYEE_COLUMNS, "Promo Date"),
-    strike1: getValue(row, EMPLOYEE_COLUMNS, "Strike 1"),
-    strike2: getValue(row, EMPLOYEE_COLUMNS, "Strike 2"),
-    callsign: getValue(row, EMPLOYEE_COLUMNS, "Callsign"),
-    timeInDept: getValue(row, EMPLOYEE_COLUMNS, "Time in Dept"),
-    terminated: getValue(row, EMPLOYEE_COLUMNS, "Terminated"),
-    loa: getValue(row, EMPLOYEE_COLUMNS, "LOA"),
-    resigned: getValue(row, EMPLOYEE_COLUMNS, "Resigned"),
-    thisMonthHours: getValue(row, EMPLOYEE_COLUMNS, "This Month's Hours"),
-    lastMonthHours: getValue(row, EMPLOYEE_COLUMNS, "Last Month's Hours"),
-  }))
+  const header = findHeader(sheet, EMPLOYEE_COLUMNS, 10)
+  if (!header) return []
+
+  const identityIndexes = [
+    header.indexes[0],
+    header.indexes[1],
+    header.indexes[2],
+  ].filter((index) => index >= 0)
+
+  const result: EmployeeRow[] = []
+  let currentSection = ""
+
+  for (let rowIndex = header.row + 1; rowIndex < sheet.rawRows.length; rowIndex += 1) {
+    const source = rowValues(sheet, rowIndex)
+    if (!source.some(Boolean)) continue
+
+    const sectionRow = isOnlySectionRow(source, identityIndexes)
+    if (sectionRow) {
+      currentSection = sectionRow
+      continue
+    }
+
+    const selected = header.indexes.map((index) =>
+      index >= 0 ? clean(source[index]) : "",
+    )
+
+    if (!selected.some(Boolean)) continue
+
+    const normalized = selected.map(normalize)
+    const headerWords = EMPLOYEE_COLUMNS.map(([label]) => normalize(label))
+    if (headerWords.filter((word) => normalized.includes(word)).length >= 6) {
+      continue
+    }
+
+    const row: EmployeeRow = {
+      section: currentSection,
+      badgeNumber: getValue(selected, EMPLOYEE_COLUMNS, "Badge Number"),
+      name: getValue(selected, EMPLOYEE_COLUMNS, "Name"),
+      discordId: getValue(selected, EMPLOYEE_COLUMNS, "Discord ID"),
+      departmentStatus: getValue(selected, EMPLOYEE_COLUMNS, "Department Status"),
+      rank: getValue(selected, EMPLOYEE_COLUMNS, "Rank"),
+      timezone: getValue(selected, EMPLOYEE_COLUMNS, "Timezone"),
+      joinDeptDate: getValue(selected, EMPLOYEE_COLUMNS, "Join Dept Date"),
+      promoDate: getValue(selected, EMPLOYEE_COLUMNS, "Promo Date"),
+      strike1: getValue(selected, EMPLOYEE_COLUMNS, "Strike 1"),
+      strike2: getValue(selected, EMPLOYEE_COLUMNS, "Strike 2"),
+      callsign: getValue(selected, EMPLOYEE_COLUMNS, "Callsign"),
+      timeInDept: getValue(selected, EMPLOYEE_COLUMNS, "Time in Dept"),
+      terminated: getValue(selected, EMPLOYEE_COLUMNS, "Terminated"),
+      loa: getValue(selected, EMPLOYEE_COLUMNS, "LOA"),
+      resigned: getValue(selected, EMPLOYEE_COLUMNS, "Resigned"),
+      thisMonthHours: getValue(selected, EMPLOYEE_COLUMNS, "This Month's Hours"),
+      lastMonthHours: getValue(selected, EMPLOYEE_COLUMNS, "Last Month's Hours"),
+    }
+
+    if (row.badgeNumber || row.name || row.discordId) {
+      result.push(row)
+    }
+  }
+
+  return result
 }
 
 function parseRankedRows(sheet: Sheet, definitions: ColumnDefinition[]): string[][] {
@@ -342,21 +476,31 @@ function findCell(sheet: Sheet, label: string): { row: number; column: number } 
   return null
 }
 
-function nearby(sheet: Sheet, position: { row: number; column: number }, rowRadius: number, columnRadius: number): string[] {
+function nearby(
+  sheet: Sheet,
+  position: { row: number; column: number },
+  rowRadius: number,
+  columnRadius: number,
+  excludedTitles: string[] = [],
+): string[] {
   const values: string[] = []
   const seen = new Set<string>()
+  const excluded = new Set(excludedTitles.map(normalize))
 
-  const startRow = Math.max(0, position.row)
+  const startRow = Math.max(0, position.row + 1)
   const endRow = Math.min(sheet.rawRows.length - 1, position.row + rowRadius)
   const startColumn = Math.max(0, position.column - columnRadius)
   const endColumn = Math.min(sheet.columnCount - 1, position.column + columnRadius)
 
   for (let row = startRow; row <= endRow; row += 1) {
     const rowData = rowValues(sheet, row)
+
     for (let column = startColumn; column <= endColumn; column += 1) {
       const value = clean(rowData[column])
       const key = normalize(value)
-      if (!value || seen.has(key)) continue
+
+      if (!value || seen.has(key) || excluded.has(key)) continue
+
       seen.add(key)
       values.push(value)
     }
@@ -365,12 +509,21 @@ function nearby(sheet: Sheet, position: { row: number; column: number }, rowRadi
   return values
 }
 
-function homeValues(sheet: Sheet, title: string, rowRadius: number, columnRadius: number): string[] {
+function homeValues(
+  sheet: Sheet,
+  title: string,
+  rowRadius: number,
+  columnRadius = 2,
+): string[] {
   const position = findCell(sheet, title)
   if (!position) return []
 
-  return nearby(sheet, position, rowRadius, columnRadius).filter(
-    (value) => normalize(value) !== normalize(title),
+  return nearby(
+    sheet,
+    position,
+    rowRadius,
+    columnRadius,
+    HOME_CARDS.map((card) => card.title),
   )
 }
 
@@ -389,15 +542,15 @@ function HomeCard({ title, icon: Icon, children }: { title: string; icon: Lucide
 }
 
 function HomeView({ sheet }: { sheet: Sheet }) {
-  const hours = homeValues(sheet, "This Month's Dept. Hours", 5, 5)
-  const documents = uniqueInOrder(homeValues(sheet, "Documents", 10, 8))
-  const statistics = uniqueInOrder(homeValues(sheet, "Statistics", 12, 8))
-  const subdivisions = uniqueInOrder(homeValues(sheet, "FTD & Subdivisions", 30, 8))
-  const founders = uniqueInOrder(homeValues(sheet, "Metro PD Founders", 15, 8))
+  const hours = homeValues(sheet, "This Month's Dept. Hours", 4, 1)
+  const documents = uniqueInOrder(homeValues(sheet, "Documents", 10, 2))
+  const statistics = uniqueInOrder(homeValues(sheet, "Statistics", 12, 2))
+  const subdivisions = uniqueInOrder(homeValues(sheet, "FTD & Subdivisions", 30, 2))
+  const founders = uniqueInOrder(homeValues(sheet, "Metro PD Founders", 15, 2))
 
   const leadership = HOME_CARDS.filter((card) => card.kind === "leadership").map((card) => ({
     ...card,
-    values: uniqueInOrder(homeValues(sheet, card.title, 5, 7)),
+    values: uniqueInOrder(homeValues(sheet, card.title, 5, 2)),
   }))
 
   return (
@@ -508,14 +661,106 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
   return <div className="relative min-w-[165px]"><Filter className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><select value={value} onChange={(event) => onChange(event.target.value)} className="h-9 w-full appearance-none rounded-md border border-input bg-background pl-8 pr-8 text-xs outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"><option value="">All {label}</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select><ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /></div>
 }
 
-function DepartmentTable({ rows }: { rows: DepartmentRow[] }) {
-  if (!rows.length) return <EmptyState message="No Department Roster records match your filters." />
-  return <TableShell><TableHead>{DEPARTMENT_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}</TableHead><tbody>{rows.map((row, index) => <tr key={`${row.badgeNumber || row.discordId || row.name}-${index}`} className="transition-colors hover:bg-muted/20"><Td className="font-semibold">{display(row.callsign)}</Td><Td>{display(row.badgeNumber)}</Td><Td className="font-medium">{display(row.name)}</Td><Td>{display(row.rank)}</Td><Td className="max-w-sm whitespace-normal text-left">{display(row.jobDescription)}</Td><Td>{display(row.timeInDept)}</Td><Td>{display(row.timeInRank)}</Td><Td><StatusBadge value={row.status} /></Td><Td className="font-mono text-[10px]">{display(row.discordId)}</Td><Td>{display(row.hoursThisMonth)}</Td></tr>)}</tbody></TableShell>
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2.5 border-b border-border bg-muted/30 px-4 py-3">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
+        <Shield className="h-4 w-4 text-blue-500" />
+      </div>
+      <h3 className="text-sm font-semibold">{display(title)}</h3>
+    </div>
+  )
 }
 
-function EmployeeTable({ rows }: { rows: EmployeeRow[] }) {
-  if (!rows.length) return <EmptyState message="No Employee Database records match your filters." />
-  return <TableShell><TableHead>{EMPLOYEE_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}</TableHead><tbody>{rows.map((row, index) => <tr key={`${row.badgeNumber || row.discordId || row.name}-${index}`} className="transition-colors hover:bg-muted/20"><Td className="font-semibold">{display(row.badgeNumber)}</Td><Td className="font-medium">{display(row.name)}</Td><Td className="font-mono text-[10px]">{display(row.discordId)}</Td><Td><StatusBadge value={row.departmentStatus} /></Td><Td>{display(row.rank)}</Td><Td>{display(row.timezone)}</Td><Td>{display(row.joinDeptDate)}</Td><Td>{display(row.promoDate)}</Td><Td><BooleanBadge value={row.strike1} /></Td><Td><BooleanBadge value={row.strike2} /></Td><Td className="font-semibold">{display(row.callsign)}</Td><Td>{display(row.timeInDept)}</Td><Td><BooleanBadge value={row.terminated} /></Td><Td><BooleanBadge value={row.loa} /></Td><Td><BooleanBadge value={row.resigned} /></Td><Td>{display(row.thisMonthHours)}</Td><Td>{display(row.lastMonthHours)}</Td></tr>)}</tbody></TableShell>
+function DepartmentTable({ groups }: { groups: Array<[string, DepartmentRow[]]> }) {
+  const visibleGroups = groups.filter(([, rows]) => rows.length)
+
+  if (!visibleGroups.length) {
+    return <EmptyState message="No Department Roster records match your filters." />
+  }
+
+  return (
+    <div className="space-y-4 p-4">
+      {visibleGroups.map(([section, rows]) => (
+        <section key={section} className="overflow-hidden rounded-xl border border-border bg-card">
+          <SectionHeader title={section || "Department Roster"} />
+          <TableShell>
+            <TableHead>
+              {DEPARTMENT_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}
+            </TableHead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr
+                  key={`${row.badgeNumber || row.discordId || row.name}-${index}`}
+                  className="transition-colors hover:bg-muted/20"
+                >
+                  <Td className="font-semibold">{display(row.callsign)}</Td>
+                  <Td>{display(row.badgeNumber)}</Td>
+                  <Td className="font-medium">{display(row.name)}</Td>
+                  <Td>{display(row.rank)}</Td>
+                  <Td className="max-w-sm whitespace-normal text-left">{display(row.jobDescription)}</Td>
+                  <Td>{display(row.timeInDept)}</Td>
+                  <Td>{display(row.timeInRank)}</Td>
+                  <Td><StatusBadge value={row.status} /></Td>
+                  <Td className="font-mono text-[10px]">{display(row.discordId)}</Td>
+                  <Td>{display(row.hoursThisMonth)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </TableShell>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+function EmployeeTable({ groups }: { groups: Array<[string, EmployeeRow[]]> }) {
+  const visibleGroups = groups.filter(([, rows]) => rows.length)
+
+  if (!visibleGroups.length) {
+    return <EmptyState message="No Employee Database records match your filters." />
+  }
+
+  return (
+    <div className="space-y-4 p-4">
+      {visibleGroups.map(([section, rows]) => (
+        <section key={section} className="overflow-hidden rounded-xl border border-border bg-card">
+          <SectionHeader title={section || "Employee Database"} />
+          <TableShell>
+            <TableHead>
+              {EMPLOYEE_COLUMNS.map(([label]) => <Th key={label}>{label}</Th>)}
+            </TableHead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr
+                  key={`${row.badgeNumber || row.discordId || row.name}-${index}`}
+                  className="transition-colors hover:bg-muted/20"
+                >
+                  <Td className="font-semibold">{display(row.badgeNumber)}</Td>
+                  <Td className="font-medium">{display(row.name)}</Td>
+                  <Td className="font-mono text-[10px]">{display(row.discordId)}</Td>
+                  <Td><StatusBadge value={row.departmentStatus} /></Td>
+                  <Td>{display(row.rank)}</Td>
+                  <Td>{display(row.timezone)}</Td>
+                  <Td>{display(row.joinDeptDate)}</Td>
+                  <Td>{display(row.promoDate)}</Td>
+                  <Td><BooleanBadge value={row.strike1} /></Td>
+                  <Td><BooleanBadge value={row.strike2} /></Td>
+                  <Td className="font-semibold">{display(row.callsign)}</Td>
+                  <Td>{display(row.timeInDept)}</Td>
+                  <Td><BooleanBadge value={row.terminated} /></Td>
+                  <Td><BooleanBadge value={row.loa} /></Td>
+                  <Td><BooleanBadge value={row.resigned} /></Td>
+                  <Td>{display(row.thisMonthHours)}</Td>
+                  <Td>{display(row.lastMonthHours)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </TableShell>
+        </section>
+      ))}
+    </div>
+  )
 }
 
 function RankSection({ rank, children }: { rank: string; children: ReactNode }) {
@@ -626,28 +871,101 @@ export default function MainRoster() {
   const vehicleRows = useMemo(() => parseRankedRows(sheets["vehicle-roster"] ?? ({ rawRows: [], columnCount: 0 } as Sheet), VEHICLE_COLUMNS).map((row) => ({ rank: row[0], vehicleName: row[1], spawncode: row[2], requiredExtras: row[3], livery: row[4], windowTint: row[5], turbo: row[6], slicktopOptional: row[7], unmarkedAllowed: row[8] })), [sheets])
   const uniformRows = useMemo(() => parseRankedRows(sheets["uniform-roster"] ?? ({ rawRows: [], columnCount: 0 } as Sheet), UNIFORM_COLUMNS).map((row) => ({ rank: row[0], className: row[1], sharedOutfitCode: row[2] })), [sheets])
 
-  const statusOptions = useMemo(() => uniqueInOrder(departmentRows.map((row) => row.status)), [departmentRows])
-  const departmentRankOptions = useMemo(() => uniqueInOrder(departmentRows.map((row) => row.rank)), [departmentRows])
-  const employeeRankOptions = useMemo(() => uniqueInOrder(employeeRows.map((row) => row.rank)), [employeeRows])
+  const statusOptions = useMemo(
+    () => uniqueInOrder(departmentRows.map((row) => row.status)),
+    [departmentRows],
+  )
+
+  const departmentRankOptions = useMemo(
+    () => uniqueInOrder(departmentRows.map((row) => row.rank)),
+    [departmentRows],
+  )
+
+  const employeeRankOptions = useMemo(
+    () => uniqueInOrder(employeeRows.map((row) => row.rank)),
+    [employeeRows],
+  )
 
   const filteredDepartmentRows = useMemo(() => {
-    const query = search.trim().toLowerCase()
+    const query = normalize(search)
+
     return departmentRows.filter((row) => {
-      const matchesSearch = !query || [row.callsign, row.badgeNumber, row.name, row.rank, row.jobDescription, row.status, row.discordId, row.hoursThisMonth].some((value) => clean(value).toLowerCase().includes(query))
-      const matchesStatus = !statusFilter || normalize(row.status) === normalize(statusFilter)
-      const matchesRank = !rankFilter || normalize(row.rank) === normalize(rankFilter)
+      const matchesSearch =
+        !query ||
+        [
+          row.callsign,
+          row.badgeNumber,
+          row.name,
+          row.rank,
+          row.jobDescription,
+          row.status,
+          row.discordId,
+          row.hoursThisMonth,
+        ].some((value) => normalize(value).includes(query))
+
+      const matchesStatus =
+        !statusFilter || normalize(row.status) === normalize(statusFilter)
+
+      const matchesRank =
+        !rankFilter || normalize(row.rank) === normalize(rankFilter)
+
       return matchesSearch && matchesStatus && matchesRank
     })
   }, [departmentRows, search, statusFilter, rankFilter])
 
   const filteredEmployeeRows = useMemo(() => {
-    const query = search.trim().toLowerCase()
+    const query = normalize(search)
+
     return employeeRows.filter((row) => {
-      const matchesSearch = !query || [row.badgeNumber, row.name, row.discordId, row.departmentStatus, row.rank, row.timezone, row.joinDeptDate, row.promoDate, row.callsign, row.timeInDept, row.thisMonthHours, row.lastMonthHours].some((value) => clean(value).toLowerCase().includes(query))
-      const matchesRank = !rankFilter || normalize(row.rank) === normalize(rankFilter)
+      const matchesSearch =
+        !query ||
+        [
+          row.badgeNumber,
+          row.name,
+          row.discordId,
+          row.departmentStatus,
+          row.rank,
+          row.timezone,
+          row.joinDeptDate,
+          row.promoDate,
+          row.callsign,
+          row.timeInDept,
+          row.thisMonthHours,
+          row.lastMonthHours,
+        ].some((value) => normalize(value).includes(query))
+
+      const matchesRank =
+        !rankFilter || normalize(row.rank) === normalize(rankFilter)
+
       return matchesSearch && matchesRank
     })
   }, [employeeRows, search, rankFilter])
+
+  const departmentGroups = useMemo(() => {
+    const groups = new Map<string, DepartmentRow[]>()
+
+    for (const row of filteredDepartmentRows) {
+      const section = row.section || "Department Roster"
+      const current = groups.get(section) ?? []
+      current.push(row)
+      groups.set(section, current)
+    }
+
+    return Array.from(groups.entries())
+  }, [filteredDepartmentRows])
+
+  const employeeGroups = useMemo(() => {
+    const groups = new Map<string, EmployeeRow[]>()
+
+    for (const row of filteredEmployeeRows) {
+      const section = row.section || "Employee Database"
+      const current = groups.get(section) ?? []
+      current.push(row)
+      groups.set(section, current)
+    }
+
+    return Array.from(groups.entries())
+  }, [filteredEmployeeRows])
 
   const counts = countCards(departmentRows, employeeRows, vehicleRows, uniformRows)
 
@@ -672,7 +990,7 @@ export default function MainRoster() {
             {(page === "department-roster" || page === "employee-database") && <div className="flex w-full flex-col gap-2 xl:w-auto xl:flex-row"><div className="relative w-full xl:w-80"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${pageInfo.label.toLowerCase()}...`} className="pl-9" /></div>{page === "department-roster" ? <><FilterSelect label="Status" value={statusFilter} options={statusOptions} onChange={setStatusFilter} /><FilterSelect label="Rank" value={rankFilter} options={departmentRankOptions} onChange={setRankFilter} /></> : <FilterSelect label="Rank" value={rankFilter} options={employeeRankOptions} onChange={setRankFilter} />}</div>}
           </div>
 
-          {loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={() => void loadSheet(page, true, false)} /> : !sheet ? <EmptyState message="No roster data is available." /> : page === "home" ? <HomeView sheet={sheet} /> : page === "department-roster" ? <DepartmentTable rows={filteredDepartmentRows} /> : page === "employee-database" ? <EmployeeTable rows={filteredEmployeeRows} /> : page === "vehicle-roster" ? <VehicleSections rows={vehicleRows} /> : <UniformSections rows={uniformRows} />}
+          {loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={() => void loadSheet(page, true, false)} /> : !sheet ? <EmptyState message="No roster data is available." /> : page === "home" ? <HomeView sheet={sheet} /> : page === "department-roster" ? <DepartmentTable groups={departmentGroups} /> : page === "employee-database" ? <EmployeeTable groups={employeeGroups} /> : page === "vehicle-roster" ? <VehicleSections rows={vehicleRows} /> : <UniformSections rows={uniformRows} />}
         </section>
       </div>
     </DashboardLayout>
