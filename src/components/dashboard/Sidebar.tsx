@@ -16,9 +16,10 @@ import {
   Home,
   Images,
   LayoutDashboard,
+  List,
   LogOut,
   RefreshCw,
-  List,
+  ShieldCheck,
 } from "lucide-react"
 
 import {
@@ -709,10 +710,11 @@ export default function DashboardSidebar() {
 
   const hasPermission = (
     permission: string,
-  ) => checkPermission(
-    user,
-    permission,
-  )
+  ) =>
+    checkPermission(
+      user,
+      permission,
+    )
 
   const canSeeActivityManagement =
     hasPermission(
@@ -722,6 +724,11 @@ export default function DashboardSidebar() {
   const canSeePromotionManagement =
     hasPermission(
       "promotionmanagement",
+    )
+
+  const canSeeAdmin =
+    hasPermission(
+      "admin",
     )
 
   /* ==============================================================
@@ -1277,6 +1284,8 @@ export default function DashboardSidebar() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
+                    {/* ACTION LOGS */}
+
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         asChild
@@ -1289,11 +1298,11 @@ export default function DashboardSidebar() {
                         }
                       >
                         <NavLink
-                          to="/dashboard/promotion/promotionroster"
+                          to="/dashboard/promotion/actionlogs"
                           end
                           className="text-sidebar-foreground"
                         >
-                          <List  className="h-4 w-4 shrink-0" />
+                          <List className="h-4 w-4 shrink-0" />
 
                           <span>
                             Action Logs
@@ -1422,6 +1431,43 @@ export default function DashboardSidebar() {
               </CollapsibleContent>
             </SidebarGroup>
           </Collapsible>
+        )}
+
+        {/* ========================================================
+            ADMINISTRATION
+        ======================================================== */}
+
+        {canSeeAdmin && (
+          <SidebarGroup className="mt-auto">
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip="Admin"
+                    isActive={isRouteActive(
+                      "/dashboard/admin/permissions",
+                    )}
+                    className={
+                      navigationButtonClass
+                    }
+                  >
+                    <NavLink
+                      to="/dashboard/admin/permissions"
+                      end
+                      className="text-sidebar-foreground"
+                    >
+                      <ShieldCheck className="h-4 w-4 shrink-0" />
+
+                      <span>
+                        Admin
+                      </span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
       </SidebarContent>
 
