@@ -97,7 +97,7 @@ export default function Permissions() {
       )
 
       if (pageCheck.status === 401) {
-        navigate("/login", { replace: true })
+        navigate("/sign-in", { replace: true })
         return
       }
 
