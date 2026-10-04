@@ -10,7 +10,6 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  ClipboardList,
   Clock3,
   Copy,
   Filter,
@@ -865,16 +864,26 @@ export default function PromotionRoster() {
 
       setSelectedCopied(true)
 
-      toast.success(
-        "Copied successfully",
-        {
-          description: `${selectedMembers.length} ${
-            selectedMembers.length === 1
-              ? "member"
-              : "members"
-          } copied to your clipboard.`,
-        },
-      )
+      const copyLabels: Record<CopyType, string> = {
+        discord: "Discord ID",
+        "discord-mention": "Discord Mention",
+        name: "Name",
+        callsign: "Callsign",
+        badge: "Badge Number",
+        rank: "Rank",
+        "name-discord": "Name + Discord ID",
+        "callsign-discord": "Callsign + Discord ID",
+        "callsign-name": "Callsign + Name",
+        "callsign-badge": "Callsign + Badge Number",
+        "badge-name": "Badge Number + Name",
+        "badge-discord": "Badge Number + Discord ID",
+        "callsign-name-discord": "Callsign + Name + Discord ID",
+        "callsign-badge-discord": "Callsign + Badge Number + Discord ID",
+        "name-badge-discord": "Name + Badge Number + Discord ID",
+        full: "Full Roster",
+      }
+
+      toast.success(`${copyLabels[type]} copied to clipboard`)
 
       logAction({
         module: "promotion",
@@ -1084,9 +1093,7 @@ export default function PromotionRoster() {
         summary: `Copied ${member.name}'s Discord ID from the ${division} promotion roster.`,
       })
 
-      toast.success("Discord ID copied", {
-        description: `${member.name}'s Discord ID has been copied to your clipboard.`,
-      })
+      toast.success("Discord ID copied to clipboard")
     } catch {
       toast.error("Copy failed", {
         description: "Your browser could not access the clipboard.",
@@ -1667,7 +1674,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Name + Discord ID
                     </DropdownMenuItem>
 
@@ -1679,7 +1686,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Callsign + Discord ID
                     </DropdownMenuItem>
 
@@ -1691,7 +1698,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Callsign + Name
                     </DropdownMenuItem>
 
@@ -1703,7 +1710,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Callsign + Badge
                     </DropdownMenuItem>
 
@@ -1715,7 +1722,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Badge + Name
                     </DropdownMenuItem>
 
@@ -1727,7 +1734,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Badge + Discord ID
                     </DropdownMenuItem>
 
@@ -1741,7 +1748,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Callsign + Name + Discord
                     </DropdownMenuItem>
 
@@ -1753,7 +1760,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Callsign + Badge + Discord
                     </DropdownMenuItem>
 
@@ -1765,7 +1772,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Name + Badge + Discord
                     </DropdownMenuItem>
 
@@ -1779,7 +1786,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Copy Full Details
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -1872,7 +1879,7 @@ export default function PromotionRoster() {
         {/* Roster */}
 
         <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
-          <div className="sticky top-0 z-20 flex items-center justify-between border-b bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+          <div className="flex items-center justify-between border-b bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
             <div className="min-w-0">
               <h2 className="font-medium">
                 {divisions.find(
@@ -1954,9 +1961,9 @@ export default function PromotionRoster() {
                     <col className="w-[7%]" />
                   </colgroup>
 
-                  <thead>
+                  <thead className="sticky top-0 z-30 bg-card">
                     <tr className="border-b bg-muted/30 text-center">
-                      <th className="overflow-hidden px-2 py-3 text-center">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center">
                         <div className="flex justify-center">
                           <Checkbox
                             checked={
@@ -1970,57 +1977,57 @@ export default function PromotionRoster() {
                         </div>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         Callsign
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         Badge
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         Name
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         Rank
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         Discord ID
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         <span className="block truncate">
                           Time in Dept
                         </span>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         <span className="block truncate">
                           Time in Rank
                         </span>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         <span className="block truncate">
                           Required Time in Rank
                         </span>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         Required Logs
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         Required Hours
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         Hours
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="overflow-hidden bg-muted/30 px-2 py-3 text-center font-medium text-muted-foreground">
                         Status
                       </th>
                     </tr>
@@ -2134,7 +2141,7 @@ export default function PromotionRoster() {
                                     title={
                                       member.discordId
                                     }
-                                    className="mx-auto block max-w-full truncate rounded-md px-1.5 py-1 font-mono text-[10px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+                                    className="mx-auto block max-w-full truncate rounded-md px-1.5 py-1 font-mono text-[10px] text-blue-400"
                                   >
                                     {
                                       member.discordId
@@ -2147,9 +2154,9 @@ export default function PromotionRoster() {
                                     onClick={() => void copyDiscordId(member)}
                                     className="gap-2"
                                   >
-                                    <ClipboardList className="h-4 w-4" />
+                                    <Copy className="h-4 w-4 text-blue-400" />
 
-                                    Copy User ID
+                                    Copy Discord ID
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -2481,9 +2488,9 @@ export default function PromotionRoster() {
                                     onClick={() => void copyDiscordId(member)}
                                     className="gap-2"
                                   >
-                                    <ClipboardList className="h-4 w-4" />
+                                    <Copy className="h-4 w-4 text-blue-400" />
 
-                                    Copy User ID
+                                    Copy Discord ID
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
