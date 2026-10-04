@@ -114,6 +114,18 @@ export type MainRosterResponse = {
 
 const mainRoster = env.mainRoster
 
+// Main Roster is intentionally cached server-side so every page view/user does
+// not trigger a new Google Sheets API request. The cache expires every 30 minutes.
+const MAIN_ROSTER_CACHE_TTL_MS = 30 * 60 * 1000
+
+type MainRosterCacheEntry = {
+  data: MainRosterSheetData
+  fetchedAt: number
+}
+
+const mainRosterCache = new Map<MainRosterSheetKey, MainRosterCacheEntry>()
+const mainRosterInFlight = new Map<MainRosterSheetKey, Promise<MainRosterSheetData>>()
+
 const SHEETS: Record<MainRosterSheetKey, MainRosterSheetConfig> = {
   home: { key: "home", name: mainRoster.home.name, gid: mainRoster.home.gid },
   departmentRoster: {
@@ -265,7 +277,7 @@ function mergeCellFormat(base: any, fallback: any) {
   return base ?? fallback ?? {}
 }
 
-export async function getMainRosterSheet(
+async function fetchMainRosterSheetFromGoogle(
   key: MainRosterSheetKey,
 ): Promise<MainRosterSheetData> {
   const config = getConfiguredSheet(key)
@@ -421,6 +433,39 @@ export async function getMainRosterSheet(
   }
 }
 
+export async function getMainRosterSheet(
+  key: MainRosterSheetKey,
+  options: { forceRefresh?: boolean } = {},
+): Promise<MainRosterSheetData> {
+  const forceRefresh = options.forceRefresh === true
+  const now = Date.now()
+  const cached = mainRosterCache.get(key)
+
+  if (!forceRefresh && cached && now - cached.fetchedAt < MAIN_ROSTER_CACHE_TTL_MS) {
+    return cached.data
+  }
+
+  const existingRequest = mainRosterInFlight.get(key)
+  if (!forceRefresh && existingRequest) {
+    return existingRequest
+  }
+
+  const request = fetchMainRosterSheetFromGoogle(key)
+    .then((data) => {
+      mainRosterCache.set(key, {
+        data,
+        fetchedAt: Date.now(),
+      })
+      return data
+    })
+    .finally(() => {
+      mainRosterInFlight.delete(key)
+    })
+
+  mainRosterInFlight.set(key, request)
+  return request
+}
+
 export async function getMainRoster(): Promise<MainRosterResponse> {
   const sheets = getSheetsClient()
   const spreadsheet = await sheets.spreadsheets.get({
@@ -506,7 +551,8 @@ export function registerMainRosterRoutes(app: Express) {
     }
 
     try {
-      const sheet = await getMainRosterSheet(key)
+      const forceRefresh = req.query.refresh === "1" || req.query.refresh === "true"
+      const sheet = await getMainRosterSheet(key, { forceRefresh })
       sendNoCache(res)
       return res.json({ success: true, sheet })
     } catch (error) {
@@ -528,6 +574,9 @@ export function registerMainRosterRoutes(app: Express) {
         publishedUrl: mainRoster.publishedUrl,
       },
       sheets: SHEETS,
+      cache: {
+        ttlMinutes: MAIN_ROSTER_CACHE_TTL_MS / 60000,
+      },
     })
   })
 
