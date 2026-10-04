@@ -457,6 +457,38 @@ export default function Permissions() {
     }
   }, [])
 
+  useEffect(() => {
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return
+      }
+
+      // Close the top-most open UI overlay first.
+      if (contextMenu) {
+        event.preventDefault()
+        setContextMenu(null)
+        return
+      }
+
+      if (deleteTarget) {
+        event.preventDefault()
+        setDeleteTarget(null)
+        return
+      }
+
+      if (modalKind) {
+        event.preventDefault()
+        closeModal()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [contextMenu, deleteTarget, modalKind])
+
   async function copyText(value: string, label: string) {
     try {
       await navigator.clipboard.writeText(value)
