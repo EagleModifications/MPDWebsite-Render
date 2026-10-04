@@ -27,6 +27,7 @@ import MainRoster from "@/pages/documents/MainRoster"
 import SWATRoster from "@/pages/documents/SWATRoster"
 import MCDRoster from "@/pages/documents/MCDRoster"
 import TRURoster from "@/pages/documents/TRURoster"
+import FTDRoster from "@/pages/documents/FTDRoster"
 
 import Dashboard from "@/pages/dashboard/Dashboard"
 
@@ -213,6 +214,11 @@ export default function App() {
         <Route
           path="/documents/truroster"
           element={<TRURoster />}
+        />
+
+        <Route
+          path="/documents/FTDroster"
+          element={<FTDRoster />}
         />
 
         {/* =================================================
