@@ -289,6 +289,145 @@ function CustomSelect({
   )
 }
 
+function CustomMultiSelect({
+  id,
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  id: string
+  value: readonly GalleryTag[]
+  options: readonly GalleryTag[]
+  onChange: (value: GalleryTag[]) => void
+  ariaLabel: string
+}) {
+  const dropdown = useContext(DropdownContext)
+
+  if (!dropdown) {
+    throw new Error("CustomMultiSelect must be used inside DropdownProvider.")
+  }
+
+  const { openDropdown, setOpenDropdown } = dropdown
+  const open = openDropdown === id
+
+  useEffect(() => {
+    if (!open) return
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as HTMLElement
+      if (!target.closest(`[data-custom-select="${id}"]`)) {
+        setOpenDropdown(null)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpenDropdown(null)
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [id, open, setOpenDropdown])
+
+  const selectedLabel =
+    value.length === 0
+      ? "Select tags"
+      : value.length === 1
+        ? value[0]
+        : `${value.length} tags selected`
+
+  return (
+    <div className="relative" data-custom-select={id}>
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpenDropdown(open ? null : id)}
+        className={[
+          "flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-all",
+          "hover:border-blue-500/30 hover:bg-muted/40",
+          "focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20",
+          open ? "border-blue-500/50 ring-2 ring-blue-500/20" : "",
+        ].join(" ")}
+      >
+        <span className="flex min-w-0 items-center gap-2 truncate">
+          <span
+            aria-hidden="true"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"
+          />
+          <span className={value.length === 0 ? "text-muted-foreground" : ""}>
+            {selectedLabel}
+          </span>
+        </span>
+        <ChevronDown
+          className={[
+            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+            open ? "rotate-180" : "",
+          ].join(" ")}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[100] rounded-xl border border-border/80 bg-popover p-1.5 text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5">
+          {options.map((option) => {
+            const selected = value.includes(option)
+
+            return (
+              <button
+                key={option}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => {
+                  onChange(
+                    selected
+                      ? value.filter((tag) => tag !== option)
+                      : [...value, option],
+                  )
+                }}
+                className={[
+                  "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                  selected
+                    ? "bg-muted/70 text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ].join(" ")}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className={[
+                      "h-1.5 w-1.5 shrink-0 rounded-full",
+                      option === "Dept"
+                        ? "bg-blue-500"
+                        : option === "SWAT"
+                          ? "bg-slate-500"
+                          : option === "MTF-7"
+                            ? "bg-sky-700"
+                            : option === "MCD"
+                              ? "bg-blue-950 dark:bg-blue-800"
+                              : option === "TRU"
+                                ? "bg-yellow-500"
+                                : "bg-red-500",
+                    ].join(" ")}
+                  />
+                  <span>{option}</span>
+                </span>
+                {selected && <Check className="h-4 w-4 text-blue-500" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function getGalleryMediaUrl(media: GalleryMedia) {
   return media.url
 }
@@ -1599,7 +1738,7 @@ export default function Gallery() {
                                 className="group/info w-full cursor-pointer rounded-lg px-1 py-1 pr-16 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-500/40"
                                 aria-label={`View information for ${item.title}`}
                               >
-                                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                                <div className="mb-1.5 flex flex-col items-start gap-1.5">
                                   <span
                                     className={[
                                       "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
@@ -1611,17 +1750,21 @@ export default function Gallery() {
                                     {item.category ?? "Community"}
                                   </span>
 
-                                  {(item.tags ?? []).map((tag) => (
-                                    <span
-                                      key={`${item.id}-tag-${tag}`}
-                                      className={[
-                                        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide",
-                                        GALLERY_TAG_CLASSES[tag],
-                                      ].join(" ")}
-                                    >
-                                      {tag}
-                                    </span>
-                                  ))}
+                                  {(item.tags ?? []).length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      {(item.tags ?? []).map((tag) => (
+                                        <span
+                                          key={`${item.id}-tag-${tag}`}
+                                          className={[
+                                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide",
+                                            GALLERY_TAG_CLASSES[tag],
+                                          ].join(" ")}
+                                        >
+                                          {tag}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
 
                                 <h3 className="truncate text-sm font-semibold">
@@ -2195,38 +2338,13 @@ export default function Gallery() {
                     Tags <span className="text-xs font-normal text-muted-foreground">(Optional · Select multiple)</span>
                   </label>
 
-                  <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-input bg-background p-1.5 shadow-sm">
-                    {GALLERY_TAGS.map((tag) => {
-                      const selected = tags.includes(tag)
-
-                      return (
-                        <button
-                          key={tag}
-                          type="button"
-                          aria-pressed={selected}
-                          onClick={() =>
-                            setTags((current) =>
-                              selected
-                                ? current.filter((value) => value !== tag)
-                                : [...current, tag],
-                            )
-                          }
-                          className={[
-                            "rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide transition-all",
-                            selected
-                              ? `${GALLERY_TAG_CLASSES[tag]} ring-1 ring-current/20`
-                              : "border-border bg-background/70 text-muted-foreground hover:bg-muted hover:text-foreground",
-                          ].join(" ")}
-                        >
-                          {tag}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    These tags are shown separately from Community/Fleet and can be combined.
-                  </p>
+                  <CustomMultiSelect
+                    id="gallery-tags"
+                    value={tags}
+                    options={GALLERY_TAGS}
+                    ariaLabel="Gallery tags"
+                    onChange={setTags}
+                  />
                 </div>
 
                 <div className="sm:col-span-2">
