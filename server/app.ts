@@ -22,6 +22,7 @@ import {
 } from "./auth/session"
 
 import { hasPermission } from "./permissions/permissions"
+import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
@@ -4326,6 +4327,11 @@ export function createApp() {
 
   // Main Roster Google Sheets API routes.
   registerMainRosterRoutes(app)
+
+  // Permission administration API routes.
+  // These must be registered before the React fallback so /api/admin/*
+  // requests are handled by Express instead of becoming 404 responses.
+  registerPermissionAdminRoutes(app)
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
