@@ -194,7 +194,7 @@ export function registerRosterListRoutes(app: Express) {
       const selectedUsers = Array.isArray(req.body?.selectedUsers)
         ? req.body.selectedUsers
             .map((item: any) => ({
-              userId: clean(item?.userId),
+              userId: clean(item?.userId || item?.discordId),
               name: clean(item?.name),
               callsign: clean(item?.callsign),
               badgeNumber: clean(item?.badgeNumber),
