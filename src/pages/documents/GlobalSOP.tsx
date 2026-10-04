@@ -25,11 +25,11 @@ export default function SOPs() {
             </div>
 
             <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-              Standard Operating Procedures
+              Global Standard Operating Procedures
             </h1>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              Access Metro Police Department Standard Operating Procedures.
+              Access California Roleplay Global Departments Standard Operating Procedures.
             </p>
           </div>
 
@@ -43,7 +43,7 @@ export default function SOPs() {
 
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-semibold sm:text-base">
-                  Standard Operating Procedures
+                  Global Standard Operating Procedures
                 </h2>
 
                 <p className="text-xs text-muted-foreground">
