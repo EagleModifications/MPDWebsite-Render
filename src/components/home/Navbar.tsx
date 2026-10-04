@@ -489,7 +489,7 @@ export default function Navbar() {
               className="gap-2"
             >
               <LogOut className="h-4 w-4" />
-              Sign Uut
+              Sign Out
             </Button>
           ) : (
             <Button
