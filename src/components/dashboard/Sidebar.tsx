@@ -1200,6 +1200,33 @@ export default function DashboardSidebar() {
                         </CollapsibleContent>
                       </SidebarMenuItem>
                     </Collapsible>
+
+                    {/* ACTIVITY LOGS */}
+
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip="Activity Logs"
+                        isActive={isRouteActive(
+                          "/dashboard/activity/activitylogs",
+                        )}
+                        className={
+                          navigationButtonClass
+                        }
+                      >
+                        <NavLink
+                          to="/dashboard/activity/activitylogs"
+                          end
+                          className="text-sidebar-foreground"
+                        >
+                          <List className="h-4 w-4 shrink-0" />
+
+                          <span>
+                            Activity Logs
+                          </span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>
@@ -1279,33 +1306,6 @@ export default function DashboardSidebar() {
 
                           <span>
                             Promotion Roster
-                          </span>
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-
-                    {/* ACTION LOGS */}
-
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        asChild
-                        tooltip="Action Logs"
-                        isActive={isRouteActive(
-                          "/dashboard/promotion/actionlogs",
-                        )}
-                        className={
-                          navigationButtonClass
-                        }
-                      >
-                        <NavLink
-                          to="/dashboard/promotion/actionlogs"
-                          end
-                          className="text-sidebar-foreground"
-                        >
-                          <List className="h-4 w-4 shrink-0" />
-
-                          <span>
-                            Action Logs
                           </span>
                         </NavLink>
                       </SidebarMenuButton>
@@ -1426,6 +1426,33 @@ export default function DashboardSidebar() {
                         </CollapsibleContent>
                       </SidebarMenuItem>
                     </Collapsible>
+
+                    {/* PROMOTION LOGS */}
+
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip="Promotion Logs"
+                        isActive={isRouteActive(
+                          "/dashboard/promotion/promotionlogs",
+                        )}
+                        className={
+                          navigationButtonClass
+                        }
+                      >
+                        <NavLink
+                          to="/dashboard/promotion/promotionlogs"
+                          end
+                          className="text-sidebar-foreground"
+                        >
+                          <List className="h-4 w-4 shrink-0" />
+
+                          <span>
+                            Promotion Logs
+                          </span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>
