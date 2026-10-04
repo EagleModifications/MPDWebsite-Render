@@ -108,8 +108,6 @@ export default function MainRoster() {
             <div className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-500">
               <NotebookPen className="h-4 w-4 shrink-0" />
 
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-
               <span>METRO POLICE DEPARTMENT</span>
             </div>
 
