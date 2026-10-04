@@ -1,40 +1,22 @@
-import {
-  MongoClient,
-  type Db,
-} from "mongodb"
+import { MongoClient, type Db } from "mongodb"
 
-const uri =
-  process.env.MONGODB_URI?.trim() ?? ""
+const uri = process.env.MONGODB_URI?.trim() ?? ""
+const dbName = process.env.MONGODB_DB_NAME?.trim() || "mpd-dashboard"
 
-const dbName =
-  process.env.MONGODB_DB_NAME?.trim() ||
-  "mpd-dashboard"
-
-if (!uri) {
-  throw new Error(
-    "MONGODB_URI is not configured.",
-  )
-}
+if (!uri) throw new Error("MONGODB_URI is not configured.")
 
 const globalForMongo = globalThis as unknown as {
   mongoClientPromise?: Promise<MongoClient>
 }
 
-const clientPromise =
-  globalForMongo.mongoClientPromise ??
-  new MongoClient(uri).connect()
+const clientPromise = globalForMongo.mongoClientPromise ?? new MongoClient(uri, {
+  maxPoolSize: 5,
+  minPoolSize: 0,
+  maxIdleTimeMS: 30000,
+}).connect()
 
-if (
-  process.env.NODE_ENV !==
-    "production"
-) {
-  globalForMongo.mongoClientPromise =
-    clientPromise
-}
+globalForMongo.mongoClientPromise = clientPromise
 
 export async function getMongoDb(): Promise<Db> {
-  const client =
-    await clientPromise
-
-  return client.db(dbName)
+  return (await clientPromise).db(dbName)
 }
