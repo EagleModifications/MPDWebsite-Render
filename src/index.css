@@ -294,3 +294,13 @@ UTILITY HELPERS
     text-wrap: pretty;
   }
 }
+
+/* =========================================================
+   SONNER CLOSE BUTTON
+========================================================= */
+
+[data-sonner-toast] [data-close-button] {
+  left: auto !important;
+  right: 8px !important;
+  top: 8px !important;
+}
