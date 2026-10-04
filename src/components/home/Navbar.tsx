@@ -297,7 +297,7 @@ export default function Navbar() {
                   [
                     "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-foreground/10 text-foreground"
+                      ? "text-foreground"
                       : "text-muted-foreground hover:text-foreground",
                   ].join(" ")
                 }
@@ -483,8 +483,8 @@ export default function Navbar() {
                   [
                     "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-foreground/10 text-foreground"
-                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
                   ].join(" ")
                 }
               >
@@ -557,8 +557,8 @@ export default function Navbar() {
                   [
                     "rounded-lg px-4 py-3 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-foreground/10 text-foreground"
-                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
                   ].join(" ")
                 }
               >
