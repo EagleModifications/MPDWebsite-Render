@@ -158,15 +158,6 @@ function headerIndex(headers: string[], aliases: readonly string[]): number {
   return -1
 }
 
-function valueFromRow(
-  headers: string[],
-  row: string[],
-  aliases: readonly string[],
-): string {
-  const index = headerIndex(headers, aliases)
-  return index === -1 ? "" : clean(row[index])
-}
-
 function uniqueInSheetOrder(values: string[]): string[] {
   const seen = new Set<string>()
   const result: string[] = []
