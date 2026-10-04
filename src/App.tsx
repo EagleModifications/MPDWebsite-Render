@@ -198,32 +198,32 @@ export default function App() {
         />
 
         <Route
-          path="/documents/rosters/mainroster"
+          path="/documents/rosters/metro-rosters"
           element={<MainRoster />}
         />
 
         <Route
-          path="/documents/rosters/swatroster"
+          path="/documents/rosters/swat-rosters"
           element={<SWATRoster />}
         />
 
         <Route
-          path="/documents/rosters/mcdroster"
+          path="/documents/rosters/mcd-rosters"
           element={<MCDRoster />}
         />
 
         <Route
-          path="/documents/rosters/truroster"
+          path="/documents/rosters/tru-rosters"
           element={<TRURoster />}
         />
 
         <Route
-          path="/documents/rosters/FTDroster"
+          path="/documents/rosters/ftd-rosters"
           element={<FTDRoster />}
         />
 
         <Route
-          path="/documents/sops/globalsop"
+          path="/documents/sops/global-sops"
           element={<GlobalSOP />}
         />
 
