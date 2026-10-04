@@ -1,8 +1,8 @@
 import {
   Car,
   Database,
+  FileText,
   Home,
-  NotebookPen,
   Shirt,
   Users,
 } from "lucide-react"
@@ -106,7 +106,7 @@ export default function MainRoster() {
           {/* Header */}
           <div className="mb-5">
             <div className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-500">
-              <NotebookPen className="h-4 w-4 shrink-0" />
+              <FileText className="h-4 w-4 shrink-0" />
 
               <span>METRO POLICE DEPARTMENT</span>
             </div>
