@@ -10,10 +10,10 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  ClipboardList,
   Clock3,
   Copy,
   Filter,
+  ListPlus,
   Search,
   Shield,
   Users,
@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
+import RosterListDialog from "@/components/dashboard/RosterListDialog"
 import GoogleRosterRefresh from "@/components/dashboard/GoogleRosterRefresh"
 import { logAction } from "@/lib/actionLog"
 import { Button } from "@/components/ui/button"
@@ -78,6 +79,9 @@ type CopyType =
   | "callsign-name-discord"
   | "callsign-badge-discord"
   | "name-badge-discord"
+  | "callsign-badge-name"
+  | "callsign-badge-name-discord"
+  | "name-rank-discord"
   | "full"
 
 const divisions: {
@@ -231,6 +235,9 @@ export default function PromotionRoster() {
   const [division, setDivision] =
     useState<Division>("department")
 
+  const displayDivision =
+    divisions.find((entry) => entry.id === division)?.label ?? division
+
   const [members, setMembers] =
     useState<PromotionRosterMember[]>([])
 
@@ -253,6 +260,9 @@ export default function PromotionRoster() {
     useState<string[]>([])
 
   const [selectedCopied, setSelectedCopied] =
+    useState(false)
+
+  const [rosterListOpen, setRosterListOpen] =
     useState(false)
 
   const shiftSelectingRef =
@@ -576,7 +586,7 @@ export default function PromotionRoster() {
         targetUserId: member.discordId,
         targetName: member.name,
         targetRank: member.rank,
-        summary: `${wasSelected ? "Deselected" : "Selected"} ${member.name} in the ${division} promotion roster.`,
+        summary: `${wasSelected ? "Deselected" : "Selected"} ${member.name} in the ${displayDivision} promotion roster.`,
       })
     }
 
@@ -621,12 +631,12 @@ export default function PromotionRoster() {
     )
 
     logAction({
-      module: "promotion",
+        module: "promotion",
       action: "select-rank",
       category: "roster",
       division,
       targetRank: member.rank,
-      summary: `Selected ${rankIds.length} ${member.rank} members in the ${division} promotion roster.`,
+      summary: `Selected ${rankIds.length} ${member.rank} members in the ${displayDivision} promotion roster.`,
       details: { count: rankIds.length },
     })
 
@@ -685,11 +695,11 @@ export default function PromotionRoster() {
     }
 
     logAction({
-      module: "promotion",
+        module: "promotion",
       action: allSelected ? "deselect-all-visible" : "select-all-visible",
       category: "roster",
       division,
-      summary: `${allSelected ? "Deselected" : "Selected"} all ${visibleIds.length} visible members in the ${division} promotion roster.`,
+      summary: `${allSelected ? "Deselected" : "Selected"} all ${visibleIds.length} visible members in the ${displayDivision} promotion roster.`,
       details: { count: visibleIds.length },
     })
 
@@ -817,6 +827,27 @@ export default function PromotionRoster() {
         )
         break
 
+      case "callsign-badge-name":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.badgeNumber} — ${member.name}`,
+        )
+        break
+
+      case "callsign-badge-name-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.badgeNumber} — ${member.name} — ${member.discordId}`,
+        )
+        break
+
+      case "name-rank-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.name} — ${member.rank} — ${member.discordId}`,
+        )
+        break
+
       case "full":
         values = selectedMembers.map(
           (member) => {
@@ -865,23 +896,37 @@ export default function PromotionRoster() {
 
       setSelectedCopied(true)
 
-      toast.success(
-        "Copied successfully",
-        {
-          description: `${selectedMembers.length} ${
-            selectedMembers.length === 1
-              ? "member"
-              : "members"
-          } copied to your clipboard.`,
-        },
-      )
+      const copyLabels: Record<CopyType, string> = {
+        discord: "Discord ID",
+        "discord-mention": "Discord Mention",
+        name: "Name",
+        callsign: "Callsign",
+        badge: "Badge Number",
+        rank: "Rank",
+        "name-discord": "Name + Discord ID",
+        "callsign-discord": "Callsign + Discord ID",
+        "callsign-name": "Callsign + Name",
+        "callsign-badge": "Callsign + Badge Number",
+        "badge-name": "Badge Number + Name",
+        "badge-discord": "Badge Number + Discord ID",
+        "callsign-name-discord": "Callsign + Name + Discord ID",
+        "callsign-badge-discord": "Callsign + Badge Number + Discord ID",
+        "name-badge-discord": "Name + Badge Number + Discord ID",
+        "callsign-badge-name": "Callsign + Badge Number + Name",
+        "callsign-badge-name-discord":
+          "Callsign + Badge Number + Name + Discord ID",
+        "name-rank-discord": "Name + Rank + Discord ID",
+        full: "Full Roster",
+      }
+
+      toast.success(`${copyLabels[type]} copied to clipboard`)
 
       logAction({
         module: "promotion",
         action: "copy-roster",
         category: "roster",
         division,
-        summary: `Copied ${selectedMembers.length} selected members from the ${division} promotion roster.`,
+        summary: `Copied ${selectedMembers.length} selected members from the ${displayDivision} promotion roster.`,
         details: {
           copyType: type,
           count: selectedMembers.length,
@@ -923,11 +968,11 @@ export default function PromotionRoster() {
     setSelectedCopied(false)
 
     logAction({
-      module: "promotion",
+        module: "promotion",
       action: "filter-status",
       category: "roster",
       division,
-      summary: `Toggled ${getStatusLabel(status)} status filter on the ${division} promotion roster.`,
+      summary: `Toggled ${getStatusLabel(status)} status filter on the ${displayDivision} promotion roster.`,
       details: { status },
     })
   }
@@ -940,11 +985,11 @@ export default function PromotionRoster() {
     )
 
     logAction({
-      module: "promotion",
+        module: "promotion",
       action: "filter-status",
       category: "roster",
       division,
-      summary: `Selected all status filters on the ${division} promotion roster.`,
+      summary: `Selected all status filters on the ${displayDivision} promotion roster.`,
     })
 
     setSelectedCopied(false)
@@ -953,11 +998,11 @@ export default function PromotionRoster() {
   const clearStatuses = () => {
     setStatusFilters([])
     logAction({
-      module: "promotion",
+        module: "promotion",
       action: "clear-status-filters",
       category: "roster",
       division,
-      summary: `Cleared status filters on the ${division} promotion roster.`,
+      summary: `Cleared status filters on the ${displayDivision} promotion roster.`,
     })
     setSelectedCopied(false)
   }
@@ -988,12 +1033,12 @@ export default function PromotionRoster() {
     })
 
     logAction({
-      module: "promotion",
+        module: "promotion",
       action: "filter-rank",
       category: "roster",
       division,
       targetRank: rank,
-      summary: `Toggled ${rank} rank filter on the ${division} promotion roster.`,
+      summary: `Toggled ${rank} rank filter on the ${displayDivision} promotion roster.`,
       details: { rank },
     })
 
@@ -1003,11 +1048,11 @@ export default function PromotionRoster() {
   const selectAllRanks = () => {
     setRankFilters([...rankOptions])
     logAction({
-      module: "promotion",
+        module: "promotion",
       action: "filter-rank",
       category: "roster",
       division,
-      summary: `Selected all rank filters on the ${division} promotion roster.`,
+      summary: `Selected all rank filters on the ${displayDivision} promotion roster.`,
       details: { ranks: rankOptions },
     })
     setSelectedCopied(false)
@@ -1016,11 +1061,11 @@ export default function PromotionRoster() {
   const clearRanks = () => {
     setRankFilters([])
     logAction({
-      module: "promotion",
+        module: "promotion",
       action: "clear-rank-filters",
       category: "roster",
       division,
-      summary: `Cleared rank filters on the ${division} promotion roster.`,
+      summary: `Cleared rank filters on the ${displayDivision} promotion roster.`,
     })
     setSelectedCopied(false)
   }
@@ -1036,11 +1081,11 @@ export default function PromotionRoster() {
     setSelectedCopied(false)
 
     logAction({
-      module: "promotion",
+        module: "promotion",
       action: "clear-filters",
       category: "roster",
       division,
-      summary: `Cleared all filters on the ${division} promotion roster.`,
+      summary: `Cleared all filters on the ${displayDivision} promotion roster.`,
     })
   }
 
@@ -1067,31 +1112,144 @@ export default function PromotionRoster() {
   const selectedRankCount =
     rankFilters.length
 
-  const copyDiscordId = async (
+  const copyMember = async (
+    type: CopyType,
     member: PromotionRosterMember,
   ) => {
+    let value = ""
+    let label = ""
+
+    switch (type) {
+      case "discord":
+        value = member.discordId
+        label = "Discord ID"
+        break
+      case "discord-mention":
+        value = `<@${member.discordId}>`
+        label = "Discord Mention"
+        break
+      case "name":
+        value = member.name
+        label = "Name"
+        break
+      case "callsign":
+        value = member.callsign
+        label = "Callsign"
+        break
+      case "badge":
+        value = member.badgeNumber
+        label = "Badge Number"
+        break
+      case "rank":
+        value = member.rank
+        label = "Rank"
+        break
+      case "name-discord":
+        value = `${member.name} — ${member.discordId}`
+        label = "Name + Discord ID"
+        break
+      case "callsign-discord":
+        value = `${member.callsign} — ${member.discordId}`
+        label = "Callsign + Discord ID"
+        break
+      case "callsign-name":
+        value = `${member.callsign} — ${member.name}`
+        label = "Callsign + Name"
+        break
+      case "callsign-badge":
+        value = `${member.callsign} — ${member.badgeNumber}`
+        label = "Callsign + Badge Number"
+        break
+      case "badge-name":
+        value = `${member.badgeNumber} — ${member.name}`
+        label = "Badge Number + Name"
+        break
+      case "badge-discord":
+        value = `${member.badgeNumber} — ${member.discordId}`
+        label = "Badge Number + Discord ID"
+        break
+      case "callsign-name-discord":
+        value = `${member.callsign} — ${member.name} — ${member.discordId}`
+        label = "Callsign + Name + Discord"
+        break
+      case "callsign-badge-discord":
+        value = `${member.callsign} — ${member.badgeNumber} — ${member.discordId}`
+        label = "Callsign + Badge + Discord"
+        break
+      case "name-badge-discord":
+        value = `${member.name} — ${member.badgeNumber} — ${member.discordId}`
+        label = "Name + Badge + Discord"
+        break
+      case "callsign-badge-name":
+        value = `${member.callsign} — ${member.badgeNumber} — ${member.name}`
+        label = "Callsign + Badge + Name"
+        break
+      case "callsign-badge-name-discord":
+        value = `${member.callsign} — ${member.badgeNumber} — ${member.name} — ${member.discordId}`
+        label = "Callsign + Badge + Name + Discord"
+        break
+      case "name-rank-discord":
+        value = `${member.name} — ${member.rank} — ${member.discordId}`
+        label = "Name + Rank + Discord"
+        break
+      case "full": {
+        const details = [
+          member.callsign,
+          member.badgeNumber,
+          member.name,
+          member.rank,
+          member.discordId,
+          member.timeInDept,
+          member.timeInRank,
+          `${member.requiredTimeInRankDays} DAYS`,
+          `Trainings: ${member.requiredTrainingLogs}`,
+        ]
+
+        if (showRecruitmentLogs) {
+          details.push(
+            `Recruitments/Ridealongs: ${member.requiredRecruitmentLogs}`,
+          )
+        }
+
+        details.push(
+          `${member.requiredHours.toFixed(1)}h`,
+          `${member.promotionHours.toFixed(1)}h`,
+          getStatusLabel(member.status),
+        )
+
+        value = details.join(" — ")
+        label = "Full Details"
+        break
+      }
+    }
+
     try {
-      await navigator.clipboard.writeText(member.discordId)
+      await navigator.clipboard.writeText(value)
 
       logAction({
         module: "promotion",
-        action: "copy-discord-id",
+        action: "copy-member",
         category: "roster",
         division,
         targetUserId: member.discordId,
         targetName: member.name,
         targetRank: member.rank,
-        summary: `Copied ${member.name}'s Discord ID from the ${division} promotion roster.`,
+        summary: `Copied ${label} for ${member.name} from the ${displayDivision} promotion roster.`,
+        details: { copyType: type },
       })
 
-      toast.success("Discord ID copied", {
-        description: `${member.name}'s Discord ID has been copied to your clipboard.`,
-      })
+      toast.success(`${label} copied to clipboard`)
     } catch {
       toast.error("Copy failed", {
         description: "Your browser could not access the clipboard.",
       })
     }
+  }
+
+  const copyDiscordId = async (
+    member: PromotionRosterMember,
+  ) => {
+    await copyMember("discord", member)
   }
 
   /* ─────────────────────────────────────────────
@@ -1144,7 +1302,7 @@ export default function PromotionRoster() {
                       }
 
                       logAction({
-                        module: "promotion",
+        module: "promotion",
                         action: "change-division",
                         category: "navigation",
                         division: item.id,
@@ -1259,6 +1417,21 @@ export default function PromotionRoster() {
                 className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
+
+            {/* Clear Filters */}
+
+            {hasFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="shrink-0 gap-2 text-white hover:bg-white/5 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+                Clear
+              </Button>
+            )}
 
             {/* Status Filter */}
 
@@ -1533,19 +1706,18 @@ export default function PromotionRoster() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Clear Filters */}
+            {/* Promotion List */}
 
-            {hasFilters && (
+            {selectedIds.length > 0 && (
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                onClick={clearFilters}
                 className="gap-2"
+                onClick={() => setRosterListOpen(true)}
               >
-                <X className="h-4 w-4" />
-
-                Clear
+                <ListPlus className="h-4 w-4 text-blue-500" />
+                Promotion List
               </Button>
             )}
 
@@ -1667,7 +1839,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Name + Discord ID
                     </DropdownMenuItem>
 
@@ -1679,7 +1851,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Callsign + Discord ID
                     </DropdownMenuItem>
 
@@ -1691,7 +1863,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Callsign + Name
                     </DropdownMenuItem>
 
@@ -1703,7 +1875,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Callsign + Badge
                     </DropdownMenuItem>
 
@@ -1715,7 +1887,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Badge + Name
                     </DropdownMenuItem>
 
@@ -1727,7 +1899,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Badge + Discord ID
                     </DropdownMenuItem>
 
@@ -1741,7 +1913,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Callsign + Name + Discord
                     </DropdownMenuItem>
 
@@ -1753,7 +1925,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Callsign + Badge + Discord
                     </DropdownMenuItem>
 
@@ -1765,8 +1937,44 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Name + Badge + Discord
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "callsign-badge-name",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Callsign + Badge + Name
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "callsign-badge-name-discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Callsign + Badge + Name + Discord
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "name-rank-discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Name + Rank + Discord
                     </DropdownMenuItem>
 
                     <div className="my-1 h-px bg-border" />
@@ -1779,7 +1987,7 @@ export default function PromotionRoster() {
                       }
                       className="gap-2 text-sm"
                     >
-                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      <Copy className="h-4 w-4 text-blue-400" />
                       Copy Full Details
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -1872,7 +2080,7 @@ export default function PromotionRoster() {
         {/* Roster */}
 
         <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
-          <div className="sticky top-0 z-20 flex items-center justify-between border-b bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+          <div className="flex items-center justify-between border-b bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
             <div className="min-w-0">
               <h2 className="font-medium">
                 {divisions.find(
@@ -1954,9 +2162,9 @@ export default function PromotionRoster() {
                     <col className="w-[7%]" />
                   </colgroup>
 
-                  <thead>
-                    <tr className="border-b bg-muted/30 text-center">
-                      <th className="overflow-hidden px-2 py-3 text-center">
+                  <thead className="sticky top-0 z-40 bg-card">
+                    <tr className="border-b bg-card text-center">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center shadow-[0_1px_0_hsl(var(--border))]">
                         <div className="flex justify-center">
                           <Checkbox
                             checked={
@@ -1970,57 +2178,57 @@ export default function PromotionRoster() {
                         </div>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Callsign
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Badge
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Name
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Rank
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Discord ID
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         <span className="block truncate">
                           Time in Dept
                         </span>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         <span className="block truncate">
                           Time in Rank
                         </span>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         <span className="block truncate">
                           Required Time in Rank
                         </span>
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Required Logs
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Required Hours
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
-                        Activity
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                        Hours
                       </th>
 
-                      <th className="overflow-hidden px-2 py-3 text-center font-medium text-muted-foreground">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Status
                       </th>
                     </tr>
@@ -2134,7 +2342,7 @@ export default function PromotionRoster() {
                                     title={
                                       member.discordId
                                     }
-                                    className="mx-auto block max-w-full truncate rounded-md px-1.5 py-1 font-mono text-[10px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+                                    className="mx-auto block max-w-full truncate bg-transparent px-1.5 py-1 font-mono text-[10px] text-blue-400 outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
                                   >
                                     {
                                       member.discordId
@@ -2142,14 +2350,79 @@ export default function PromotionRoster() {
                                   </button>
                                 </DropdownMenuTrigger>
 
-                                <DropdownMenuContent align="start">
-                                  <DropdownMenuItem
-                                    onClick={() => void copyDiscordId(member)}
-                                    className="gap-2"
-                                  >
-                                    <ClipboardList className="h-4 w-4" />
+                                <DropdownMenuContent
+                                  side="bottom"
+                                  align="start"
+                                  sideOffset={4}
+                                  avoidCollisions={false}
+                                  className="w-[285px] max-h-80 overflow-y-auto p-1"
+                                >
+                                  {([
+                                    ["discord", "Copy Discord ID"],
+                                    ["discord-mention", "Copy Discord Mention"],
+                                    ["name", "Copy Name"],
+                                    ["callsign", "Copy Callsign"],
+                                    ["badge", "Copy Badge Number"],
+                                    ["rank", "Copy Rank"],
+                                  ] as [CopyType, string][]).map(([type, label]) => (
+                                    <DropdownMenuItem
+                                      key={type}
+                                      onClick={() => void copyMember(type, member)}
+                                      className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+                                    >
+                                      <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                                      <span>{label}</span>
+                                    </DropdownMenuItem>
+                                  ))}
 
-                                    Copy User ID
+                                  <div className="my-0.5 h-px bg-border" />
+
+                                  {([
+                                    ["name-discord", "Name + Discord ID"],
+                                    ["callsign-discord", "Callsign + Discord ID"],
+                                    ["callsign-name", "Callsign + Name"],
+                                    ["callsign-badge", "Callsign + Badge Number"],
+                                    ["badge-name", "Badge Number + Name"],
+                                    ["badge-discord", "Badge Number + Discord ID"],
+                                  ] as [CopyType, string][]).map(([type, label]) => (
+                                    <DropdownMenuItem
+                                      key={type}
+                                      onClick={() => void copyMember(type, member)}
+                                      className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+                                    >
+                                      <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                                      <span>{label}</span>
+                                    </DropdownMenuItem>
+                                  ))}
+
+                                  <div className="my-0.5 h-px bg-border" />
+
+                                  {([
+                                    ["callsign-name-discord", "Callsign + Name + Discord"],
+                                    ["callsign-badge-discord", "Callsign + Badge + Discord"],
+                                    ["name-badge-discord", "Name + Badge + Discord"],
+                                    ["callsign-badge-name", "Callsign + Badge + Name"],
+                                    ["callsign-badge-name-discord", "Callsign + Badge + Name + Discord"],
+                                    ["name-rank-discord", "Name + Rank + Discord"],
+                                  ] as [CopyType, string][]).map(([type, label]) => (
+                                    <DropdownMenuItem
+                                      key={type}
+                                      onClick={() => void copyMember(type, member)}
+                                      className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+                                    >
+                                      <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                                      <span>{label}</span>
+                                    </DropdownMenuItem>
+                                  ))}
+
+                                  <div className="my-0.5 h-px bg-border" />
+
+                                  <DropdownMenuItem
+                                    onClick={() => void copyMember("full", member)}
+                                    className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+                                  >
+                                    <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                                    <span>Copy Full Details</span>
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -2468,7 +2741,7 @@ export default function PromotionRoster() {
                                 <DropdownMenuTrigger asChild>
                                   <button
                                     type="button"
-                                    className="min-w-0 max-w-[calc(100%-60px)] truncate rounded-md px-2 py-1 font-mono text-[11px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+                                    className="min-w-0 max-w-[calc(100%-60px)] truncate bg-transparent px-2 py-1 font-mono text-[11px] text-blue-400 outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
                                   >
                                     {
                                       member.discordId
@@ -2481,9 +2754,9 @@ export default function PromotionRoster() {
                                     onClick={() => void copyDiscordId(member)}
                                     className="gap-2"
                                   >
-                                    <ClipboardList className="h-4 w-4" />
+                                    <Copy className="h-4 w-4 text-blue-400" />
 
-                                    Copy User ID
+                                    Copy Discord ID
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -2499,6 +2772,15 @@ export default function PromotionRoster() {
           )}
         </div>
       </div>
+
+      <RosterListDialog
+        open={rosterListOpen}
+        onClose={() => setRosterListOpen(false)}
+        module="promotion"
+        division={division}
+        members={members}
+        initialSelectedIds={selectedIds}
+      />
     </DashboardLayout>
   )
 }
