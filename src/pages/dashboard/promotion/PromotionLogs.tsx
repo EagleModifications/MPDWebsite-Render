@@ -722,7 +722,7 @@ export default function ActionLogs() {
                     <div
                       role="button"
                       tabIndex={0}
-                      className="w-full text-left transition-colors hover:bg-muted/20"
+                      className="w-full bg-transparent text-left transition-colors hover:bg-muted/20"
                       onClick={() => {
                         setExpanded((current) => (current === log.id ? null : log.id))
                         setOpenUserMenu(null)
