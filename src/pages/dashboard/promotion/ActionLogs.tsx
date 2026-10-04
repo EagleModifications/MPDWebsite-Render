@@ -10,7 +10,6 @@ import {
   Search,
   Shield,
   UserRound,
-  X,
 } from "lucide-react"
 import {
   useCallback,
@@ -529,17 +528,6 @@ export default function ActionLogs() {
           ],
     [availableActions],
   )
-
-  const clearFilters = () => {
-    setSearch("")
-    setCategory("")
-    setDivision("")
-    setAction("")
-    setFrom("")
-    setTo("")
-    setPage(1)
-    setExpanded(null)
-  }
 
   const openContextMenu = (
     event: React.MouseEvent,
