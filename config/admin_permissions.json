@@ -8,5 +8,8 @@
   ],
   "superAdminDiscordIds": [
     "YOUR_DISCORD_ID_HERE"
+  ],
+  "protectedUrls": [
+    "/dashboard/promotion/promotionroster"
   ]
 }
