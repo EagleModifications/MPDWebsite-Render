@@ -4425,57 +4425,36 @@ export function createApp() {
 
       if (!permission && !url) {
         return res.status(400).json({
-          error: "A permission or url query parameter is required.",
+          allowed: false,
+          error:
+            "A permission or url query parameter is required.",
         })
       }
 
-      const user = await getRequestUser(req)
-
-      // Permission checks always require authentication.
+      /*
+       * ----------------------------------------------------------
+       * DIRECT PERMISSION CHECK
+       * ----------------------------------------------------------
+       *
+       * This endpoint is explicitly asking whether the current
+       * session has a permission. Authentication is therefore
+       * required here.
+       */
       if (permission) {
+        const user =
+          await getRequestUser(req)
+
         if (!user) {
           return res.status(401).json({
+            allowed: false,
             error: "Unauthorized",
           })
         }
 
         if (!hasPermission(user, permission)) {
           return res.status(403).json({
+            allowed: false,
             error: "Forbidden",
-          })
-        }
-
-        return res.json({
-          allowed: true,
-          user,
-        })
-      }
-
-      if (url) {
-        const protectedPage = await isPageProtected(url)
-
-        // Unprotected pages are public. This is important because the
-        // frontend calls this endpoint for every browser route.
-        if (!protectedPage) {
-          return res.json({
-            allowed: true,
-            protected: false,
-            user,
-          })
-        }
-
-        // A protected page requires a logged-in user.
-        if (!user) {
-          return res.status(401).json({
-            error: "Unauthorized",
-            protected: true,
-          })
-        }
-
-        if (!(await canAccessPage(user, url))) {
-          return res.status(403).json({
-            error: "Forbidden",
-            protected: true,
           })
         }
 
@@ -4485,8 +4464,91 @@ export function createApp() {
           user,
         })
       }
+
+      /*
+       * ----------------------------------------------------------
+       * FRONTEND PAGE CHECK
+       * ----------------------------------------------------------
+       *
+       * protectedUrls in config/admin_permissions.json is the
+       * ONLY master switch for frontend route protection.
+       *
+       * CRITICAL:
+       *
+       * We determine whether the URL is protected BEFORE
+       * calling getRequestUser().
+       *
+       * This means:
+       *
+       *   /                    -> public
+       *   /events              -> public
+       *   /gallery             -> public
+       *   protected URL        -> authentication required
+       *
+       * A public page therefore never receives a 401 simply
+       * because the visitor is not logged in.
+       */
+      if (url) {
+        const protectedPage =
+          await isPageProtected(url)
+
+        /*
+         * PUBLIC PAGE
+         */
+        if (!protectedPage) {
+          return res.json({
+            allowed: true,
+            protected: false,
+            user: null,
+          })
+        }
+
+        /*
+         * PROTECTED PAGE
+         *
+         * Authentication is only checked after we know the URL
+         * is in protectedUrls.
+         */
+        const user =
+          await getRequestUser(req)
+
+        if (!user) {
+          return res.status(401).json({
+            allowed: false,
+            protected: true,
+            error: "Unauthorized",
+          })
+        }
+
+        /*
+         * The user is authenticated, but still needs the
+         * matching MongoDB web permission.
+         */
+        if (
+          !(await canAccessPage(user, url))
+        ) {
+          return res.status(403).json({
+            allowed: false,
+            protected: true,
+            error: "Forbidden",
+          })
+        }
+
+        return res.json({
+          allowed: true,
+          protected: true,
+          user,
+        })
+      }
+
+      return res.status(400).json({
+        allowed: false,
+        error:
+          "A permission or url query parameter is required.",
+      })
     },
   )
+
 
   /* ─────────────────────────────────────────
      Manual Roster Import
