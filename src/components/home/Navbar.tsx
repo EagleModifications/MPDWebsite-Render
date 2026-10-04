@@ -49,30 +49,38 @@ const navItems: NavItem[] = [
   },
 ]
 
-const documentsItems: NavItem[] = [
+const rosterItems: NavItem[] = [
   {
     name: "Main Roster",
-    href: "/documents/mainroster",
+    href: "/documents/rosters/mainroster",
     permission: "documents",
   },
   {
     name: "SWAT Roster",
-    href: "/documents/swatroster",
+    href: "/documents/rosters/swatroster",
     permission: "documents",
   },
   {
     name: "MCD Roster",
-    href: "/documents/mcdroster",
+    href: "/documents/rosters/mcdroster",
     permission: "documents",
   },
   {
     name: "TRU Roster",
-    href: "/documents/truroster",
+    href: "/documents/rosters/truroster",
     permission: "documents",
   },
   {
     name: "FTD Roster",
-    href: "/documents/ftdroster",
+    href: "/documents/rosters/ftdroster",
+    permission: "documents",
+  },
+]
+
+const sopItems: NavItem[] = [
+  {
+    name: "Global SOP",
+    href: "/documents/sops/globalsop",
     permission: "documents",
   },
 ]
@@ -81,6 +89,8 @@ export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [documentsOpen, setDocumentsOpen] = useState(false)
+  const [rostersOpen, setRostersOpen] = useState(false)
+  const [sopsOpen, setSopsOpen] = useState(false)
 
   const documentsRef = useRef<HTMLDivElement>(null)
 
@@ -121,6 +131,8 @@ export default function Navbar() {
         !documentsRef.current.contains(target)
       ) {
         setDocumentsOpen(false)
+        setRostersOpen(false)
+        setSopsOpen(false)
       }
     }
 
@@ -160,17 +172,50 @@ export default function Navbar() {
   }
 
   const visibleItems = navItems.filter(canViewItem)
-  const visibleDocuments =
-    documentsItems.filter(canViewItem)
+  const visibleRosters = rosterItems.filter(canViewItem)
+  const visibleSops = sopItems.filter(canViewItem)
 
-  const documentsActive = visibleDocuments.some(
-    (item) =>
-      window.location.pathname === item.href,
+  const hasDocuments =
+    visibleRosters.length > 0 ||
+    visibleSops.length > 0
+
+  const documentsActive =
+    visibleRosters.some(
+      (item) => window.location.pathname === item.href,
+    ) ||
+    visibleSops.some(
+      (item) => window.location.pathname === item.href,
+    )
+
+  const rostersActive = visibleRosters.some(
+    (item) => window.location.pathname === item.href,
+  )
+
+  const sopsActive = visibleSops.some(
+    (item) => window.location.pathname === item.href,
   )
 
   const closeMobileMenu = () => {
     setMobileOpen(false)
     setDocumentsOpen(false)
+    setRostersOpen(false)
+    setSopsOpen(false)
+  }
+
+  const toggleDocuments = () => {
+    setDocumentsOpen((open) => !open)
+    setRostersOpen(false)
+    setSopsOpen(false)
+  }
+
+  const toggleRosters = () => {
+    setRostersOpen((open) => !open)
+    setSopsOpen(false)
+  }
+
+  const toggleSops = () => {
+    setSopsOpen((open) => !open)
+    setRostersOpen(false)
   }
 
   return (
@@ -197,38 +242,38 @@ export default function Navbar() {
 
         {/* DESKTOP — Navigation */}
         <nav className="hidden items-center justify-center gap-7 whitespace-nowrap px-6 text-sm md:flex lg:gap-8">
-          {visibleItems.map((item) => (
-            <NavLink
-              key={item.href}
-              to={item.href}
-              end={item.href === "/"}
-              className={({ isActive }) =>
-                `
-                  font-medium
-                  transition-colors
-                  ${
-                    isActive
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }
-                `
-              }
-            >
-              {item.name}
-            </NavLink>
-          ))}
+          {visibleItems
+            .filter((item) => item.name !== "Dashboard")
+            .map((item) => (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                end={item.href === "/"}
+                className={({ isActive }) =>
+                  `
+                    font-medium
+                    transition-colors
+                    ${
+                      isActive
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }
+                  `
+                }
+              >
+                {item.name}
+              </NavLink>
+            ))}
 
           {/* DOCUMENTS DROPDOWN */}
-          {visibleDocuments.length > 0 && (
+          {hasDocuments && (
             <div
               ref={documentsRef}
               className="relative"
             >
               <button
                 type="button"
-                onClick={() =>
-                  setDocumentsOpen((open) => !open)
-                }
+                onClick={toggleDocuments}
                 className={`
                   flex items-center gap-1.5
                   font-medium
@@ -261,7 +306,7 @@ export default function Navbar() {
                 <div
                   className="
                     absolute left-1/2 top-full mt-3
-                    min-w-[190px]
+                    min-w-[220px]
                     -translate-x-1/2
                     overflow-hidden
                     rounded-xl
@@ -273,34 +318,163 @@ export default function Navbar() {
                   "
                   role="menu"
                 >
-                  {visibleDocuments.map((item) => (
-                    <NavLink
-                      key={item.href}
-                      to={item.href}
-                      onClick={() =>
-                        setDocumentsOpen(false)
-                      }
-                      className={({ isActive }) =>
-                        `
-                          block rounded-lg px-3 py-2.5
+                  {/* ROSTERS */}
+                  {visibleRosters.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={toggleRosters}
+                        className={`
+                          flex w-full items-center justify-between
+                          rounded-lg px-3 py-2.5
                           text-sm font-medium
                           transition-colors
                           ${
-                            isActive
+                            rostersActive || rostersOpen
                               ? "bg-foreground/10 text-foreground"
                               : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                           }
-                        `
-                      }
-                      role="menuitem"
-                    >
-                      {item.name}
-                    </NavLink>
-                  ))}
+                        `}
+                        aria-expanded={rostersOpen}
+                      >
+                        <span>Rosters</span>
+
+                        <ChevronDown
+                          className={`
+                            h-4 w-4
+                            transition-transform duration-200
+                            ${
+                              rostersOpen
+                                ? "rotate-180"
+                                : ""
+                            }
+                          `}
+                        />
+                      </button>
+
+                      {rostersOpen && (
+                        <div className="ml-2 border-l border-border pl-2">
+                          {visibleRosters.map((item) => (
+                            <NavLink
+                              key={item.href}
+                              to={item.href}
+                              onClick={() =>
+                                setDocumentsOpen(false)
+                              }
+                              className={({ isActive }) =>
+                                `
+                                  block rounded-lg px-3 py-2.5
+                                  text-sm font-medium
+                                  transition-colors
+                                  ${
+                                    isActive
+                                      ? "bg-foreground/10 text-foreground"
+                                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                  }
+                                `
+                              }
+                              role="menuitem"
+                            >
+                              {item.name}
+                            </NavLink>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* SOPS */}
+                  {visibleSops.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={toggleSops}
+                        className={`
+                          flex w-full items-center justify-between
+                          rounded-lg px-3 py-2.5
+                          text-sm font-medium
+                          transition-colors
+                          ${
+                            sopsActive || sopsOpen
+                              ? "bg-foreground/10 text-foreground"
+                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                          }
+                        `}
+                        aria-expanded={sopsOpen}
+                      >
+                        <span>SOPs</span>
+
+                        <ChevronDown
+                          className={`
+                            h-4 w-4
+                            transition-transform duration-200
+                            ${
+                              sopsOpen
+                                ? "rotate-180"
+                                : ""
+                            }
+                          `}
+                        />
+                      </button>
+
+                      {sopsOpen && (
+                        <div className="ml-2 border-l border-border pl-2">
+                          {visibleSops.map((item) => (
+                            <NavLink
+                              key={item.href}
+                              to={item.href}
+                              onClick={() =>
+                                setDocumentsOpen(false)
+                              }
+                              className={({ isActive }) =>
+                                `
+                                  block rounded-lg px-3 py-2.5
+                                  text-sm font-medium
+                                  transition-colors
+                                  ${
+                                    isActive
+                                      ? "bg-foreground/10 text-foreground"
+                                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                  }
+                                `
+                              }
+                              role="menuitem"
+                            >
+                              {item.name}
+                            </NavLink>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
+
+          {/* DASHBOARD — AFTER DOCUMENTS */}
+          {visibleItems
+            .filter((item) => item.name === "Dashboard")
+            .map((item) => (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                end={item.href === "/"}
+                className={({ isActive }) =>
+                  `
+                    font-medium
+                    transition-colors
+                    ${
+                      isActive
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }
+                  `
+                }
+              >
+                {item.name}
+              </NavLink>
+            ))}
         </nav>
 
         {/* RIGHT — Desktop */}
@@ -386,39 +560,37 @@ export default function Navbar() {
       {mobileOpen && (
         <div className="mx-4 mt-1 overflow-hidden rounded-xl border border-border bg-background/95 shadow-lg backdrop-blur-md md:hidden">
           <nav className="flex flex-col p-2">
-            {visibleItems.map((item) => (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                end={item.href === "/"}
-                onClick={closeMobileMenu}
-                className={({ isActive }) =>
-                  `
-                    rounded-lg px-4 py-3
-                    text-sm font-medium
-                    transition-colors
-                    ${
-                      isActive
-                        ? "bg-foreground/10 text-foreground"
-                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                    }
-                  `
-                }
-              >
-                {item.name}
-              </NavLink>
-            ))}
+            {visibleItems
+              .filter((item) => item.name !== "Dashboard")
+              .map((item) => (
+                <NavLink
+                  key={item.href}
+                  to={item.href}
+                  end={item.href === "/"}
+                  onClick={closeMobileMenu}
+                  className={({ isActive }) =>
+                    `
+                      rounded-lg px-4 py-3
+                      text-sm font-medium
+                      transition-colors
+                      ${
+                        isActive
+                          ? "bg-foreground/10 text-foreground"
+                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                      }
+                    `
+                  }
+                >
+                  {item.name}
+                </NavLink>
+              ))}
 
-            {/* MOBILE DOCUMENTS DROPDOWN */}
-            {visibleDocuments.length > 0 && (
+            {/* MOBILE DOCUMENTS */}
+            {hasDocuments && (
               <div>
                 <button
                   type="button"
-                  onClick={() =>
-                    setDocumentsOpen(
-                      (open) => !open,
-                    )
-                  }
+                  onClick={toggleDocuments}
                   className={`
                     flex w-full items-center justify-between
                     rounded-lg px-4 py-3
@@ -450,31 +622,160 @@ export default function Navbar() {
 
                 {documentsOpen && (
                   <div className="ml-3 border-l border-border pl-2">
-                    {visibleDocuments.map((item) => (
-                      <NavLink
-                        key={item.href}
-                        to={item.href}
-                        onClick={closeMobileMenu}
-                        className={({ isActive }) =>
-                          `
-                            block rounded-lg px-4 py-2.5
-                            text-sm font-medium
+                    {/* MOBILE ROSTERS */}
+                    {visibleRosters.length > 0 && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={toggleRosters}
+                          className={`
+                            flex w-full items-center justify-between
+                            rounded-lg px-4 py-2.5
+                            text-left text-sm font-medium
                             transition-colors
                             ${
-                              isActive
+                              rostersActive ||
+                              rostersOpen
                                 ? "bg-foreground/10 text-foreground"
                                 : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                             }
-                          `
-                        }
-                      >
-                        {item.name}
-                      </NavLink>
-                    ))}
+                          `}
+                          aria-expanded={rostersOpen}
+                        >
+                          <span>Rosters</span>
+
+                          <ChevronDown
+                            className={`
+                              h-4 w-4
+                              transition-transform duration-200
+                              ${
+                                rostersOpen
+                                  ? "rotate-180"
+                                  : ""
+                              }
+                            `}
+                          />
+                        </button>
+
+                        {rostersOpen && (
+                          <div className="ml-3 border-l border-border pl-2">
+                            {visibleRosters.map((item) => (
+                              <NavLink
+                                key={item.href}
+                                to={item.href}
+                                onClick={closeMobileMenu}
+                                className={({ isActive }) =>
+                                  `
+                                    block rounded-lg px-4 py-2.5
+                                    text-sm font-medium
+                                    transition-colors
+                                    ${
+                                      isActive
+                                        ? "bg-foreground/10 text-foreground"
+                                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                    }
+                                  `
+                                }
+                              >
+                                {item.name}
+                              </NavLink>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* MOBILE SOPS */}
+                    {visibleSops.length > 0 && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={toggleSops}
+                          className={`
+                            flex w-full items-center justify-between
+                            rounded-lg px-4 py-2.5
+                            text-left text-sm font-medium
+                            transition-colors
+                            ${
+                              sopsActive || sopsOpen
+                                ? "bg-foreground/10 text-foreground"
+                                : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                            }
+                          `}
+                          aria-expanded={sopsOpen}
+                        >
+                          <span>SOPs</span>
+
+                          <ChevronDown
+                            className={`
+                              h-4 w-4
+                              transition-transform duration-200
+                              ${
+                                sopsOpen
+                                  ? "rotate-180"
+                                  : ""
+                              }
+                            `}
+                          />
+                        </button>
+
+                        {sopsOpen && (
+                          <div className="ml-3 border-l border-border pl-2">
+                            {visibleSops.map((item) => (
+                              <NavLink
+                                key={item.href}
+                                to={item.href}
+                                onClick={closeMobileMenu}
+                                className={({ isActive }) =>
+                                  `
+                                    block rounded-lg px-4 py-2.5
+                                    text-sm font-medium
+                                    transition-colors
+                                    ${
+                                      isActive
+                                        ? "bg-foreground/10 text-foreground"
+                                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                                    }
+                                  `
+                                }
+                              >
+                                {item.name}
+                              </NavLink>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
+
+            {/* MOBILE DASHBOARD */}
+            {visibleItems
+              .filter((item) => item.name === "Dashboard")
+              .map((item) => (
+                <NavLink
+                  key={item.href}
+                  to={item.href}
+                  end={item.href === "/"}
+                  onClick={closeMobileMenu}
+                  className={({ isActive }) =>
+                    `
+                      rounded-lg px-4 py-3
+                      text-sm font-medium
+                      transition-colors
+                      ${
+                        isActive
+                          ? "bg-foreground/10 text-foreground"
+                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                      }
+                    `
+                  }
+                >
+                  {item.name}
+                </NavLink>
+              ))}
 
             <div className="my-1 h-px bg-border" />
 
