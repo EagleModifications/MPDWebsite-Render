@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-  ChevronDown,
-  ChevronUp,
   Plus,
   RotateCcw,
   Save,
