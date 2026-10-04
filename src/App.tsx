@@ -1,7 +1,6 @@
 import {
   useEffect,
   useState,
-  type ReactNode,
 } from "react"
 
 import {
@@ -103,7 +102,34 @@ function PageProtection() {
   const [state, setState] =
     useState<PageProtectionState>("checking")
 
+  /*
+   * These pages must never be intercepted by the
+   * page-protection system.
+   *
+   * Otherwise /verifying could redirect to itself
+   * while the permission check is taking place.
+   */
+  const protectionExemptRoutes = [
+    "/sign-in",
+    "/signed-out",
+    "/verifying",
+    "/no-permission",
+    "/error",
+  ]
+
+  const isProtectionExempt =
+    protectionExemptRoutes.includes(location.pathname)
+
   useEffect(() => {
+    /*
+     * Do not perform page protection checks on
+     * the system/redirect pages.
+     */
+    if (isProtectionExempt) {
+      setState("allowed")
+      return
+    }
+
     let cancelled = false
 
     async function checkPageAccess() {
@@ -178,15 +204,18 @@ function PageProtection() {
   }, [
     location.pathname,
     location.search,
+    isProtectionExempt,
   ])
 
   /*
-   * Permission check is running.
+   * The permission check is currently running.
    *
-   * /verifying is intentionally OUTSIDE this
-   * protection route so there is no redirect loop.
+   * Send the user to the dedicated verifying page.
    */
-  if (state === "checking") {
+  if (
+    state === "checking" &&
+    !isProtectionExempt
+  ) {
     return (
       <Navigate
         to="/verifying"
@@ -263,7 +292,7 @@ function PageProtection() {
 }
 
 /* =========================================================
-   APP PROTECTION
+   SITE PROTECTION
 ========================================================= */
 
 function useSiteProtection() {
@@ -673,11 +702,6 @@ export default function App() {
           />
 
           <Route
-            path="/dashboard/promotion/mcd-requirements"
-            element={<PromotionRequirementsMCD />}
-          />
-
-          <Route
             path="/dashboard/promotion/mtf7-requirements"
             element={<PromotionRequirementsMTF7 />}
           />
@@ -704,10 +728,6 @@ export default function App() {
 
           {/* ===================================================
               404
-
-              Keep this INSIDE the protection wrapper so that
-              protectedUrls can also protect arbitrary routes
-              if required.
           =================================================== */}
 
           <Route
