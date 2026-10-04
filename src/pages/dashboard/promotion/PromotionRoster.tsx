@@ -911,7 +911,7 @@ export default function PromotionRoster() {
         full: "Full Roster",
       }
 
-      toast.success(`${copyLabels[type]} copied to clipboard`{
+      toast.success(`${copyLabels[type]} copied to clipboard`, {
         description: `${member.name}`
       })
 
