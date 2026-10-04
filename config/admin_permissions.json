@@ -1,13 +1,13 @@
 {
   "adminRanks": [
-    "Lieutenant Colonel",
+    "Colonel",
     "Chief Of Staff",
     "Assistant Chief Of Police",
     "Deputy Chief Of Police",
     "Chief Of Police"
   ],
   "superAdminDiscordIds": [
-    "YOUR_DISCORD_ID_HERE"
+    "1314550564389912609"
   ],
   "protectedUrls": [
     "/dashboard/admin/permissions",
