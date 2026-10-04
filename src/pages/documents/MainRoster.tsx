@@ -18,7 +18,6 @@ import {
 
 import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
-import { Button } from "@/components/ui/button"
 
 type TabId =
   | "home"
