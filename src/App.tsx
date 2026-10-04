@@ -38,6 +38,7 @@ import SupervisorDocs from "@/pages/documents/SupervisorDocs"
 import CommandDocs from "@/pages/documents/CommandDocs"
 
 import Dashboard from "@/pages/dashboard/Dashboard"
+import AdminPermissions from "@/pages/dashboard/admin/Permissions"
 
 import ActivityRoster from "@/pages/dashboard/activity/ActivityRoster"
 import PromotionRoster from "@/pages/dashboard/promotion/PromotionRoster"
@@ -276,6 +277,11 @@ export default function App() {
         <Route
           path="/dashboard"
           element={<Dashboard />}
+        />
+
+        <Route
+          path="/dashboard/admin/permissions"
+          element={<AdminPermissions />}
         />
 
         {/* =================================================
