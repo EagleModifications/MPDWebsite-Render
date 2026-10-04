@@ -1,54 +1,35 @@
 import {
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  Clipboard,
+  FileText,
+  Filter,
+  ListChecks,
+  MousePointerClick,
+  RefreshCw,
+  Search,
+  Shield,
+  Upload,
+  UserRound,
+  X,
+} from "lucide-react"
+import {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
+  type MouseEvent,
 } from "react"
-
-import {
-  Activity,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Clipboard,
-  ClipboardCheck,
-  Copy,
-  FileDown,
-  History,
-  MousePointerClick,
-  Navigation,
-  Pencil,
-  Plus,
-  RefreshCw,
-  Search,
-  Settings2,
-  Trash2,
-  X,
-} from "lucide-react"
 import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
-type Module = "" | "promotion" | "activity"
-
-type Category =
-  | ""
-  | "roster"
-  | "import"
-  | "requirements"
-  | "navigation"
-  | "management"
-
+type Category = "roster" | "import" | "requirements" | "navigation" | "management" | ""
 type Division =
-  | ""
   | "department"
   | "swat"
   | "mtf7"
@@ -56,41 +37,38 @@ type Division =
   | "tru"
   | "teu"
   | "sar"
+  | ""
 
 type ActionLog = {
   id: string
-  entryNumber: number
+  entryNumber?: number
   createdAt: string
-
   userId: string
   userName: string
   username: string
   rank: string
   callsign: string
   badgeNumber: string
+  discordDisplayName?: string
+  discordUsername?: string
   avatar?: string | null
-
   action: string
-  module: Exclude<Module, "">
   category: Exclude<Category, "">
-  division?: Exclude<Division, ""> | null
-
-  targetUserId?: string
-  targetName?: string
-  targetRank?: string
-
+  division: Exclude<Division, ""> | null
+  targetUserId: string | null
+  targetName: string | null
+  targetRank: string | null
   summary: string
-  details?: Record<string, unknown>
-  path?: string
+  details: Record<string, unknown> | null
+  path: string | null
 }
 
 type RosterMember = {
-  name?: string
-  callsign?: string
-  badgeNumber?: string
-  rank?: string
-  discordId?: string
-  avatar?: string | null
+  discordId: string
+  name: string
+  rank: string
+  callsign: string
+  badgeNumber: string
 }
 
 type ApiResponse = {
@@ -105,45 +83,40 @@ type ApiResponse = {
   }
 }
 
-type Option = {
-  value: string
-  label: string
+type RosterResponse = {
+  success?: boolean
+  error?: string
+  members?: Array<Record<string, unknown>>
 }
 
-const moduleOptions: Option[] = [
-  { value: "", label: "All modules" },
-  { value: "promotion", label: "Promotion" },
-  { value: "activity", label: "Activity" },
-]
+type ContextMenu = {
+  x: number
+  y: number
+  discordId: string
+  label: string
+} | null
 
-const categoryOptions: Option[] = [
-  { value: "", label: "All categories" },
-  { value: "requirements", label: "Requirements" },
-  { value: "import", label: "Imports" },
+const categoryOptions = [
+  { value: "", label: "All Categories" },
   { value: "roster", label: "Roster" },
+  { value: "import", label: "Imports" },
+  { value: "requirements", label: "Requirements" },
   { value: "navigation", label: "Navigation" },
   { value: "management", label: "Management" },
-]
+] as const
 
-const divisionLabels: Record<string, string> = {
-  department: "Department",
-  swat: "SWAT",
-  mtf7: "MTF-7",
-  mcd: "MCD",
-  tru: "TRU",
-  teu: "TEU",
-  sar: "SAR",
-}
+const divisionOptions = [
+  { value: "", label: "All Divisions" },
+  { value: "department", label: "Department" },
+  { value: "swat", label: "SWAT" },
+  { value: "mtf7", label: "MTF-7" },
+  { value: "mcd", label: "MCD" },
+  { value: "tru", label: "TRU" },
+  { value: "teu", label: "TEU" },
+  { value: "sar", label: "SAR" },
+] as const
 
-const divisionOptions: Option[] = [
-  { value: "", label: "All divisions" },
-  ...Object.entries(divisionLabels).map(([value, label]) => ({
-    value,
-    label,
-  })),
-]
-
-const rosterDivisions = [
+const rosterDivisions: Exclude<Division, "">[] = [
   "department",
   "swat",
   "mtf7",
@@ -151,24 +124,74 @@ const rosterDivisions = [
   "tru",
   "teu",
   "sar",
-] as const
+]
 
-const moduleLabel = (value: string) => {
-  if (value === "promotion") return "Promotion"
-  if (value === "activity") return "Activity"
+const fallbackActions = [
+  "view-roster",
+  "change-division",
+  "search-roster",
+  "filter-status",
+  "filter-rank",
+  "clear-filters",
+  "select-member",
+  "deselect-member",
+  "select-rank",
+  "select-all-visible",
+  "deselect-all-visible",
+  "copy-roster",
+  "copy-discord-id",
+  "refresh-roster",
+  "import-promotion",
+  "save-requirements",
+  "reset-requirements",
+]
 
-  return value || "All modules"
-}
+const divisionLabel = (value: string | null) =>
+  divisionOptions.find((item) => item.value === value)?.label ?? value ?? "—"
+
+const categoryLabel = (value: string) =>
+  categoryOptions.find((item) => item.value === value)?.label ?? value
 
 const actionLabel = (value: string) =>
   value
     .replace(/[-_]+/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
 
-const divisionLabel = (value?: string | null) =>
-  value
-    ? divisionLabels[value] ?? actionLabel(value)
-    : "Department"
+const formatDateTime = (value: string) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "Unknown time"
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date)
+}
+
+const formatDetailValue = (value: unknown) => {
+  if (value === null || value === undefined) return "—"
+  if (typeof value === "string") return value
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
+const getDefaultAvatar = (discordId: string) => {
+  try {
+    return `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(discordId) % 6n)}.png?size=128`
+  } catch {
+    return undefined
+  }
+}
+
+const getAvatarUrl = (discordId: string, avatar?: string | null) => {
+  if (!avatar) return getDefaultAvatar(discordId)
+  if (avatar.startsWith("http://") || avatar.startsWith("https://")) return avatar
+  if (avatar.startsWith("a_")) {
+    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.gif?size=128`
+  }
+  return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png?size=128`
+}
 
 const getInitials = (value: string) =>
   value
@@ -179,2069 +202,763 @@ const getInitials = (value: string) =>
     .slice(0, 2)
     .toUpperCase() || "U"
 
-const getAvatarUrl = (
-  discordId: string,
-  avatar?: string | null,
-) => {
-  if (!discordId) return undefined
+const cleanRosterValue = (value: unknown) =>
+  value === null || value === undefined ? "" : String(value).trim()
 
-  if (
-    avatar?.startsWith("http://") ||
-    avatar?.startsWith("https://")
-  ) {
-    return avatar
-  }
+const getRosterName = (
+  log: ActionLog,
+  rosterProfiles: Record<string, RosterMember>,
+) =>
+  rosterProfiles[log.userId]?.name || log.userName || log.discordDisplayName || log.username || "Unknown User"
 
-  if (avatar) {
-    const extension = avatar.startsWith("a_")
-      ? "gif"
-      : "png"
+const getTargetName = (
+  log: ActionLog,
+  rosterProfiles: Record<string, RosterMember>,
+) =>
+  (log.targetUserId ? rosterProfiles[log.targetUserId]?.name : "") || log.targetName || "—"
 
-    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.${extension}?size=128`
-  }
+const getActionIcon = (action: string, category: string) => {
+  const normalized = action.toLowerCase()
 
-  try {
-    const index = Number(BigInt(discordId) % 6n)
-
-    return `https://cdn.discordapp.com/embed/avatars/${index}.png?size=128`
-  } catch {
-    return undefined
-  }
+  if (normalized.includes("copy")) return Clipboard
+  if (normalized.includes("select") || normalized.includes("deselect")) return MousePointerClick
+  if (category === "import" || normalized.includes("import")) return Upload
+  if (category === "requirements" || normalized.includes("requirement")) return ListChecks
+  if (category === "navigation" || normalized.includes("view-") || normalized.includes("search-")) return Activity
+  if (category === "management") return Shield
+  return FileText
 }
 
-const relativeTime = (value: string) => {
-  const timestamp = new Date(value).getTime()
-
-  if (!Number.isFinite(timestamp)) {
-    return "Unknown time"
-  }
-
-  const seconds = Math.max(
-    0,
-    Math.floor((Date.now() - timestamp) / 1000),
-  )
-
-  if (seconds < 10) return "just now"
-  if (seconds < 60) return `${seconds}s ago`
-
-  const minutes = Math.floor(seconds / 60)
-
-  if (minutes < 60) return `${minutes}m ago`
-
-  const hours = Math.floor(minutes / 60)
-
-  if (hours < 24) return `${hours}h ago`
-
-  const days = Math.floor(hours / 24)
-
-  if (days < 30) return `${days}d ago`
-
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(timestamp)
-}
-
-const formatDateTime = (value: string) => {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown"
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date)
-}
-
-const dateHeading = (value: string) => {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "UNKNOWN DATE"
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  })
-    .format(date)
-    .toUpperCase()
-}
-
-function tagClass(
-  type: "module" | "division" | "category",
-  value?: string | null,
-) {
-  const key = (value ?? "").toLowerCase()
-
-  if (type === "module") {
-    if (key === "promotion") {
-      return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-    }
-
-    if (key === "activity") {
-      return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-    }
-
-    return "border-border bg-muted/30 text-muted-foreground"
-  }
-
-  if (type === "division") {
-    if (key === "department") {
-      return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-    }
-
-    if (key === "swat") {
-      return "border-blue-500/20 bg-blue-500/5 text-blue-300"
-    }
-
-    if (key === "mtf7") {
-      return "border-border bg-muted/30 text-muted-foreground"
-    }
-
-    if (key === "mcd") {
-      return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-    }
-
-    if (key === "tru") {
-      return "border-red-500/20 bg-red-500/10 text-red-400"
-    }
-
-    if (key === "teu") {
-      return "border-border bg-muted/30 text-muted-foreground"
-    }
-
-    if (key === "sar") {
-      return "border-blue-500/20 bg-blue-500/5 text-blue-400"
-    }
-
-    return "border-border bg-muted/30 text-muted-foreground"
-  }
-
-  if (key === "requirements") {
-    return "border-border bg-muted/30 text-muted-foreground"
-  }
-
-  if (key === "import") {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-  }
-
-  if (key === "roster") {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-  }
-
-  if (key === "management") {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-  }
-
-  if (key === "navigation") {
-    return "border-border bg-muted/30 text-muted-foreground"
-  }
-
-  return "border-border bg-muted/30 text-muted-foreground"
-}
-
-function statusLabel(log: ActionLog) {
-  const value = log.action.toLowerCase()
-
-  if (value.includes("copy")) return "Copied"
-  if (value.includes("select")) return "Selected"
-  if (value.includes("import")) return "Imported"
-  if (
-    value.includes("delete") ||
-    value.includes("remove")
-  ) {
-    return "Removed"
-  }
-
-  if (
-    value.includes("create") ||
-    value.includes("add")
-  ) {
-    return "Created"
-  }
-
-  return "Updated"
-}
-
-function statusClass(log: ActionLog) {
-  const value = statusLabel(log).toLowerCase()
-
-  if (value === "created") {
-    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-  }
-
-  if (
-    value === "removed" ||
-    value === "deleted"
-  ) {
-    return "border-red-500/20 bg-red-500/10 text-red-400"
-  }
-
-  if (value === "copied") {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-  }
-
-  if (value === "selected") {
-    return "border-violet-500/20 bg-violet-500/10 text-violet-400"
-  }
-
-  return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-}
-
-function ActionIcon({
-  log,
-  small = false,
-}: {
-  log: ActionLog
-  small?: boolean
-}) {
-  const action =
-    `${log.action} ${log.summary}`.toLowerCase()
-
-  const category = (
-    log.category ?? ""
-  ).toLowerCase()
-
-  let Icon = Activity
-
-  let className =
-    "border-border bg-muted/30 text-muted-foreground"
-
-  if (
-    action.includes("copy") ||
-    action.includes("clipboard")
-  ) {
-    Icon = Copy
-    className =
-      "border-blue-500/25 bg-blue-500/10 text-blue-400"
-  } else if (
-    action.includes("select") ||
-    action.includes("selection")
-  ) {
-    Icon = MousePointerClick
-    className =
-      "border-violet-500/25 bg-violet-500/10 text-violet-400"
-  } else if (
-    action.includes("import") ||
-    category === "import"
-  ) {
-    Icon = FileDown
-    className =
-      "border-cyan-500/25 bg-cyan-500/10 text-cyan-400"
-  } else if (
-    action.includes("delete") ||
-    action.includes("remove")
-  ) {
-    Icon = Trash2
-    className =
-      "border-red-500/25 bg-red-500/10 text-red-400"
-  } else if (
-    action.includes("create") ||
-    action.includes("created") ||
-    action.includes("add")
-  ) {
-    Icon = Plus
-    className =
-      "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
-  } else if (
-    action.includes("update") ||
-    action.includes("edit") ||
-    action.includes("change")
-  ) {
-    Icon = Pencil
-    className =
-      "border-amber-500/25 bg-amber-500/10 text-amber-400"
-  } else if (category === "requirements") {
-    Icon = ClipboardCheck
-    className =
-      "border-indigo-500/25 bg-indigo-500/10 text-indigo-400"
-  } else if (category === "management") {
-    Icon = Settings2
-    className =
-      "border-orange-500/25 bg-orange-500/10 text-orange-400"
-  } else if (category === "navigation") {
-    Icon = Navigation
-    className =
-      "border-slate-500/25 bg-slate-500/10 text-slate-400"
-  } else if (category === "roster") {
-    Icon = Clipboard
-    className =
-      "border-blue-500/25 bg-blue-500/10 text-blue-400"
-  }
+function IconBox({ action, category }: { action: string; category: string }) {
+  const Icon = getActionIcon(action, category)
 
   return (
-    <span
-      title={actionLabel(log.action)}
-      className={`inline-flex shrink-0 items-center justify-center rounded-md border ${
-        small ? "h-7 w-7" : "h-8 w-8"
-      } ${className}`}
+    <div
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-blue-500/25 bg-blue-500/10"
+      title={actionLabel(action)}
     >
-      <Icon
-        className={
-          small
-            ? "h-3.5 w-3.5"
-            : "h-4 w-4"
-        }
-        strokeWidth={2}
-      />
-    </span>
-  )
-}
-
-function Tag({
-  children,
-  className,
-}: {
-  children: ReactNode
-  className: string
-}) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-medium leading-none ${className}`}
-    >
-      {children}
-    </span>
+      <Icon className="h-4 w-4 text-blue-500" />
+    </div>
   )
 }
 
 function Avatar({
-  name,
-  id,
+  discordId,
   avatar,
-  className = "h-6 w-6",
+  name,
 }: {
-  name: string
-  id: string
+  discordId: string
   avatar?: string | null
-  className?: string
+  name: string
 }) {
-  const [failed, setFailed] = useState(false)
-
-  const url = failed
-    ? getAvatarUrl(id)
-    : getAvatarUrl(id, avatar)
+  const avatarUrl = getAvatarUrl(discordId, avatar)
 
   return (
-    <span
-      className={`${className} shrink-0 overflow-hidden rounded-full border border-border bg-muted`}
-    >
-      {url ? (
-        <img
-          src={url}
-          alt=""
-          className="h-full w-full object-cover"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
-        />
+    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border bg-muted">
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
       ) : (
-        <span className="flex h-full w-full items-center justify-center text-[8px] font-semibold text-muted-foreground">
+        <div className="flex h-full w-full items-center justify-center text-xs font-semibold">
           {getInitials(name)}
-        </span>
-      )}
-    </span>
-  )
-}
-
-function CopyMenu({
-  name,
-  id,
-  callsign,
-  badgeNumber,
-  rank,
-  avatar,
-  large = false,
-}: {
-  name: string
-  id?: string
-  callsign?: string
-  badgeNumber?: string
-  rank?: string
-  avatar?: string | null
-  large?: boolean
-}) {
-  const display =
-    name?.trim() || "Unknown User"
-
-  const safeId = id?.trim() || ""
-  const safeCallsign =
-    callsign?.trim() || ""
-  const safeBadge =
-    badgeNumber?.trim() || ""
-  const safeRank =
-    rank?.trim() || ""
-
-  const items = [
-    [
-      "discord",
-      "Copy Discord ID",
-      safeId,
-    ],
-    [
-      "discord-mention",
-      "Copy Discord Mention",
-      safeId
-        ? `<@${safeId}>`
-        : "",
-    ],
-    [
-      "name",
-      "Copy Name",
-      display,
-    ],
-    [
-      "callsign",
-      "Copy Callsign",
-      safeCallsign,
-    ],
-    [
-      "badge",
-      "Copy Badge Number",
-      safeBadge,
-    ],
-    [
-      "rank",
-      "Copy Rank",
-      safeRank,
-    ],
-  ] as const
-
-  const combined = [
-    [
-      "name-discord",
-      "Name + Discord ID",
-      safeId
-        ? `${display} — ${safeId}`
-        : "",
-    ],
-    [
-      "callsign-discord",
-      "Callsign + Discord ID",
-      safeCallsign && safeId
-        ? `${safeCallsign} — ${safeId}`
-        : "",
-    ],
-    [
-      "callsign-name",
-      "Callsign + Name",
-      safeCallsign
-        ? `${safeCallsign} — ${display}`
-        : "",
-    ],
-    [
-      "callsign-badge",
-      "Callsign + Badge Number",
-      safeCallsign && safeBadge
-        ? `${safeCallsign} — ${safeBadge}`
-        : "",
-    ],
-    [
-      "badge-name",
-      "Badge Number + Name",
-      safeBadge
-        ? `${safeBadge} — ${display}`
-        : "",
-    ],
-    [
-      "badge-discord",
-      "Badge Number + Discord ID",
-      safeBadge && safeId
-        ? `${safeBadge} — ${safeId}`
-        : "",
-    ],
-  ] as const
-
-  const copy = async (
-    value: string,
-    label: string,
-  ) => {
-    if (!value) return
-
-    try {
-      await navigator.clipboard.writeText(value)
-
-      toast.success(`${label} copied`, {
-        description: value,
-      })
-    } catch {
-      toast.error("Copy failed")
-    }
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          title="Copy options"
-          className="inline-flex max-w-full items-center gap-2 rounded-md bg-transparent py-0.5 text-left outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
-        >
-          <Avatar
-            name={display}
-            id={safeId}
-            avatar={avatar}
-            className={
-              large
-                ? "h-10 w-10"
-                : "h-6 w-6"
-            }
-          />
-
-          <span
-            className={`truncate font-medium text-blue-400 ${
-              large
-                ? "text-sm"
-                : "text-xs"
-            }`}
-          >
-            {display}
-          </span>
-        </button>
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent
-        side="bottom"
-        align="start"
-        sideOffset={4}
-        avoidCollisions={false}
-        className="w-[285px] max-h-80 overflow-y-auto p-1"
-      >
-        {items.map(
-          ([type, label, value]) => (
-            <DropdownMenuItem
-              key={type}
-              disabled={!value}
-              onClick={() =>
-                void copy(value, label)
-              }
-              className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
-            >
-              <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-
-              <span>{label}</span>
-            </DropdownMenuItem>
-          ),
-        )}
-
-        <div className="my-0.5 h-px bg-border" />
-
-        {combined.map(
-          ([type, label, value]) => (
-            <DropdownMenuItem
-              key={type}
-              disabled={!value}
-              onClick={() =>
-                void copy(value, label)
-              }
-              className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
-            >
-              <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-
-              <span>{label}</span>
-            </DropdownMenuItem>
-          ),
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-function FilterSelect({
-  value,
-  options,
-  onChange,
-  ariaLabel,
-  className = "",
-}: {
-  value: string
-  options: Option[]
-  onChange: (value: string) => void
-  ariaLabel: string
-  className?: string
-}) {
-  const selected =
-    options.find(
-      (option) =>
-        option.value === value,
-    ) ?? options[0]
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={ariaLabel}
-          className={`inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground outline-none transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-white focus:outline-none ${className}`}
-        >
-          <span className="min-w-0 flex-1 truncate text-left">
-            {selected?.label ??
-              ariaLabel}
-          </span>
-
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        </button>
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent
-        side="bottom"
-        align="start"
-        sideOffset={4}
-        avoidCollisions={false}
-        className="max-h-80 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto p-1"
-      >
-        {options.map((option) => (
-          <DropdownMenuItem
-            key={
-              option.value ||
-              `all-${ariaLabel}`
-            }
-            onClick={() =>
-              onChange(option.value)
-            }
-            className={`h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs ${
-              option.value === value
-                ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/15 focus:text-blue-300"
-                : ""
-            }`}
-          >
-            <span className="min-w-0 flex-1 truncate">
-              {option.label}
-            </span>
-
-            {option.value === value ? (
-              <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-blue-400" />
-            ) : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-function formatValue(value: unknown): string {
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
-    return "—"
-  }
-
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return String(value)
-  }
-
-  try {
-    return JSON.stringify(
-      value,
-      null,
-      2,
-    )
-  } catch {
-    return String(value)
-  }
-}
-
-function displayChangeValue(
-  value: unknown,
-) {
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
-    return "—"
-  }
-
-  if (typeof value === "object") {
-    return formatValue(value)
-  }
-
-  return String(value)
-}
-
-function ChangeList({
-  changes,
-}: {
-  changes: unknown
-}) {
-  if (
-    !Array.isArray(changes) ||
-    changes.length === 0
-  ) {
-    return null
-  }
-
-  const visible =
-    changes.slice(0, 120) as Array<
-      Record<string, unknown>
-    >
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-border">
-      {visible.map(
-        (change, index) => {
-          const oldValue =
-            change.old
-
-          const newValue =
-            change.new
-
-          const rank = String(
-            change.rank ??
-              change.name ??
-              change.discordId ??
-              `Change ${index + 1}`,
-          )
-
-          return (
-            <div
-              key={`${rank}-${index}`}
-              className="grid gap-4 border-b border-border p-3 last:border-b-0 md:grid-cols-[1.1fr_1fr_1fr]"
-            >
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {String(
-                    change.field ??
-                      change.label ??
-                      change.key ??
-                      (change.rank
-                        ? "Rank"
-                        : "Change"),
-                  )}
-                </p>
-
-                <p className="mt-1 break-words text-xs font-medium text-foreground">
-                  {rank}
-                </p>
-              </div>
-
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Old
-                </p>
-
-                <p className="mt-1 break-words text-xs text-muted-foreground line-through decoration-red-500/70">
-                  {displayChangeValue(
-                    oldValue,
-                  )}
-                </p>
-              </div>
-
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  New
-                </p>
-
-                <p className="mt-1 break-words text-xs font-semibold text-emerald-400">
-                  {displayChangeValue(
-                    newValue,
-                  )}
-                </p>
-              </div>
-            </div>
-          )
-        },
+        </div>
       )}
     </div>
   )
 }
 
-function getRosterUser(
-  rosterUsers: Record<
-    string,
-    RosterMember
-  >,
-  discordId?: string | null,
-) {
-  if (!discordId) return undefined
-
-  return rosterUsers[
-    String(discordId).trim()
-  ]
-}
-
-function getRosterName(
-  rosterUsers: Record<
-    string,
-    RosterMember
-  >,
-  discordId?: string | null,
-  fallback?: string,
-) {
-  const user = getRosterUser(
-    rosterUsers,
-    discordId,
-  )
-
-  return (
-    user?.name?.trim() ||
-    fallback?.trim() ||
-    "Unknown User"
-  )
-}
-
-function DetailPanel({
+function UserIdentity({
   log,
-  rosterUsers,
+  displayName,
+  open,
+  onOpen,
+  onContextMenu,
 }: {
   log: ActionLog
-  rosterUsers: Record<
-    string,
-    RosterMember
-  >
+  displayName: string
+  open: boolean
+  onOpen: () => void
+  onContextMenu: (event: MouseEvent) => void
 }) {
-  const details = log.details ?? {}
-
-  const additionalDetails =
-    Object.entries(details).filter(
-      ([key]) =>
-        key !== "changes" &&
-        key !== "old" &&
-        key !== "new",
-    )
-
-  const changedBy = getRosterUser(
-    rosterUsers,
-    log.userId,
-  )
-
-  const target = getRosterUser(
-    rosterUsers,
-    log.targetUserId,
-  )
-
-  const changedByName =
-    changedBy?.name ||
-    log.userName ||
-    log.username ||
-    "Unknown User"
-
-  const targetName =
-    target?.name ||
-    log.targetName ||
-    "Unknown User"
-
-  const targetCallsign =
-    target?.callsign ||
-    String(
-      details.targetCallsign ??
-        details.callsign ??
-        "",
-    )
-
-  const targetBadge =
-    target?.badgeNumber ||
-    String(
-      details.targetBadgeNumber ??
-        details.badgeNumber ??
-        "",
-    )
-
-  const targetRank =
-    target?.rank ||
-    log.targetRank ||
-    ""
-
   return (
-    <div className="border-t border-border bg-muted/10 px-4 py-4">
-      <div className="grid gap-4">
-        <ChangeList
-          changes={details.changes}
-        />
+    <div className="relative min-w-0">
+      <button
+        type="button"
+        className="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-muted/50"
+        onClick={(event) => {
+          event.stopPropagation()
+          onOpen()
+        }}
+        onContextMenu={onContextMenu}
+      >
+        <Avatar discordId={log.userId} avatar={log.avatar} name={displayName} />
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Changed by
-            </p>
-
-            <div className="mt-1">
-              <CopyMenu
-                name={changedByName}
-                id={log.userId}
-                callsign={
-                  changedBy?.callsign ||
-                  log.callsign
-                }
-                badgeNumber={
-                  changedBy?.badgeNumber ||
-                  log.badgeNumber
-                }
-                rank={
-                  changedBy?.rank ||
-                  log.rank
-                }
-                avatar={
-                  changedBy?.avatar ||
-                  log.avatar
-                }
-              />
-            </div>
-          </div>
-
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Entry
-            </p>
-
-            <p className="mt-1 font-mono text-xs font-medium text-foreground">
-              #{log.entryNumber}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Discord ID
-            </p>
-
-            <p className="mt-1 break-all text-xs font-medium text-foreground">
-              {log.userId || "—"}
-            </p>
+        <div className="min-w-0 leading-tight">
+          <div className="truncate text-sm font-medium text-blue-400">{displayName}</div>
+          <div className="truncate text-[11px] text-muted-foreground">
+            {log.callsign || log.badgeNumber || "Roster member"}
           </div>
         </div>
+      </button>
 
-        {log.targetName ||
-        log.targetRank ||
-        log.targetUserId ? (
-          <div className="border-t border-border pt-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Target
-            </p>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              {log.targetName ||
-              log.targetUserId ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Name
-                  </p>
-
-                  <div className="mt-1">
-                    <CopyMenu
-                      name={targetName}
-                      id={
-                        log.targetUserId
-                      }
-                      callsign={
-                        targetCallsign
-                      }
-                      badgeNumber={
-                        targetBadge
-                      }
-                      rank={
-                        targetRank
-                      }
-                      avatar={
-                        target?.avatar ||
-                        log.avatar
-                      }
-                    />
-                  </div>
-                </div>
-              ) : null}
-
-              {targetRank ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Rank
-                  </p>
-
-                  <p className="mt-1 text-xs font-medium">
-                    {targetRank}
-                  </p>
-                </div>
-              ) : null}
-
-              {log.targetUserId ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Discord ID
-                  </p>
-
-                  <p className="mt-1 break-all text-xs font-medium">
-                    {log.targetUserId}
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-
-        {additionalDetails.length >
-        0 ? (
-          <div className="border-t border-border pt-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Additional details
-            </p>
-
-            <div className="divide-y divide-border">
-              {additionalDetails.map(
-                ([key, value]) => (
-                  <div
-                    key={key}
-                    className="grid gap-1 py-2 sm:grid-cols-[160px_1fr]"
-                  >
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {actionLabel(key)}
-                    </span>
-
-                    <pre className="m-0 whitespace-pre-wrap break-words font-sans text-xs text-foreground/90">
-                      {formatValue(value)}
-                    </pre>
-                  </div>
-                ),
-              )}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Action
-            </p>
-
-            <p className="mt-1 text-xs font-medium">
-              {actionLabel(log.action)}
+      {open && (
+        <div
+          className="absolute left-0 top-full z-50 mt-1 w-56 rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl"
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <div className="border-b px-3 py-2">
+            <p className="truncate text-sm font-semibold">{displayName}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {log.rank || "Rank unavailable"}
+              {log.callsign ? ` · ${log.callsign}` : ""}
             </p>
           </div>
-
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Recorded
-            </p>
-
-            <p className="mt-1 text-xs font-medium">
-              {formatDateTime(
-                log.createdAt,
-              )}
-            </p>
-          </div>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+            onClick={() => {
+              void navigator.clipboard
+                .writeText(log.userId)
+                .then(() => toast.success("Discord ID copied", { description: log.userId }))
+                .catch(() => toast.error("Copy failed"))
+              onOpen()
+            }}
+          >
+            <Clipboard className="h-4 w-4 text-blue-500" />
+            Copy Discord ID
+          </button>
         </div>
-
-        {log.path ? (
-          <p className="break-all border-t border-border pt-3 text-[10px] text-muted-foreground">
-            {log.path}
-          </p>
-        ) : null}
-      </div>
+      )}
     </div>
   )
 }
 
 export default function ActionLogs() {
-  const [logs, setLogs] = useState<
-    ActionLog[]
-  >([])
+  const [logs, setLogs] = useState<ActionLog[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [category, setCategory] = useState<Category>("")
+  const [division, setDivision] = useState<Division>("")
+  const [action, setAction] = useState("")
+  const [from, setFrom] = useState("")
+  const [to, setTo] = useState("")
+  const [page, setPage] = useState(1)
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [openUserMenu, setOpenUserMenu] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenu>(null)
+  const [availableActions, setAvailableActions] = useState<string[]>([])
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 })
+  const [rosterProfiles, setRosterProfiles] = useState<Record<string, RosterMember>>({})
+  const rosterProfilesRef = useRef<Record<string, RosterMember>>({})
+  const rosterLoadingRef = useRef<Set<string>>(new Set())
 
-  const [loading, setLoading] =
-    useState(true)
+  const hasFilters = Boolean(search.trim() || category || division || action || from || to)
 
-  const [error, setError] =
-    useState<string | null>(null)
+  const loadRoster = useCallback(async (divisionValue: Exclude<Division, "">) => {
+    if (rosterLoadingRef.current.has(divisionValue)) return
+    rosterLoadingRef.current.add(divisionValue)
 
-  const [module, setModule] =
-    useState<Module>("")
+    try {
+      const response = await fetch(`/api/promotion/roster/${divisionValue}`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      })
 
-  const [category, setCategory] =
-    useState<Category>("")
+      if (!response.ok) return
 
-  const [division, setDivision] =
-    useState<Division>("")
+      const data = (await response.json()) as RosterResponse
+      if (!data.success || !Array.isArray(data.members)) return
 
-  const [userId, setUserId] =
-    useState("")
+      const nextProfiles: Record<string, RosterMember> = {}
 
-  const [action, setAction] =
-    useState("")
+      for (const member of data.members) {
+        const discordId = cleanRosterValue(member.discordId)
+        const name = cleanRosterValue(member.name)
+        if (!discordId || !name) continue
 
-  const [search, setSearch] =
-    useState("")
-
-  const [expanded, setExpanded] =
-    useState<string | null>(null)
-
-  const [page, setPage] =
-    useState(1)
-
-  const [pageSize, setPageSize] =
-    useState(25)
-
-  const [pages, setPages] =
-    useState(1)
-
-  const [total, setTotal] =
-    useState(0)
-
-  const [rosterUsers, setRosterUsers] =
-    useState<
-      Record<string, RosterMember>
-    >({})
-
-  const rosterUsersRef =
-    useRef<
-      Record<string, RosterMember>
-    >({})
-
-  const rosterLoadingRef =
-    useRef(false)
-
-  const loadRosterUsers =
-    useCallback(async () => {
-      if (rosterLoadingRef.current) {
-        return
+        nextProfiles[discordId] = {
+          discordId,
+          name,
+          rank: cleanRosterValue(member.rank),
+          callsign: cleanRosterValue(member.callsign),
+          badgeNumber: cleanRosterValue(member.badgeNumber),
+        }
       }
 
-      rosterLoadingRef.current = true
+      if (!Object.keys(nextProfiles).length) return
+
+      rosterProfilesRef.current = {
+        ...rosterProfilesRef.current,
+        ...nextProfiles,
+      }
+      setRosterProfiles(rosterProfilesRef.current)
+    } catch {
+      // Stored audit data remains available if the roster endpoint cannot be reached.
+    } finally {
+      rosterLoadingRef.current.delete(divisionValue)
+    }
+  }, [])
+
+  const loadLogs = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: "50" })
+      if (search.trim()) params.set("search", search.trim())
+      if (category) params.set("category", category)
+      if (division) params.set("division", division)
+      if (action) params.set("action", action)
+      if (from) params.set("from", `${from}T00:00:00.000Z`)
+      if (to) params.set("to", `${to}T23:59:59.999Z`)
+
+      const response = await fetch(`/api/promotion/action-logs?${params.toString()}`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      })
+
+      const text = await response.text()
+      let data: ApiResponse = {}
 
       try {
-        const responses =
-          await Promise.all(
-            rosterDivisions.map(
-              async (rosterDivision) => {
-                try {
-                  const response =
-                    await fetch(
-                      `/api/promotion/roster/${rosterDivision}`,
-                      {
-                        credentials:
-                          "include",
-                        cache:
-                          "no-store",
-                        headers: {
-                          Accept:
-                            "application/json",
-                        },
-                      },
-                    )
-
-                  if (!response.ok) {
-                    return []
-                  }
-
-                  const data =
-                    (await response.json()) as {
-                      success?: boolean
-                      members?: RosterMember[]
-                      roster?: RosterMember[]
-                      users?: RosterMember[]
-                    }
-
-                  if (
-                    Array.isArray(
-                      data.members,
-                    )
-                  ) {
-                    return data.members
-                  }
-
-                  if (
-                    Array.isArray(
-                      data.roster,
-                    )
-                  ) {
-                    return data.roster
-                  }
-
-                  if (
-                    Array.isArray(
-                      data.users,
-                    )
-                  ) {
-                    return data.users
-                  }
-
-                  return []
-                } catch {
-                  return []
-                }
-              },
-            ),
-          )
-
-        const nextUsers: Record<
-          string,
-          RosterMember
-        > = {}
-
-        for (const members of responses) {
-          for (const member of members) {
-            const discordId =
-              String(
-                member.discordId ??
-                  "",
-              ).trim()
-
-            if (!discordId) {
-              continue
-            }
-
-            nextUsers[discordId] = {
-              ...nextUsers[
-                discordId
-              ],
-              ...member,
-            }
-          }
-        }
-
-        rosterUsersRef.current =
-          nextUsers
-
-        setRosterUsers(nextUsers)
-      } finally {
-        rosterLoadingRef.current =
-          false
+        data = text ? (JSON.parse(text) as ApiResponse) : {}
+      } catch {
+        throw new Error("The action logs API returned an invalid response.")
       }
-    }, [])
+
+      if (!response.ok || data.success !== true) {
+        throw new Error(data.error || `Failed to load action logs (${response.status}).`)
+      }
+
+      const incoming = Array.isArray(data.logs) ? data.logs : []
+      const nextLogs: ActionLog[] = []
+
+      for (const log of incoming) {
+        const previous = nextLogs[nextLogs.length - 1]
+        const sameEvent =
+          previous &&
+          previous.userId === log.userId &&
+          previous.action === log.action &&
+          previous.category === log.category &&
+          previous.division === log.division &&
+          previous.targetUserId === log.targetUserId &&
+          previous.targetName === log.targetName &&
+          previous.summary === log.summary &&
+          Math.abs(new Date(previous.createdAt).getTime() - new Date(log.createdAt).getTime()) <= 3000
+
+        if (!sameEvent) nextLogs.push(log)
+      }
+
+      setLogs(nextLogs)
+      setPagination(data.pagination ?? { page, limit: 50, total: nextLogs.length, pages: 1 })
+      setAvailableActions((current) =>
+        Array.from(new Set([...fallbackActions, ...current, ...nextLogs.map((log) => log.action)])).sort(),
+      )
+    } catch (err) {
+      setLogs([])
+      setError(err instanceof Error ? err.message : "Failed to load promotion action logs.")
+    } finally {
+      setLoading(false)
+    }
+  }, [page, search, category, division, action, from, to])
 
   useEffect(() => {
-    void loadRosterUsers()
-  }, [loadRosterUsers])
-
-  const loadLogs =
-    useCallback(async () => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const params =
-          new URLSearchParams({
-            page: String(page),
-            limit: String(pageSize),
-          })
-
-        if (module) {
-          params.set(
-            "module",
-            module,
-          )
-        }
-
-        if (category) {
-          params.set(
-            "category",
-            category,
-          )
-        }
-
-        if (division) {
-          params.set(
-            "division",
-            division,
-          )
-        }
-
-        if (userId) {
-          params.set(
-            "userId",
-            userId,
-          )
-        }
-
-        if (action) {
-          params.set(
-            "action",
-            action,
-          )
-        }
-
-        if (search.trim()) {
-          params.set(
-            "search",
-            search.trim(),
-          )
-        }
-
-        const response =
-          await fetch(
-            `/api/action-logs?${params.toString()}`,
-            {
-              credentials:
-                "include",
-              cache:
-                "no-store",
-              headers: {
-                Accept:
-                  "application/json",
-              },
-            },
-          )
-
-        const data =
-          (await response.json()) as ApiResponse
-
-        if (
-          !response.ok ||
-          !data.success
-        ) {
-          throw new Error(
-            data.error ||
-              `Failed to load promotion logs (${response.status}).`,
-          )
-        }
-
-        const nextLogs =
-          Array.isArray(
-            data.logs,
-          )
-            ? data.logs
-            : []
-
-        setLogs(nextLogs)
-
-        setTotal(
-          data.pagination
-            ?.total ?? 0,
-        )
-
-        setPages(
-          Math.max(
-            1,
-            data.pagination
-              ?.pages ?? 1,
-          ),
-        )
-
-        if (
-          data.pagination
-            ?.page &&
-          data.pagination
-            .page !== page
-        ) {
-          setPage(
-            data.pagination.page,
-          )
-        }
-      } catch (err) {
-        setLogs([])
-        setTotal(0)
-        setPages(1)
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load promotion logs.",
-        )
-      } finally {
-        setLoading(false)
-      }
-    }, [
-      action,
-      category,
-      division,
-      module,
-      page,
-      pageSize,
-      search,
-      userId,
-    ])
+    void loadLogs()
+  }, [loadLogs])
 
   useEffect(() => {
-    const timer =
-      window.setTimeout(
-        () =>
-          void loadLogs(),
-        search ? 250 : 0,
-      )
+    const divisions = new Set<Exclude<Division, "">>()
 
-    return () =>
-      window.clearTimeout(
-        timer,
-      )
-  }, [
-    loadLogs,
-    search,
-  ])
-
-  const userOptions =
-    useMemo<Option[]>(
-      () => {
-        const map =
-          new Map<
-            string,
-            string
-          >()
-
-        for (const log of logs) {
-          if (!log.userId) {
-            continue
-          }
-
-          map.set(
-            log.userId,
-            getRosterName(
-              rosterUsers,
-              log.userId,
-              log.userName ||
-                log.username ||
-                log.userId,
-            ),
-          )
-        }
-
-        return [
-          {
-            value: "",
-            label: "Anyone",
-          },
-          ...Array.from(
-            map.entries(),
-          )
-            .sort((a, b) =>
-              a[1].localeCompare(
-                b[1],
-              ),
-            )
-            .map(
-              ([
-                value,
-                label,
-              ]) => ({
-                value,
-                label,
-              }),
-            ),
-        ]
-      },
-      [
-        logs,
-        rosterUsers,
-      ],
-    )
-
-  const actionOptions =
-    useMemo<Option[]>(
-      () => {
-        const map =
-          new Map<
-            string,
-            string
-          >()
-
-        for (const log of logs) {
-          if (!log.action) {
-            continue
-          }
-
-          map.set(
-            log.action,
-            actionLabel(
-              log.action,
-            ),
-          )
-        }
-
-        return [
-          {
-            value: "",
-            label: "All actions",
-          },
-          ...Array.from(
-            map.entries(),
-          )
-            .sort((a, b) =>
-              a[1].localeCompare(
-                b[1],
-              ),
-            )
-            .map(
-              ([
-                value,
-                label,
-              ]) => ({
-                value,
-                label,
-              }),
-            ),
-        ]
-      },
-      [logs],
-    )
-
-  const grouped =
-    useMemo(() => {
-      const map =
-        new Map<
-          string,
-          ActionLog[]
-        >()
-
-      for (const log of logs) {
-        const key =
-          dateHeading(
-            log.createdAt,
-          )
-
-        const current =
-          map.get(key) ?? []
-
-        current.push(log)
-        map.set(
-          key,
-          current,
-        )
-      }
-
-      return Array.from(
-        map.entries(),
-      )
-    }, [logs])
-
-  const clearFilters =
-    () => {
-      setCategory("")
-      setDivision("")
-      setUserId("")
-      setAction("")
-      setSearch("")
-      setPage(1)
-      setExpanded(null)
+    for (const log of logs) {
+      if (log.division) divisions.add(log.division)
     }
 
-  const selectModule =
-    (value: Module) => {
-      setModule(value)
-      setPage(1)
-      setExpanded(null)
+    // Action logs can contain an actor without a division. Load all roster divisions
+    // in that case so the actor is still resolved from the database roster name.
+    if (logs.some((log) => !log.division)) {
+      for (const rosterDivision of rosterDivisions) divisions.add(rosterDivision)
     }
 
-  const start = total
-    ? (page - 1) *
-        pageSize +
-      1
-    : 0
+    for (const rosterDivision of divisions) {
+      void loadRoster(rosterDivision)
+    }
+  }, [logs, loadRoster])
 
-  const end = total
-    ? Math.min(
-        page * pageSize,
-        total,
-      )
-    : 0
+  useEffect(() => {
+    const close = () => {
+      setContextMenu(null)
+      setOpenUserMenu(null)
+    }
 
-  const hasFilters =
-    Boolean(
-      category ||
-        division ||
-        userId ||
-        action ||
-        search,
-    )
+    window.addEventListener("click", close)
+    window.addEventListener("scroll", close, true)
+
+    return () => {
+      window.removeEventListener("click", close)
+      window.removeEventListener("scroll", close, true)
+    }
+  }, [])
+
+  const actionOptions = useMemo(
+    () => Array.from(new Set([...fallbackActions, ...availableActions])).sort(),
+    [availableActions],
+  )
+
+  const clearFilters = () => {
+    setSearch("")
+    setCategory("")
+    setDivision("")
+    setAction("")
+    setFrom("")
+    setTo("")
+    setPage(1)
+    setExpanded(null)
+  }
+
+  const openContextMenu = (event: MouseEvent, log: ActionLog) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!log.userId) return
+
+    const width = 180
+    const height = 46
+
+    setContextMenu({
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - height - 8)),
+      discordId: log.userId,
+      label: getRosterName(log, rosterProfilesRef.current),
+    })
+  }
+
+  const copyContextId = async () => {
+    if (!contextMenu) return
+
+    try {
+      await navigator.clipboard.writeText(contextMenu.discordId)
+      toast.success("Discord ID copied", { description: contextMenu.discordId })
+    } catch {
+      toast.error("Copy failed")
+    } finally {
+      setContextMenu(null)
+    }
+  }
 
   return (
     <DashboardLayout>
-      <div className="mx-auto w-full max-w-[1120px] px-4 py-5 sm:px-6 lg:px-0">
-        <header className="mb-5 flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/25 bg-blue-500/10">
-              <History className="h-5 w-5 text-blue-400" />
+      <div className="flex min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
+              <FileText className="h-5 w-5 text-blue-500" />
             </div>
-
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight">
-                  Promotion Logs
-                </h1>
-
-                <span className="rounded-full border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
-                  60 days
-                </span>
-              </div>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                A numbered audit trail for roster,
-                import, requirement, selection and
-                management changes. Entries are
-                retained for 60 days.
-              </p>
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Promotion Action Logs</h1>
+              <p className="truncate text-xs text-muted-foreground sm:text-sm">Promotion Management audit history.</p>
             </div>
           </div>
 
-          <button
+          <Button
             type="button"
-            onClick={() =>
-              void loadLogs()
-            }
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
+            variant="outline"
+            size="sm"
+            className="gap-2 self-start"
+            onClick={() => void loadLogs()}
+            disabled={loading}
           >
-            <RefreshCw
-              className={`h-3.5 w-3.5 text-white ${
-                loading
-                  ? "animate-spin"
-                  : ""
-              }`}
-            />
-
-            {loading
-              ? "Refreshing"
-              : "Refresh"}
-          </button>
-        </header>
-
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          {moduleOptions.map(
-            (option) => {
-              const active =
-                module ===
-                option.value
-
-              return (
-                <button
-                  key={
-                    option.value ||
-                    "all"
-                  }
-                  type="button"
-                  onClick={() =>
-                    selectModule(
-                      option.value as Module,
-                    )
-                  }
-                  className={`h-8 rounded-lg border px-3 text-xs font-medium transition-all ${
-                    active
-                      ? "border-blue-500/60 bg-blue-500/10 text-blue-400"
-                      : "border-border bg-card text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              )
-            },
-          )}
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
 
-        <div className="mb-5 flex flex-wrap items-center gap-2">
-          <div className="flex w-full min-w-0 max-w-[430px] flex-1 items-center gap-2 sm:w-auto">
-            <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-400" />
+        <div className="rounded-lg border bg-card p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Filter className="h-3.5 w-3.5 text-blue-500" />
+              Filters
+            </div>
 
-              <input
+            {hasFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                onClick={clearFilters}
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            )}
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(260px,2fr)_repeat(3,minmax(140px,1fr))_130px_130px]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
                 value={search}
-                onChange={(
-                  event,
-                ) => {
-                  setSearch(
-                    event.target
-                      .value,
-                  )
-
+                onChange={(event) => {
+                  setSearch(event.target.value)
                   setPage(1)
                 }}
-                placeholder="Search entries, people, ranks, IDs..."
-                className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
+                placeholder="Search users, actions, IDs, targets..."
+                className="h-8 pl-8 text-xs"
               />
             </div>
 
-            {hasFilters ? (
-              <button
-                type="button"
-                onClick={
-                  clearFilters
-                }
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 px-1 text-xs font-medium text-white transition-colors hover:text-blue-300"
-              >
-                <X className="h-3.5 w-3.5 text-white" />
+            <select
+              value={category}
+              onChange={(event) => {
+                setCategory(event.target.value as Category)
+                setPage(1)
+              }}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            >
+              {categoryOptions.map((item) => (
+                <option key={item.value || "all"} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
 
-                Clear
-              </button>
-            ) : null}
+            <select
+              value={division}
+              onChange={(event) => {
+                setDivision(event.target.value as Division)
+                setPage(1)
+              }}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            >
+              {divisionOptions.map((item) => (
+                <option key={item.value || "all"} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={action}
+              onChange={(event) => {
+                setAction(event.target.value)
+                setPage(1)
+              }}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            >
+              <option value="">All Actions</option>
+              {actionOptions.map((item) => (
+                <option key={item} value={item}>
+                  {actionLabel(item)}
+                </option>
+              ))}
+            </select>
+
+            <Input
+              type="date"
+              value={from}
+              onChange={(event) => {
+                setFrom(event.target.value)
+                setPage(1)
+              }}
+              className="h-8 text-xs"
+            />
+
+            <Input
+              type="date"
+              value={to}
+              onChange={(event) => {
+                setTo(event.target.value)
+                setPage(1)
+              }}
+              className="h-8 text-xs"
+            />
           </div>
 
-          <FilterSelect
-            value={userId}
-            options={
-              userOptions
-            }
-            onChange={(
-              value,
-            ) => {
-              setUserId(value)
-              setPage(1)
-              setExpanded(null)
-            }}
-            ariaLabel="People"
-            className="w-[170px]"
-          />
-
-          <FilterSelect
-            value={action}
-            options={
-              actionOptions
-            }
-            onChange={(
-              value,
-            ) => {
-              setAction(value)
-              setPage(1)
-              setExpanded(null)
-            }}
-            ariaLabel="Actions"
-            className="w-[160px]"
-          />
-
-          <FilterSelect
-            value={category}
-            options={
-              categoryOptions
-            }
-            onChange={(
-              value,
-            ) => {
-              setCategory(
-                value as Category,
-              )
-              setPage(1)
-              setExpanded(null)
-            }}
-            ariaLabel="Categories"
-            className="w-[175px]"
-          />
-
-          <FilterSelect
-            value={division}
-            options={
-              divisionOptions
-            }
-            onChange={(
-              value,
-            ) => {
-              setDivision(
-                value as Division,
-              )
-              setPage(1)
-              setExpanded(null)
-            }}
-            ariaLabel="Divisions"
-            className="w-[175px]"
-          />
-
-          <span className="ml-auto text-xs text-muted-foreground">
-            {total.toLocaleString()}{" "}
-            {total === 1
-              ? "change"
-              : "changes"}
-          </span>
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            {pagination.total.toLocaleString()} total logs
+          </div>
         </div>
 
-        {error ? (
-          <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
+        {error && (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
             {error}
           </div>
-        ) : null}
+        )}
 
-        <section>
-          {loading &&
-          !logs.length ? (
-            <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
-              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        <div className="overflow-visible rounded-lg border bg-card">
+          <div className="hidden border-b bg-muted/20 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground lg:grid lg:grid-cols-[1.55fr_1fr_.8fr_.8fr_1.8fr_125px] lg:gap-3">
+            <span>User</span>
+            <span>Action</span>
+            <span>Category</span>
+            <span>Division</span>
+            <span>Details</span>
+            <span>Time</span>
+          </div>
 
-              Loading promotion logs...
+          {loading ? (
+            <div className="divide-y">
+              {Array.from({ length: 7 }).map((_, index) => (
+                <div key={index} className="h-14 animate-pulse bg-muted/10" />
+              ))}
             </div>
-          ) : null}
-
-          {!loading &&
-          !logs.length ? (
-            <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
-              <History className="h-8 w-8 text-muted-foreground" />
-
-              <p className="mt-3 font-medium">
-                No promotion logs found
-              </p>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                Try clearing the
-                filters or perform
-                a dashboard action.
-              </p>
+          ) : logs.length === 0 ? (
+            <div className="flex min-h-44 flex-col items-center justify-center gap-1 px-4 text-center">
+              <FileText className="h-7 w-7 text-muted-foreground/40" />
+              <p className="text-sm font-medium">No action logs found</p>
+              <p className="text-xs text-muted-foreground">Try changing your search or filters.</p>
             </div>
-          ) : null}
+          ) : (
+            <div className="divide-y">
+              {logs.map((log) => {
+                const isExpanded = expanded === log.id
+                const userMenuOpen = openUserMenu === log.id
+                const actorName = getRosterName(log, rosterProfiles)
+                const targetName = getTargetName(log, rosterProfiles)
 
-          {grouped.map(
-            ([
-              heading,
-              group,
-            ]) => (
-              <div
-                key={heading}
-                className="mb-6"
-              >
-                <div className="mb-2 px-0">
-                  <span className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
-                    {heading}
-                  </span>
-                </div>
+                return (
+                  <div key={log.id} className="relative">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className="w-full text-left transition-colors hover:bg-muted/20"
+                      onClick={() => {
+                        setExpanded((current) => (current === log.id ? null : log.id))
+                        setOpenUserMenu(null)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault()
+                          setExpanded((current) => (current === log.id ? null : log.id))
+                          setOpenUserMenu(null)
+                        }
+                      }}
+                    >
+                      <div className="grid gap-2 px-3 py-2.5 lg:grid-cols-[44px_36px_minmax(165px,.65fr)_minmax(280px,2fr)_auto] lg:items-center lg:gap-3">
+                        <div className="flex items-center justify-center">
+                          <span className="text-[11px] font-semibold text-blue-500">
+                            #{log.entryNumber ?? log.id.slice(-4)}
+                          </span>
+                        </div>
 
-                <div className="space-y-1.5">
-                  {group.map(
-                    (log) => {
-                      const isOpen =
-                        expanded ===
-                        log.id
+                        <div className="flex items-center justify-center">
+                          <IconBox action={log.action} category={log.category} />
+                        </div>
 
-                      const rosterUser =
-                        getRosterUser(
-                          rosterUsers,
-                          log.userId,
-                        )
+                        <div onClick={(event) => event.stopPropagation()}>
+                          <UserIdentity
+                            log={log}
+                            displayName={actorName}
+                            open={userMenuOpen}
+                            onOpen={() => setOpenUserMenu((current) => (current === log.id ? null : log.id))}
+                            onContextMenu={(event) => openContextMenu(event, log)}
+                          />
+                        </div>
 
-                      const displayName =
-                        rosterUser?.name ||
-                        log.userName ||
-                        log.username ||
-                        "Unknown User"
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {isExpanded ? (
+                              <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            )}
+                            <span className="truncate text-xs font-semibold sm:text-sm">{log.summary}</span>
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-5">
+                            <span className="text-[10px] text-muted-foreground">{formatDateTime(log.createdAt)}</span>
+                            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">
+                              {actionLabel(log.action)}
+                            </span>
+                            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">
+                              {divisionLabel(log.division)}
+                            </span>
+                            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">
+                              {categoryLabel(log.category)}
+                            </span>
+                          </div>
+                        </div>
 
-                      return (
-                        <article
-                          key={log.id}
-                          className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-blue-500/25 hover:bg-muted/20"
-                        >
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setExpanded(
-                                isOpen
-                                  ? null
-                                  : log.id,
-                              )
-                            }
-                            className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/20 md:grid-cols-[44px_40px_minmax(165px,0.65fr)_minmax(280px,2fr)_auto] md:items-center"
-                          >
-                            <div className="flex items-center">
-                              <span className="font-mono text-[10px] font-semibold text-blue-400">
-                                #{log.entryNumber}
-                              </span>
+                        <div className="hidden items-center justify-end lg:flex">
+                          <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-[10px] font-medium text-blue-400">
+                            {isExpanded ? "Open" : "Details"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="border-t bg-muted/5 px-3 py-3">
+                        <div className="grid gap-2 md:grid-cols-3">
+                          <div className="rounded-md border bg-background/70 px-3 py-2">
+                            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              <UserRound className="h-3 w-3" />
+                              Changed By
                             </div>
 
-                            <div className="flex items-center">
-                              <ActionIcon
-                                log={log}
-                              />
-                            </div>
-
-                            <div className="min-w-0">
-                              <CopyMenu
-                                name={
-                                  displayName
-                                }
-                                id={
-                                  log.userId
-                                }
-                                callsign={
-                                  rosterUser?.callsign ||
-                                  log.callsign
-                                }
-                                badgeNumber={
-                                  rosterUser?.badgeNumber ||
-                                  log.badgeNumber
-                                }
-                                rank={
-                                  rosterUser?.rank ||
-                                  log.rank
-                                }
-                                avatar={
-                                  rosterUser?.avatar ||
-                                  log.avatar
-                                }
-                                large
-                              />
-                            </div>
-
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium leading-5 text-foreground">
-                                {log.summary}
-                              </p>
-
-                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-                                <span className="text-blue-300/80">
-                                  {relativeTime(
-                                    log.createdAt,
-                                  )}
-                                </span>
-
-                                <span className="text-muted-foreground/60">
-                                  •
-                                </span>
-
-                                <Tag
-                                  className={tagClass(
-                                    "module",
-                                    log.module,
-                                  )}
-                                >
-                                  {moduleLabel(
-                                    log.module,
-                                  )}
-                                </Tag>
-
-                                <Tag
-                                  className={tagClass(
-                                    "division",
-                                    log.division,
-                                  )}
-                                >
-                                  {divisionLabel(
-                                    log.division,
-                                  )}
-                                </Tag>
-
-                                {log.category ? (
-                                  <Tag
-                                    className={tagClass(
-                                      "category",
-                                      log.category,
-                                    )}
-                                  >
-                                    {actionLabel(
-                                      log.category,
-                                    )}
-                                  </Tag>
-                                ) : null}
+                            <div className="flex items-center gap-2">
+                              <Avatar discordId={log.userId} avatar={log.avatar} name={actorName} />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-blue-400">{actorName}</p>
+                                <p className="truncate text-[11px] text-muted-foreground">
+                                  {log.rank || rosterProfiles[log.userId]?.rank || "Rank unavailable"}
+                                  {log.callsign || rosterProfiles[log.userId]?.callsign
+                                    ? ` · ${log.callsign || rosterProfiles[log.userId]?.callsign}`
+                                    : ""}
+                                </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-end gap-2">
-                              <Tag
-                                className={statusClass(
-                                  log,
-                                )}
+                            <div className="mt-2 grid gap-0.5 text-xs">
+                              <span>
+                                <b>Badge:</b> {log.badgeNumber || rosterProfiles[log.userId]?.badgeNumber || "—"}
+                              </span>
+                              <button
+                                type="button"
+                                className="w-fit font-mono text-[10px] text-blue-400 hover:text-blue-300"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  void navigator.clipboard
+                                    .writeText(log.userId)
+                                    .then(() => toast.success("Discord ID copied", { description: log.userId }))
+                                    .catch(() => toast.error("Copy failed"))
+                                }}
                               >
-                                {statusLabel(
-                                  log,
-                                )}
-                              </Tag>
-
-                              {isOpen ? (
-                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                              )}
+                                {log.userId}
+                              </button>
                             </div>
-                          </button>
+                          </div>
 
-                          {isOpen ? (
-                            <DetailPanel
-                              log={log}
-                              rosterUsers={
-                                rosterUsers
-                              }
-                            />
-                          ) : null}
-                        </article>
-                      )
-                    },
-                  )}
-                </div>
-              </div>
-            ),
+                          <div className="rounded-md border bg-background/70 px-3 py-2">
+                            <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              <Shield className="h-3 w-3" />
+                              Action
+                            </div>
+                            <div className="grid gap-0.5 text-xs">
+                              <span>
+                                <b>Action:</b> {actionLabel(log.action)}
+                              </span>
+                              <span>
+                                <b>Category:</b> {categoryLabel(log.category)} · <b>Division:</b> {divisionLabel(log.division)}
+                              </span>
+                              <span className="truncate" title={log.path || ""}>
+                                <b>Page:</b> {log.path || "—"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="rounded-md border bg-background/70 px-3 py-2">
+                            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Target
+                            </div>
+
+                            {log.targetUserId ? (
+                              <div className="flex items-center gap-2">
+                                <Avatar
+                                  discordId={log.targetUserId}
+                                  name={targetName}
+                                />
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium text-blue-400">{targetName}</p>
+                                  <p className="truncate text-[11px] text-muted-foreground">
+                                    {log.targetRank || rosterProfiles[log.targetUserId]?.rank || "Rank unavailable"}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No target</p>
+                            )}
+
+                            <div className="mt-2 grid gap-0.5 text-xs">
+                              <span>
+                                <b>Rank:</b> {log.targetRank || (log.targetUserId ? rosterProfiles[log.targetUserId]?.rank : "") || "—"}
+                              </span>
+                              <span className="font-mono text-[10px] text-blue-400">{log.targetUserId || "—"}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-2 grid gap-2 md:grid-cols-2">
+                          <div className="rounded-md border bg-background/70 px-3 py-2">
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Summary</p>
+                            <p className="text-xs leading-5">{log.summary}</p>
+                          </div>
+
+                          <div className="rounded-md border bg-background/70 px-3 py-2">
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Recorded</p>
+                            <p className="text-xs leading-5">{formatDateTime(log.createdAt)}</p>
+                          </div>
+                        </div>
+
+                        {log.details && Object.keys(log.details).length > 0 && (
+                          <div className="mt-2 rounded-md border bg-background/70 px-3 py-2">
+                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Additional Details</p>
+                            <div className="grid max-h-44 gap-1.5 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
+                              {Object.entries(log.details).map(([key, value]) => (
+                                <div key={key} className="min-w-0 rounded border bg-muted/10 px-2 py-1.5">
+                                  <p className="truncate text-[10px] font-medium text-muted-foreground">{actionLabel(key)}</p>
+                                  <pre className="mt-0.5 max-h-24 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4">{formatDetailValue(value)}</pre>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           )}
-        </section>
 
-        {total > 0 ? (
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>
-                Page {page} of{" "}
-                {pages}
+          {!loading && logs.length > 0 && (
+            <div className="flex items-center justify-between gap-3 border-t bg-muted/10 px-3 py-2">
+              <span className="text-[11px] text-muted-foreground">
+                Page {pagination.page} of {pagination.pages} · {pagination.total.toLocaleString()} logs
               </span>
-
-              <FilterSelect
-                value={String(
-                  pageSize,
-                )}
-                options={[
-                  {
-                    value: "25",
-                    label: "25 / page",
-                  },
-                  {
-                    value: "50",
-                    label: "50 / page",
-                  },
-                  {
-                    value: "75",
-                    label: "75 / page",
-                  },
-                  {
-                    value: "100",
-                    label: "100 / page",
-                  },
-                ]}
-                onChange={(
-                  value,
-                ) => {
-                  setPageSize(
-                    Number(value),
-                  )
-
-                  setPage(1)
-                }}
-                ariaLabel="Pages"
-                className="w-[112px]"
-              />
-
-              <span>
-                {start.toLocaleString()}
-                –
-                {end.toLocaleString()}{" "}
-                of{" "}
-                {total.toLocaleString()}
-              </span>
+              <div className="flex gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={page >= pagination.pages}
+                  onClick={() => setPage((current) => Math.min(pagination.pages, current + 1))}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={
-                  page <= 1 ||
-                  loading
-                }
-                onClick={() =>
-                  setPage(
-                    (value) =>
-                      value - 1,
-                  )
-                }
-                className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Previous
-              </button>
-
-              <button
-                type="button"
-                disabled={
-                  page >= pages ||
-                  loading
-                }
-                onClick={() =>
-                  setPage(
-                    (value) =>
-                      value + 1,
-                  )
-                }
-                className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        ) : null}
+          )}
+        </div>
       </div>
+
+      {contextMenu && (
+        <div
+          className="fixed z-[100] min-w-[180px] rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+            onClick={() => void copyContextId()}
+          >
+            <Clipboard className="h-4 w-4 text-blue-500" />
+            Copy User ID
+          </button>
+        </div>
+      )}
     </DashboardLayout>
   )
 }
