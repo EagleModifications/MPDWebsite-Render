@@ -428,15 +428,9 @@ export default function PromotionRoster() {
           profileError,
         )
 
-        // Keep the dropdown useful even if Discord profile lookup fails.
-        setDiscordProfiles((current) => ({
-          ...current,
-          [discordId]: {
-            id: discordId,
-            username: "",
-            displayName: "",
-          },
-        }))
+        // Do not cache a failed lookup as an empty profile.
+        // That would permanently make this user show "Username unavailable"
+        // until the page was reloaded. A later hover/click should retry.
       } finally {
         setDiscordProfileLoading((current) => ({
           ...current,
