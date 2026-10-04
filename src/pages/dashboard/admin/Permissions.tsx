@@ -15,6 +15,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Search,
   Shield,
   Trash2,
   Users,
@@ -301,6 +302,7 @@ export default function Permissions() {
     { type: "permission" | "rank" | "discord"; label: string; id: string } | null
   >(null)
   const [contextMenu, setContextMenu] = useState<{ discordId: string; x: number; y: number } | null>(null)
+  const [permissionSearch, setPermissionSearch] = useState("")
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -341,6 +343,32 @@ export default function Permissions() {
       ),
     [permissions],
   )
+
+  const filteredPermissions = useMemo(() => {
+    const query = permissionSearch.trim().toLowerCase()
+
+    if (!query) {
+      return permissions
+    }
+
+    return permissions.filter((permission) =>
+      [permission.name, permission.key, permission.description].some((value) =>
+        value.toLowerCase().includes(query),
+      ),
+    )
+  }, [permissions, permissionSearch])
+
+  const filteredPermissionKeys = useMemo(
+    () => filteredPermissions.map((permission) => permission.key),
+    [filteredPermissions],
+  )
+
+  function permissionDisplayName(permissionKey: string) {
+    return (
+      permissions.find((permission) => permission.key === permissionKey)?.name ||
+      permissionKey
+    )
+  }
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -445,6 +473,7 @@ export default function Permissions() {
   function closeModal() {
     setModalKind(null)
     setModalMode("create")
+    setPermissionSearch("")
 
     setPermissionDraft({
       ...emptyPermission,
@@ -521,6 +550,7 @@ export default function Permissions() {
   }
 
   function openCreateRank() {
+    setPermissionSearch("")
     setModalKind("rank")
     setModalMode("create")
     setEditingRankName(null)
@@ -533,6 +563,7 @@ export default function Permissions() {
   }
 
   function openEditRank(rank: Rank) {
+    setPermissionSearch("")
     setModalKind("rank")
     setModalMode("edit")
     setEditingRankName(rank.rank)
@@ -544,7 +575,35 @@ export default function Permissions() {
     })
   }
 
+  function duplicateRank(rank: Rank) {
+    setPermissionSearch("")
+    const existingRanks = new Set(
+      ranks.map((item) => item.rank.trim().toLowerCase()),
+    )
+
+    const baseRank = `${rank.rank.trim()} Copy`
+    let duplicateRankName = baseRank
+    let number = 2
+
+    while (existingRanks.has(duplicateRankName.toLowerCase())) {
+      duplicateRankName = `${baseRank} ${number}`
+      number += 1
+    }
+
+    setModalKind("rank")
+    setModalMode("create")
+    setEditingRankName(null)
+    setRankDraft({
+      rank: duplicateRankName,
+      permissions: [...rank.permissions],
+      isAdminRank: false,
+    })
+
+    toast.success(`Prepared a copy as ${duplicateRankName}.`)
+  }
+
   function openCreateDiscord() {
+    setPermissionSearch("")
     setModalKind("discord")
     setModalMode("create")
 
@@ -563,6 +622,7 @@ export default function Permissions() {
       return
     }
 
+    setPermissionSearch("")
     setModalKind("discord")
     setModalMode("edit")
 
@@ -571,6 +631,26 @@ export default function Permissions() {
       permissions: [...entry.permissions],
       isSuperAdmin: false,
     })
+  }
+
+  function duplicateDiscord(entry: DiscordPermission) {
+    if (entry.isSuperAdmin) {
+      toast.error(
+        "Super Admin Discord IDs cannot be duplicated here because they are controlled by config/admin_permissions.json.",
+      )
+      return
+    }
+
+    setPermissionSearch("")
+    setModalKind("discord")
+    setModalMode("create")
+    setDiscordDraft({
+      discordId: "",
+      permissions: [...entry.permissions],
+      isSuperAdmin: false,
+    })
+
+    toast.success("Prepared a copy. Enter the new Discord user ID.")
   }
 
   function togglePermissionExpanded(key: string) {
@@ -1163,8 +1243,8 @@ export default function Permissions() {
                         type="button"
                         variant="outline"
                         className="shrink-0"
-                        onClick={() => void copyText(rank.rank, "Rank") }
-                        aria-label={`Copy ${rank.rank}`}
+                        onClick={() => duplicateRank(rank)}
+                        aria-label={`Duplicate ${rank.rank}`}
                       >
                         <Copy className="mr-2 h-4 w-4" />
                         Copy
@@ -1206,7 +1286,7 @@ export default function Permissions() {
                                 className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs"
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" />
-                                {permission}
+                                {permissionDisplayName(permission)}
                               </span>
                             ))}
                           </div>
@@ -1266,9 +1346,23 @@ export default function Permissions() {
                         <span
                           className="truncate text-sm font-semibold text-blue-400"
                           title={`${discordDisplayName(entry.discordId)} (${entry.discordId})`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            const rect = event.currentTarget.getBoundingClientRect()
+                            setContextMenu({
+                              discordId: entry.discordId,
+                              x: rect.left,
+                              y: rect.bottom + 6,
+                            })
+                          }}
                           onContextMenu={(event) => {
                             event.preventDefault()
-                            setContextMenu({ discordId: entry.discordId, x: event.clientX, y: event.clientY })
+                            event.stopPropagation()
+                            setContextMenu({
+                              discordId: entry.discordId,
+                              x: event.clientX,
+                              y: event.clientY,
+                            })
                           }}
                         >
                           {discordDisplayName(entry.discordId)} ({entry.discordId})
@@ -1297,8 +1391,8 @@ export default function Permissions() {
                             type="button"
                             variant="outline"
                             className="shrink-0"
-                            onClick={() => void copyText(entry.discordId, "Discord ID")}
-                            aria-label={`Copy Discord ID ${entry.discordId}`}
+                            onClick={() => duplicateDiscord(entry)}
+                            aria-label={`Duplicate ${entry.discordId}`}
                           >
                             <Copy className="mr-2 h-4 w-4" />
                             Copy
@@ -1336,7 +1430,7 @@ export default function Permissions() {
                                 className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs"
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" />
-                                {permission}
+                                {permissionDisplayName(permission)}
                               </span>
                             ))}
                           </div>
@@ -1399,13 +1493,13 @@ export default function Permissions() {
 
       {contextMenu ? (
         <div
-          className="fixed z-[100] min-w-44 rounded-xl border border-border bg-card p-1.5 shadow-2xl"
+          className="fixed z-[100] min-w-52 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-2xl"
           style={{ left: Math.min(contextMenu.x, window.innerWidth - 190), top: Math.min(contextMenu.y, window.innerHeight - 70) }}
           onClick={(event) => event.stopPropagation()}
         >
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted"
             onClick={() => {
               void copyText(contextMenu.discordId, "Discord ID")
               setContextMenu(null)
@@ -1669,8 +1763,23 @@ export default function Permissions() {
                 Create a Web Permission first.
               </div>
             ) : (
-              <div className="max-h-80 overflow-y-auto rounded-lg border border-border">
-                {permissionKeys.map((permissionKey) => {
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={permissionSearch}
+                    onChange={(event) => setPermissionSearch(event.target.value)}
+                    placeholder="Search permissions..."
+                    className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="max-h-80 overflow-y-auto rounded-lg border border-border">
+                {filteredPermissionKeys.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    No permissions match your search.
+                  </div>
+                ) : filteredPermissionKeys.map((permissionKey) => {
                   const checked =
                     rankDraft.permissions.includes(permissionKey)
 
@@ -1691,12 +1800,13 @@ export default function Permissions() {
                         className="h-4 w-4 accent-blue-500"
                       />
 
-                      <span className="font-mono text-sm">
-                        {permissionKey}
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                        {permissionDisplayName(permissionKey)}
                       </span>
                     </label>
                   )
                 })}
+                </div>
               </div>
             )}
           </div>
@@ -1780,8 +1890,23 @@ export default function Permissions() {
                 Create a Web Permission first.
               </div>
             ) : (
-              <div className="max-h-80 overflow-y-auto rounded-lg border border-border">
-                {permissionKeys.map((permissionKey) => {
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={permissionSearch}
+                    onChange={(event) => setPermissionSearch(event.target.value)}
+                    placeholder="Search permissions..."
+                    className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="max-h-80 overflow-y-auto rounded-lg border border-border">
+                {filteredPermissionKeys.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    No permissions match your search.
+                  </div>
+                ) : filteredPermissionKeys.map((permissionKey) => {
                   const checked =
                     discordDraft.permissions.includes(permissionKey)
 
@@ -1802,12 +1927,13 @@ export default function Permissions() {
                         className="h-4 w-4 accent-blue-500"
                       />
 
-                      <span className="font-mono text-sm">
-                        {permissionKey}
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                        {permissionDisplayName(permissionKey)}
                       </span>
                     </label>
                   )
                 })}
+                </div>
               </div>
             )}
           </div>
