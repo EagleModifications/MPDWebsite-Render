@@ -6,7 +6,11 @@ import { useMemo, useState } from "react"
 import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
 
-type TabId = "global-sops"
+type TabId =
+  | "global-sop"
+  | "global-jurisdictions"
+  | "global-penalcodes-speedlimits"
+  | "global-disciplinary-guidelines"
 
 type Tab = {
   id: TabId
@@ -28,11 +32,65 @@ const tabs: Tab[] = [
     icon: FileText,
     url: "https://docs.google.com/document/d/1LrIAof7fOQXfQxzRZb4uB0jkLG4aS2ITLAaLvM21r18/preview",
   },
+  {
+    id: "global-penalcodes-speedlimits",
+    label: "Global Penal Codes & Speed Limits",
+    icon: FileText,
+    url: "https://docs.google.com/spreadsheets/d/1GC2rhvQa-xnCm1a4WLg3PWXzUwvfwI8Kt-XT4nxKT30/preview",
+  },
+  {
+    id: "global-disciplinary-guidelines",
+    label: "Global Disciplinary Guidelines",
+    icon: FileText,
+    url: "https://docs.google.com/spreadsheets/d/13LWYmyd-hvy_RgTg17wiq3PHU7KmAkuzLGuTk1CPWoI/preview",
+  },
 ]
+
+function getEmbedUrl(url: string) {
+  if (url.includes("docs.google.com/document/")) {
+    const match = url.match(
+      /\/document\/d\/([^/]+)/,
+    )
+
+    if (!match) {
+      return url
+    }
+
+    return `https://docs.google.com/document/d/${match[1]}/preview`
+  }
+
+  if (url.includes("docs.google.com/spreadsheets/")) {
+    const match = url.match(
+      /\/spreadsheets\/d\/([^/]+)/,
+    )
+
+    if (!match) {
+      return url
+    }
+
+    const sheetId = match[1]
+
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/preview`
+  }
+
+  return url
+}
+
+function getDocumentType(url: string) {
+  if (url.includes("spreadsheets")) {
+    return "Google Sheets"
+  }
+
+  if (url.includes("document")) {
+    return "Google Docs"
+  }
+
+  return "Document"
+}
 
 export default function SOPs() {
   const [activeTab, setActiveTab] =
-    useState<TabId>("global-sops")
+    useState<TabId>("global-sop")
 
   const activeTabData = useMemo(
     () =>
@@ -43,6 +101,15 @@ export default function SOPs() {
   )
 
   const ActiveIcon = activeTabData.icon
+
+  const embedUrl = useMemo(
+    () => getEmbedUrl(activeTabData.url),
+    [activeTabData.url],
+  )
+
+  const documentType = getDocumentType(
+    activeTabData.url,
+  )
 
   function changeTab(tab: TabId) {
     setActiveTab(tab)
@@ -103,7 +170,7 @@ export default function SOPs() {
             </div>
           </div>
 
-          {/* Google Doc */}
+          {/* Google Document / Sheet */}
           <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
             {/* Document header */}
             <div className="flex items-center gap-3 border-b border-border/70 px-4 py-3.5 sm:px-5">
@@ -117,16 +184,16 @@ export default function SOPs() {
                 </h2>
 
                 <p className="text-xs text-muted-foreground">
-                  Google Docs
+                  {documentType}
                 </p>
               </div>
             </div>
 
-            {/* Embedded document */}
+            {/* Embedded document / sheet */}
             <div className="w-full overflow-hidden bg-background">
               <iframe
-                key={activeTabData.url}
-                src={activeTabData.url}
+                key={embedUrl}
+                src={embedUrl}
                 title={activeTabData.label}
                 className="block h-[800px] w-full border-0"
                 loading="lazy"
