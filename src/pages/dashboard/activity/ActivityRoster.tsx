@@ -14,6 +14,7 @@ import {
   Clock3,
   Copy,
   Filter,
+  ListPlus,
   Search,
   Shield,
   Users,
@@ -23,6 +24,7 @@ import {
 import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
+import RosterListDialog from "@/components/dashboard/RosterListDialog"
 import GoogleRosterRefresh from "@/components/dashboard/GoogleRosterRefresh"
 import { logAction } from "@/lib/actionLog"
 import { Button } from "@/components/ui/button"
@@ -252,6 +254,9 @@ export default function ActivityRoster() {
     useState<string[]>([])
 
   const [selectedCopied, setSelectedCopied] =
+    useState(false)
+
+  const [rosterListOpen, setRosterListOpen] =
     useState(false)
 
   /*
@@ -1448,6 +1453,21 @@ export default function ActivityRoster() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Activity List */}
+
+            {selectedIds.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => setRosterListOpen(true)}
+              >
+                <ListPlus className="h-4 w-4 text-blue-500" />
+                Activity List
+              </Button>
+            )}
+
             {/* Selected Copy Actions */}
 
             {selectedIds.length > 0 && (
@@ -2169,6 +2189,15 @@ export default function ActivityRoster() {
           )}
         </div>
       </div>
+
+      <RosterListDialog
+        open={rosterListOpen}
+        onClose={() => setRosterListOpen(false)}
+        module="activity"
+        division={division}
+        members={members}
+        initialSelectedIds={selectedIds}
+      />
     </DashboardLayout>
   )
 }
