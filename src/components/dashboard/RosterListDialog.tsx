@@ -153,6 +153,20 @@ export default function RosterListDialog({
   }
 
   useEffect(() => {
+    if (!open) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        onClose()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [open, onClose])
+
+  useEffect(() => {
     if (open) {
       setSelected(initialSelectedIds)
       setSearch("")
