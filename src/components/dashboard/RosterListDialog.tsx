@@ -247,13 +247,12 @@ export default function RosterListDialog({
     const sections: string[] = [ACTIVITY_HEADER, ACTIVITY_TITLE, ACTIVITY_INTRO, DIVIDER]
 
     for (const strike of [1, 2, 3]) {
-      sections.push(`**${strikeLabel(strike)}**`)
       const strikeMembers = previewMembers.filter((item) => item.strike === strike)
-      sections.push(
-        strikeMembers.length
-          ? strikeMembers.map(({ member }) => `• <@${member.discordId}>`).join("\n")
-          : "• None",
-      )
+      if (!strikeMembers.length) continue
+
+      sections.push(`**${strikeLabel(strike)}**`)
+      sections.push(strikeMembers.map(({ member }) => `• <@${member.discordId}>`).join("\n"))
+      sections.push("")
       sections.push(DIVIDER)
     }
 
@@ -516,7 +515,6 @@ export default function RosterListDialog({
                   <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
                     {previousWeeks.map((item) => {
                       const isGlobal = item.scope === "global"
-                      const isUser = item.scope === "user"
                       const isEffective = scope === "global" ? isGlobal : item.id === effectivePrevious?.id
                       return (
                         <div key={item.id} className={`rounded-xl border p-3 transition-colors ${isEffective ? "border-blue-500/30 bg-blue-500/5" : "bg-muted/5"}`}>
@@ -561,10 +559,12 @@ export default function RosterListDialog({
                     <p>{DIVIDER}</p>
                     {[1, 2, 3].map((strike) => {
                       const group = previewMembers.filter((item) => item.strike === strike)
+                      if (!group.length) return null
                       return (
                         <div key={strike} className="mt-2">
                           <p className="font-semibold">{strikeLabel(strike)}</p>
-                          {group.length ? group.map(({ member }) => <p key={member.discordId}>• {member.name || "Unknown"}</p>) : <p>• None</p>}
+                          {group.map(({ member }) => <p key={member.discordId}>• {member.name || "Unknown"}</p>)}
+                          <p className="h-5" aria-hidden="true" />
                           <p>{DIVIDER}</p>
                         </div>
                       )
