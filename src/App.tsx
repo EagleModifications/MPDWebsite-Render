@@ -1,9 +1,15 @@
-import { useEffect } from "react"
+import {
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react"
 
 import {
   BrowserRouter,
+  Navigate,
   Route,
   Routes,
+  useLocation,
 } from "react-router-dom"
 
 import {
@@ -162,6 +168,122 @@ function useSiteProtection() {
 }
 
 /* =========================================================
+   PAGE PERMISSION PROTECTION
+========================================================= */
+
+type PageProtectionState =
+  | "checking"
+  | "allowed"
+  | "unauthenticated"
+  | "forbidden"
+  | "error"
+
+function PageProtection({
+  children,
+}: {
+  children: ReactNode
+}) {
+  const location = useLocation()
+  const [state, setState] = useState<PageProtectionState>("checking")
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function checkPageAccess() {
+      setState("checking")
+
+      try {
+        const url =
+          `${location.pathname}${location.search}`
+
+        const response = await fetch(
+          `/api/auth/check?url=${encodeURIComponent(url)}`,
+          {
+            credentials: "include",
+            cache: "no-store",
+          },
+        )
+
+        if (cancelled) return
+
+        if (response.status === 401) {
+          setState("unauthenticated")
+          return
+        }
+
+        if (response.status === 403) {
+          setState("forbidden")
+          return
+        }
+
+        if (!response.ok) {
+          setState("error")
+          return
+        }
+
+        setState("allowed")
+      } catch {
+        if (!cancelled) {
+          setState("error")
+        }
+      }
+    }
+
+    void checkPageAccess()
+
+    return () => {
+      cancelled = true
+    }
+  }, [location.pathname, location.search])
+
+  if (state === "checking") {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-blue-500" />
+          <p className="text-sm text-muted-foreground">
+            Checking access...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (state === "unauthenticated") {
+    return (
+      <Navigate
+        to="/sign-in"
+        replace
+        state={{
+          from: `${location.pathname}${location.search}`,
+        }}
+      />
+    )
+  }
+
+  if (state === "forbidden") {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  if (state === "error") {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-6">
+        <div className="max-w-md text-center">
+          <h1 className="text-xl font-semibold">
+            Unable to verify access
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Please refresh the page and try again.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return <>{children}</>
+}
+
+/* =========================================================
    APP
 ========================================================= */
 
@@ -170,7 +292,8 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
+      <PageProtection>
+        <Routes>
         {/* =================================================
             PUBLIC
         ================================================= */}
@@ -466,7 +589,8 @@ export default function App() {
           path="*"
           element={<NotFound />}
         />
-      </Routes>
+        </Routes>
+      </PageProtection>
 
       {/* ===================================================
           GLOBAL NOTIFICATIONS
