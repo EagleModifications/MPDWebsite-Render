@@ -99,6 +99,7 @@ type GalleryMedia = {
   thumbnailUrl: string
   source: "upload" | "url"
   storageId?: string
+  fallbackUrl?: string
 }
 
 type GalleryCategory = "Community" | "Fleet"
@@ -430,16 +431,7 @@ function CustomMultiSelect({
 }
 
 function getGalleryMediaUrl(media: GalleryMedia) {
-  if (media.storageId) {
-    return `/api/gallery/file/${encodeURIComponent(media.storageId)}`
-  }
-
   return media.url
-}
-
-function getGalleryMediaFallbackUrl(media: GalleryMedia) {
-  if (!media.storageId) return undefined
-  return `/api/gallery/file/${encodeURIComponent(media.storageId)}`
 }
 
 function getYouTubeVideoId(value: string) {
@@ -559,65 +551,6 @@ function isEmbeddableVideo(media: GalleryMedia) {
 function getMediaThumbnail(media: GalleryMedia) {
   if (media.thumbnailUrl) return media.thumbnailUrl
   return getYouTubeThumbnail(media.url)
-}
-
-function GalleryImage({
-  src,
-  fallbackSrc,
-  alt,
-  className,
-  onLoad,
-}: {
-  src: string
-  fallbackSrc?: string
-  alt: string
-  className: string
-  onLoad?: (event: SyntheticEvent<HTMLImageElement>) => void
-}) {
-  const [currentSrc, setCurrentSrc] = useState(src)
-  const [failed, setFailed] = useState(!src)
-
-  useEffect(() => {
-    setCurrentSrc(src)
-    setFailed(!src)
-  }, [src, fallbackSrc])
-
-  if (failed) {
-    return (
-      <div
-        role="img"
-        aria-label={alt || "Image unavailable"}
-        className={[
-          className,
-          "flex items-center justify-center bg-muted/70 text-muted-foreground",
-        ].join(" ")}
-      >
-        <span className="flex flex-col items-center gap-1.5 text-center">
-          <ImageIcon className="h-5 w-5 opacity-50" />
-          <span className="px-3 text-[10px] font-medium opacity-70">
-            Image unavailable
-          </span>
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <img
-      src={currentSrc}
-      alt={alt}
-      className={className}
-      onLoad={onLoad}
-      onError={() => {
-        if (fallbackSrc && currentSrc !== fallbackSrc) {
-          setCurrentSrc(fallbackSrc)
-          return
-        }
-
-        setFailed(true)
-      }}
-    />
-  )
 }
 
 function getMediaLabel(type: GalleryMediaType) {
@@ -2635,15 +2568,14 @@ export default function Gallery() {
                           >
                             <div className="aspect-square">
                               {media.type === "image" ? (
-                                <GalleryImage
-                                  src={media.previewUrl || getGalleryMediaUrl(media)}
-                                  fallbackSrc={getGalleryMediaFallbackUrl(media)}
+                                <img
+                                  src={media.previewUrl || media.url}
                                   alt=""
                                   className="h-full w-full object-cover"
                                 />
                               ) : getMediaThumbnail(media) ? (
                                 <div className="relative h-full w-full">
-                                  <GalleryImage
+                                  <img
                                     src={getMediaThumbnail(media)}
                                     alt=""
                                     className="h-full w-full object-cover"
@@ -2659,7 +2591,7 @@ export default function Gallery() {
                                 />
                               ) : (
                                 <video
-                                  src={media.previewUrl || getGalleryMediaUrl(media)}
+                                  src={media.previewUrl || media.url}
                                   autoPlay
                                   muted
                                   loop
@@ -2828,8 +2760,8 @@ export default function Gallery() {
                   if (currentMedia.type === "image") {
                     return (
                       <GalleryImage
-                        src={getGalleryMediaUrl(currentMedia)}
-                        fallbackSrc={getGalleryMediaFallbackUrl(currentMedia)}
+                        src={currentMedia.url}
+                        fallbackSrc={currentMedia.fallbackUrl}
                         alt={viewer.item.title}
                         className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
                       />
@@ -3494,6 +3426,58 @@ function YouTubeGalleryPreview({
   )
 }
 
+function GalleryImage({
+  src,
+  fallbackSrc,
+  alt,
+  className,
+  onLoad,
+}: {
+  src: string
+  fallbackSrc?: string
+  alt: string
+  className?: string
+  onLoad?: (event: SyntheticEvent<HTMLImageElement>) => void
+}) {
+  const [currentSrc, setCurrentSrc] = useState(src)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setCurrentSrc(src)
+    setFailed(false)
+  }, [src])
+
+  function handleError() {
+    if (fallbackSrc && currentSrc !== fallbackSrc) {
+      setCurrentSrc(fallbackSrc)
+      return
+    }
+
+    setFailed(true)
+  }
+
+  if (failed || !currentSrc) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-muted/30">
+        <div className="text-center text-muted-foreground">
+          <ImageIcon className="mx-auto h-6 w-6 opacity-50" />
+          <span className="mt-1 block text-[10px]">Image unavailable</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      className={className}
+      onLoad={onLoad}
+      onError={handleError}
+    />
+  )
+}
+
 function GalleryMediaCard({
   media,
   title,
@@ -3523,8 +3507,8 @@ function GalleryMediaCard({
         />
       ) : media.type === "image" ? (
         <GalleryImage
-          src={getGalleryMediaUrl(media)}
-          fallbackSrc={getGalleryMediaFallbackUrl(media)}
+          src={media.url}
+          fallbackSrc={media.fallbackUrl}
           alt={title}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           onLoad={(event) => {
@@ -3536,7 +3520,7 @@ function GalleryMediaCard({
         />
       ) : getMediaThumbnail(media) ? (
         <div className="relative h-full w-full">
-          <GalleryImage
+          <img
             src={getMediaThumbnail(media)}
             alt={title}
             className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
@@ -3558,7 +3542,7 @@ function GalleryMediaCard({
         />
       ) : (
         <video
-          src={getGalleryMediaUrl(media)}
+          src={media.url}
           autoPlay
           muted
           loop
