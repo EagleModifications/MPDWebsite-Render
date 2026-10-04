@@ -1496,29 +1496,13 @@ export default function Gallery() {
                           key={item.id}
                           className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"
                         >
-                          <div className="grid gap-1">
-                            {mediaList.map(
-                              (media) => (
-                                <GalleryMediaCard
-                                  key={
-                                    media.id
-                                  }
-                                  media={
-                                    media
-                                  }
-                                  title={
-                                    item.title
-                                  }
-                                  onClick={() =>
-                                    openViewer(
-                                      item,
-                                      media,
-                                    )
-                                  }
-                                />
-                              ),
-                            )}
-                          </div>
+                          <GalleryMediaCollage
+                            media={mediaList}
+                            title={item.title}
+                            onClick={(media) =>
+                              openViewer(item, media)
+                            }
+                          />
 
                           <div className="border-t border-border/70 p-3">
                             <div className="relative">
@@ -2624,13 +2608,41 @@ function qualityLabel(value: string) {
 
 function useDocumentCursorFix(enabled: boolean) {
   useEffect(() => {
-    if (!enabled) return
-    const previous = document.documentElement.style.cursor
-    document.documentElement.style.cursor = "default"
+    const root = document.documentElement
+    const styleId = "gallery-video-fullscreen-cursor"
+    const existingStyle = document.getElementById(styleId)
+
+    if (!enabled) {
+      root.classList.remove("gallery-video-fullscreen")
+      existingStyle?.remove()
+      return
+    }
+
+    root.classList.add("gallery-video-fullscreen")
+    const previousHtmlCursor = root.style.cursor
+    const previousBodyCursor = document.body.style.cursor
+    root.style.cursor = "default"
     document.body.style.cursor = "default"
+
+    if (!existingStyle) {
+      const style = document.createElement("style")
+      style.id = styleId
+      style.textContent = `
+        html.gallery-video-fullscreen,
+        html.gallery-video-fullscreen *,
+        :fullscreen,
+        :fullscreen * {
+          cursor: default !important;
+        }
+      `
+      document.head.appendChild(style)
+    }
+
     return () => {
-      document.documentElement.style.cursor = previous
-      document.body.style.cursor = ""
+      root.classList.remove("gallery-video-fullscreen")
+      root.style.cursor = previousHtmlCursor
+      document.body.style.cursor = previousBodyCursor
+      document.getElementById(styleId)?.remove()
     }
   }, [enabled])
 }
@@ -2924,6 +2936,7 @@ function CustomYouTubePlayer({
         videoId,
         playerVars: {
           autoplay: 1,
+          mute: 1,
           controls: 0,
           disablekb: 1,
           fs: 0,
@@ -2935,14 +2948,21 @@ function CustomYouTubePlayer({
         events: {
           onReady: (event) => {
             playerRef.current = event.target
+            // Start muted so browser autoplay is allowed, then immediately attempt to restore audio.
             event.target.setVolume(100)
-            event.target.unMute()
-            setMuted(false)
+            event.target.mute()
+            setMuted(true)
             setVolume(1)
             setDuration(event.target.getDuration() || 0)
             setQualities(event.target.getAvailableQualityLevels?.() || [])
             event.target.setPlaybackRate(1)
             event.target.playVideo()
+            window.setTimeout(() => {
+              try {
+                event.target.unMute()
+                setMuted(false)
+              } catch {}
+            }, 50)
           },
           onStateChange: (event) => {
             const state = event.data
@@ -2968,6 +2988,8 @@ function CustomYouTubePlayer({
       if (!player) return
       setCurrentTime(player.getCurrentTime?.() || 0)
       setDuration(player.getDuration?.() || 0)
+      const available = player.getAvailableQualityLevels?.() || []
+      if (available.length) setQualities(available)
     }, 250)
     return () => window.clearInterval(timer)
   }, [])
@@ -3056,6 +3078,100 @@ function CustomYouTubePlayer({
   )
 }
 
+function GalleryMediaCollage({
+  media,
+  title,
+  onClick,
+}: {
+  media: GalleryMedia[]
+  title: string
+  onClick: (media: GalleryMedia) => void
+}) {
+  const visible = media.slice(0, 4)
+  const extraCount = Math.max(0, media.length - 3)
+
+  if (visible.length === 0) return null
+
+  if (visible.length === 1) {
+    return (
+      <div className="grid gap-1">
+        <GalleryMediaCard
+          media={visible[0]}
+          title={title}
+          onClick={() => onClick(visible[0])}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-1">
+      <div className="min-w-0">
+        <GalleryMediaCard
+          media={visible[0]}
+          title={title}
+          onClick={() => onClick(visible[0])}
+        />
+      </div>
+      <div className="min-w-0">
+        <GalleryMediaCard
+          media={visible[1]}
+          title={title}
+          onClick={() => onClick(visible[1])}
+        />
+      </div>
+      <div className="col-span-2 min-w-0">
+        {visible.length >= 3 && (
+          <div className={visible.length >= 4 ? "grid grid-cols-2 gap-1" : ""}>
+            <GalleryMediaCard
+              media={visible[2]}
+              title={title}
+              onClick={() => onClick(visible[2])}
+            />
+            {visible.length >= 4 && (
+              <div className="group relative min-w-0">
+                <GalleryMediaCard
+                  media={visible[3]}
+                  title={title}
+                  onClick={() => onClick(visible[3])}
+                />
+                <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center text-white">
+                  <Images className="h-7 w-7" />
+                  <span className="mt-1 text-sm font-semibold">
+                    +{extraCount} {extraCount === 1 ? "image/video" : "images/videos"}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function YouTubeGalleryPreview({
+  videoId,
+  title,
+}: {
+  videoId: string
+  title: string
+}) {
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-black">
+      <iframe
+        src={`https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&mute=1&controls=0&disablekb=1&fs=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&enablejsapi=1`}
+        title={title}
+        tabIndex={-1}
+        className="pointer-events-none absolute inset-0 h-full w-full border-0"
+        allow="autoplay; encrypted-media; picture-in-picture"
+      />
+      <div className="pointer-events-none absolute inset-0" />
+    </div>
+  )
+}
+
 function GalleryMediaCard({
   media,
   title,
@@ -3078,7 +3194,12 @@ function GalleryMediaCard({
       onClick={onClick}
       aria-label={`View ${title}`}
     >
-      {media.type === "image" ? (
+      {getYouTubeVideoId(media.url) ? (
+        <YouTubeGalleryPreview
+          videoId={getYouTubeVideoId(media.url) || ""}
+          title={title}
+        />
+      ) : media.type === "image" ? (
         <img
           src={media.url}
           alt={title}
@@ -3103,7 +3224,6 @@ function GalleryMediaCard({
               }
             }}
           />
-
         </div>
       ) : isEmbeddableVideo(media) ? (
         <iframe
@@ -3111,8 +3231,7 @@ function GalleryMediaCard({
           title={title}
           tabIndex={-1}
           className="pointer-events-none h-full w-full border-0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
+          allow="autoplay; encrypted-media; picture-in-picture"
         />
       ) : (
         <video
