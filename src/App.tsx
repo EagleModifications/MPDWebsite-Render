@@ -31,6 +31,7 @@ import FTDRoster from "@/pages/documents/FTDRoster"
 import MetroSOP from "@/pages/documents/MetroSOP"
 import SWATSOP from "@/pages/documents/SWATSOP"
 import MCDSOP from "@/pages/documents/MCDSOP"
+import TRUSOP from "@/pages/documents/TRUSOP"
 import GlobalSOP from "@/pages/documents/GlobalSOP"
 
 import Dashboard from "@/pages/dashboard/Dashboard"
@@ -238,6 +239,11 @@ export default function App() {
         <Route
           path="/documents/sops/mcd-sops"
           element={<MCDSOP />}
+        />
+
+        <Route
+          path="/documents/sops/tru-sops"
+          element={<TRUSOP />}
         />
 
         <Route
