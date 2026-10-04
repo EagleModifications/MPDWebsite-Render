@@ -149,15 +149,6 @@ function truthy(value: unknown): boolean {
   return ["true", "yes", "y", "1", "on", "active"].includes(normalize(value))
 }
 
-function headerIndex(headers: string[], aliases: readonly string[]): number {
-  const normalizedHeaders = headers.map(normalize)
-  for (const alias of aliases) {
-    const index = normalizedHeaders.indexOf(normalize(alias))
-    if (index !== -1) return index
-  }
-  return -1
-}
-
 function uniqueInSheetOrder(values: string[]): string[] {
   const seen = new Set<string>()
   const result: string[] = []
