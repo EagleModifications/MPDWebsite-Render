@@ -521,7 +521,7 @@ export default function Navbar() {
             >
               <Link to="/sign-in">
                 <LogIn className="h-4 w-4" />
-                Log In
+                Sign In
               </Link>
             </Button>
           )}
