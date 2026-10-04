@@ -6,11 +6,7 @@ import { useMemo, useState } from "react"
 import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
 
-type TabId =
-  | "metro-sop"
-  | "metro-jurisdictions"
-  | "metro-penalcodes-speedlimits"
-  | "metro-disciplinary-guidelines"
+type TabId = "metro-sop"
 
 type Tab = {
   id: TabId
