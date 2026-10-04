@@ -7,7 +7,6 @@ import os from "node:os"
 import XLSX from "xlsx"
 
 import { syncGoogleRosters } from "./googleRosterSync"
-import { registerMainRosterRoutes } from "./googleMainRoster"
 
 import {
   authenticateDiscordCode,
@@ -399,6 +398,43 @@ const GALLERY_CATEGORIES = [
   "Fleet",
 ] as const
 
+const GALLERY_TAGS = [
+  "Dept",
+  "SWAT",
+  "MTF-7",
+  "MCD",
+  "TRU",
+  "SAR",
+] as const
+
+type GalleryTag =
+  (typeof GALLERY_TAGS)[number]
+
+function isGalleryTag(
+  value: unknown,
+): value is GalleryTag {
+  return (
+    typeof value === "string" &&
+    GALLERY_TAGS.includes(
+      value as GalleryTag,
+    )
+  )
+}
+
+function normalizeGalleryTags(
+  value: unknown,
+): GalleryTag[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return Array.from(
+    new Set(
+      value.filter(isGalleryTag),
+    ),
+  )
+}
+
 type GalleryCategory =
   (typeof GALLERY_CATEGORIES)[number]
 
@@ -428,6 +464,7 @@ type GalleryDocument = {
   description: string
   media: GalleryMedia[]
   category?: GalleryCategory
+  tags?: GalleryTag[]
   createdBy: string
   createdAt: Date
   updatedAt: Date
@@ -590,6 +627,7 @@ function serializeGalleryItem(
     title: item.title,
     description: item.description,
     category: item.category ?? "Community",
+    tags: normalizeGalleryTags(item.tags),
     media: getGalleryMedia(item).map((media) => ({
       ...media,
       url: getGalleryPublicMediaUrl(media),
@@ -4259,9 +4297,6 @@ export function createApp() {
   app.use(express.json())
   app.use(cookieParser())
 
-  // Main Roster Google Sheets API
-  registerMainRosterRoutes(app)
-
   app.get("/health", (_req, res) => {
     res.status(200).json({
       ok: true,
@@ -6073,6 +6108,36 @@ export function createApp() {
             ? requestedCategory
             : "Community"
 
+        const requestedTags =
+          req.body?.tags
+
+        if (
+          requestedTags !== undefined &&
+          !Array.isArray(requestedTags)
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: "Gallery tags must be an array.",
+          })
+        }
+
+        const tags = normalizeGalleryTags(
+          requestedTags,
+        )
+
+        if (
+          Array.isArray(requestedTags) &&
+          requestedTags.some(
+            (tag) => !isGalleryTag(tag),
+          )
+        ) {
+          return res.status(400).json({
+            success: false,
+            error:
+              "Gallery tags must be Dept, SWAT, MTF-7, MCD, TRU, or SAR.",
+          })
+        }
+
         const rawMedia = req.body?.media
 
         if (rawMedia !== undefined && !Array.isArray(rawMedia)) {
@@ -6174,6 +6239,7 @@ export function createApp() {
           title,
           description,
           category,
+          tags,
           media,
           createdBy: userId,
           createdAt: now,
@@ -6292,6 +6358,32 @@ export function createApp() {
         const requestedCategory =
           req.body?.category
 
+        const requestedTags =
+          req.body?.tags
+
+        if (
+          requestedTags !== undefined &&
+          !Array.isArray(requestedTags)
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: "Gallery tags must be an array.",
+          })
+        }
+
+        if (
+          Array.isArray(requestedTags) &&
+          requestedTags.some(
+            (tag) => !isGalleryTag(tag),
+          )
+        ) {
+          return res.status(400).json({
+            success: false,
+            error:
+              "Gallery tags must be Dept, SWAT, MTF-7, MCD, TRU, or SAR.",
+          })
+        }
+
         if (!title) {
           return res.status(400).json({
             success: false,
@@ -6327,6 +6419,11 @@ export function createApp() {
           )
             ? requestedCategory
             : existing.category ?? "Community"
+
+        const tags =
+          requestedTags === undefined
+            ? normalizeGalleryTags(existing.tags)
+            : normalizeGalleryTags(requestedTags)
 
         const rawMedia = req.body?.media
 
@@ -6441,6 +6538,7 @@ export function createApp() {
               title,
               description,
               category,
+              tags,
               media,
               updatedAt:
                 new Date(),
