@@ -7,6 +7,7 @@ import os from "node:os"
 import XLSX from "xlsx"
 
 import { syncGoogleRosters } from "./googleRosterSync"
+import { registerMainRosterRoutes } from "./googleMainRoster"
 
 import {
   authenticateDiscordCode,
@@ -4257,6 +4258,9 @@ export function createApp() {
 
   app.use(express.json())
   app.use(cookieParser())
+
+  // Main Roster Google Sheets API
+  registerMainRosterRoutes(app)
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
