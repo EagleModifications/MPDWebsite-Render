@@ -150,16 +150,6 @@ export default function Permissions() {
     })
   }, [permissions, protectedUrls])
 
-  const protectedPermissionKeys = useMemo(
-    () =>
-      new Set(
-        protectedUrlStatuses
-          .map((item) => item.permissionKey)
-          .filter((key): key is string => Boolean(key)),
-      ),
-    [protectedUrlStatuses],
-  )
-
   async function load() {
     try {
       setIsLoading(true)
