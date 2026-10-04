@@ -101,12 +101,14 @@ type GalleryMedia = {
 }
 
 type GalleryCategory = "Community" | "Fleet"
+type GalleryTag = "Dept" | "SWAT" | "MTF-7" | "MCD" | "TRU" | "SAR"
 
 type GalleryItem = {
   id: string
   title: string
   description: string
   category?: GalleryCategory
+  tags?: GalleryTag[]
   media: GalleryMedia[]
   createdBy: string
   createdAt: string
@@ -119,6 +121,24 @@ type PendingMedia = GalleryMedia & {
 }
 
 type GalleryCategoryFilter = "All" | GalleryCategory
+
+const GALLERY_TAGS: readonly GalleryTag[] = [
+  "Dept",
+  "SWAT",
+  "MTF-7",
+  "MCD",
+  "TRU",
+  "SAR",
+]
+
+const GALLERY_TAG_CLASSES: Record<GalleryTag, string> = {
+  Dept: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  SWAT: "border-slate-500/40 bg-slate-800/80 text-slate-100 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-100",
+  "MTF-7": "border-sky-500/30 bg-sky-500/10 text-sky-800 dark:text-sky-300",
+  MCD: "border-blue-950/40 bg-blue-950/15 text-blue-950 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200",
+  TRU: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
+  SAR: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
+}
 type GalleryMediaFilter = "All" | "Images" | "Videos"
 
 const GALLERY_CATEGORY_FILTERS: GalleryCategoryFilter[] = [
@@ -483,6 +503,9 @@ export default function Gallery() {
   const [category, setCategory] =
     useState<GalleryCategory>("Community")
 
+  const [tags, setTags] =
+    useState<GalleryTag[]>([])
+
   const [pendingMedia, setPendingMedia] =
     useState<PendingMedia[]>([])
 
@@ -701,6 +724,7 @@ export default function Gallery() {
     setTitle("")
     setDescription("")
     setCategory("Community")
+    setTags([])
     setPendingMedia([])
     setUrlInput("")
     setUrlType("image")
@@ -729,6 +753,7 @@ export default function Gallery() {
     setTitle(item.title)
     setDescription(item.description)
     setCategory(item.category ?? "Community")
+    setTags(item.tags ?? [])
     setPendingMedia(
       item.media.map(
         makePendingFromMedia,
@@ -1150,6 +1175,7 @@ export default function Gallery() {
               title: cleanTitle,
               description,
               category,
+              tags,
               media,
             }),
           },
@@ -1573,7 +1599,7 @@ export default function Gallery() {
                                 className="group/info w-full cursor-pointer rounded-lg px-1 py-1 pr-16 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-blue-500/40"
                                 aria-label={`View information for ${item.title}`}
                               >
-                                <div className="mb-1.5 flex items-center gap-2">
+                                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                                   <span
                                     className={[
                                       "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
@@ -1584,6 +1610,18 @@ export default function Gallery() {
                                   >
                                     {item.category ?? "Community"}
                                   </span>
+
+                                  {(item.tags ?? []).map((tag) => (
+                                    <span
+                                      key={`${item.id}-tag-${tag}`}
+                                      className={[
+                                        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide",
+                                        GALLERY_TAG_CLASSES[tag],
+                                      ].join(" ")}
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
                                 </div>
 
                                 <h3 className="truncate text-sm font-semibold">
@@ -2150,6 +2188,45 @@ export default function Gallery() {
                       setCategory(value as GalleryCategory)
                     }
                   />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Tags <span className="text-xs font-normal text-muted-foreground">(Optional · Select multiple)</span>
+                  </label>
+
+                  <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-input bg-background p-1.5 shadow-sm">
+                    {GALLERY_TAGS.map((tag) => {
+                      const selected = tags.includes(tag)
+
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() =>
+                            setTags((current) =>
+                              selected
+                                ? current.filter((value) => value !== tag)
+                                : [...current, tag],
+                            )
+                          }
+                          className={[
+                            "rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide transition-all",
+                            selected
+                              ? `${GALLERY_TAG_CLASSES[tag]} ring-1 ring-current/20`
+                              : "border-border bg-background/70 text-muted-foreground hover:bg-muted hover:text-foreground",
+                          ].join(" ")}
+                        >
+                          {tag}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    These tags are shown separately from Community/Fleet and can be combined.
+                  </p>
                 </div>
 
                 <div className="sm:col-span-2">
