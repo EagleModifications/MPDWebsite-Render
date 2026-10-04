@@ -23,7 +23,6 @@ import {
 
 import { hasPermission } from "./permissions/permissions"
 import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
-import { registerPromotionActionLogRoutes, logPromotionAction } from "./promotion/actionLogs"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
@@ -3716,20 +3715,6 @@ async function handlePromotionImport(
       },
     )
 
-    await logPromotionAction(user, {
-      action: "promotion_import",
-      category: "import",
-      division,
-      target: `${division} promotion data`,
-      description: `Imported promotion points: ${rows.length} rows, ${added} added, ${updated} updated.`,
-      details: {
-        imported: rows.length,
-        added,
-        updated,
-        totalMembers: points.length,
-      },
-    })
-
     return res.json({
       success: true,
 
@@ -4074,22 +4059,6 @@ async function handlePromotionRequirementsSave(
         requirements,
       )
 
-    await logPromotionAction(user, {
-      action: "promotion_requirements_save",
-      category: "requirements",
-      division,
-      target: `${division} promotion requirements`,
-      description: `Saved promotion requirements for ${Object.keys(requirements).length} ranks.`,
-      details: {
-        rankCount: Object.keys(requirements).length,
-        requirements: Object.values(requirements).map((item) => ({
-          rankId: item.rankId,
-          rankName: item.rankName,
-          points: item.points,
-        })),
-      },
-    })
-
     return res.json({
       success: true,
 
@@ -4363,7 +4332,6 @@ export function createApp() {
   // These must be registered before the React fallback so /api/admin/*
   // requests are handled by Express instead of becoming 404 responses.
   registerPermissionAdminRoutes(app)
-  registerPromotionActionLogRoutes(app)
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
@@ -5088,107 +5056,6 @@ export function createApp() {
   )
 
   /* ─────────────────────────────────────────
-     Promotion Discord Profile
-  ───────────────────────────────────────── */
-
-  app.get(
-    "/api/promotion/discord-profile/:discordId",
-    async (req, res) => {
-      try {
-        const user = await getRequestUser(req)
-
-        if (!user) {
-          return res.status(401).json({
-            success: false,
-            error: "Unauthorized",
-          })
-        }
-
-        const discordId =
-          typeof req.params.discordId === "string"
-            ? req.params.discordId.trim()
-            : ""
-
-        if (!/^\d{17,20}$/.test(discordId)) {
-          return res.status(400).json({
-            success: false,
-            error: "Invalid Discord user ID.",
-          })
-        }
-
-        if (!env.discordBotToken) {
-          return res.status(503).json({
-            success: false,
-            error:
-              "Discord profile lookup is not configured. Set DISCORD_BOT_TOKEN on the server.",
-          })
-        }
-
-        const response = await fetch(
-          `https://discord.com/api/v10/users/${encodeURIComponent(
-            discordId,
-          )}`,
-          {
-            headers: {
-              Authorization: `Bot ${env.discordBotToken}`,
-              Accept: "application/json",
-            },
-          },
-        )
-
-        if (!response.ok) {
-          const body = await response.text().catch(() => "")
-          console.error(
-            "[promotion-discord-profile] Discord lookup failed:",
-            response.status,
-            body,
-          )
-
-          return res.status(502).json({
-            success: false,
-            error:
-              "Discord could not return this user's profile.",
-          })
-        }
-
-        const discordUser = (await response.json()) as {
-          id?: string
-          username?: string
-          global_name?: string | null
-          avatar?: string | null
-        }
-
-        return res.json({
-          success: true,
-          profile: {
-            id: String(discordUser.id ?? discordId),
-            username: String(discordUser.username ?? "").trim(),
-            displayName: String(
-              discordUser.global_name ||
-                discordUser.username ||
-                "",
-            ).trim(),
-            avatar: discordUser.avatar ?? null,
-          },
-        })
-      } catch (error) {
-        console.error(
-          "[promotion-discord-profile] Failed:",
-          error,
-        )
-
-        return res.status(500).json({
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to load Discord profile.",
-        })
-      }
-    },
-  )
-
-  /* ─────────────────────────────────────────
      Promotion Roster Audit
   ───────────────────────────────────────── */
 
@@ -5509,14 +5376,6 @@ export function createApp() {
           await syncGoogleRosters(
             userId,
           )
-
-        await logPromotionAction(user, {
-          action: "promotion_roster_refresh",
-          category: "roster",
-          target: "Google roster synchronization",
-          description: "Manually synchronized Google roster data.",
-          details: result as unknown as Record<string, unknown>,
-        })
 
         return res
           .status(200)
