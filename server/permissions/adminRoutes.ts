@@ -7,7 +7,7 @@ import {
   getDiscordPermissionDocuments,
   getPermissionDefinitions,
   getPermissionStore,
-  getProtectedAdminUrls,
+  getProtectedPageUrls,
   getSuperAdminDiscordIds,
   getRankPermissionDocuments,
   hasPermission,
@@ -90,7 +90,7 @@ export function registerPermissionAdminRoutes(app: Express) {
         })),
         adminRanks: getAdminRanks(),
         superAdminDiscordIds: getSuperAdminDiscordIds(),
-        protectedUrls: getProtectedAdminUrls(),
+        protectedUrls: getProtectedPageUrls(),
         currentUser: {
           discordId: user.discordId,
           rank: user.rank,
