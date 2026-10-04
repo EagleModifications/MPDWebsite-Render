@@ -352,6 +352,7 @@ function CustomSelect({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.stopPropagation()
         setOpenDropdown(null)
       }
     }
@@ -624,6 +625,7 @@ function DateSelect({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.stopPropagation()
         setOpenDropdown(null)
       }
     }
@@ -1104,6 +1106,53 @@ export default function Events() {
     setEditingEvent(null)
     setForm(EMPTY_FORM)
   }
+
+  /* ------------------------------------------------------------------------ */
+  /* Escape key handling                                                      */
+  /* ------------------------------------------------------------------------ */
+
+  useEffect(() => {
+    const overlayOpen =
+      showEventModal ||
+      Boolean(selectedDate) ||
+      Boolean(deleteEventTarget)
+
+    if (!overlayOpen) {
+      return
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return
+      }
+
+      if (deleteEventTarget) {
+        closeDeleteModal()
+        return
+      }
+
+      if (showEventModal) {
+        closeEventModal()
+        return
+      }
+
+      if (selectedDate) {
+        setSelectedDate(null)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [
+    deleteEventTarget,
+    saving,
+    selectedDate,
+    showEventModal,
+    deletingId,
+  ])
 
   /* ------------------------------------------------------------------------ */
   /* Save                                                                     */
