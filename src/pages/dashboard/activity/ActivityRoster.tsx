@@ -1160,6 +1160,21 @@ export default function ActivityRoster() {
               />
             </div>
 
+            {/* Clear Filters */}
+
+            {hasFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="shrink-0 gap-2 text-white hover:bg-white/5 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+                Clear
+              </Button>
+            )}
+
             {/* Status Filter */}
 
             <DropdownMenu>
@@ -1432,22 +1447,6 @@ export default function ActivityRoster() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {/* Clear Filters */}
-
-            {hasFilters && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="gap-2"
-              >
-                <X className="h-4 w-4" />
-
-                Clear
-              </Button>
-            )}
 
             {/* Selected Copy Actions */}
 
