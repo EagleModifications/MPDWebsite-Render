@@ -4333,6 +4333,7 @@ export function createApp() {
   // These must be registered before the React fallback so /api/admin/*
   // requests are handled by Express instead of becoming 404 responses.
   registerPermissionAdminRoutes(app)
+  // Promotion Action Logs API. The action-log module has no Google roster-sync dependency.
   registerPromotionActionLogRoutes(app)
 
   app.get("/health", (_req, res) => {
