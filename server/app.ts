@@ -24,6 +24,7 @@ import {
 import { hasPermission } from "./permissions/permissions"
 import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
 import { logAction, registerActionLogRoutes } from "./actionLogs"
+import { registerRosterListRoutes } from "./rosterLists"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
@@ -4360,6 +4361,7 @@ export function createApp() {
   registerPermissionAdminRoutes(app)
   // Action Logs API. Logs are kept in-memory for the last 14 days.
   registerActionLogRoutes(app)
+  registerRosterListRoutes(app)
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
