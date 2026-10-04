@@ -8,7 +8,6 @@ import XLSX from "xlsx"
 
 import { syncGoogleRosters } from "./googleRosterSync"
 import { registerMainRosterRoutes } from "./googleMainRoster"
-import { registerBadgeRoutes } from "./badges"
 
 import {
   authenticateDiscordCode,
@@ -23,6 +22,7 @@ import {
 } from "./auth/session"
 
 import { hasPermission } from "./permissions/permissions"
+import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
@@ -4302,8 +4302,9 @@ export function createApp() {
   // Main Roster Google Sheets API routes.
   registerMainRosterRoutes(app)
 
-  // Badge Generator API routes.
-  registerBadgeRoutes(app)
+  // Permission administration routes.
+  // These are protected by the permissionadmin permission.
+  registerPermissionAdminRoutes(app)
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
