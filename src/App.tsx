@@ -13,9 +13,9 @@ import {
 } from "react-router-dom"
 
 import {
-  AlertTriangle,
   CheckCircle2,
   Info,
+  AlertTriangle,
   XCircle,
 } from "lucide-react"
 
@@ -27,25 +27,11 @@ import SignedOut from "@/pages/SignedOut"
 import Verifying from "@/pages/Verifying"
 import NotFound from "@/pages/NotFound"
 import NoPermission from "@/pages/NoPermission"
+import ErrorPage from "@/pages/Error"
 import Events from "@/pages/Events"
 import Gallery from "@/pages/Gallery"
 
-import MainRoster from "@/pages/documents/MainRoster"
-import SWATRoster from "@/pages/documents/SWATRoster"
-import MCDRoster from "@/pages/documents/MCDRoster"
-import TRURoster from "@/pages/documents/TRURoster"
-import FTDRoster from "@/pages/documents/FTDRoster"
-import MetroSOP from "@/pages/documents/MetroSOP"
-import SWATSOP from "@/pages/documents/SWATSOP"
-import MCDSOP from "@/pages/documents/MCDSOP"
-import TRUSOP from "@/pages/documents/TRUSOP"
-import FTDSOP from "@/pages/documents/FTDSOP"
-import GlobalSOP from "@/pages/documents/GlobalSOP"
-import SupervisorDocs from "@/pages/documents/SupervisorDocs"
-import CommandDocs from "@/pages/documents/CommandDocs"
-
 import Dashboard from "@/pages/dashboard/Dashboard"
-import AdminPermissions from "@/pages/dashboard/admin/Permissions"
 
 import ActivityRoster from "@/pages/dashboard/activity/ActivityRoster"
 import PromotionRoster from "@/pages/dashboard/promotion/PromotionRoster"
@@ -82,96 +68,6 @@ import PromotionRequirementsSWAT from "@/pages/dashboard/promotion/requirements/
 import PromotionRequirementsTEU from "@/pages/dashboard/promotion/requirements/TEU"
 import PromotionRequirementsTRU from "@/pages/dashboard/promotion/requirements/TRU"
 
-/* =========================================================
-   APP PROTECTION
-========================================================= */
-
-function useSiteProtection() {
-  useEffect(() => {
-    /*
-     * Disable right-click context menu.
-     */
-    const handleContextMenu = (event: MouseEvent) => {
-      event.preventDefault()
-    }
-
-    /*
-     * Disable common browser developer-tool shortcuts.
-     *
-     * This is only a client-side deterrent and is NOT
-     * a security mechanism.
-     */
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase()
-
-      const isF12 = event.key === "F12"
-
-      const isDeveloperTools =
-        event.ctrlKey &&
-        event.shiftKey &&
-        (key === "i" || key === "j" || key === "c")
-
-      const isViewSource =
-        event.ctrlKey &&
-        key === "u"
-
-      if (
-        isF12 ||
-        isDeveloperTools ||
-        isViewSource
-      ) {
-        event.preventDefault()
-        event.stopPropagation()
-      }
-    }
-
-    /*
-     * Prevent normal page content from being dragged.
-     */
-    const handleDragStart = (event: DragEvent) => {
-      event.preventDefault()
-    }
-
-    document.addEventListener(
-      "contextmenu",
-      handleContextMenu,
-    )
-
-    document.addEventListener(
-      "keydown",
-      handleKeyDown,
-      true,
-    )
-
-    document.addEventListener(
-      "dragstart",
-      handleDragStart,
-    )
-
-    return () => {
-      document.removeEventListener(
-        "contextmenu",
-        handleContextMenu,
-      )
-
-      document.removeEventListener(
-        "keydown",
-        handleKeyDown,
-        true,
-      )
-
-      document.removeEventListener(
-        "dragstart",
-        handleDragStart,
-      )
-    }
-  }, [])
-}
-
-/* =========================================================
-   PAGE PERMISSION PROTECTION
-========================================================= */
-
 type PageProtectionState =
   | "checking"
   | "allowed"
@@ -185,7 +81,9 @@ function PageProtection({
   children: ReactNode
 }) {
   const location = useLocation()
-  const [state, setState] = useState<PageProtectionState>("checking")
+
+  const [state, setState] =
+    useState<PageProtectionState>("checking")
 
   useEffect(() => {
     let cancelled = false
@@ -200,23 +98,38 @@ function PageProtection({
         const response = await fetch(
           `/api/auth/check?url=${encodeURIComponent(url)}`,
           {
+            method: "GET",
             credentials: "include",
             cache: "no-store",
           },
         )
 
-        if (cancelled) return
+        if (cancelled) {
+          return
+        }
 
+        /*
+         * The requested page is protected and the user
+         * is not authenticated.
+         */
         if (response.status === 401) {
           setState("unauthenticated")
           return
         }
 
+        /*
+         * The user is authenticated but does not have
+         * the required permission.
+         */
         if (response.status === 403) {
           setState("forbidden")
           return
         }
 
+        /*
+         * Any other non-success response means the
+         * permission check itself failed.
+         */
         if (!response.ok) {
           setState("error")
           return
@@ -235,405 +148,327 @@ function PageProtection({
     return () => {
       cancelled = true
     }
-  }, [location.pathname, location.search])
+  }, [
+    location.pathname,
+    location.search,
+  ])
 
+  /*
+   * Access is being checked.
+   *
+   * Do NOT show a loading screen here.
+   * Send the user to the existing /verifying page.
+   */
   if (state === "checking") {
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-blue-500" />
-          <p className="text-sm text-muted-foreground">
-            Checking access...
-          </p>
-        </div>
-      </div>
+      <Navigate
+        to="/verifying"
+        replace
+        state={{
+          from:
+            location.pathname +
+            location.search,
+        }}
+      />
     )
   }
 
+  /*
+   * Protected page but user is not logged in.
+   */
   if (state === "unauthenticated") {
     return (
       <Navigate
         to="/sign-in"
         replace
         state={{
-          from: `${location.pathname}${location.search}`,
+          from:
+            location.pathname +
+            location.search,
         }}
       />
     )
   }
 
+  /*
+   * User is logged in but does not have
+   * the required page permission.
+   */
   if (state === "forbidden") {
-    return <Navigate to="/dashboard" replace />
+    return (
+      <Navigate
+        to="/no-permission"
+        replace
+        state={{
+          from:
+            location.pathname +
+            location.search,
+        }}
+      />
+    )
   }
 
+  /*
+   * Permission system/server failure.
+   */
   if (state === "error") {
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-6">
-        <div className="max-w-md text-center">
-          <h1 className="text-xl font-semibold">
-            Unable to verify access
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Please refresh the page and try again.
-          </p>
-        </div>
-      </div>
+      <Navigate
+        to="/error"
+        replace
+        state={{
+          from:
+            location.pathname +
+            location.search,
+        }}
+      />
     )
   }
 
   return <>{children}</>
 }
 
-/* =========================================================
-   APP
-========================================================= */
-
 export default function App() {
-  useSiteProtection()
-
   return (
     <BrowserRouter>
       <PageProtection>
         <Routes>
-        {/* =================================================
-            PUBLIC
-        ================================================= */}
+          {/* =========================================================
+              PUBLIC
+          ========================================================= */}
 
-        <Route
-          path="/"
-          element={<Home />}
-        />
+          <Route
+            path="/"
+            element={<Home />}
+          />
 
-        <Route
-          path="/sign-in"
-          element={<SignIn />}
-        />
+          <Route
+            path="/sign-in"
+            element={<SignIn />}
+          />
 
-        <Route
-          path="/signed-out"
-          element={<SignedOut />}
-        />
+          <Route
+            path="/signed-out"
+            element={<SignedOut />}
+          />
 
-        <Route
-          path="/verifying"
-          element={<Verifying />}
-        />
+          <Route
+            path="/verifying"
+            element={<Verifying />}
+          />
 
-        <Route
-          path="/events"
-          element={<Events />}
-        />
+          <Route
+            path="/no-permission"
+            element={<NoPermission />}
+          />
 
-        <Route
-          path="/gallery"
-          element={<Gallery />}
-        />
+          <Route
+            path="/error"
+            element={<ErrorPage />}
+          />
 
-        <Route
-          path="/documents/rosters/metro-rosters"
-          element={<MainRoster />}
-        />
+          <Route
+            path="/events"
+            element={<Events />}
+          />
 
-        <Route
-          path="/documents/rosters/swat-rosters"
-          element={<SWATRoster />}
-        />
+          <Route
+            path="/gallery"
+            element={<Gallery />}
+          />
 
-        <Route
-          path="/documents/rosters/mcd-rosters"
-          element={<MCDRoster />}
-        />
+          {/* =========================================================
+              DASHBOARD
+          ========================================================= */}
 
-        <Route
-          path="/documents/rosters/tru-rosters"
-          element={<TRURoster />}
-        />
+          <Route
+            path="/dashboard"
+            element={<Dashboard />}
+          />
 
-        <Route
-          path="/documents/rosters/ftd-rosters"
-          element={<FTDRoster />}
-        />
+          <Route
+            path="/dashboard/admin/permissions"
+            element={<Permissions />}
+          />
 
-        <Route
-          path="/documents/sops/metro-sops"
-          element={<MetroSOP />}
-        />
+          <Route
+            path="/dashboard/activity/activityroster"
+            element={<ActivityRoster />}
+          />
 
-        <Route
-          path="/documents/sops/swat-sops"
-          element={<SWATSOP />}
-        />
+          <Route
+            path="/dashboard/promotion/promotionroster"
+            element={<PromotionRoster />}
+          />
 
-        <Route
-          path="/documents/sops/mcd-sops"
-          element={<MCDSOP />}
-        />
+          {/* =========================================================
+              ACTIVITY IMPORTS
+          ========================================================= */}
 
-        <Route
-          path="/documents/sops/tru-sops"
-          element={<TRUSOP />}
-        />
+          <Route
+            path="/dashboard/activity/department-import"
+            element={<ActivityImportDepartment />}
+          />
 
-        <Route
-          path="/documents/sops/ftd-sops"
-          element={<FTDSOP />}
-        />
+          <Route
+            path="/dashboard/activity/mcd-import"
+            element={<ActivityImportMCD />}
+          />
 
-        <Route
-          path="/documents/sops/global-sops"
-          element={<GlobalSOP />}
-        />
+          <Route
+            path="/dashboard/activity/mtf7-import"
+            element={<ActivityImportMTF7 />}
+          />
 
-        <Route
-          path="/documents/supervisor/supervisor-docs"
-          element={<SupervisorDocs />}
-        />
+          <Route
+            path="/dashboard/activity/sar-import"
+            element={<ActivityImportSAR />}
+          />
 
-        <Route
-          path="/documents/command/command-docs"
-          element={<CommandDocs />}
-        />
+          <Route
+            path="/dashboard/activity/swat-import"
+            element={<ActivityImportSWAT />}
+          />
 
-        {/* =================================================
-            DASHBOARD
-        ================================================= */}
+          <Route
+            path="/dashboard/activity/teu-import"
+            element={<ActivityImportTEU />}
+          />
 
-        <Route
-          path="/dashboard"
-          element={<Dashboard />}
-        />
+          <Route
+            path="/dashboard/activity/tru-import"
+            element={<ActivityImportTRU />}
+          />
 
-        <Route
-          path="/dashboard/admin/permissions"
-          element={<AdminPermissions />}
-        />
+          {/* =========================================================
+              PROMOTION IMPORTS
+          ========================================================= */}
 
-        {/* =================================================
-            ACTIVITY ROSTER
-        ================================================= */}
+          <Route
+            path="/dashboard/promotion/department-import"
+            element={<PromotionImportDepartment />}
+          />
 
-        <Route
-          path="/dashboard/activity/activityroster"
-          element={<ActivityRoster />}
-        />
+          <Route
+            path="/dashboard/promotion/mcd-import"
+            element={<PromotionImportMCD />}
+          />
 
-        {/* =================================================
-            PROMOTION ROSTER
-        ================================================= */}
+          <Route
+            path="/dashboard/promotion/mtf7-import"
+            element={<PromotionImportMTF7 />}
+          />
 
-        <Route
-          path="/dashboard/promotion/promotionroster"
-          element={<PromotionRoster />}
-        />
+          <Route
+            path="/dashboard/promotion/sar-import"
+            element={<PromotionImportSAR />}
+          />
 
-        {/* =================================================
-            ACTIVITY IMPORTS
-        ================================================= */}
+          <Route
+            path="/dashboard/promotion/swat-import"
+            element={<PromotionImportSWAT />}
+          />
 
-        <Route
-          path="/dashboard/activity/department-import"
-          element={<ActivityImportDepartment />}
-        />
+          <Route
+            path="/dashboard/promotion/teu-import"
+            element={<PromotionImportTEU />}
+          />
 
-        <Route
-          path="/dashboard/activity/mcd-import"
-          element={<ActivityImportMCD />}
-        />
+          <Route
+            path="/dashboard/promotion/tru-import"
+            element={<PromotionImportTRU />}
+          />
 
-        <Route
-          path="/dashboard/activity/mtf7-import"
-          element={<ActivityImportMTF7 />}
-        />
+          {/* =========================================================
+              ACTIVITY REQUIREMENTS
+          ========================================================= */}
 
-        <Route
-          path="/dashboard/activity/sar-import"
-          element={<ActivityImportSAR />}
-        />
+          <Route
+            path="/dashboard/activity/requirements/department"
+            element={<ActivityRequirementsDepartment />}
+          />
 
-        <Route
-          path="/dashboard/activity/swat-import"
-          element={<ActivityImportSWAT />}
-        />
+          <Route
+            path="/dashboard/activity/requirements/mcd"
+            element={<ActivityRequirementsMCD />}
+          />
 
-        <Route
-          path="/dashboard/activity/teu-import"
-          element={<ActivityImportTEU />}
-        />
+          <Route
+            path="/dashboard/activity/requirements/mtf7"
+            element={<ActivityRequirementsMTF7 />}
+          />
 
-        <Route
-          path="/dashboard/activity/tru-import"
-          element={<ActivityImportTRU />}
-        />
+          <Route
+            path="/dashboard/activity/requirements/sar"
+            element={<ActivityRequirementsSAR />}
+          />
 
-        {/* =================================================
-            PROMOTION IMPORTS
-        ================================================= */}
+          <Route
+            path="/dashboard/activity/requirements/swat"
+            element={<ActivityRequirementsSWAT />}
+          />
 
-        <Route
-          path="/dashboard/promotion/department-import"
-          element={<PromotionImportDepartment />}
-        />
+          <Route
+            path="/dashboard/activity/requirements/teu"
+            element={<ActivityRequirementsTEU />}
+          />
 
-        <Route
-          path="/dashboard/promotion/mcd-import"
-          element={<PromotionImportMCD />}
-        />
+          <Route
+            path="/dashboard/activity/requirements/tru"
+            element={<ActivityRequirementsTRU />}
+          />
 
-        <Route
-          path="/dashboard/promotion/mtf7-import"
-          element={<PromotionImportMTF7 />}
-        />
+          {/* =========================================================
+              PROMOTION REQUIREMENTS
+          ========================================================= */}
 
-        <Route
-          path="/dashboard/promotion/sar-import"
-          element={<PromotionImportSAR />}
-        />
+          <Route
+            path="/dashboard/promotion/requirements/department"
+            element={<PromotionRequirementsDepartment />}
+          />
 
-        <Route
-          path="/dashboard/promotion/swat-import"
-          element={<PromotionImportSWAT />}
-        />
+          <Route
+            path="/dashboard/promotion/requirements/mcd"
+            element={<PromotionRequirementsMCD />}
+          />
 
-        <Route
-          path="/dashboard/promotion/teu-import"
-          element={<PromotionImportTEU />}
-        />
+          <Route
+            path="/dashboard/promotion/requirements/mtf7"
+            element={<PromotionRequirementsMTF7 />}
+          />
 
-        <Route
-          path="/dashboard/promotion/tru-import"
-          element={<PromotionImportTRU />}
-        />
+          <Route
+            path="/dashboard/promotion/requirements/sar"
+            element={<PromotionRequirementsSAR />}
+          />
 
-        {/* =================================================
-            ACTIVITY REQUIREMENTS
-        ================================================= */}
+          <Route
+            path="/dashboard/promotion/requirements/swat"
+            element={<PromotionRequirementsSWAT />}
+          />
 
-        <Route
-          path="/dashboard/activity/department-requirements"
-          element={<ActivityRequirementsDepartment />}
-        />
+          <Route
+            path="/dashboard/promotion/requirements/teu"
+            element={<PromotionRequirementsTEU />}
+          />
 
-        <Route
-          path="/dashboard/activity/mcd-requirements"
-          element={<ActivityRequirementsMCD />}
-        />
+          <Route
+            path="/dashboard/promotion/requirements/tru"
+            element={<PromotionRequirementsTRU />}
+          />
 
-        <Route
-          path="/dashboard/activity/mtf7-requirements"
-          element={<ActivityRequirementsMTF7 />}
-        />
+          {/* =========================================================
+              404
+          ========================================================= */}
 
-        <Route
-          path="/dashboard/activity/sar-requirements"
-          element={<ActivityRequirementsSAR />}
-        />
-
-        <Route
-          path="/dashboard/activity/swat-requirements"
-          element={<ActivityRequirementsSWAT />}
-        />
-
-        <Route
-          path="/dashboard/activity/teu-requirements"
-          element={<ActivityRequirementsTEU />}
-        />
-
-        <Route
-          path="/dashboard/activity/tru-requirements"
-          element={<ActivityRequirementsTRU />}
-        />
-
-        {/* =================================================
-            PROMOTION REQUIREMENTS
-        ================================================= */}
-
-        <Route
-          path="/dashboard/promotion/department-requirements"
-          element={<PromotionRequirementsDepartment />}
-        />
-
-        <Route
-          path="/dashboard/promotion/mcd-requirements"
-          element={<PromotionRequirementsMCD />}
-        />
-
-        <Route
-          path="/dashboard/promotion/mtf7-requirements"
-          element={<PromotionRequirementsMTF7 />}
-        />
-
-        <Route
-          path="/dashboard/promotion/sar-requirements"
-          element={<PromotionRequirementsSAR />}
-        />
-
-        <Route
-          path="/dashboard/promotion/swat-requirements"
-          element={<PromotionRequirementsSWAT />}
-        />
-
-        <Route
-          path="/dashboard/promotion/teu-requirements"
-          element={<PromotionRequirementsTEU />}
-        />
-
-        <Route
-          path="/dashboard/promotion/tru-requirements"
-          element={<PromotionRequirementsTRU />}
-        />
-
-        {/* =================================================
-            FINAL FALLBACK
-        ================================================= */}
-
-        <Route
-          path="*"
-          element={<NotFound />}
-        />
-
-        <Route
-          path="/no-permission"
-          element={<NoPermission />}
-        />
-          
+          <Route
+            path="*"
+            element={<NotFound />}
+          />
         </Routes>
       </PageProtection>
 
-      {/* ===================================================
-          GLOBAL NOTIFICATIONS
-      =================================================== */}
-
-      <Toaster
-        position="top-right"
-        visibleToasts={5}
-        gap={6}
-        theme="system"
-        closeButton
-        icons={{
-          success: (
-            <CheckCircle2 className="size-5 shrink-0 text-green-500" />
-          ),
-          info: (
-            <Info className="size-5 shrink-0 text-blue-500" />
-          ),
-          warning: (
-            <AlertTriangle className="size-5 shrink-0 text-yellow-500" />
-          ),
-          error: (
-            <XCircle className="size-5 shrink-0 text-red-500" />
-          ),
-        }}
-        toastOptions={{
-          classNames: {
-            toast:
-              "bg-background text-foreground border-border pr-12",
-            title:
-              "text-foreground",
-            description:
-              "text-muted-foreground",
-          },
-        }}
-      />
+      <Toaster />
     </BrowserRouter>
   )
 }
