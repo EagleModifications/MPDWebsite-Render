@@ -22,7 +22,9 @@ import Verifying from "@/pages/Verifying"
 import NotFound from "@/pages/NotFound"
 import Events from "@/pages/Events"
 import Gallery from "@/pages/Gallery"
+
 import MainRoster from "@/pages/documents/MainRoster"
+import SWATRoster from "@/pages/documents/SWATRoster"
 
 import Dashboard from "@/pages/dashboard/Dashboard"
 
@@ -194,6 +196,11 @@ export default function App() {
         <Route
           path="/documents/mainroster"
           element={<MainRoster />}
+        />
+
+        <Route
+          path="/documents/swatroster"
+          element={<SWATRoster />}
         />
 
         {/* =================================================
