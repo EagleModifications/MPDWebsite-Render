@@ -1053,17 +1053,30 @@ export default function ActionLogs() {
 
         {/* Search and filters stay visible at all times. */}
         <div className="mb-5 flex flex-wrap items-center gap-2">
-          <div className="relative w-full min-w-[220px] max-w-[430px] sm:w-[360px]">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-400" />
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                setPage(1)
-              }}
-              placeholder="Search entries, people, ranks, IDs..."
-              className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
-            />
+          <div className="flex w-full min-w-0 max-w-[430px] flex-1 items-center gap-2 sm:w-auto">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-400" />
+              <input
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value)
+                  setPage(1)
+                }}
+                placeholder="Search entries, people, ranks, IDs..."
+                className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
+              />
+            </div>
+
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 px-1 text-xs font-medium text-white transition-colors hover:text-blue-300"
+              >
+                <X className="h-3.5 w-3.5 text-white" />
+                Clear
+              </button>
+            ) : null}
           </div>
 
           <FilterSelect
@@ -1098,17 +1111,6 @@ export default function ActionLogs() {
             ariaLabel="Divisions"
             className="w-[175px]"
           />
-
-          {hasFilters ? (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="inline-flex h-9 items-center gap-1.5 px-2 text-xs font-medium text-white transition-colors hover:text-blue-300"
-            >
-              <X className="h-3.5 w-3.5 text-white" />
-              Clear
-            </button>
-          ) : null}
 
           <span className="ml-auto text-xs text-muted-foreground">
             {total.toLocaleString()} {total === 1 ? "change" : "changes"}
