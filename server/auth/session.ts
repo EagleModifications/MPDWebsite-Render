@@ -1,54 +1,98 @@
-import { SignJWT, jwtVerify } from "jose"
-import type { Response, Request } from "express"
-import type { AuthUser } from "../types"
+import type { Request, Response } from "express"
+import { jwtVerify, SignJWT } from "jose"
+
 import { env } from "../config"
+import {
+  refreshAuthUserPermissions,
+} from "../permissions/permissions"
+import type { AuthUser } from "../types"
 
 const COOKIE_NAME = "mpd_session"
-const secret = new TextEncoder().encode(env.sessionSecret)
+const SESSION_MAX_AGE = 8 * 60 * 60 * 1000
 
-export async function createSession(user: AuthUser): Promise<string> {
-  return new SignJWT({ user })
+function sessionSecret() {
+  return new TextEncoder().encode(env.sessionSecret)
+}
+
+export async function createSession(user: AuthUser) {
+  return new SignJWT(user as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("8h")
-    .sign(secret)
+    .sign(sessionSecret())
 }
 
-export async function readSession(token: string | undefined): Promise<AuthUser | null> {
-  if (!token) return null
+export function setSessionCookie(
+  res: Response,
+  token: string,
+) {
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: SESSION_MAX_AGE,
+    path: "/",
+  })
+}
 
-  try {
-    const { payload } = await jwtVerify(token, secret)
+export function clearSessionCookie(res: Response) {
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  })
+}
 
-    if (!payload.user || typeof payload.user !== "object") {
-      return null
-    }
+function payloadToAuthUser(
+  payload: Record<string, unknown>,
+): Omit<AuthUser, "permissions"> | null {
+  const discordId = String(payload.discordId ?? "").trim()
+  const rank = String(payload.rank ?? "").trim()
 
-    return payload.user as unknown as AuthUser
-  } catch {
-    return null
+  if (!discordId || !rank) return null
+
+  return {
+    discordId,
+    callsign: String(payload.callsign ?? ""),
+    badgeNumber: String(payload.badgeNumber ?? ""),
+    name: String(payload.name ?? ""),
+    rank,
+    timeInDept: String(payload.timeInDept ?? ""),
+    timeInRank: String(payload.timeInRank ?? ""),
+    status: String(payload.status ?? ""),
+    username: String(payload.username ?? ""),
+    displayName: String(payload.displayName ?? ""),
+    ...(typeof payload.avatar === "string"
+      ? { avatar: payload.avatar }
+      : {}),
   }
 }
 
-export function setSessionCookie(response: Response, token: string): void {
-  response.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 8 * 60 * 60 * 1000
-  })
-}
+export async function getRequestUser(
+  req: Request,
+): Promise<AuthUser | null> {
+  const token = req.cookies?.[COOKIE_NAME]
 
-export function clearSessionCookie(response: Response): void {
-  response.clearCookie(COOKIE_NAME, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/"
-  })
-}
+  if (!token) return null
 
-export async function getRequestUser(request: Request): Promise<AuthUser | null> {
-  return readSession(request.cookies?.[COOKIE_NAME])
+  try {
+    const { payload } = await jwtVerify(
+      token,
+      sessionSecret(),
+    )
+
+    const baseUser = payloadToAuthUser(
+      payload as Record<string, unknown>,
+    )
+
+    if (!baseUser) return null
+
+    // Re-resolve permissions on every authenticated request.
+    // This means admin changes take effect without waiting for users
+    // to log out and back in.
+    return await refreshAuthUserPermissions(baseUser)
+  } catch {
+    return null
+  }
 }
