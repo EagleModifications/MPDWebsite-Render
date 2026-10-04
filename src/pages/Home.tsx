@@ -1310,7 +1310,7 @@ export default function Home() {
                       {/* Category */}
                       {item.category && (
                         <span
-                          className={`absolute left-4 top-4 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-md ${
+                          className={`absolute left-4 top-4 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                             galleryCategoryClasses[
                               item.category
                             ]
@@ -1326,7 +1326,7 @@ export default function Home() {
                           {tags.map((tag) => (
                             <span
                               key={tag}
-                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide backdrop-blur-md ${galleryTagClasses[tag]}`}
+                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${galleryTagClasses[tag]}`}
                             >
                               {tag}
                             </span>
