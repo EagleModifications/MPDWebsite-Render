@@ -1105,65 +1105,84 @@ export default function PromotionRoster() {
     rankFilters.length
 
   const copyMember = async (
-    member: PromotionRosterMember,
     type: CopyType,
+    member: PromotionRosterMember,
   ) => {
     let value = ""
+    let label = ""
 
     switch (type) {
       case "discord":
         value = member.discordId
+        label = "Discord ID"
         break
       case "discord-mention":
         value = `<@${member.discordId}>`
+        label = "Discord Mention"
         break
       case "name":
         value = member.name
+        label = "Name"
         break
       case "callsign":
         value = member.callsign
+        label = "Callsign"
         break
       case "badge":
         value = member.badgeNumber
+        label = "Badge Number"
         break
       case "rank":
         value = member.rank
+        label = "Rank"
         break
       case "name-discord":
         value = `${member.name} — ${member.discordId}`
+        label = "Name + Discord ID"
         break
       case "callsign-discord":
         value = `${member.callsign} — ${member.discordId}`
+        label = "Callsign + Discord ID"
         break
       case "callsign-name":
         value = `${member.callsign} — ${member.name}`
+        label = "Callsign + Name"
         break
       case "callsign-badge":
         value = `${member.callsign} — ${member.badgeNumber}`
+        label = "Callsign + Badge Number"
         break
       case "badge-name":
         value = `${member.badgeNumber} — ${member.name}`
+        label = "Badge Number + Name"
         break
       case "badge-discord":
         value = `${member.badgeNumber} — ${member.discordId}`
+        label = "Badge Number + Discord ID"
         break
       case "callsign-name-discord":
         value = `${member.callsign} — ${member.name} — ${member.discordId}`
+        label = "Callsign + Name + Discord"
         break
       case "callsign-badge-discord":
         value = `${member.callsign} — ${member.badgeNumber} — ${member.discordId}`
+        label = "Callsign + Badge + Discord"
         break
       case "name-badge-discord":
         value = `${member.name} — ${member.badgeNumber} — ${member.discordId}`
+        label = "Name + Badge + Discord"
         break
       case "callsign-badge-name":
         value = `${member.callsign} — ${member.badgeNumber} — ${member.name}`
+        label = "Callsign + Badge + Name"
         break
       case "callsign-badge-name-discord":
         value = `${member.callsign} — ${member.badgeNumber} — ${member.name} — ${member.discordId}`
+        label = "Callsign + Badge + Name + Discord"
         break
       case "name-rank-discord":
         value = `${member.name} — ${member.rank} — ${member.discordId}`
+        label = "Name + Rank + Discord"
         break
       case "full": {
         const details = [
@@ -1191,34 +1210,9 @@ export default function PromotionRoster() {
         )
 
         value = details.join(" — ")
+        label = "Full Details"
         break
       }
-    }
-
-    if (!value) {
-      return
-    }
-
-    const copyLabels: Record<CopyType, string> = {
-      discord: "Discord ID",
-      "discord-mention": "Discord Mention",
-      name: "Name",
-      callsign: "Callsign",
-      badge: "Badge Number",
-      rank: "Rank",
-      "name-discord": "Name + Discord ID",
-      "callsign-discord": "Callsign + Discord ID",
-      "callsign-name": "Callsign + Name",
-      "callsign-badge": "Callsign + Badge Number",
-      "badge-name": "Badge Number + Name",
-      "badge-discord": "Badge Number + Discord ID",
-      "callsign-name-discord": "Callsign + Name + Discord ID",
-      "callsign-badge-discord": "Callsign + Badge Number + Discord ID",
-      "name-badge-discord": "Name + Badge Number + Discord ID",
-      "callsign-badge-name": "Callsign + Badge Number + Name",
-      "callsign-badge-name-discord": "Callsign + Badge Number + Name + Discord ID",
-      "name-rank-discord": "Name + Rank + Discord ID",
-      full: "Full Details",
     }
 
     try {
@@ -1232,11 +1226,11 @@ export default function PromotionRoster() {
         targetUserId: member.discordId,
         targetName: member.name,
         targetRank: member.rank,
-        summary: `Copied ${copyLabels[type]} for ${member.name} from the ${division} promotion roster.`,
+        summary: `Copied ${label} for ${member.name} from the ${division} promotion roster.`,
         details: { copyType: type },
       })
 
-      toast.success(`${copyLabels[type]} copied to clipboard`)
+      toast.success(`${label} copied to clipboard`)
     } catch {
       toast.error("Copy failed", {
         description: "Your browser could not access the clipboard.",
@@ -1244,94 +1238,11 @@ export default function PromotionRoster() {
     }
   }
 
-  const renderMemberCopyDropdown = (
+  const copyDiscordId = async (
     member: PromotionRosterMember,
-  ) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          title={member.discordId}
-          className="mx-auto block max-w-full truncate bg-transparent px-1.5 py-1 font-mono text-[10px] text-blue-400 outline-none transition-colors hover:bg-transparent hover:text-blue-200 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
-        >
-          {member.discordId}
-        </button>
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent
-        align="start"
-        className="w-auto min-w-[220px] max-w-[300px]"
-      >
-        {([
-          ["discord", "Copy Discord ID"],
-          ["discord-mention", "Copy Discord Mention"],
-          ["name", "Copy Name"],
-          ["callsign", "Copy Callsign"],
-          ["badge", "Copy Badge Number"],
-          ["rank", "Copy Rank"],
-        ] as [CopyType, string][]).map(([type, label]) => (
-          <DropdownMenuItem
-            key={type}
-            onClick={() => void copyMember(member, type)}
-            className="gap-2 whitespace-nowrap text-sm"
-          >
-            <Copy className="h-4 w-4 shrink-0 text-blue-400" />
-            {label}
-          </DropdownMenuItem>
-        ))}
-
-        <div className="my-1 h-px bg-border" />
-
-        {([
-          ["name-discord", "Name + Discord ID"],
-          ["callsign-discord", "Callsign + Discord ID"],
-          ["callsign-name", "Callsign + Name"],
-          ["callsign-badge", "Callsign + Badge Number"],
-          ["badge-name", "Badge Number + Name"],
-          ["badge-discord", "Badge Number + Discord ID"],
-        ] as [CopyType, string][]).map(([type, label]) => (
-          <DropdownMenuItem
-            key={type}
-            onClick={() => void copyMember(member, type)}
-            className="gap-2 whitespace-nowrap text-sm"
-          >
-            <Copy className="h-4 w-4 shrink-0 text-blue-400" />
-            {label}
-          </DropdownMenuItem>
-        ))}
-
-        <div className="my-1 h-px bg-border" />
-
-        {([
-          ["callsign-name-discord", "Callsign + Name + Discord"],
-          ["callsign-badge-discord", "Callsign + Badge + Discord"],
-          ["name-badge-discord", "Name + Badge + Discord"],
-          ["callsign-badge-name", "Callsign + Badge + Name"],
-          ["callsign-badge-name-discord", "Callsign + Badge + Name + Discord"],
-          ["name-rank-discord", "Name + Rank + Discord"],
-        ] as [CopyType, string][]).map(([type, label]) => (
-          <DropdownMenuItem
-            key={type}
-            onClick={() => void copyMember(member, type)}
-            className="gap-2 whitespace-nowrap text-sm"
-          >
-            <Copy className="h-4 w-4 shrink-0 text-blue-400" />
-            {label}
-          </DropdownMenuItem>
-        ))}
-
-        <div className="my-1 h-px bg-border" />
-
-        <DropdownMenuItem
-          onClick={() => void copyMember(member, "full")}
-          className="gap-2 whitespace-nowrap text-sm"
-        >
-          <Copy className="h-4 w-4 shrink-0 text-blue-400" />
-          Copy Full Details
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
+  ) => {
+    await copyMember("discord", member)
+  }
 
   /* ─────────────────────────────────────────────
      Render
@@ -1339,7 +1250,7 @@ export default function PromotionRoster() {
 
   return (
     <DashboardLayout>
-      <div className="flex min-h-full min-w-0 flex-col gap-4 overflow-x-clip p-3 sm:gap-6 sm:p-6">
+      <div className="flex min-h-full min-w-0 flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-6">
         {/* HEADER */}
 
         <div className="flex shrink-0 flex-col gap-4">
@@ -2146,7 +2057,7 @@ export default function PromotionRoster() {
 
         {/* Roster */}
 
-        <div className="relative min-w-0 rounded-xl border bg-card">
+        <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
           <div className="flex items-center justify-between border-b bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
             <div className="min-w-0">
               <h2 className="font-medium">
@@ -2211,7 +2122,7 @@ export default function PromotionRoster() {
             <>
               {/* Desktop roster */}
 
-              <div className="hidden w-full min-w-0 md:block">
+              <div className="hidden w-full min-w-0 overflow-hidden md:block">
                 <table className="w-full table-fixed text-xs">
                   <colgroup>
                     <col className="w-[3%]" />
@@ -2229,9 +2140,9 @@ export default function PromotionRoster() {
                     <col className="w-[7%]" />
                   </colgroup>
 
-                  <thead className="sticky top-0 z-50 bg-card">
+                  <thead className="sticky top-0 z-40 bg-card">
                     <tr className="border-b bg-card text-center">
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center shadow-[0_1px_0_hsl(var(--border))]">
                         <div className="flex justify-center">
                           <Checkbox
                             checked={
@@ -2245,57 +2156,57 @@ export default function PromotionRoster() {
                         </div>
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Callsign
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Badge
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Name
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Rank
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Discord ID
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         <span className="block truncate">
                           Time in Dept
                         </span>
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         <span className="block truncate">
                           Time in Rank
                         </span>
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         <span className="block truncate">
                           Required Time in Rank
                         </span>
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Required Logs
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Required Hours
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Hours
                       </th>
 
-                      <th className="sticky top-0 z-50 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
+                      <th className="sticky top-0 z-40 overflow-hidden border-b bg-card px-2 py-3 text-center font-medium text-muted-foreground shadow-[0_1px_0_hsl(var(--border))]">
                         Status
                       </th>
                     </tr>
@@ -2400,7 +2311,99 @@ export default function PromotionRoster() {
                             {/* Discord */}
 
                             <td className="overflow-hidden px-2 py-3 text-center align-middle">
-                              {renderMemberCopyDropdown(member)}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger
+                                  asChild
+                                >
+                                  <button
+                                    type="button"
+                                    title={
+                                      member.discordId
+                                    }
+                                    className="mx-auto block max-w-full truncate bg-transparent px-1.5 py-1 font-mono text-[10px] text-blue-400 outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
+                                  >
+                                    {
+                                      member.discordId
+                                    }
+                                  </button>
+                                </DropdownMenuTrigger>
+
+                                <DropdownMenuContent
+                                  side="bottom"
+                                  align="start"
+                                  sideOffset={4}
+                                  avoidCollisions={false}
+                                  className="w-[285px] max-h-80 overflow-y-auto p-1"
+                                >
+                                  {([
+                                    ["discord", "Copy Discord ID"],
+                                    ["discord-mention", "Copy Discord Mention"],
+                                    ["name", "Copy Name"],
+                                    ["callsign", "Copy Callsign"],
+                                    ["badge", "Copy Badge Number"],
+                                    ["rank", "Copy Rank"],
+                                  ] as [CopyType, string][]).map(([type, label]) => (
+                                    <DropdownMenuItem
+                                      key={type}
+                                      onClick={() => void copyMember(type, member)}
+                                      className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+                                    >
+                                      <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                                      <span>{label}</span>
+                                    </DropdownMenuItem>
+                                  ))}
+
+                                  <div className="my-0.5 h-px bg-border" />
+
+                                  {([
+                                    ["name-discord", "Name + Discord ID"],
+                                    ["callsign-discord", "Callsign + Discord ID"],
+                                    ["callsign-name", "Callsign + Name"],
+                                    ["callsign-badge", "Callsign + Badge Number"],
+                                    ["badge-name", "Badge Number + Name"],
+                                    ["badge-discord", "Badge Number + Discord ID"],
+                                  ] as [CopyType, string][]).map(([type, label]) => (
+                                    <DropdownMenuItem
+                                      key={type}
+                                      onClick={() => void copyMember(type, member)}
+                                      className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+                                    >
+                                      <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                                      <span>{label}</span>
+                                    </DropdownMenuItem>
+                                  ))}
+
+                                  <div className="my-0.5 h-px bg-border" />
+
+                                  {([
+                                    ["callsign-name-discord", "Callsign + Name + Discord"],
+                                    ["callsign-badge-discord", "Callsign + Badge + Discord"],
+                                    ["name-badge-discord", "Name + Badge + Discord"],
+                                    ["callsign-badge-name", "Callsign + Badge + Name"],
+                                    ["callsign-badge-name-discord", "Callsign + Badge + Name + Discord"],
+                                    ["name-rank-discord", "Name + Rank + Discord"],
+                                  ] as [CopyType, string][]).map(([type, label]) => (
+                                    <DropdownMenuItem
+                                      key={type}
+                                      onClick={() => void copyMember(type, member)}
+                                      className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+                                    >
+                                      <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                                      <span>{label}</span>
+                                    </DropdownMenuItem>
+                                  ))}
+
+                                  <div className="my-0.5 h-px bg-border" />
+
+                                  <DropdownMenuItem
+                                    onClick={() => void copyMember("full", member)}
+                                    className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+                                  >
+                                    <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                                    <span>Copy Full Details</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </td>
 
                             {/* Time in Department */}
@@ -2712,7 +2715,29 @@ export default function PromotionRoster() {
                                 Discord
                               </span>
 
-{renderMemberCopyDropdown(member)}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="min-w-0 max-w-[calc(100%-60px)] truncate bg-transparent px-2 py-1 font-mono text-[11px] text-blue-400 outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
+                                  >
+                                    {
+                                      member.discordId
+                                    }
+                                  </button>
+                                </DropdownMenuTrigger>
+
+                                <DropdownMenuContent align="start">
+                                  <DropdownMenuItem
+                                    onClick={() => void copyDiscordId(member)}
+                                    className="gap-2"
+                                  >
+                                    <Copy className="h-4 w-4 text-blue-400" />
+
+                                    Copy Discord ID
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
                         </div>
