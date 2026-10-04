@@ -188,7 +188,7 @@ export default function RosterListDialog({
   const scopeList = current.find((item) => item.scope === scope)
   const savedStrikeMap = new Map((scopeList?.selectedUsers ?? []).map((item) => [item.userId, item.strike]))
   const previewMap = new Map(preview.map((item) => [item.userId, item.strike]))
-  const previousWeek = history.find((item) => item.week !== week)
+  const previousWeek = history.find((item) => item.week < week)
 
   return (
     <div
