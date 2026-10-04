@@ -540,7 +540,16 @@ export default function PromotionLogs() {
         headers: { Accept: "application/json" },
       })
       if (!response.ok) return
-      const data = (await response.json()) as { success?: boolean; members?: Array<Record<string, unknown>> }
+
+      const responseText = await response.text()
+      let data: { success?: boolean; members?: Array<Record<string, unknown>> } = {}
+
+      try {
+        data = responseText ? JSON.parse(responseText) as typeof data : {}
+      } catch {
+        return
+      }
+
       if (!data.success || !Array.isArray(data.members)) return
 
       setRosterByDiscord((current) => {
@@ -578,9 +587,21 @@ export default function PromotionLogs() {
         cache: "no-store",
         headers: { Accept: "application/json" },
       })
-      const data = (await response.json()) as ApiResponse
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || `Failed to load promotion action logs (${response.status}).`)
+      const responseText = await response.text()
+      let data: ApiResponse = {}
+
+      try {
+        data = responseText ? JSON.parse(responseText) as ApiResponse : {}
+      } catch {
+        throw new Error(
+          `The promotion action logs API returned an invalid response (${response.status}).`,
+        )
+      }
+
+      if (!response.ok || data.success !== true) {
+        throw new Error(
+          data.error || `Failed to load promotion action logs (${response.status}).`,
+        )
       }
 
       const nextLogs = Array.isArray(data.logs) ? data.logs : []
@@ -694,18 +715,23 @@ export default function PromotionLogs() {
                 className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
               />
             </div>
-            {hasFilters ? (
-              <button type="button" onClick={clearFilters} className="inline-flex h-9 shrink-0 items-center gap-1.5 px-1 text-xs font-medium text-white transition-colors hover:text-blue-300">
-                <X className="h-3.5 w-3.5 text-white" />
-                Clear
-              </button>
-            ) : null}
           </div>
 
           <FilterSelect value={actor} options={actorOptions} onChange={(value) => { setActor(value); setPage(1); setExpanded(null) }} ariaLabel="People" className="w-[170px]" />
           <FilterSelect value={action} options={actionOptions} onChange={(value) => { setAction(value); setPage(1); setExpanded(null) }} ariaLabel="Actions" className="w-[160px]" />
           <FilterSelect value={category} options={categoryOptions} onChange={(value) => { setCategory(value as Category); setPage(1); setExpanded(null) }} ariaLabel="Categories" className="w-[175px]" />
           <FilterSelect value={division} options={divisionOptions} onChange={(value) => { setDivision(value as Division); setPage(1); setExpanded(null) }} ariaLabel="Divisions" className="w-[175px]" />
+
+          {hasFilters ? (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 px-1 text-xs font-medium text-white transition-colors hover:text-blue-300"
+            >
+              <X className="h-3.5 w-3.5 text-white" />
+              Clear
+            </button>
+          ) : null}
 
           <span className="ml-auto text-xs text-muted-foreground">{total.toLocaleString()} {total === 1 ? "change" : "changes"}</span>
         </div>
