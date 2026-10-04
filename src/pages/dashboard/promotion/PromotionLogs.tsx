@@ -84,10 +84,12 @@ type ActionLog = {
   path?: string
 }
 
-type DiscordProfile = {
-  id: string
-  username?: string
-  displayName?: string
+type RosterMember = {
+  name?: string
+  callsign?: string
+  badgeNumber?: string
+  rank?: string
+  discordId?: string
   avatar?: string | null
 }
 
@@ -141,9 +143,20 @@ const divisionOptions: Option[] = [
   })),
 ]
 
+const rosterDivisions = [
+  "department",
+  "swat",
+  "mtf7",
+  "mcd",
+  "tru",
+  "teu",
+  "sar",
+] as const
+
 const moduleLabel = (value: string) => {
   if (value === "promotion") return "Promotion"
   if (value === "activity") return "Activity"
+
   return value || "All modules"
 }
 
@@ -153,7 +166,9 @@ const actionLabel = (value: string) =>
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
 
 const divisionLabel = (value?: string | null) =>
-  value ? divisionLabels[value] ?? actionLabel(value) : "Department"
+  value
+    ? divisionLabels[value] ?? actionLabel(value)
+    : "Department"
 
 const getInitials = (value: string) =>
   value
@@ -164,15 +179,23 @@ const getInitials = (value: string) =>
     .slice(0, 2)
     .toUpperCase() || "U"
 
-const getAvatarUrl = (discordId: string, avatar?: string | null) => {
+const getAvatarUrl = (
+  discordId: string,
+  avatar?: string | null,
+) => {
   if (!discordId) return undefined
 
-  if (avatar?.startsWith("http://") || avatar?.startsWith("https://")) {
+  if (
+    avatar?.startsWith("http://") ||
+    avatar?.startsWith("https://")
+  ) {
     return avatar
   }
 
   if (avatar) {
-    const extension = avatar.startsWith("a_") ? "gif" : "png"
+    const extension = avatar.startsWith("a_")
+      ? "gif"
+      : "png"
 
     return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.${extension}?size=128`
   }
@@ -334,8 +357,19 @@ function statusLabel(log: ActionLog) {
   if (value.includes("copy")) return "Copied"
   if (value.includes("select")) return "Selected"
   if (value.includes("import")) return "Imported"
-  if (value.includes("delete") || value.includes("remove")) return "Removed"
-  if (value.includes("create") || value.includes("add")) return "Created"
+  if (
+    value.includes("delete") ||
+    value.includes("remove")
+  ) {
+    return "Removed"
+  }
+
+  if (
+    value.includes("create") ||
+    value.includes("add")
+  ) {
+    return "Created"
+  }
 
   return "Updated"
 }
@@ -347,7 +381,10 @@ function statusClass(log: ActionLog) {
     return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
   }
 
-  if (value === "removed" || value === "deleted") {
+  if (
+    value === "removed" ||
+    value === "deleted"
+  ) {
     return "border-red-500/20 bg-red-500/10 text-red-400"
   }
 
@@ -356,20 +393,12 @@ function statusClass(log: ActionLog) {
   }
 
   if (value === "selected") {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
+    return "border-violet-500/20 bg-violet-500/10 text-violet-400"
   }
 
   return "border-blue-500/20 bg-blue-500/10 text-blue-400"
 }
 
-/*
- * Action icon shown between the entry number and profile.
- *
- * Each type has:
- * - its own icon
- * - its own colour
- * - its own subtle boxed background
- */
 function ActionIcon({
   log,
   small = false,
@@ -377,10 +406,15 @@ function ActionIcon({
   log: ActionLog
   small?: boolean
 }) {
-  const action = `${log.action} ${log.summary}`.toLowerCase()
-  const category = (log.category ?? "").toLowerCase()
+  const action =
+    `${log.action} ${log.summary}`.toLowerCase()
+
+  const category = (
+    log.category ?? ""
+  ).toLowerCase()
 
   let Icon = Activity
+
   let className =
     "border-border bg-muted/30 text-muted-foreground"
 
@@ -454,7 +488,11 @@ function ActionIcon({
       } ${className}`}
     >
       <Icon
-        className={small ? "h-3.5 w-3.5" : "h-4 w-4"}
+        className={
+          small
+            ? "h-3.5 w-3.5"
+            : "h-4 w-4"
+        }
         strokeWidth={2}
       />
     </span>
@@ -533,30 +571,59 @@ function CopyMenu({
   avatar?: string | null
   large?: boolean
 }) {
-  const display = name?.trim() || "Unknown User"
+  const display =
+    name?.trim() || "Unknown User"
+
   const safeId = id?.trim() || ""
-  const safeCallsign = callsign?.trim() || ""
-  const safeBadge = badgeNumber?.trim() || ""
-  const safeRank = rank?.trim() || ""
+  const safeCallsign =
+    callsign?.trim() || ""
+  const safeBadge =
+    badgeNumber?.trim() || ""
+  const safeRank =
+    rank?.trim() || ""
 
   const items = [
-    ["discord", "Copy Discord ID", safeId],
+    [
+      "discord",
+      "Copy Discord ID",
+      safeId,
+    ],
     [
       "discord-mention",
       "Copy Discord Mention",
-      safeId ? `<@${safeId}>` : "",
+      safeId
+        ? `<@${safeId}>`
+        : "",
     ],
-    ["name", "Copy Name", display],
-    ["callsign", "Copy Callsign", safeCallsign],
-    ["badge", "Copy Badge Number", safeBadge],
-    ["rank", "Copy Rank", safeRank],
+    [
+      "name",
+      "Copy Name",
+      display,
+    ],
+    [
+      "callsign",
+      "Copy Callsign",
+      safeCallsign,
+    ],
+    [
+      "badge",
+      "Copy Badge Number",
+      safeBadge,
+    ],
+    [
+      "rank",
+      "Copy Rank",
+      safeRank,
+    ],
   ] as const
 
   const combined = [
     [
       "name-discord",
       "Name + Discord ID",
-      safeId ? `${display} — ${safeId}` : "",
+      safeId
+        ? `${display} — ${safeId}`
+        : "",
     ],
     [
       "callsign-discord",
@@ -568,7 +635,9 @@ function CopyMenu({
     [
       "callsign-name",
       "Callsign + Name",
-      safeCallsign ? `${safeCallsign} — ${display}` : "",
+      safeCallsign
+        ? `${safeCallsign} — ${display}`
+        : "",
     ],
     [
       "callsign-badge",
@@ -580,7 +649,9 @@ function CopyMenu({
     [
       "badge-name",
       "Badge Number + Name",
-      safeBadge ? `${safeBadge} — ${display}` : "",
+      safeBadge
+        ? `${safeBadge} — ${display}`
+        : "",
     ],
     [
       "badge-discord",
@@ -591,7 +662,10 @@ function CopyMenu({
     ],
   ] as const
 
-  const copy = async (value: string, label: string) => {
+  const copy = async (
+    value: string,
+    label: string,
+  ) => {
     if (!value) return
 
     try {
@@ -617,12 +691,18 @@ function CopyMenu({
             name={display}
             id={safeId}
             avatar={avatar}
-            className={large ? "h-10 w-10" : "h-6 w-6"}
+            className={
+              large
+                ? "h-10 w-10"
+                : "h-6 w-6"
+            }
           />
 
           <span
             className={`truncate font-medium text-blue-400 ${
-              large ? "text-sm" : "text-xs"
+              large
+                ? "text-sm"
+                : "text-xs"
             }`}
           >
             {display}
@@ -637,31 +717,41 @@ function CopyMenu({
         avoidCollisions={false}
         className="w-[285px] max-h-80 overflow-y-auto p-1"
       >
-        {items.map(([type, label, value]) => (
-          <DropdownMenuItem
-            key={type}
-            disabled={!value}
-            onClick={() => void copy(value, label)}
-            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
-          >
-            <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-            <span>{label}</span>
-          </DropdownMenuItem>
-        ))}
+        {items.map(
+          ([type, label, value]) => (
+            <DropdownMenuItem
+              key={type}
+              disabled={!value}
+              onClick={() =>
+                void copy(value, label)
+              }
+              className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+            >
+              <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+
+              <span>{label}</span>
+            </DropdownMenuItem>
+          ),
+        )}
 
         <div className="my-0.5 h-px bg-border" />
 
-        {combined.map(([type, label, value]) => (
-          <DropdownMenuItem
-            key={type}
-            disabled={!value}
-            onClick={() => void copy(value, label)}
-            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
-          >
-            <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-            <span>{label}</span>
-          </DropdownMenuItem>
-        ))}
+        {combined.map(
+          ([type, label, value]) => (
+            <DropdownMenuItem
+              key={type}
+              disabled={!value}
+              onClick={() =>
+                void copy(value, label)
+              }
+              className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+            >
+              <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+
+              <span>{label}</span>
+            </DropdownMenuItem>
+          ),
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -681,8 +771,10 @@ function FilterSelect({
   className?: string
 }) {
   const selected =
-    options.find((option) => option.value === value) ??
-    options[0]
+    options.find(
+      (option) =>
+        option.value === value,
+    ) ?? options[0]
 
   return (
     <DropdownMenu>
@@ -693,7 +785,8 @@ function FilterSelect({
           className={`inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground outline-none transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-white focus:outline-none ${className}`}
         >
           <span className="min-w-0 flex-1 truncate text-left">
-            {selected?.label ?? ariaLabel}
+            {selected?.label ??
+              ariaLabel}
           </span>
 
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -709,8 +802,13 @@ function FilterSelect({
       >
         {options.map((option) => (
           <DropdownMenuItem
-            key={option.value || `all-${ariaLabel}`}
-            onClick={() => onChange(option.value)}
+            key={
+              option.value ||
+              `all-${ariaLabel}`
+            }
+            onClick={() =>
+              onChange(option.value)
+            }
             className={`h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs ${
               option.value === value
                 ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/15 focus:text-blue-300"
@@ -749,13 +847,19 @@ function formatValue(value: unknown): string {
   }
 
   try {
-    return JSON.stringify(value, null, 2)
+    return JSON.stringify(
+      value,
+      null,
+      2,
+    )
   } catch {
     return String(value)
   }
 }
 
-function displayChangeValue(value: unknown) {
+function displayChangeValue(
+  value: unknown,
+) {
   if (
     value === null ||
     value === undefined ||
@@ -771,94 +875,195 @@ function displayChangeValue(value: unknown) {
   return String(value)
 }
 
-function ChangeList({ changes }: { changes: unknown }) {
-  if (!Array.isArray(changes) || changes.length === 0) {
+function ChangeList({
+  changes,
+}: {
+  changes: unknown
+}) {
+  if (
+    !Array.isArray(changes) ||
+    changes.length === 0
+  ) {
     return null
   }
 
-  const visible = changes.slice(0, 120) as Array<
-    Record<string, unknown>
-  >
+  const visible =
+    changes.slice(0, 120) as Array<
+      Record<string, unknown>
+    >
 
   return (
     <div className="overflow-hidden rounded-lg border border-border">
-      {visible.map((change, index) => {
-        const oldValue = change.old
-        const newValue = change.new
+      {visible.map(
+        (change, index) => {
+          const oldValue =
+            change.old
 
-        const rank = String(
-          change.rank ??
-            change.name ??
-            change.discordId ??
-            `Change ${index + 1}`,
-        )
+          const newValue =
+            change.new
 
-        return (
-          <div
-            key={`${rank}-${index}`}
-            className="grid gap-4 border-b border-border p-3 last:border-b-0 md:grid-cols-[1.1fr_1fr_1fr]"
-          >
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {String(
-                  change.field ??
-                    change.label ??
-                    change.key ??
-                    (change.rank ? "Rank" : "Change"),
-                )}
-              </p>
+          const rank = String(
+            change.rank ??
+              change.name ??
+              change.discordId ??
+              `Change ${index + 1}`,
+          )
 
-              <p className="mt-1 break-words text-xs font-medium text-foreground">
-                {rank}
-              </p>
+          return (
+            <div
+              key={`${rank}-${index}`}
+              className="grid gap-4 border-b border-border p-3 last:border-b-0 md:grid-cols-[1.1fr_1fr_1fr]"
+            >
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {String(
+                    change.field ??
+                      change.label ??
+                      change.key ??
+                      (change.rank
+                        ? "Rank"
+                        : "Change"),
+                  )}
+                </p>
+
+                <p className="mt-1 break-words text-xs font-medium text-foreground">
+                  {rank}
+                </p>
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Old
+                </p>
+
+                <p className="mt-1 break-words text-xs text-muted-foreground line-through decoration-red-500/70">
+                  {displayChangeValue(
+                    oldValue,
+                  )}
+                </p>
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  New
+                </p>
+
+                <p className="mt-1 break-words text-xs font-semibold text-emerald-400">
+                  {displayChangeValue(
+                    newValue,
+                  )}
+                </p>
+              </div>
             </div>
-
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Old
-              </p>
-
-              <p className="mt-1 break-words text-xs text-muted-foreground line-through decoration-red-500/70">
-                {displayChangeValue(oldValue)}
-              </p>
-            </div>
-
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                New
-              </p>
-
-              <p className="mt-1 break-words text-xs font-semibold text-emerald-400">
-                {displayChangeValue(newValue)}
-              </p>
-            </div>
-          </div>
-        )
-      })}
+          )
+        },
+      )}
     </div>
+  )
+}
+
+function getRosterUser(
+  rosterUsers: Record<
+    string,
+    RosterMember
+  >,
+  discordId?: string | null,
+) {
+  if (!discordId) return undefined
+
+  return rosterUsers[
+    String(discordId).trim()
+  ]
+}
+
+function getRosterName(
+  rosterUsers: Record<
+    string,
+    RosterMember
+  >,
+  discordId?: string | null,
+  fallback?: string,
+) {
+  const user = getRosterUser(
+    rosterUsers,
+    discordId,
+  )
+
+  return (
+    user?.name?.trim() ||
+    fallback?.trim() ||
+    "Unknown User"
   )
 }
 
 function DetailPanel({
   log,
-  profile,
+  rosterUsers,
 }: {
   log: ActionLog
-  profile?: DiscordProfile
+  rosterUsers: Record<
+    string,
+    RosterMember
+  >
 }) {
   const details = log.details ?? {}
 
-  const additionalDetails = Object.entries(details).filter(
-    ([key]) =>
-      key !== "changes" &&
-      key !== "old" &&
-      key !== "new",
+  const additionalDetails =
+    Object.entries(details).filter(
+      ([key]) =>
+        key !== "changes" &&
+        key !== "old" &&
+        key !== "new",
+    )
+
+  const changedBy = getRosterUser(
+    rosterUsers,
+    log.userId,
   )
+
+  const target = getRosterUser(
+    rosterUsers,
+    log.targetUserId,
+  )
+
+  const changedByName =
+    changedBy?.name ||
+    log.userName ||
+    log.username ||
+    "Unknown User"
+
+  const targetName =
+    target?.name ||
+    log.targetName ||
+    "Unknown User"
+
+  const targetCallsign =
+    target?.callsign ||
+    String(
+      details.targetCallsign ??
+        details.callsign ??
+        "",
+    )
+
+  const targetBadge =
+    target?.badgeNumber ||
+    String(
+      details.targetBadgeNumber ??
+        details.badgeNumber ??
+        "",
+    )
+
+  const targetRank =
+    target?.rank ||
+    log.targetRank ||
+    ""
 
   return (
     <div className="border-t border-border bg-muted/10 px-4 py-4">
       <div className="grid gap-4">
-        <ChangeList changes={details.changes} />
+        <ChangeList
+          changes={details.changes}
+        />
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
@@ -868,17 +1073,24 @@ function DetailPanel({
 
             <div className="mt-1">
               <CopyMenu
-                name={
-                  profile?.displayName ||
-                  log.userName ||
-                  log.username ||
-                  "Unknown user"
-                }
+                name={changedByName}
                 id={log.userId}
-                callsign={log.callsign}
-                badgeNumber={log.badgeNumber}
-                rank={log.rank}
-                avatar={profile?.avatar || log.avatar}
+                callsign={
+                  changedBy?.callsign ||
+                  log.callsign
+                }
+                badgeNumber={
+                  changedBy?.badgeNumber ||
+                  log.badgeNumber
+                }
+                rank={
+                  changedBy?.rank ||
+                  log.rank
+                }
+                avatar={
+                  changedBy?.avatar ||
+                  log.avatar
+                }
               />
             </div>
           </div>
@@ -913,7 +1125,8 @@ function DetailPanel({
             </p>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              {log.targetName ? (
+              {log.targetName ||
+              log.targetUserId ? (
                 <div>
                   <p className="text-[10px] text-muted-foreground">
                     Name
@@ -921,32 +1134,36 @@ function DetailPanel({
 
                   <div className="mt-1">
                     <CopyMenu
-                      name={log.targetName}
-                      id={log.targetUserId}
-                      callsign={String(
-                        details.targetCallsign ??
-                          details.callsign ??
-                          "",
-                      )}
-                      badgeNumber={String(
-                        details.targetBadgeNumber ??
-                          details.badgeNumber ??
-                          "",
-                      )}
-                      rank={log.targetRank}
+                      name={targetName}
+                      id={
+                        log.targetUserId
+                      }
+                      callsign={
+                        targetCallsign
+                      }
+                      badgeNumber={
+                        targetBadge
+                      }
+                      rank={
+                        targetRank
+                      }
+                      avatar={
+                        target?.avatar ||
+                        log.avatar
+                      }
                     />
                   </div>
                 </div>
               ) : null}
 
-              {log.targetRank ? (
+              {targetRank ? (
                 <div>
                   <p className="text-[10px] text-muted-foreground">
                     Rank
                   </p>
 
                   <p className="mt-1 text-xs font-medium">
-                    {log.targetRank}
+                    {targetRank}
                   </p>
                 </div>
               ) : null}
@@ -966,27 +1183,30 @@ function DetailPanel({
           </div>
         ) : null}
 
-        {additionalDetails.length > 0 ? (
+        {additionalDetails.length >
+        0 ? (
           <div className="border-t border-border pt-4">
             <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Additional details
             </p>
 
             <div className="divide-y divide-border">
-              {additionalDetails.map(([key, value]) => (
-                <div
-                  key={key}
-                  className="grid gap-1 py-2 sm:grid-cols-[160px_1fr]"
-                >
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {actionLabel(key)}
-                  </span>
+              {additionalDetails.map(
+                ([key, value]) => (
+                  <div
+                    key={key}
+                    className="grid gap-1 py-2 sm:grid-cols-[160px_1fr]"
+                  >
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {actionLabel(key)}
+                    </span>
 
-                  <pre className="m-0 whitespace-pre-wrap break-words font-sans text-xs text-foreground/90">
-                    {formatValue(value)}
-                  </pre>
-                </div>
-              ))}
+                    <pre className="m-0 whitespace-pre-wrap break-words font-sans text-xs text-foreground/90">
+                      {formatValue(value)}
+                    </pre>
+                  </div>
+                ),
+              )}
             </div>
           </div>
         ) : null}
@@ -1008,7 +1228,9 @@ function DetailPanel({
             </p>
 
             <p className="mt-1 text-xs font-medium">
-              {formatDateTime(log.createdAt)}
+              {formatDateTime(
+                log.createdAt,
+              )}
             </p>
           </div>
         </div>
@@ -1024,275 +1246,503 @@ function DetailPanel({
 }
 
 export default function ActionLogs() {
-  const [logs, setLogs] = useState<ActionLog[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [logs, setLogs] = useState<
+    ActionLog[]
+  >([])
 
-  const [module, setModule] = useState<Module>("")
-  const [category, setCategory] = useState<Category>("")
-  const [division, setDivision] = useState<Division>("")
-  const [userId, setUserId] = useState("")
-  const [action, setAction] = useState("")
-  const [search, setSearch] = useState("")
+  const [loading, setLoading] =
+    useState(true)
 
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
-  const [pages, setPages] = useState(1)
-  const [total, setTotal] = useState(0)
+  const [error, setError] =
+    useState<string | null>(null)
 
-  const [profiles, setProfiles] =
-    useState<Record<string, DiscordProfile>>({})
+  const [module, setModule] =
+    useState<Module>("")
 
-  const profilesRef =
-    useRef<Record<string, DiscordProfile>>({})
+  const [category, setCategory] =
+    useState<Category>("")
 
-  const profileLoadingRef =
-    useRef<Set<string>>(new Set())
+  const [division, setDivision] =
+    useState<Division>("")
 
-  const loadProfile = useCallback(
-    async (discordId: string) => {
-      if (
-        !discordId ||
-        profilesRef.current[discordId] ||
-        profileLoadingRef.current.has(discordId)
-      ) {
+  const [userId, setUserId] =
+    useState("")
+
+  const [action, setAction] =
+    useState("")
+
+  const [search, setSearch] =
+    useState("")
+
+  const [expanded, setExpanded] =
+    useState<string | null>(null)
+
+  const [page, setPage] =
+    useState(1)
+
+  const [pageSize, setPageSize] =
+    useState(25)
+
+  const [pages, setPages] =
+    useState(1)
+
+  const [total, setTotal] =
+    useState(0)
+
+  const [rosterUsers, setRosterUsers] =
+    useState<
+      Record<string, RosterMember>
+    >({})
+
+  const rosterUsersRef =
+    useRef<
+      Record<string, RosterMember>
+    >({})
+
+  const rosterLoadingRef =
+    useRef(false)
+
+  const loadRosterUsers =
+    useCallback(async () => {
+      if (rosterLoadingRef.current) {
         return
       }
 
-      profileLoadingRef.current.add(discordId)
+      rosterLoadingRef.current = true
 
       try {
-        const response = await fetch(
-          `/api/promotion/discord-profile/${encodeURIComponent(
-            discordId,
-          )}`,
-          {
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-              Accept: "application/json",
-            },
-          },
-        )
+        const responses =
+          await Promise.all(
+            rosterDivisions.map(
+              async (rosterDivision) => {
+                try {
+                  const response =
+                    await fetch(
+                      `/api/promotion/roster/${rosterDivision}`,
+                      {
+                        credentials:
+                          "include",
+                        cache:
+                          "no-store",
+                        headers: {
+                          Accept:
+                            "application/json",
+                        },
+                      },
+                    )
 
-        if (!response.ok) return
+                  if (!response.ok) {
+                    return []
+                  }
 
-        const data = (await response.json()) as {
-          success?: boolean
-          profile?: DiscordProfile
+                  const data =
+                    (await response.json()) as {
+                      success?: boolean
+                      members?: RosterMember[]
+                      roster?: RosterMember[]
+                      users?: RosterMember[]
+                    }
+
+                  if (
+                    Array.isArray(
+                      data.members,
+                    )
+                  ) {
+                    return data.members
+                  }
+
+                  if (
+                    Array.isArray(
+                      data.roster,
+                    )
+                  ) {
+                    return data.roster
+                  }
+
+                  if (
+                    Array.isArray(
+                      data.users,
+                    )
+                  ) {
+                    return data.users
+                  }
+
+                  return []
+                } catch {
+                  return []
+                }
+              },
+            ),
+          )
+
+        const nextUsers: Record<
+          string,
+          RosterMember
+        > = {}
+
+        for (const members of responses) {
+          for (const member of members) {
+            const discordId =
+              String(
+                member.discordId ??
+                  "",
+              ).trim()
+
+            if (!discordId) {
+              continue
+            }
+
+            nextUsers[discordId] = {
+              ...nextUsers[
+                discordId
+              ],
+              ...member,
+            }
+          }
         }
 
-        if (data.success && data.profile) {
-          profilesRef.current[discordId] = data.profile
+        rosterUsersRef.current =
+          nextUsers
 
-          setProfiles((current) => ({
-            ...current,
-            [discordId]: data.profile!,
-          }))
-        }
-      } catch {
-        // Stored log identity remains usable if Discord cannot be reached.
+        setRosterUsers(nextUsers)
       } finally {
-        profileLoadingRef.current.delete(discordId)
+        rosterLoadingRef.current =
+          false
       }
-    },
-    [],
-  )
+    }, [])
 
   useEffect(() => {
-    for (const discordId of new Set(
-      logs.map((log) => log.userId).filter(Boolean),
-    )) {
-      void loadProfile(discordId)
-    }
-  }, [logs, loadProfile])
+    void loadRosterUsers()
+  }, [loadRosterUsers])
 
-  const loadLogs = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const loadLogs =
+    useCallback(async () => {
+      setLoading(true)
+      setError(null)
 
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(pageSize),
-      })
+      try {
+        const params =
+          new URLSearchParams({
+            page: String(page),
+            limit: String(pageSize),
+          })
 
-      if (module) params.set("module", module)
-      if (category) params.set("category", category)
-      if (division) params.set("division", division)
-      if (userId) params.set("userId", userId)
-      if (action) params.set("action", action)
-      if (search.trim()) {
-        params.set("search", search.trim())
-      }
+        if (module) {
+          params.set(
+            "module",
+            module,
+          )
+        }
 
-      const response = await fetch(
-        `/api/action-logs?${params.toString()}`,
-        {
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            Accept: "application/json",
-          },
-        },
-      )
+        if (category) {
+          params.set(
+            "category",
+            category,
+          )
+        }
 
-      const data = (await response.json()) as ApiResponse
+        if (division) {
+          params.set(
+            "division",
+            division,
+          )
+        }
 
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.error ||
-            `Failed to load promotion logs (${response.status}).`,
+        if (userId) {
+          params.set(
+            "userId",
+            userId,
+          )
+        }
+
+        if (action) {
+          params.set(
+            "action",
+            action,
+          )
+        }
+
+        if (search.trim()) {
+          params.set(
+            "search",
+            search.trim(),
+          )
+        }
+
+        const response =
+          await fetch(
+            `/api/action-logs?${params.toString()}`,
+            {
+              credentials:
+                "include",
+              cache:
+                "no-store",
+              headers: {
+                Accept:
+                  "application/json",
+              },
+            },
+          )
+
+        const data =
+          (await response.json()) as ApiResponse
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.error ||
+              `Failed to load promotion logs (${response.status}).`,
+          )
+        }
+
+        const nextLogs =
+          Array.isArray(
+            data.logs,
+          )
+            ? data.logs
+            : []
+
+        setLogs(nextLogs)
+
+        setTotal(
+          data.pagination
+            ?.total ?? 0,
         )
+
+        setPages(
+          Math.max(
+            1,
+            data.pagination
+              ?.pages ?? 1,
+          ),
+        )
+
+        if (
+          data.pagination
+            ?.page &&
+          data.pagination
+            .page !== page
+        ) {
+          setPage(
+            data.pagination.page,
+          )
+        }
+      } catch (err) {
+        setLogs([])
+        setTotal(0)
+        setPages(1)
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load promotion logs.",
+        )
+      } finally {
+        setLoading(false)
       }
+    }, [
+      action,
+      category,
+      division,
+      module,
+      page,
+      pageSize,
+      search,
+      userId,
+    ])
 
-      const nextLogs = Array.isArray(data.logs)
-        ? data.logs
-        : []
-
-      setLogs(nextLogs)
-      setTotal(data.pagination?.total ?? 0)
-      setPages(
-        Math.max(1, data.pagination?.pages ?? 1),
+  useEffect(() => {
+    const timer =
+      window.setTimeout(
+        () =>
+          void loadLogs(),
+        search ? 250 : 0,
       )
 
-      if (
-        data.pagination?.page &&
-        data.pagination.page !== page
-      ) {
-        setPage(data.pagination.page)
-      }
-    } catch (err) {
-      setLogs([])
-      setTotal(0)
-      setPages(1)
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load promotion logs.",
+    return () =>
+      window.clearTimeout(
+        timer,
       )
-    } finally {
-      setLoading(false)
-    }
   }, [
-    action,
-    category,
-    division,
-    module,
-    page,
-    pageSize,
+    loadLogs,
     search,
-    userId,
   ])
 
-  useEffect(() => {
-    const timer = window.setTimeout(
-      () => void loadLogs(),
-      search ? 250 : 0,
+  const userOptions =
+    useMemo<Option[]>(
+      () => {
+        const map =
+          new Map<
+            string,
+            string
+          >()
+
+        for (const log of logs) {
+          if (!log.userId) {
+            continue
+          }
+
+          map.set(
+            log.userId,
+            getRosterName(
+              rosterUsers,
+              log.userId,
+              log.userName ||
+                log.username ||
+                log.userId,
+            ),
+          )
+        }
+
+        return [
+          {
+            value: "",
+            label: "Anyone",
+          },
+          ...Array.from(
+            map.entries(),
+          )
+            .sort((a, b) =>
+              a[1].localeCompare(
+                b[1],
+              ),
+            )
+            .map(
+              ([
+                value,
+                label,
+              ]) => ({
+                value,
+                label,
+              }),
+            ),
+        ]
+      },
+      [
+        logs,
+        rosterUsers,
+      ],
     )
 
-    return () => window.clearTimeout(timer)
-  }, [loadLogs, search])
+  const actionOptions =
+    useMemo<Option[]>(
+      () => {
+        const map =
+          new Map<
+            string,
+            string
+          >()
 
-  const userOptions = useMemo<Option[]>(() => {
-    const map = new Map<string, string>()
+        for (const log of logs) {
+          if (!log.action) {
+            continue
+          }
 
-    for (const log of logs) {
-      if (!log.userId) continue
+          map.set(
+            log.action,
+            actionLabel(
+              log.action,
+            ),
+          )
+        }
 
-      map.set(
-        log.userId,
-        log.userName ||
-          log.username ||
-          log.userId,
-      )
-    }
+        return [
+          {
+            value: "",
+            label: "All actions",
+          },
+          ...Array.from(
+            map.entries(),
+          )
+            .sort((a, b) =>
+              a[1].localeCompare(
+                b[1],
+              ),
+            )
+            .map(
+              ([
+                value,
+                label,
+              ]) => ({
+                value,
+                label,
+              }),
+            ),
+        ]
+      },
+      [logs],
+    )
 
-    return [
-      { value: "", label: "Anyone" },
-      ...Array.from(map.entries())
-        .sort((a, b) =>
-          a[1].localeCompare(b[1]),
+  const grouped =
+    useMemo(() => {
+      const map =
+        new Map<
+          string,
+          ActionLog[]
+        >()
+
+      for (const log of logs) {
+        const key =
+          dateHeading(
+            log.createdAt,
+          )
+
+        const current =
+          map.get(key) ?? []
+
+        current.push(log)
+        map.set(
+          key,
+          current,
         )
-        .map(([value, label]) => ({
-          value,
-          label,
-        })),
-    ]
-  }, [logs])
+      }
 
-  const actionOptions = useMemo<Option[]>(() => {
-    const map = new Map<string, string>()
-
-    for (const log of logs) {
-      if (!log.action) continue
-
-      map.set(
-        log.action,
-        actionLabel(log.action),
+      return Array.from(
+        map.entries(),
       )
+    }, [logs])
+
+  const clearFilters =
+    () => {
+      setCategory("")
+      setDivision("")
+      setUserId("")
+      setAction("")
+      setSearch("")
+      setPage(1)
+      setExpanded(null)
     }
 
-    return [
-      { value: "", label: "All actions" },
-      ...Array.from(map.entries())
-        .sort((a, b) =>
-          a[1].localeCompare(b[1]),
-        )
-        .map(([value, label]) => ({
-          value,
-          label,
-        })),
-    ]
-  }, [logs])
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, ActionLog[]>()
-
-    for (const log of logs) {
-      const key = dateHeading(log.createdAt)
-      const current = map.get(key) ?? []
-
-      current.push(log)
-      map.set(key, current)
+  const selectModule =
+    (value: Module) => {
+      setModule(value)
+      setPage(1)
+      setExpanded(null)
     }
-
-    return Array.from(map.entries())
-  }, [logs])
-
-  const clearFilters = () => {
-    setCategory("")
-    setDivision("")
-    setUserId("")
-    setAction("")
-    setSearch("")
-    setPage(1)
-    setExpanded(null)
-  }
-
-  const selectModule = (value: Module) => {
-    setModule(value)
-    setPage(1)
-    setExpanded(null)
-  }
 
   const start = total
-    ? (page - 1) * pageSize + 1
+    ? (page - 1) *
+        pageSize +
+      1
     : 0
 
   const end = total
-    ? Math.min(page * pageSize, total)
+    ? Math.min(
+        page * pageSize,
+        total,
+      )
     : 0
 
-  const hasFilters = Boolean(
-    category ||
-      division ||
-      userId ||
-      action ||
-      search,
-  )
+  const hasFilters =
+    Boolean(
+      category ||
+        division ||
+        userId ||
+        action ||
+        search,
+    )
 
   return (
     <DashboardLayout>
@@ -1315,51 +1765,65 @@ export default function ActionLogs() {
               </div>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                A numbered audit trail for roster, import,
-                requirement, selection and management
-                changes. Entries are retained for 60 days.
+                A numbered audit trail for roster,
+                import, requirement, selection and
+                management changes. Entries are
+                retained for 60 days.
               </p>
             </div>
           </div>
 
           <button
             type="button"
-            onClick={() => void loadLogs()}
+            onClick={() =>
+              void loadLogs()
+            }
             className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
           >
             <RefreshCw
               className={`h-3.5 w-3.5 text-white ${
-                loading ? "animate-spin" : ""
+                loading
+                  ? "animate-spin"
+                  : ""
               }`}
             />
 
-            {loading ? "Refreshing" : "Refresh"}
+            {loading
+              ? "Refreshing"
+              : "Refresh"}
           </button>
         </header>
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          {moduleOptions.map((option) => {
-            const active = module === option.value
+          {moduleOptions.map(
+            (option) => {
+              const active =
+                module ===
+                option.value
 
-            return (
-              <button
-                key={option.value || "all"}
-                type="button"
-                onClick={() =>
-                  selectModule(
-                    option.value as Module,
-                  )
-                }
-                className={`h-8 rounded-lg border px-3 text-xs font-medium transition-all ${
-                  active
-                    ? "border-blue-500/60 bg-blue-500/10 text-blue-400"
-                    : "border-border bg-card text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
-                }`}
-              >
-                {option.label}
-              </button>
-            )
-          })}
+              return (
+                <button
+                  key={
+                    option.value ||
+                    "all"
+                  }
+                  type="button"
+                  onClick={() =>
+                    selectModule(
+                      option.value as Module,
+                    )
+                  }
+                  className={`h-8 rounded-lg border px-3 text-xs font-medium transition-all ${
+                    active
+                      ? "border-blue-500/60 bg-blue-500/10 text-blue-400"
+                      : "border-border bg-card text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              )
+            },
+          )}
         </div>
 
         <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -1369,8 +1833,14 @@ export default function ActionLogs() {
 
               <input
                 value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value)
+                onChange={(
+                  event,
+                ) => {
+                  setSearch(
+                    event.target
+                      .value,
+                  )
+
                   setPage(1)
                 }}
                 placeholder="Search entries, people, ranks, IDs..."
@@ -1381,10 +1851,13 @@ export default function ActionLogs() {
             {hasFilters ? (
               <button
                 type="button"
-                onClick={clearFilters}
+                onClick={
+                  clearFilters
+                }
                 className="inline-flex h-9 shrink-0 items-center gap-1.5 px-1 text-xs font-medium text-white transition-colors hover:text-blue-300"
               >
                 <X className="h-3.5 w-3.5 text-white" />
+
                 Clear
               </button>
             ) : null}
@@ -1392,8 +1865,12 @@ export default function ActionLogs() {
 
           <FilterSelect
             value={userId}
-            options={userOptions}
-            onChange={(value) => {
+            options={
+              userOptions
+            }
+            onChange={(
+              value,
+            ) => {
               setUserId(value)
               setPage(1)
               setExpanded(null)
@@ -1404,8 +1881,12 @@ export default function ActionLogs() {
 
           <FilterSelect
             value={action}
-            options={actionOptions}
-            onChange={(value) => {
+            options={
+              actionOptions
+            }
+            onChange={(
+              value,
+            ) => {
               setAction(value)
               setPage(1)
               setExpanded(null)
@@ -1416,9 +1897,15 @@ export default function ActionLogs() {
 
           <FilterSelect
             value={category}
-            options={categoryOptions}
-            onChange={(value) => {
-              setCategory(value as Category)
+            options={
+              categoryOptions
+            }
+            onChange={(
+              value,
+            ) => {
+              setCategory(
+                value as Category,
+              )
               setPage(1)
               setExpanded(null)
             }}
@@ -1428,9 +1915,15 @@ export default function ActionLogs() {
 
           <FilterSelect
             value={division}
-            options={divisionOptions}
-            onChange={(value) => {
-              setDivision(value as Division)
+            options={
+              divisionOptions
+            }
+            onChange={(
+              value,
+            ) => {
+              setDivision(
+                value as Division,
+              )
               setPage(1)
               setExpanded(null)
             }}
@@ -1440,7 +1933,9 @@ export default function ActionLogs() {
 
           <span className="ml-auto text-xs text-muted-foreground">
             {total.toLocaleString()}{" "}
-            {total === 1 ? "change" : "changes"}
+            {total === 1
+              ? "change"
+              : "changes"}
           </span>
         </div>
 
@@ -1451,14 +1946,17 @@ export default function ActionLogs() {
         ) : null}
 
         <section>
-          {loading && !logs.length ? (
+          {loading &&
+          !logs.length ? (
             <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
               <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+
               Loading promotion logs...
             </div>
           ) : null}
 
-          {!loading && !logs.length ? (
+          {!loading &&
+          !logs.length ? (
             <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
               <History className="h-8 w-8 text-muted-foreground" />
 
@@ -1467,168 +1965,205 @@ export default function ActionLogs() {
               </p>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Try clearing the filters or perform a
-                dashboard action.
+                Try clearing the
+                filters or perform
+                a dashboard action.
               </p>
             </div>
           ) : null}
 
-          {grouped.map(([heading, group]) => (
-            <div key={heading} className="mb-6">
-              <div className="mb-2 px-0">
-                <span className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
-                  {heading}
-                </span>
-              </div>
+          {grouped.map(
+            ([
+              heading,
+              group,
+            ]) => (
+              <div
+                key={heading}
+                className="mb-6"
+              >
+                <div className="mb-2 px-0">
+                  <span className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
+                    {heading}
+                  </span>
+                </div>
 
-              <div className="space-y-1.5">
-                {group.map((log) => {
-                  const isOpen = expanded === log.id
+                <div className="space-y-1.5">
+                  {group.map(
+                    (log) => {
+                      const isOpen =
+                        expanded ===
+                        log.id
 
-                  return (
-                    <article
-                      key={log.id}
-                      className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-blue-500/25 hover:bg-muted/20"
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setExpanded(
-                            isOpen ? null : log.id,
-                          )
-                        }
-                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/20 md:grid-cols-[44px_40px_minmax(165px,0.65fr)_minmax(280px,2fr)_auto] md:items-center"
-                      >
-                        {/* Entry number */}
-                        <div className="flex items-center">
-                          <span className="font-mono text-[10px] font-semibold text-blue-400">
-                            #{log.entryNumber}
-                          </span>
-                        </div>
+                      const rosterUser =
+                        getRosterUser(
+                          rosterUsers,
+                          log.userId,
+                        )
 
-                        {/* NEW: action icon */}
-                        <div className="flex items-center">
-                          <ActionIcon log={log} />
-                        </div>
+                      const displayName =
+                        rosterUser?.name ||
+                        log.userName ||
+                        log.username ||
+                        "Unknown User"
 
-                        {/* Profile */}
-                        <div className="min-w-0">
-                          <CopyMenu
-                            name={
-                              profiles[log.userId]
-                                ?.displayName ||
-                              log.userName ||
-                              log.username ||
-                              "Unknown User"
+                      return (
+                        <article
+                          key={log.id}
+                          className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-blue-500/25 hover:bg-muted/20"
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpanded(
+                                isOpen
+                                  ? null
+                                  : log.id,
+                              )
                             }
-                            id={log.userId}
-                            callsign={log.callsign}
-                            badgeNumber={
-                              log.badgeNumber
-                            }
-                            rank={log.rank}
-                            avatar={
-                              profiles[log.userId]
-                                ?.avatar ||
-                              log.avatar
-                            }
-                            large
-                          />
-                        </div>
+                            className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/20 md:grid-cols-[44px_40px_minmax(165px,0.65fr)_minmax(280px,2fr)_auto] md:items-center"
+                          >
+                            <div className="flex items-center">
+                              <span className="font-mono text-[10px] font-semibold text-blue-400">
+                                #{log.entryNumber}
+                              </span>
+                            </div>
 
-                        {/* Summary */}
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium leading-5 text-foreground">
-                            {log.summary}
-                          </p>
+                            <div className="flex items-center">
+                              <ActionIcon
+                                log={log}
+                              />
+                            </div>
 
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-                            <span className="text-blue-300/80">
-                              {relativeTime(
-                                log.createdAt,
-                              )}
-                            </span>
+                            <div className="min-w-0">
+                              <CopyMenu
+                                name={
+                                  displayName
+                                }
+                                id={
+                                  log.userId
+                                }
+                                callsign={
+                                  rosterUser?.callsign ||
+                                  log.callsign
+                                }
+                                badgeNumber={
+                                  rosterUser?.badgeNumber ||
+                                  log.badgeNumber
+                                }
+                                rank={
+                                  rosterUser?.rank ||
+                                  log.rank
+                                }
+                                avatar={
+                                  rosterUser?.avatar ||
+                                  log.avatar
+                                }
+                                large
+                              />
+                            </div>
 
-                            <span className="text-muted-foreground/60">
-                              •
-                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium leading-5 text-foreground">
+                                {log.summary}
+                              </p>
 
-                            <Tag
-                              className={tagClass(
-                                "module",
-                                log.module,
-                              )}
-                            >
-                              {moduleLabel(log.module)}
-                            </Tag>
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+                                <span className="text-blue-300/80">
+                                  {relativeTime(
+                                    log.createdAt,
+                                  )}
+                                </span>
 
-                            <Tag
-                              className={tagClass(
-                                "division",
-                                log.division,
-                              )}
-                            >
-                              {divisionLabel(
-                                log.division,
-                              )}
-                            </Tag>
+                                <span className="text-muted-foreground/60">
+                                  •
+                                </span>
 
-                            {log.category ? (
+                                <Tag
+                                  className={tagClass(
+                                    "module",
+                                    log.module,
+                                  )}
+                                >
+                                  {moduleLabel(
+                                    log.module,
+                                  )}
+                                </Tag>
+
+                                <Tag
+                                  className={tagClass(
+                                    "division",
+                                    log.division,
+                                  )}
+                                >
+                                  {divisionLabel(
+                                    log.division,
+                                  )}
+                                </Tag>
+
+                                {log.category ? (
+                                  <Tag
+                                    className={tagClass(
+                                      "category",
+                                      log.category,
+                                    )}
+                                  >
+                                    {actionLabel(
+                                      log.category,
+                                    )}
+                                  </Tag>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2">
                               <Tag
-                                className={tagClass(
-                                  "category",
-                                  log.category,
+                                className={statusClass(
+                                  log,
                                 )}
                               >
-                                {actionLabel(
-                                  log.category,
+                                {statusLabel(
+                                  log,
                                 )}
                               </Tag>
-                            ) : null}
-                          </div>
-                        </div>
 
-                        {/* Status */}
-                        <div className="flex items-center justify-end gap-2">
-                          <Tag
-                            className={statusClass(log)}
-                          >
-                            {statusLabel(log)}
-                          </Tag>
+                              {isOpen ? (
+                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </div>
+                          </button>
 
                           {isOpen ? (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </div>
-                      </button>
-
-                      {isOpen ? (
-                        <DetailPanel
-                          log={log}
-                          profile={
-                            profiles[log.userId]
-                          }
-                        />
-                      ) : null}
-                    </article>
-                  )
-                })}
+                            <DetailPanel
+                              log={log}
+                              rosterUsers={
+                                rosterUsers
+                              }
+                            />
+                          ) : null}
+                        </article>
+                      )
+                    },
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ),
+          )}
         </section>
 
         {total > 0 ? (
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>
-                Page {page} of {pages}
+                Page {page} of{" "}
+                {pages}
               </span>
 
               <FilterSelect
-                value={String(pageSize)}
+                value={String(
+                  pageSize,
+                )}
                 options={[
                   {
                     value: "25",
@@ -1647,8 +2182,13 @@ export default function ActionLogs() {
                     label: "100 / page",
                   },
                 ]}
-                onChange={(value) => {
-                  setPageSize(Number(value))
+                onChange={(
+                  value,
+                ) => {
+                  setPageSize(
+                    Number(value),
+                  )
+
                   setPage(1)
                 }}
                 ariaLabel="Pages"
@@ -1656,8 +2196,10 @@ export default function ActionLogs() {
               />
 
               <span>
-                {start.toLocaleString()}–
-                {end.toLocaleString()} of{" "}
+                {start.toLocaleString()}
+                –
+                {end.toLocaleString()}{" "}
+                of{" "}
                 {total.toLocaleString()}
               </span>
             </div>
@@ -1665,9 +2207,15 @@ export default function ActionLogs() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                disabled={page <= 1 || loading}
+                disabled={
+                  page <= 1 ||
+                  loading
+                }
                 onClick={() =>
-                  setPage((value) => value - 1)
+                  setPage(
+                    (value) =>
+                      value - 1,
+                  )
                 }
                 className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -1677,10 +2225,14 @@ export default function ActionLogs() {
               <button
                 type="button"
                 disabled={
-                  page >= pages || loading
+                  page >= pages ||
+                  loading
                 }
                 onClick={() =>
-                  setPage((value) => value + 1)
+                  setPage(
+                    (value) =>
+                      value + 1,
+                  )
                 }
                 className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
