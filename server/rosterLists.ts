@@ -270,19 +270,25 @@ export function registerRosterListRoutes(app: Express) {
 
       // Preview is deliberately based on the previous week's list. If someone
       // was selected last week, the preview shows the next strike (1 -> 2 -> 3).
-      const previousDocs = history.filter((doc) => doc.week === priorWeek)
+      const effectiveDocForWeek = (docs: RosterListDocument[], targetWeek: string) => {
+        const weekDocs = docs.filter((doc) => doc.week === targetWeek)
+        if (scopeForPreview === "global") {
+          return weekDocs.find((doc) => doc.scope === "global") ?? null
+        }
+        return (
+          weekDocs.find((doc) => doc.scope === "user" && doc.ownerUserId === clean(user.discordId)) ??
+          weekDocs.find((doc) => doc.scope === "global") ??
+          null
+        )
+      }
+
+      const scopeForPreview: "global" | "user" = clean(req.query?.scope).toLowerCase() === "user" ? "user" : "global"
+      const previousDoc = effectiveDocForWeek(history, priorWeek)
       const twoWeeksAgo = previousWeek(priorWeek)
-      const twoWeeksAgoDocs = history.filter((doc) => doc.week === twoWeeksAgo)
+      const twoWeeksAgoDoc = effectiveDocForWeek(history, twoWeeksAgo)
 
-      const previousSelected = new Set<string>()
-      const twoWeeksAgoSelected = new Set<string>()
-
-      for (const doc of previousDocs) {
-        for (const id of doc.selectedUserIds) previousSelected.add(id)
-      }
-      for (const doc of twoWeeksAgoDocs) {
-        for (const id of doc.selectedUserIds) twoWeeksAgoSelected.add(id)
-      }
+      const previousSelected = new Set(previousDoc?.selectedUserIds ?? [])
+      const twoWeeksAgoSelected = new Set(twoWeeksAgoDoc?.selectedUserIds ?? [])
 
       const preview = Array.from(previousSelected).map((userId) => {
         const strike = twoWeeksAgoSelected.has(userId) ? 3 : 2
@@ -300,6 +306,19 @@ export function registerRosterListRoutes(app: Express) {
         current: current.map(serialise),
         history: history.map(serialise),
         preview,
+        effectiveCurrent: (
+          scopeForPreview === "global"
+            ? current.find((doc) => doc.scope === "global")
+            : current.find((doc) => doc.scope === "user" && doc.ownerUserId === clean(user.discordId)) ??
+              current.find((doc) => doc.scope === "global")
+        ) ? serialise(
+          scopeForPreview === "global"
+            ? current.find((doc) => doc.scope === "global")!
+            : current.find((doc) => doc.scope === "user" && doc.ownerUserId === clean(user.discordId)) ??
+              current.find((doc) => doc.scope === "global")!
+        ) : null,
+        effectivePrevious: previousDoc ? serialise(previousDoc) : null,
+        previewScope: scopeForPreview,
       })
     } catch (error) {
       console.error("GET /api/roster-lists failed:", error)
