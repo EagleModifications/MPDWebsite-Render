@@ -7,7 +7,6 @@ import os from "node:os"
 import XLSX from "xlsx"
 
 import { syncGoogleRosters } from "./googleRosterSync"
-import { registerMainRosterRoutes } from "./googleMainRoster"
 
 import {
   authenticateDiscordCode,
@@ -26,6 +25,7 @@ import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
 import { randomUUID } from "node:crypto"
+import youtubeDl from "youtube-dl-exec"
 
 // Gallery uploads use disk-backed temporary storage so large videos are not
 // kept in RAM while they are being copied into MongoDB GridFS.
@@ -796,6 +796,122 @@ async function storeGalleryFile(
     throw error
   } finally {
     await safeUnlinkGalleryTempFile(file.path)
+  }
+}
+
+function isSupportedGalleryExternalVideoUrl(value: string) {
+  try {
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase().replace(/^www\./, "")
+
+    return (
+      host === "youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "youtu.be" ||
+      host === "vimeo.com" ||
+      host === "player.vimeo.com"
+    )
+  } catch {
+    return false
+  }
+}
+
+async function importGalleryExternalVideo(
+  sourceUrl: string,
+) {
+  const url = sourceUrl.trim()
+
+  if (!isSupportedGalleryExternalVideoUrl(url)) {
+    throw new Error("Only YouTube and Vimeo video URLs can be imported as gallery files.")
+  }
+
+  const jobId = randomUUID()
+  const outputTemplate = path.join(
+    GALLERY_UPLOAD_DIR,
+    `external-${jobId}-%(ext)s`,
+  )
+
+  try {
+    await youtubeDl(
+      url,
+      {
+        noPlaylist: true,
+        format: "best[ext=mp4]/best",
+        output: outputTemplate,
+        noPart: true,
+        restrictFilenames: true,
+        noWarnings: true,
+      },
+      {
+        timeout: 20 * 60 * 1000,
+        killSignal: "SIGKILL",
+      },
+    )
+
+    const files = fs
+      .readdirSync(GALLERY_UPLOAD_DIR)
+      .filter((name) => name.startsWith(`external-${jobId}-`))
+
+    if (!files.length) {
+      throw new Error("The video extractor completed without producing a video file.")
+    }
+
+    const filename = files[0]
+    const filePath = path.join(GALLERY_UPLOAD_DIR, filename)
+    const stat = fs.statSync(filePath)
+
+    if (!stat.isFile() || stat.size <= 0) {
+      throw new Error("The extracted video file is empty.")
+    }
+
+    if (stat.size > 100 * 1024 * 1024) {
+      throw new Error("The extracted video is larger than the 100 MB gallery limit.")
+    }
+
+    const extension = path.extname(filename).toLowerCase()
+    const mimetype =
+      extension === ".mp4"
+        ? "video/mp4"
+        : extension === ".webm"
+          ? "video/webm"
+          : extension === ".mkv"
+            ? "video/x-matroska"
+            : "video/*"
+
+    const stored = await storeGalleryFile({
+      fieldname: "file",
+      originalname: `gallery-${jobId}${extension || ".mp4"}`,
+      encoding: "7bit",
+      mimetype,
+      size: stat.size,
+      destination: GALLERY_UPLOAD_DIR,
+      filename,
+      path: filePath,
+      buffer: undefined,
+      stream: fs.createReadStream(filePath),
+    } as Express.Multer.File)
+
+    return {
+      ...stored,
+      source: "upload" as const,
+    }
+  } catch (error) {
+    for (const name of fs
+      .readdirSync(GALLERY_UPLOAD_DIR)
+      .filter((entry) => entry.startsWith(`external-${jobId}-`))) {
+      await safeUnlinkGalleryTempFile(
+        path.join(GALLERY_UPLOAD_DIR, name),
+      )
+    }
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unknown extraction error"
+
+    throw new Error(
+      `Unable to import the video from the URL. ${message}`,
+    )
   }
 }
 
@@ -4142,9 +4258,6 @@ export function createApp() {
   app.use(express.json())
   app.use(cookieParser())
 
-  // Google Sheets Main Roster API
-  registerMainRosterRoutes(app)
-
   app.get("/health", (_req, res) => {
     res.status(200).json({
       ok: true,
@@ -5669,6 +5782,61 @@ export function createApp() {
    * Stream an uploaded gallery file from
    * MongoDB GridFS.
    */
+  app.post(
+    "/api/gallery/import-url",
+    async (req, res) => {
+      try {
+        const user = await getRequestUser(req)
+
+        if (!user) {
+          return res.status(401).json({
+            success: false,
+            error: "Not authenticated",
+          })
+        }
+
+        if (!hasPermission(user, "gallery")) {
+          return res.status(403).json({
+            success: false,
+            error: "You do not have permission to manage the gallery",
+          })
+        }
+
+        const url =
+          typeof req.body?.url === "string"
+            ? req.body.url.trim()
+            : ""
+
+        if (!url) {
+          return res.status(400).json({
+            success: false,
+            error: "A video URL is required.",
+          })
+        }
+
+        const media = await importGalleryExternalVideo(url)
+
+        return res.status(201).json({
+          success: true,
+          item: media,
+        })
+      } catch (error) {
+        console.error(
+          "POST /api/gallery/import-url failed:",
+          error,
+        )
+
+        return res.status(400).json({
+          success: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to import video URL",
+        })
+      }
+    },
+  )
+
   app.get(
     "/api/gallery/file/:id",
     async (req, res) => {
