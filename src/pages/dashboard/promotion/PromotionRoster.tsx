@@ -24,7 +24,6 @@ import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
 import GoogleRosterRefresh from "@/components/dashboard/GoogleRosterRefresh"
-import { logPromotionAction } from "@/lib/promotionActionLog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -568,15 +567,7 @@ export default function PromotionRoster() {
     )
 
     if (member) {
-      logPromotionAction({
-        action: wasSelected ? "deselect-member" : "select-member",
-        category: "roster",
-        division,
-        targetUserId: member.discordId,
-        targetName: member.name,
-        targetRank: member.rank,
-        summary: `${wasSelected ? "Deselected" : "Selected"} ${member.name} in the ${division} promotion roster.`,
-      })
+      
     }
 
     setSelectedCopied(false)
@@ -619,14 +610,7 @@ export default function PromotionRoster() {
       ),
     )
 
-    logPromotionAction({
-      action: "select-rank",
-      category: "roster",
-      division,
-      targetRank: member.rank,
-      summary: `Selected ${rankIds.length} ${member.rank} members in the ${division} promotion roster.`,
-      details: { count: rankIds.length },
-    })
+    
 
     setSelectedCopied(false)
   }
@@ -682,13 +666,7 @@ export default function PromotionRoster() {
       )
     }
 
-    logPromotionAction({
-      action: allSelected ? "deselect-all-visible" : "select-all-visible",
-      category: "roster",
-      division,
-      summary: `${allSelected ? "Deselected" : "Selected"} all ${visibleIds.length} visible members in the ${division} promotion roster.`,
-      details: { count: visibleIds.length },
-    })
+    
 
     setSelectedCopied(false)
   }
@@ -873,17 +851,7 @@ export default function PromotionRoster() {
         },
       )
 
-      logPromotionAction({
-        action: "copy-roster",
-        category: "roster",
-        division,
-        summary: `Copied ${selectedMembers.length} selected members from the ${division} promotion roster.`,
-        details: {
-          copyType: type,
-          count: selectedMembers.length,
-          memberIds: selectedMembers.map((member) => member.discordId),
-        },
-      })
+      
 
       window.setTimeout(() => {
         setSelectedCopied(false)
@@ -918,13 +886,7 @@ export default function PromotionRoster() {
 
     setSelectedCopied(false)
 
-    logPromotionAction({
-      action: "filter-status",
-      category: "roster",
-      division,
-      summary: `Toggled ${getStatusLabel(status)} status filter on the ${division} promotion roster.`,
-      details: { status },
-    })
+    
   }
 
   const selectAllStatuses = () => {
@@ -934,24 +896,14 @@ export default function PromotionRoster() {
       ),
     )
 
-    logPromotionAction({
-      action: "filter-status",
-      category: "roster",
-      division,
-      summary: `Selected all status filters on the ${division} promotion roster.`,
-    })
+    
 
     setSelectedCopied(false)
   }
 
   const clearStatuses = () => {
     setStatusFilters([])
-    logPromotionAction({
-      action: "clear-status-filters",
-      category: "roster",
-      division,
-      summary: `Cleared status filters on the ${division} promotion roster.`,
-    })
+    
     setSelectedCopied(false)
   }
 
@@ -980,38 +932,20 @@ export default function PromotionRoster() {
       return [...current, rank]
     })
 
-    logPromotionAction({
-      action: "filter-rank",
-      category: "roster",
-      division,
-      targetRank: rank,
-      summary: `Toggled ${rank} rank filter on the ${division} promotion roster.`,
-      details: { rank },
-    })
+    
 
     setSelectedCopied(false)
   }
 
   const selectAllRanks = () => {
     setRankFilters([...rankOptions])
-    logPromotionAction({
-      action: "filter-rank",
-      category: "roster",
-      division,
-      summary: `Selected all rank filters on the ${division} promotion roster.`,
-      details: { ranks: rankOptions },
-    })
+    
     setSelectedCopied(false)
   }
 
   const clearRanks = () => {
     setRankFilters([])
-    logPromotionAction({
-      action: "clear-rank-filters",
-      category: "roster",
-      division,
-      summary: `Cleared rank filters on the ${division} promotion roster.`,
-    })
+    
     setSelectedCopied(false)
   }
 
@@ -1025,12 +959,7 @@ export default function PromotionRoster() {
     setRankFilters([])
     setSelectedCopied(false)
 
-    logPromotionAction({
-      action: "clear-filters",
-      category: "roster",
-      division,
-      summary: `Cleared all filters on the ${division} promotion roster.`,
-    })
+    
   }
 
   const allVisibleSelected =
@@ -1062,15 +991,7 @@ export default function PromotionRoster() {
     try {
       await navigator.clipboard.writeText(member.discordId)
 
-      logPromotionAction({
-        action: "copy-discord-id",
-        category: "roster",
-        division,
-        targetUserId: member.discordId,
-        targetName: member.name,
-        targetRank: member.rank,
-        summary: `Copied ${member.name}'s Discord ID from the ${division} promotion roster.`,
-      })
+      
 
       toast.success("Discord ID copied", {
         description: `${member.name}'s Discord ID has been copied to your clipboard.`,
@@ -1131,16 +1052,7 @@ export default function PromotionRoster() {
                         return
                       }
 
-                      logPromotionAction({
-                        action: "change-division",
-                        category: "navigation",
-                        division: item.id,
-                        summary: `Switched Promotion Roster from ${divisions.find((entry) => entry.id === division)?.label ?? division} to ${item.label}.`,
-                        details: {
-                          fromDivision: division,
-                          toDivision: item.id,
-                        },
-                      })
+                      
 
                       setDivision(item.id)
                       setSearch("")
