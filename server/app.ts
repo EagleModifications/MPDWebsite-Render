@@ -21,7 +21,7 @@ import {
   setSessionCookie,
 } from "./auth/session"
 
-import { canAccessPage, hasPermission } from "./permissions/permissions"
+import { canAccessPage, hasPermission, isPageProtected } from "./permissions/permissions"
 import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
@@ -4413,22 +4413,8 @@ export function createApp() {
   app.get(
     "/api/auth/check",
     async (req, res) => {
-      const user =
-        await getRequestUser(req)
-
-      if (!user) {
-        return res
-          .status(401)
-          .json({
-            error:
-              "Unauthorized",
-          })
-      }
-
       const permission =
-        typeof req.query
-          .permission ===
-        "string"
+        typeof req.query.permission === "string"
           ? req.query.permission
           : null
 
@@ -4437,37 +4423,68 @@ export function createApp() {
           ? req.query.url
           : null
 
-      if (
-        permission &&
-        !hasPermission(
+      if (!permission && !url) {
+        return res.status(400).json({
+          error: "A permission or url query parameter is required.",
+        })
+      }
+
+      const user = await getRequestUser(req)
+
+      // Permission checks always require authentication.
+      if (permission) {
+        if (!user) {
+          return res.status(401).json({
+            error: "Unauthorized",
+          })
+        }
+
+        if (!hasPermission(user, permission)) {
+          return res.status(403).json({
+            error: "Forbidden",
+          })
+        }
+
+        return res.json({
+          allowed: true,
           user,
-          permission,
-        )
-      ) {
-        return res
-          .status(403)
-          .json({
-            error:
-              "Forbidden",
-          })
+        })
       }
 
-      if (
-        url &&
-        !(await canAccessPage(user, url))
-      ) {
-        return res
-          .status(403)
-          .json({
-            error:
-              "Forbidden",
-          })
-      }
+      if (url) {
+        const protectedPage = await isPageProtected(url)
 
-      return res.json({
-        allowed: true,
-        user,
-      })
+        // Unprotected pages are public. This is important because the
+        // frontend calls this endpoint for every browser route.
+        if (!protectedPage) {
+          return res.json({
+            allowed: true,
+            protected: false,
+            user,
+          })
+        }
+
+        // A protected page requires a logged-in user.
+        if (!user) {
+          return res.status(401).json({
+            error: "Unauthorized",
+            protected: true,
+          })
+        }
+
+        if (!(await canAccessPage(user, url))) {
+          return res.status(403).json({
+            error: "Forbidden",
+            protected: true,
+          })
+        }
+
+        return res.json({
+          allowed: true,
+          protected: true,
+          user,
+        })
+      }
     },
   )
 
