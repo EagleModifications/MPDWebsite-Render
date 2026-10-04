@@ -3720,8 +3720,8 @@ async function handlePromotionImport(
       action: "promotion_import",
       category: "import",
       division,
-      targetName: `${division} promotion data`,
-      summary: `Imported promotion points: ${rows.length} rows, ${added} added, ${updated} updated.`,
+      target: `${division} promotion data`,
+      description: `Imported promotion points: ${rows.length} rows, ${added} added, ${updated} updated.`,
       details: {
         imported: rows.length,
         added,
@@ -4078,8 +4078,8 @@ async function handlePromotionRequirementsSave(
       action: "promotion_requirements_save",
       category: "requirements",
       division,
-      targetName: `${division} promotion requirements`,
-      summary: `Saved promotion requirements for ${Object.keys(requirements).length} ranks.`,
+      target: `${division} promotion requirements`,
+      description: `Saved promotion requirements for ${Object.keys(requirements).length} ranks.`,
       details: {
         rankCount: Object.keys(requirements).length,
         requirements: Object.values(requirements).map((item) => ({
@@ -4411,6 +4411,54 @@ export function createApp() {
           await authenticateDiscordCode(
             code,
           )
+
+        // Cache the exact Discord profile returned by OAuth.
+        // Promotion Roster can then show the same display name,
+        // username, and avatar that the Sidebar shows for that user.
+        try {
+          const db = await getMongoDb()
+          const discordProfiles =
+            db.collection("discordProfiles")
+
+          const discordId =
+            typeof user.discordId === "string"
+              ? user.discordId.trim()
+              : ""
+
+          if (discordId) {
+            await discordProfiles.updateOne(
+              { discordId },
+              {
+                $set: {
+                  discordId,
+                  username:
+                    typeof user.username === "string"
+                      ? user.username.trim()
+                      : "",
+                  displayName:
+                    typeof user.displayName === "string"
+                      ? user.displayName.trim()
+                      : "",
+                  avatar:
+                    typeof user.avatar === "string"
+                      ? user.avatar.trim()
+                      : null,
+                  updatedAt: new Date(),
+                },
+                $setOnInsert: {
+                  createdAt: new Date(),
+                },
+              },
+              { upsert: true },
+            )
+          }
+        } catch (profileCacheError) {
+          // Profile caching must never prevent a successful login.
+          console.error(
+            "[auth] Failed to cache Discord profile:",
+            profileCacheError,
+          )
+        }
 
         const token =
           await createSession(user)
@@ -5116,11 +5164,48 @@ export function createApp() {
           })
         }
 
+        const db = await getMongoDb()
+        const discordProfiles =
+          db.collection("discordProfiles")
+
+        // First use the profile captured during that user's Discord OAuth
+        // login. This is the exact same source used to build the Sidebar
+        // session profile: displayName, username, and avatar.
+        const cachedProfile =
+          await discordProfiles.findOne({
+            discordId,
+          })
+
+        if (cachedProfile) {
+          return res.json({
+            success: true,
+            profile: {
+              id: discordId,
+              username:
+                typeof cachedProfile.username === "string"
+                  ? cachedProfile.username
+                  : "",
+              displayName:
+                typeof cachedProfile.displayName === "string"
+                  ? cachedProfile.displayName
+                  : "",
+              avatar:
+                typeof cachedProfile.avatar === "string"
+                  ? cachedProfile.avatar
+                  : null,
+            },
+            source: "login",
+          })
+        }
+
+        // Fallback for users who have not logged in since profile caching
+        // was introduced. If a bot token is configured, Discord can provide
+        // the same profile fields directly. The result is cached as well.
         if (!env.discordBotToken) {
-          return res.status(503).json({
+          return res.status(404).json({
             success: false,
             error:
-              "Discord profile lookup is not configured. Set DISCORD_BOT_TOKEN on the server.",
+              "This Discord user's profile has not been cached from a login yet. Ask the user to sign in once, then refresh the roster.",
           })
         }
 
@@ -5158,18 +5243,38 @@ export function createApp() {
           avatar?: string | null
         }
 
+        const profile = {
+          id: String(discordUser.id ?? discordId),
+          username: String(discordUser.username ?? "").trim(),
+          displayName: String(
+            discordUser.global_name ||
+              discordUser.username ||
+              "",
+          ).trim(),
+          avatar: discordUser.avatar ?? null,
+        }
+
+        await discordProfiles.updateOne(
+          { discordId },
+          {
+            $set: {
+              discordId,
+              username: profile.username,
+              displayName: profile.displayName,
+              avatar: profile.avatar,
+              updatedAt: new Date(),
+            },
+            $setOnInsert: {
+              createdAt: new Date(),
+            },
+          },
+          { upsert: true },
+        )
+
         return res.json({
           success: true,
-          profile: {
-            id: String(discordUser.id ?? discordId),
-            username: String(discordUser.username ?? "").trim(),
-            displayName: String(
-              discordUser.global_name ||
-                discordUser.username ||
-                "",
-            ).trim(),
-            avatar: discordUser.avatar ?? null,
-          },
+          profile,
+          source: "discord-api",
         })
       } catch (error) {
         console.error(
@@ -5513,8 +5618,8 @@ export function createApp() {
         await logPromotionAction(user, {
           action: "promotion_roster_refresh",
           category: "roster",
-          targetName: "Google roster synchronization",
-          summary: "Manually synchronized Google roster data.",
+          target: "Google roster synchronization",
+          description: "Manually synchronized Google roster data.",
           details: result as unknown as Record<string, unknown>,
         })
 
