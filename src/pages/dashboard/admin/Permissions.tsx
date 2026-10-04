@@ -296,6 +296,11 @@ export default function Permissions() {
 
   const [adminRanks, setAdminRanks] = useState<string[]>([])
   const [superAdminIds, setSuperAdminIds] = useState<string[]>([])
+  const [discordNames, setDiscordNames] = useState<Record<string, string>>({})
+  const [deleteTarget, setDeleteTarget] = useState<
+    { type: "permission" | "rank" | "discord"; label: string; id: string } | null
+  >(null)
+  const [contextMenu, setContextMenu] = useState<{ discordId: string; x: number; y: number } | null>(null)
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -378,6 +383,64 @@ export default function Permissions() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadDiscordNames() {
+      const divisions = ["department", "swat", "mtf7", "mcd", "tru", "teu", "sar"]
+      const map: Record<string, string> = {}
+
+      await Promise.all(
+        divisions.map(async (division) => {
+          try {
+            const response = await fetch(`/api/promotion/roster/${division}`, {
+              credentials: "include",
+              cache: "no-store",
+              headers: { Accept: "application/json" },
+            })
+            if (!response.ok) return
+            const data = await response.json() as { members?: Array<{ discordId?: unknown; name?: unknown }> }
+            for (const member of data.members ?? []) {
+              const id = String(member.discordId ?? "").trim()
+              const name = String(member.name ?? "").trim()
+              if (id && name && !map[id]) map[id] = name
+            }
+          } catch {
+            // A roster failing should not prevent the permissions page from loading.
+          }
+        }),
+      )
+
+      if (!cancelled) setDiscordNames(map)
+    }
+
+    void loadDiscordNames()
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    const close = () => setContextMenu(null)
+    window.addEventListener("click", close)
+    window.addEventListener("scroll", close, true)
+    return () => {
+      window.removeEventListener("click", close)
+      window.removeEventListener("scroll", close, true)
+    }
+  }, [])
+
+  async function copyText(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success(`${label} copied.`)
+    } catch {
+      toast.error(`Failed to copy ${label.toLowerCase()}.`)
+    }
+  }
+
+  function discordDisplayName(discordId: string) {
+    return discordNames[discordId] || "Unknown User"
+  }
 
   function closeModal() {
     setModalKind(null)
@@ -730,23 +793,26 @@ export default function Permissions() {
   }
 
   async function deletePermission(permission: Permission) {
-    if (
-      !window.confirm(
-        `Delete the "${permission.name || permission.key}" permission?`,
-      )
-    ) {
-      return
-    }
+    setDeleteTarget({ type: "permission", label: permission.name || permission.key, id: permission.key })
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+
+    const target = deleteTarget
+    setDeleteTarget(null)
 
     try {
-      await requestJson(
-        `/api/admin/permissions/${encodeURIComponent(permission.key)}`,
-        {
-          method: "DELETE",
-        },
-      )
-
-      toast.success("Permission deleted.")
+      if (target.type === "permission") {
+        await requestJson(`/api/admin/permissions/${encodeURIComponent(target.id)}`, { method: "DELETE" })
+        toast.success("Permission deleted.")
+      } else if (target.type === "rank") {
+        await requestJson(`/api/admin/ranks/${encodeURIComponent(target.id)}`, { method: "DELETE" })
+        toast.success("Rank deleted.")
+      } else {
+        await requestJson(`/api/admin/discord-permissions/${encodeURIComponent(target.id)}`, { method: "DELETE" })
+        toast.success("Discord permissions removed.")
+      }
       await load()
     } catch (error) {
       toast.error(
@@ -810,33 +876,10 @@ export default function Permissions() {
 
   async function deleteRank(rank: Rank) {
     if (rank.isAdminRank) {
-      toast.error(
-        "Admin ranks are controlled by config/admin_permissions.json.",
-      )
+      toast.error("Admin ranks are controlled by config/admin_permissions.json.")
       return
     }
-
-    if (!window.confirm(`Delete the "${rank.rank}" rank permissions?`)) {
-      return
-    }
-
-    try {
-      await requestJson(
-        `/api/admin/ranks/${encodeURIComponent(rank.rank)}`,
-        {
-          method: "DELETE",
-        },
-      )
-
-      toast.success("Rank deleted.")
-      await load()
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to delete rank.",
-      )
-    }
+    setDeleteTarget({ type: "rank", label: rank.rank, id: rank.rank })
   }
 
   async function submitDiscord() {
@@ -881,39 +924,14 @@ export default function Permissions() {
 
   async function deleteDiscord(entry: DiscordPermission) {
     if (entry.isSuperAdmin) {
-      toast.error(
-        "Super Admin Discord IDs are controlled by config/admin_permissions.json.",
-      )
+      toast.error("Super Admin Discord IDs are controlled by config/admin_permissions.json.")
       return
     }
-
-    if (
-      !window.confirm(
-        `Remove the Discord permission override for ${entry.discordId}?`,
-      )
-    ) {
-      return
-    }
-
-    try {
-      await requestJson(
-        `/api/admin/discord-permissions/${encodeURIComponent(
-          entry.discordId,
-        )}`,
-        {
-          method: "DELETE",
-        },
-      )
-
-      toast.success("Discord permissions removed.")
-      await load()
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to remove Discord permissions.",
-      )
-    }
+    setDeleteTarget({
+      type: "discord",
+      label: `${discordDisplayName(entry.discordId)} (${entry.discordId})`,
+      id: entry.discordId,
+    })
   }
 
   return (
@@ -1144,6 +1162,17 @@ export default function Permissions() {
                       <Button
                         type="button"
                         variant="outline"
+                        className="shrink-0"
+                        onClick={() => void copyText(rank.rank, "Rank") }
+                        aria-label={`Copy ${rank.rank}`}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
                         className="shrink-0 px-3"
                         disabled={rank.isAdminRank}
                         onClick={() => void deleteRank(rank)}
@@ -1234,8 +1263,15 @@ export default function Permissions() {
                           }`}
                         />
 
-                        <span className="truncate font-mono text-sm font-semibold">
-                          {entry.discordId}
+                        <span
+                          className="truncate text-sm font-semibold text-blue-400"
+                          title={`${discordDisplayName(entry.discordId)} (${entry.discordId})`}
+                          onContextMenu={(event) => {
+                            event.preventDefault()
+                            setContextMenu({ discordId: entry.discordId, x: event.clientX, y: event.clientY })
+                          }}
+                        >
+                          {discordDisplayName(entry.discordId)} ({entry.discordId})
                         </span>
 
                         {entry.isSuperAdmin ? (
@@ -1255,6 +1291,17 @@ export default function Permissions() {
                           >
                             <Pencil className="mr-2 h-4 w-4" />
                             Edit
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="shrink-0"
+                            onClick={() => void copyText(entry.discordId, "Discord ID")}
+                            aria-label={`Copy Discord ID ${entry.discordId}`}
+                          >
+                            <Copy className="mr-2 h-4 w-4" />
+                            Copy
                           </Button>
 
                           <Button
@@ -1349,6 +1396,53 @@ export default function Permissions() {
           </div>
         </section>
       </div>
+
+      {contextMenu ? (
+        <div
+          className="fixed z-[100] min-w-44 rounded-xl border border-border bg-card p-1.5 shadow-2xl"
+          style={{ left: Math.min(contextMenu.x, window.innerWidth - 190), top: Math.min(contextMenu.y, window.innerHeight - 70) }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
+            onClick={() => {
+              void copyText(contextMenu.discordId, "Discord ID")
+              setContextMenu(null)
+            }}
+          >
+            <Copy className="h-4 w-4" />
+            Copy ID
+          </button>
+        </div>
+      ) : null}
+
+      <Modal
+        open={Boolean(deleteTarget)}
+        title="Confirm Delete"
+        description="This action cannot be undone."
+        onClose={() => setDeleteTarget(null)}
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void confirmDelete()}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete
+            <span className="mx-1 font-semibold text-foreground">
+              {deleteTarget?.label}
+            </span>?
+          </p>
+        </div>
+      </Modal>
 
       {/* PERMISSION MODAL */}
       <Modal
