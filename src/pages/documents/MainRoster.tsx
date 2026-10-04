@@ -1,26 +1,18 @@
 import {
+  AlertCircle,
+  Car,
+  Database,
+  Home,
+  Loader2,
   Search,
+  Shirt,
   Shield,
   Users,
-  Car,
-  Shirt,
-  Home,
-  Database,
-  ChevronDown,
-  Filter,
-  X,
 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
-import DashboardLayout from "@/components/dashboard/DashboardLayout"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import Navbar from "@/components/home/Navbar"
+import Footer from "@/components/Footer"
 
 type TabId =
   | "home"
@@ -35,18 +27,15 @@ type Tab = {
   icon: typeof Home
   gid: string
   searchable?: boolean
-  filters?: boolean
 }
 
-/*
- * IMPORTANT:
- *
- * This is the PUBLISHED Google Sheets URL.
- *
- * Do NOT use the normal spreadsheet ID here.
- */
+type SheetData = {
+  headers: string[]
+  rows: string[][]
+}
+
 const PUBLISHED_SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDo_yVusgQRYUpyDhfNnkBrJXPaNXAbSYvfndxC14IcKjVp9-8wDnOCb8_AGCsgRYLNeXyWzgimNuL/pubhtml"
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDo_yVusgQRYUpyDhfNnkBrJXPaNXAbSYvfndxC14IcKjVp9-8wDnOCb8_AGCsgRYLNeXyWzgimNuL/pub"
 
 const tabs: Tab[] = [
   {
@@ -61,7 +50,6 @@ const tabs: Tab[] = [
     icon: Users,
     gid: "1093680513",
     searchable: true,
-    filters: true,
   },
   {
     id: "employees",
@@ -69,7 +57,6 @@ const tabs: Tab[] = [
     icon: Database,
     gid: "1598052317",
     searchable: true,
-    filters: true,
   },
   {
     id: "vehicles",
@@ -85,37 +72,94 @@ const tabs: Tab[] = [
   },
 ]
 
-/*
- * These are currently UI filters.
- *
- * The Google Sheet itself is inside a cross-origin iframe,
- * so React cannot directly filter its rows.
- *
- * If you want these to actually filter the roster data,
- * the Department Roster and Employee Database need to be
- * loaded through your Google Sheets API/server endpoint
- * instead of an iframe.
- */
-const filterOptions = [
-  {
-    id: "active",
-    label: "Active",
-  },
-  {
-    id: "inactive",
-    label: "Inactive",
-  },
-]
+function parseCsv(csv: string): string[][] {
+  const rows: string[][] = []
+
+  let row: string[] = []
+  let cell = ""
+  let insideQuotes = false
+
+  for (let i = 0; i < csv.length; i += 1) {
+    const character = csv[i]
+    const nextCharacter = csv[i + 1]
+
+    if (character === '"') {
+      if (insideQuotes && nextCharacter === '"') {
+        cell += '"'
+        i += 1
+      } else {
+        insideQuotes = !insideQuotes
+      }
+
+      continue
+    }
+
+    if (character === "," && !insideQuotes) {
+      row.push(cell)
+      cell = ""
+      continue
+    }
+
+    if (
+      (character === "\n" || character === "\r") &&
+      !insideQuotes
+    ) {
+      if (
+        character === "\r" &&
+        nextCharacter === "\n"
+      ) {
+        i += 1
+      }
+
+      row.push(cell)
+      cell = ""
+
+      if (
+        row.some(
+          (value) => value.trim().length > 0,
+        )
+      ) {
+        rows.push(row)
+      }
+
+      row = []
+      continue
+    }
+
+    cell += character
+  }
+
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell)
+
+    if (
+      row.some(
+        (value) => value.trim().length > 0,
+      )
+    ) {
+      rows.push(row)
+    }
+  }
+
+  return rows
+}
 
 export default function MainRoster() {
   const [activeTab, setActiveTab] =
     useState<TabId>("home")
 
-  const [search, setSearch] =
-    useState("")
+  const [search, setSearch] = useState("")
 
-  const [filters, setFilters] =
-    useState<string[]>([])
+  const [sheetData, setSheetData] =
+    useState<SheetData>({
+      headers: [],
+      rows: [],
+    })
+
+  const [loading, setLoading] = useState(true)
+
+  const [error, setError] =
+    useState<string | null>(null)
 
   const activeTabData = useMemo(
     () =>
@@ -127,91 +171,176 @@ export default function MainRoster() {
 
   const ActiveIcon = activeTabData.icon
 
-  /*
-   * Google published-sheet embed.
-   *
-   * gid       = selected worksheet
-   * single    = only selected worksheet
-   * widget    = false removes Google sheet tabs
-   * headers   = false removes Google row/column headers
-   * chrome    = false removes Google title/footer UI
-   */
-  const embedUrl = useMemo(() => {
-    const params = new URLSearchParams({
-      gid: activeTabData.gid,
-      single: "true",
-      widget: "false",
-      headers: "false",
-      chrome: "false",
-    })
+  useEffect(() => {
+    let cancelled = false
 
-    return `${PUBLISHED_SHEET_URL}?${params.toString()}`
+    async function loadSheet() {
+      setLoading(true)
+      setError(null)
+      setSearch("")
+
+      try {
+        const url = new URL(
+          PUBLISHED_SHEET_URL,
+        )
+
+        url.searchParams.set(
+          "gid",
+          activeTabData.gid,
+        )
+
+        url.searchParams.set(
+          "single",
+          "true",
+        )
+
+        url.searchParams.set(
+          "output",
+          "csv",
+        )
+
+        const response = await fetch(
+          url.toString(),
+        )
+
+        if (!response.ok) {
+          throw new Error(
+            `Google Sheets returned ${response.status}.`,
+          )
+        }
+
+        const csv = await response.text()
+
+        if (cancelled) {
+          return
+        }
+
+        const parsed = parseCsv(csv)
+
+        if (parsed.length === 0) {
+          setSheetData({
+            headers: [],
+            rows: [],
+          })
+
+          return
+        }
+
+        const headers = parsed[0].map(
+          (header) => header.trim(),
+        )
+
+        const rows = parsed
+          .slice(1)
+          .map((row) => {
+            const normalized = [...row]
+
+            while (
+              normalized.length <
+              headers.length
+            ) {
+              normalized.push("")
+            }
+
+            return normalized.slice(
+              0,
+              headers.length,
+            )
+          })
+
+        setSheetData({
+          headers,
+          rows,
+        })
+      } catch (err) {
+        console.error(
+          "Failed to load Google Sheet:",
+          err,
+        )
+
+        if (cancelled) {
+          return
+        }
+
+        setSheetData({
+          headers: [],
+          rows: [],
+        })
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load the Google Sheet.",
+        )
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadSheet()
+
+    return () => {
+      cancelled = true
+    }
   }, [activeTabData.gid])
 
-  const hasFilters =
-    Boolean(search.trim()) ||
-    filters.length > 0
+  const filteredRows = useMemo(() => {
+    const query = search
+      .trim()
+      .toLowerCase()
 
-  const toggleFilter = (
-    filter: string,
-  ) => {
-    setFilters((current) =>
-      current.includes(filter)
-        ? current.filter(
-            (item) => item !== filter,
-          )
-        : [...current, filter],
+    if (!query) {
+      return sheetData.rows
+    }
+
+    return sheetData.rows.filter((row) =>
+      row.some((cell) =>
+        String(cell ?? "")
+          .toLowerCase()
+          .includes(query),
+      ),
     )
-  }
+  }, [search, sheetData.rows])
 
-  const clearFilters = () => {
-    setSearch("")
-    setFilters([])
-  }
-
-  const changeTab = (tab: TabId) => {
+  function changeTab(tab: TabId) {
     setActiveTab(tab)
     setSearch("")
-    setFilters([])
   }
 
   return (
-    <DashboardLayout>
-      <div className="flex min-h-full min-w-0 flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-6">
+    <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
+      <Navbar />
 
-        {/* PAGE HEADER */}
-        <div className="flex shrink-0 flex-col gap-4">
+      <main className="pt-20">
+        <div className="mx-auto w-full max-w-[1800px] px-3 py-6 sm:px-6 lg:px-8 lg:py-8">
 
-          <div className="flex items-center gap-3">
-
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-              <Shield className="h-5 w-5 text-blue-500" />
+          {/* Header */}
+          <div className="mb-5">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-500">
+              <Shield className="h-4 w-4" />
+              METRO POLICE DEPARTMENT
             </div>
 
-            <div className="min-w-0">
+            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+              Main Roster
+            </h1>
 
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                Main Roster
-              </h1>
-
-              <p className="text-sm text-muted-foreground">
-                View department personnel, employee,
-                vehicle and uniform roster information.
-              </p>
-
-            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              View department personnel,
+              employee, vehicle and uniform
+              roster information.
+            </p>
           </div>
 
-          {/* TABS */}
-          <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-
-            <div className="inline-flex min-w-full items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1 sm:min-w-0">
-
+          {/* Tabs */}
+          <div className="mb-4 w-full overflow-hidden rounded-xl border border-border/70 bg-card/70 p-1 shadow-sm">
+            <div className="flex w-full flex-wrap gap-1">
               {tabs.map((tab) => {
+                const Icon = tab.icon
                 const active =
                   activeTab === tab.id
-
-                const Icon = tab.icon
 
                 return (
                   <button
@@ -220,305 +349,225 @@ export default function MainRoster() {
                     onClick={() =>
                       changeTab(tab.id)
                     }
-                    className={
+                    className={[
+                      "flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors sm:flex-none sm:px-4 sm:text-sm",
                       active
-                        ? "inline-flex shrink-0 items-center gap-2 rounded-md bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-500 shadow-sm transition-colors sm:px-4 sm:text-sm"
-                        : "inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground sm:px-4 sm:text-sm"
-                    }
+                        ? "bg-blue-500/10 text-blue-500"
+                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                    ].join(" ")}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4 shrink-0" />
 
-                    {tab.label}
+                    <span className="truncate">
+                      {tab.label}
+                    </span>
                   </button>
                 )
               })}
-
-            </div>
-          </div>
-        </div>
-
-        {/* CONTENT CARD */}
-        <div className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
-
-          {/* CARD HEADER */}
-          <div className="border-b border-border/60 bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-5">
-
-            <div className="flex min-w-0 items-center gap-3">
-
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-                <ActiveIcon className="h-4 w-4 text-blue-500" />
-              </div>
-
-              <div className="min-w-0">
-
-                <h2 className="truncate font-medium">
-                  {activeTabData.label}
-                </h2>
-
-                <p className="truncate text-xs text-muted-foreground">
-                  Google Sheets
-                </p>
-
-              </div>
-
             </div>
           </div>
 
-          {/* SEARCH / FILTERS */}
-          {(activeTabData.searchable ||
-            activeTabData.filters) && (
-            <div className="border-b border-border/60 bg-card p-3 sm:p-4">
+          {/* Roster */}
+          <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm">
 
-              <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
+            {/* Section header */}
+            <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
+                  <ActiveIcon className="h-4 w-4 text-blue-500" />
+                </div>
 
-                {/* SEARCH */}
-                {activeTabData.searchable && (
-                  <div className="relative min-w-0 flex-1">
+                <div className="min-w-0">
+                  <h2 className="truncate font-semibold">
+                    {activeTabData.label}
+                  </h2>
 
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
-                    <input
-                      type="text"
-                      value={search}
-                      onChange={(event) =>
-                        setSearch(
-                          event.target.value,
-                        )
-                      }
-                      placeholder={
-                        activeTabData.id ===
-                        "employees"
-                          ? "Search employees..."
-                          : "Search roster..."
-                      }
-                      className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-
-                  </div>
-                )}
-
-                {/* FILTER */}
-                {activeTabData.filters && (
-                  <DropdownMenu>
-
-                    <DropdownMenuTrigger
-                      asChild
-                    >
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 xl:min-w-[170px]"
-                      >
-
-                        <Filter className="h-4 w-4 text-blue-400" />
-
-                        <span>
-                          Filters
-                        </span>
-
-                        {filters.length > 0 && (
-                          <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
-                            {filters.length}
-                          </span>
-                        )}
-
-                        <ChevronDown className="ml-auto h-3.5 w-3.5 opacity-60" />
-
-                      </Button>
-                    </DropdownMenuTrigger>
-
-                    <DropdownMenuContent
-                      align="end"
-                      className="w-56"
-                    >
-
-                      <DropdownMenuItem
-                        onSelect={(event) =>
-                          event.preventDefault()
-                        }
-                        onClick={() => {
-                          const allSelected =
-                            filters.length ===
-                            filterOptions.length
-
-                          if (allSelected) {
-                            setFilters([])
-                          } else {
-                            setFilters(
-                              filterOptions.map(
-                                (filter) =>
-                                  filter.id,
-                              ),
-                            )
-                          }
-                        }}
-                        className="gap-2"
-                      >
-
-                        <Checkbox
-                          checked={
-                            filters.length ===
-                            filterOptions.length
-                          }
-                          tabIndex={-1}
-                          className="pointer-events-none"
-                        />
-
-                        <Filter className="h-4 w-4 text-blue-400" />
-
-                        <span className="font-medium">
-                          All Filters
-                        </span>
-
-                      </DropdownMenuItem>
-
-                      <div className="my-1 h-px bg-border" />
-
-                      {filterOptions.map(
-                        (filter) => {
-                          const checked =
-                            filters.includes(
-                              filter.id,
-                            )
-
-                          return (
-                            <DropdownMenuItem
-                              key={filter.id}
-                              onSelect={(event) =>
-                                event.preventDefault()
-                              }
-                              onClick={() =>
-                                toggleFilter(
-                                  filter.id,
-                                )
-                              }
-                              className="gap-2"
-                            >
-
-                              <Checkbox
-                                checked={checked}
-                                tabIndex={-1}
-                                className="pointer-events-none"
-                              />
-
-                              <span>
-                                {filter.label}
-                              </span>
-
-                            </DropdownMenuItem>
-                          )
-                        },
-                      )}
-
-                      {filters.length > 0 && (
-                        <>
-                          <div className="my-1 h-px bg-border" />
-
-                          <DropdownMenuItem
-                            onClick={
-                              clearFilters
-                            }
-                            className="gap-2 text-muted-foreground"
-                          >
-
-                            <X className="h-4 w-4" />
-
-                            Clear Filters
-
-                          </DropdownMenuItem>
-                        </>
-                      )}
-
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-
-                {/* CLEAR */}
-                {hasFilters && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearFilters}
-                    className="gap-2"
-                  >
-
-                    <X className="h-4 w-4" />
-
-                    Clear
-
-                  </Button>
-                )}
-
+                  <p className="text-xs text-muted-foreground">
+                    Metro Police Department
+                  </p>
+                </div>
               </div>
 
-              {/* ACTIVE FILTERS */}
-              {filters.length > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+              {/* Search */}
+              {activeTabData.searchable && (
+                <div className="relative w-full sm:max-w-sm">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-
-                    <Filter className="h-3.5 w-3.5" />
-
-                    Active filters:
-
-                  </div>
-
-                  {filters.map(
-                    (filter) => {
-                      const label =
-                        filterOptions.find(
-                          (item) =>
-                            item.id ===
-                            filter,
-                        )?.label ?? filter
-
-                      return (
-                        <button
-                          key={filter}
-                          type="button"
-                          onClick={() =>
-                            toggleFilter(
-                              filter,
-                            )
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
-                        >
-
-                          <Filter className="h-3 w-3" />
-
-                          {label}
-
-                          <X className="h-3 w-3" />
-
-                        </button>
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(event) =>
+                      setSearch(
+                        event.target.value,
                       )
-                    },
-                  )}
+                    }
+                    placeholder={
+                      activeTab ===
+                      "employees"
+                        ? "Search employees..."
+                        : "Search roster..."
+                    }
+                    className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+              )}
+            </div>
 
+            {/* Search count */}
+            {activeTabData.searchable &&
+              search.trim() && (
+                <div className="border-b border-border/70 bg-muted/20 px-4 py-2.5 text-xs text-muted-foreground sm:px-5">
+                  Showing{" "}
+                  <span className="font-semibold text-foreground">
+                    {filteredRows.length}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-semibold text-foreground">
+                    {sheetData.rows.length}
+                  </span>{" "}
+                  records
                 </div>
               )}
 
-            </div>
-          )}
+            {/* Loading */}
+            {loading && (
+              <div className="flex min-h-[400px] flex-col items-center justify-center px-6 text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
 
-          {/* GOOGLE SHEET */}
-          <div className="w-full overflow-hidden bg-background">
+                <p className="mt-4 text-sm font-medium">
+                  Loading roster...
+                </p>
 
-            <iframe
-              key={`${activeTabData.id}-${activeTabData.gid}`}
-              src={embedUrl}
-              title={`${activeTabData.label} Google Sheet`}
-              className="block h-[800px] w-full border-0 bg-background"
-              frameBorder="0"
-              loading="lazy"
-            />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Loading the latest published
+                  roster data.
+                </p>
+              </div>
+            )}
 
-          </div>
+            {/* Error */}
+            {!loading && error && (
+              <div className="flex min-h-[400px] flex-col items-center justify-center px-6 text-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                </div>
 
+                <p className="mt-4 text-sm font-semibold">
+                  Unable to load roster
+                </p>
+
+                <p className="mt-1 max-w-lg text-xs leading-5 text-muted-foreground">
+                  {error}
+                </p>
+              </div>
+            )}
+
+            {/* Empty */}
+            {!loading &&
+              !error &&
+              sheetData.headers.length === 0 && (
+                <div className="flex min-h-[400px] flex-col items-center justify-center px-6 text-center">
+                  <Database className="h-8 w-8 text-muted-foreground" />
+
+                  <p className="mt-4 text-sm font-medium">
+                    No roster data found
+                  </p>
+                </div>
+              )}
+
+            {/* Table */}
+            {!loading &&
+              !error &&
+              sheetData.headers.length > 0 && (
+                <div className="w-full overflow-hidden">
+                  <table className="w-full table-fixed border-collapse text-[10px] sm:text-xs">
+                    <thead>
+                      <tr className="bg-muted/40">
+                        {sheetData.headers.map(
+                          (header, index) => (
+                            <th
+                              key={`${header}-${index}`}
+                              className="border-b border-r border-border/70 px-1.5 py-2 text-center align-middle font-semibold last:border-r-0 sm:px-2.5 sm:py-2.5"
+                            >
+                              <span className="block break-words">
+                                {header ||
+                                  `Column ${
+                                    index + 1
+                                  }`}
+                              </span>
+                            </th>
+                          ),
+                        )}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {filteredRows.map(
+                        (row, rowIndex) => (
+                          <tr
+                            key={rowIndex}
+                            className="transition-colors hover:bg-muted/30"
+                          >
+                            {sheetData.headers.map(
+                              (_, columnIndex) => (
+                                <td
+                                  key={`${rowIndex}-${columnIndex}`}
+                                  className="border-b border-r border-border/50 px-1.5 py-2 text-center align-middle last:border-r-0 sm:px-2.5"
+                                >
+                                  <span className="block break-words">
+                                    {row[
+                                      columnIndex
+                                    ] ?? ""}
+                                  </span>
+                                </td>
+                              ),
+                            )}
+                          </tr>
+                        ),
+                      )}
+                    </tbody>
+                  </table>
+
+                  {/* No search results */}
+                  {filteredRows.length === 0 && (
+                    <div className="px-6 py-12 text-center">
+                      <Search className="mx-auto h-7 w-7 text-muted-foreground" />
+
+                      <p className="mt-3 text-sm font-medium">
+                        No results found
+                      </p>
+
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Try a different search.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+          </section>
+
+          {/* Footer info */}
+          {!loading &&
+            !error &&
+            sheetData.headers.length > 0 && (
+              <div className="mt-3 flex items-center justify-between px-1 text-xs text-muted-foreground">
+                <span>
+                  {filteredRows.length}{" "}
+                  {filteredRows.length === 1
+                    ? "record"
+                    : "records"}
+                </span>
+
+                <span>
+                  Data sourced from the Metro
+                  Police Department roster.
+                </span>
+              </div>
+            )}
         </div>
-      </div>
-    </DashboardLayout>
+
+        <Footer />
+      </main>
+    </div>
   )
 }
