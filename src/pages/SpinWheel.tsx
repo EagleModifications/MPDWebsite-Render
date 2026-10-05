@@ -465,7 +465,7 @@ export default function SpinWheel() {
           id: typeof wheel.id === "string" ? wheel.id : crypto.randomUUID(),
           name: typeof wheel.name === "string" && wheel.name.trim() ? wheel.name : `Wheel ${index + 1}`,
           items: Array.isArray(wheel.items)
-            ? wheel.items.map((item, itemIndex) => ({
+            ? wheel.items.map((item) => ({
                 id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
                 label: typeof item.label === "string" ? item.label : String(item.label ?? ""),
                 color: item.color,
@@ -548,6 +548,42 @@ export default function SpinWheel() {
 
       return [...current, nextWheel]
     })
+
+    // Every newly-created wheel starts with the same Wheel of Names-style
+    // defaults. Keep these explicitly per-wheel so a new wheel never inherits
+    // the settings of whichever wheel was active before it was added.
+    setAnimateWinningEntryByWheel((current) => ({
+      ...current,
+      [nextWheel.id]: false,
+    }))
+    setLaunchConfettiByWheel((current) => ({
+      ...current,
+      [nextWheel.id]: false,
+    }))
+    setAfterSoundByWheel((current) => ({
+      ...current,
+      [nextWheel.id]: "Subdued applause",
+    }))
+    setAfterVolumeByWheel((current) => ({
+      ...current,
+      [nextWheel.id]: 50,
+    }))
+    setSpinSlowlyByWheel((current) => ({
+      ...current,
+      [nextWheel.id]: false,
+    }))
+    setSpinTimeByWheel((current) => ({
+      ...current,
+      [nextWheel.id]: 10,
+    }))
+    setCenterImageByWheel((current) => ({
+      ...current,
+      [nextWheel.id]: undefined,
+    }))
+    setImageSizeByWheel((current) => ({
+      ...current,
+      [nextWheel.id]: "S",
+    }))
 
     setActiveWheelId(nextWheel.id)
     setSidebarOpen(true)
