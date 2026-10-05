@@ -670,31 +670,6 @@ export default function Sidebar({
                         <span className="text-sm font-medium">
                           Open wheel
                         </span>
-
-                        <span className="mt-0.5 text-xs text-muted-foreground">
-                          Open a saved wheel
-                        </span>
-                      </div>
-                    </button>
-
-                    {/* New blank wheel */}
-                    <button
-                      type="button"
-                      onClick={
-                        handleNewWheel
-                      }
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
-                    >
-                      <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
-
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">
-                          New blank wheel
-                        </span>
-
-                        <span className="mt-0.5 text-xs text-muted-foreground">
-                          Start with an empty list
-                        </span>
                       </div>
                     </button>
                   </div>
