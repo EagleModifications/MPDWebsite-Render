@@ -12,7 +12,6 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  Check,
   ChevronDown,
   Download,
   FolderOpen,
