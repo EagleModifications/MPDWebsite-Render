@@ -7,6 +7,7 @@ import {
 } from "react"
 
 import {
+  ArrowDownAZ,
   ChevronDown,
   Download,
   FolderOpen,
@@ -122,8 +123,8 @@ export default function Sidebar({
     useRef<HTMLDivElement | null>(null)
 
   /*
-   * Close dropdowns whenever the user clicks
-   * anywhere outside the currently open dropdown.
+   * Close any dropdown when clicking anywhere
+   * outside of that dropdown.
    */
   useEffect(() => {
     if (
@@ -223,6 +224,32 @@ export default function Sidebar({
     )
 
     onChange(shuffled)
+  }
+
+  const sortEntries = () => {
+    if (items.length < 2) {
+      return
+    }
+
+    const sorted = [...items].sort(
+      (a, b) =>
+        a.label.localeCompare(
+          b.label,
+          undefined,
+          {
+            sensitivity: "base",
+            numeric: true,
+          },
+        ),
+    )
+
+    setText(
+      sorted
+        .map((item) => item.label)
+        .join("\n"),
+    )
+
+    onChange(sorted)
   }
 
   const handleImageFiles = (
@@ -356,9 +383,9 @@ export default function Sidebar({
   const handleOpenWheel = () => {
     setWheelMenuOpen(false)
 
-    // Placeholder for the wheel-opening
-    // functionality. This keeps the menu
-    // interaction ready for the file picker.
+    // Open wheel functionality can be
+    // connected here when wheel saving/loading
+    // is implemented.
   }
 
   const toggleImageMenu = (
@@ -438,6 +465,7 @@ export default function Sidebar({
             {/* Toolbar */}
             <div className="shrink-0 border-b border-border/70 px-4 py-4">
               <div className="flex items-center gap-2">
+                {/* Shuffle */}
                 <Button
                   type="button"
                   variant="secondary"
@@ -452,6 +480,21 @@ export default function Sidebar({
                 >
                   <Shuffle className="h-3.5 w-3.5" />
                   Shuffle
+                </Button>
+
+                {/* Sort */}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={sortEntries}
+                  disabled={
+                    items.length < 2
+                  }
+                  className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold hover:bg-muted"
+                >
+                  <ArrowDownAZ className="h-3.5 w-3.5" />
+                  Sort
                 </Button>
 
                 {/* Add image */}
@@ -533,6 +576,7 @@ export default function Sidebar({
                   />
                 </div>
 
+                {/* Advanced */}
                 <label className="ml-1 flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground">
                   <input
                     type="checkbox"
