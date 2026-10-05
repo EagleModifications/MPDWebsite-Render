@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { Wheel as SpinWheel } from "spin-wheel"
 
 export type SpinWheelItem = {
@@ -13,35 +19,163 @@ type WheelProps = {
   onResult?: (item: SpinWheelItem) => void
 }
 
-const FALLBACK_COLORS = [
-  "#3b82f6",
-  "#64748b",
-  "#0ea5e9",
-  "#334155",
-  "#60a5fa",
-  "#94a3b8",
-]
+/*
+ * Generates a bright/pastel random colour.
+ *
+ * HSL gives us a much wider range of colours than a
+ * fixed palette while keeping the wheel readable.
+ */
+function createRandomColor() {
+  const hue = Math.floor(
+    Math.random() * 360,
+  )
+
+  const saturation =
+    58 + Math.floor(Math.random() * 18)
+
+  const lightness =
+    62 + Math.floor(Math.random() * 14)
+
+  return `hsl(${hue} ${saturation}% ${lightness}%)`
+}
+
+/*
+ * Convert HSL/CSS colours to a hex colour where possible.
+ * The pointer can use the CSS colour directly, so this
+ * helper isn't required for rendering.
+ */
+
+/*
+ * Creates stable random colours for entries.
+ *
+ * The colour is keyed by the entry ID so typing/editing
+ * the list doesn't constantly change every existing
+ * segment's colour.
+ */
+function useRandomItemColors(
+  items: SpinWheelItem[],
+) {
+  const colorsRef = useRef(
+    new Map<string, string>(),
+  )
+
+  return useMemo(() => {
+    const colors =
+      colorsRef.current
+
+    const activeIds = new Set(
+      items.map((item) => item.id),
+    )
+
+    for (const id of colors.keys()) {
+      if (!activeIds.has(id)) {
+        colors.delete(id)
+      }
+    }
+
+    return items.map((item) => {
+      let color = colors.get(item.id)
+
+      if (!color) {
+        color = createRandomColor()
+        colors.set(item.id, color)
+      }
+
+      return color
+    })
+  }, [items])
+}
 
 export default function Wheel({
   items,
   onResult,
 }: WheelProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const wheelRef = useRef<SpinWheel | null>(null)
-  const spinningRef = useRef(false)
+  const containerRef =
+    useRef<HTMLDivElement | null>(null)
 
-  const [isSpinning, setIsSpinning] = useState(false)
+  const wheelRef =
+    useRef<SpinWheel | null>(null)
 
+  const spinningRef =
+    useRef(false)
+
+  const [isSpinning, setIsSpinning] =
+    useState(false)
+
+  const [currentIndex, setCurrentIndex] =
+    useState(0)
+
+  const [pointerColor, setPointerColor] =
+    useState("#60a5fa")
+
+  /*
+   * Generate completely random colours for the
+   * current set of entries.
+   */
+  const randomColors =
+    useRandomItemColors(items)
+
+  /*
+   * Keep the winning item accessible to the
+   * onRest callback without recreating the wheel
+   * unnecessarily.
+   */
+  const itemsRef =
+    useRef(items)
+
+  useEffect(() => {
+    itemsRef.current = items
+  }, [items])
+
+  /*
+   * Keep the callback current without forcing
+   * the wheel to be recreated.
+   */
+  const onResultRef =
+    useRef(onResult)
+
+  useEffect(() => {
+    onResultRef.current = onResult
+  }, [onResult])
+
+  /*
+   * Change the pointer colour to match the
+   * segment currently underneath it.
+   */
+  const updatePointerColor = useCallback(
+    (index: number) => {
+      const color =
+        randomColors[index]
+
+      if (color) {
+        setPointerColor(color)
+      }
+    },
+    [randomColors],
+  )
+
+  /*
+   * Spin the wheel to a random item.
+   */
   const spin = useCallback(() => {
     const wheel = wheelRef.current
 
-    if (!wheel || items.length === 0 || spinningRef.current) {
+    if (
+      !wheel ||
+      itemsRef.current.length === 0 ||
+      spinningRef.current
+    ) {
       return
     }
 
-    const selectedIndex = Math.floor(
-      Math.random() * items.length,
-    )
+    const currentItems =
+      itemsRef.current
+
+    const selectedIndex =
+      Math.floor(
+        Math.random() *
+          currentItems.length,
+      )
 
     spinningRef.current = true
     setIsSpinning(true)
@@ -53,10 +187,44 @@ export default function Wheel({
       6,
       1,
     )
-  }, [items.length])
+  }, [])
 
+  /*
+   * Ctrl + Enter spins the wheel.
+   */
   useEffect(() => {
-    const container = containerRef.current
+    const handleKeyDown = (
+      event: KeyboardEvent,
+    ) => {
+      if (
+        event.ctrlKey &&
+        event.key === "Enter"
+      ) {
+        event.preventDefault()
+        spin()
+      }
+    }
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown,
+    )
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      )
+    }
+  }, [spin])
+
+  /*
+   * Create/recreate the wheel whenever the
+   * entries change.
+   */
+  useEffect(() => {
+    const container =
+      containerRef.current
 
     if (!container) {
       return
@@ -68,89 +236,261 @@ export default function Wheel({
     setIsSpinning(false)
 
     if (items.length === 0) {
+      setCurrentIndex(0)
+      setPointerColor("#60a5fa")
       return
     }
 
-    const wheel = new SpinWheel(container, {
-      items: items.map((item, index) => ({
-        label: item.label || "Untitled",
-        value: item.id,
-        weight: item.weight ?? 1,
+    const initialIndex = Math.min(
+      currentIndex,
+      items.length - 1,
+    )
 
-        backgroundColor:
-          item.color ??
-          FALLBACK_COLORS[
-            index % FALLBACK_COLORS.length
-          ],
+    setCurrentIndex(initialIndex)
 
-        labelColor: "#ffffff",
-      })),
+    const initialColor =
+      randomColors[initialIndex]
 
-      radius: 0.92,
+    if (initialColor) {
+      setPointerColor(initialColor)
+    }
 
-      pointerAngle: 0,
+    const wheel =
+      new SpinWheel(container, {
+        items: items.map(
+          (item, index) => ({
+            label:
+              item.label ||
+              "Untitled",
 
-      borderWidth: 2,
-      borderColor: "rgba(255,255,255,0.18)",
+            value: item.id,
 
-      lineWidth: 1,
-      lineColor: "rgba(255,255,255,0.22)",
+            weight:
+              item.weight ?? 1,
 
-      itemLabelAlign: "right",
-      itemLabelRadius: 0.78,
-      itemLabelRadiusMax: 0.3,
+            /*
+             * Ignore the colour supplied by the
+             * sidebar and use a random colour.
+             */
+            backgroundColor:
+              randomColors[index],
 
-      itemLabelFont:
-        "Inter, ui-sans-serif, system-ui, sans-serif",
+            /*
+             * Matches the screenshot:
+             * dark/black labels on pastel segments.
+             */
+            labelColor: "#111111",
+          }),
+        ),
 
-      itemLabelFontSizeMax: 34,
-      itemLabelStrokeWidth: 0,
+        /*
+         * Make the wheel fill almost the
+         * entire container.
+         */
+        radius: 0.96,
 
-      isInteractive: false,
+        /*
+         * Pointer is positioned on the right
+         * side of the wheel.
+         */
+        pointerAngle: 0,
 
-      rotationResistance: -35,
-      rotationSpeedMax: 1000,
+        /*
+         * Thin clean outer border.
+         */
+        borderWidth: 2,
+        borderColor:
+          "rgba(255,255,255,0.28)",
 
-      onRest: () => {
-        const selectedIndex =
-          wheel.getCurrentIndex()
+        /*
+         * Very subtle segment separators.
+         */
+        lineWidth: 1,
+        lineColor:
+          "rgba(255,255,255,0.28)",
 
-        const selectedItem =
-          items[selectedIndex]
+        /*
+         * Radial labels like the screenshot.
+         */
+        itemLabelAlign: "right",
+        itemLabelRadius: 0.82,
+        itemLabelRadiusMax: 0.28,
 
-        spinningRef.current = false
-        setIsSpinning(false)
+        itemLabelFont:
+          "Inter, ui-sans-serif, system-ui, sans-serif",
 
-        if (selectedItem) {
-          onResult?.(selectedItem)
-        }
-      },
-    })
+        itemLabelFontSizeMax: 42,
+
+        itemLabelStrokeWidth: 0,
+
+        /*
+         * We handle the spin ourselves so clicking
+         * the wheel doesn't trigger the package's
+         * drag interaction.
+         */
+        isInteractive: false,
+
+        rotationResistance: -35,
+        rotationSpeedMax: 1000,
+
+        /*
+         * Fired whenever the pointer moves onto
+         * another segment.
+         */
+        onCurrentIndexChange: (event) => {
+          const index =
+            event.currentIndex
+
+          setCurrentIndex(index)
+          updatePointerColor(index)
+        },
+
+        onRest: (event) => {
+          const selectedIndex =
+            event.currentIndex
+
+          const selectedItem =
+            itemsRef.current[
+              selectedIndex
+            ]
+
+          setCurrentIndex(
+            selectedIndex,
+          )
+
+          updatePointerColor(
+            selectedIndex,
+          )
+
+          spinningRef.current = false
+          setIsSpinning(false)
+
+          if (selectedItem) {
+            onResultRef.current?.(
+              selectedItem,
+            )
+          }
+        },
+      })
 
     wheelRef.current = wheel
+
+    /*
+     * Set the initial pointer colour using
+     * the wheel's actual current index.
+     */
+    const actualIndex =
+      wheel.getCurrentIndex()
+
+    setCurrentIndex(actualIndex)
+    updatePointerColor(actualIndex)
 
     return () => {
       wheel.remove()
       wheelRef.current = null
       spinningRef.current = false
     }
-  }, [items, onResult])
+  }, [
+    items,
+    randomColors,
+    updatePointerColor,
+  ])
+
+  /*
+   * Clicking the wheel itself starts a spin.
+   */
+  const handleWheelClick = () => {
+    if (
+      items.length === 0 ||
+      spinningRef.current
+    ) {
+      return
+    }
+
+    spin()
+  }
 
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-background">
-      {/* Subtle MPD background glow */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.07),transparent_56%)]" />
+      {/* Background */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.035),transparent_58%)]" />
 
       {items.length > 0 ? (
         <div
-          ref={containerRef}
-          className="relative aspect-square w-[min(76vw,calc(100vh-150px),980px)] max-w-[90%]"
+          className="relative aspect-square w-[min(78vw,calc(100vh-130px),1000px)] max-w-[94%]"
+          onClick={handleWheelClick}
+          role="button"
+          tabIndex={0}
           aria-label="Spin wheel"
+          onKeyDown={(event) => {
+            if (
+              event.key === "Enter" ||
+              event.key === " "
+            ) {
+              event.preventDefault()
+              handleWheelClick()
+            }
+          }}
         >
-          {/* Pointer */}
-          <div className="pointer-events-none absolute left-1/2 top-[-1px] z-20 -translate-x-1/2">
-            <div className="h-0 w-0 border-l-[20px] border-r-[20px] border-t-[38px] border-l-transparent border-r-transparent border-t-foreground drop-shadow-xl" />
+          {/* Actual wheel */}
+          <div
+            ref={containerRef}
+            className="absolute inset-0"
+          />
+
+          {/* Right-side pointer */}
+          <div
+            className="pointer-events-none absolute right-[-27px] top-1/2 z-30 -translate-y-1/2"
+            aria-hidden="true"
+          >
+            <div
+              className="relative h-[48px] w-[54px] drop-shadow-[0_3px_8px_rgba(0,0,0,0.45)] transition-colors duration-100"
+              style={{
+                filter:
+                  "drop-shadow(0 0 3px rgba(255,255,255,0.35))",
+              }}
+            >
+              {/* Outer arrow */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  clipPath:
+                    "polygon(100% 0, 0 50%, 100% 100%, 76% 50%)",
+                  backgroundColor:
+                    "rgba(255,255,255,0.55)",
+                }}
+              />
+
+              {/* Coloured arrow */}
+              <div
+                className="absolute inset-[2px]"
+                style={{
+                  clipPath:
+                    "polygon(100% 0, 0 50%, 100% 100%, 76% 50%)",
+                  backgroundColor:
+                    pointerColor,
+                  transition:
+                    "background-color 100ms ease",
+                }}
+              />
+            </div>
           </div>
+
+          {/* White centre */}
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex h-[17%] w-[17%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-[0_1px_8px_rgba(0,0,0,0.18)]" />
+
+          {/* Wheel of Names style overlay text */}
+          {!isSpinning && (
+            <div className="pointer-events-none absolute inset-0 z-25">
+              <div className="absolute left-1/2 top-[26%] -translate-x-1/2 -rotate-[8deg] whitespace-nowrap text-[clamp(24px,3vw,42px)] font-extrabold tracking-tight text-white drop-shadow-[0_4px_5px_rgba(0,0,0,0.75)]">
+                Click to spin
+              </div>
+
+              <div className="absolute bottom-[22%] left-1/2 -translate-x-1/2 rotate-[8deg] whitespace-nowrap text-[clamp(18px,2.2vw,30px)] font-extrabold tracking-tight text-white drop-shadow-[0_4px_5px_rgba(0,0,0,0.75)]">
+                or press ctrl+enter
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex aspect-square w-[min(62vw,calc(100vh-180px),760px)] max-w-[78%] items-center justify-center rounded-full border border-border/70 bg-card/30">
@@ -160,24 +500,12 @@ export default function Wheel({
             </p>
 
             <p className="mt-2 text-sm text-muted-foreground">
-              Add entries from the sidebar to get started.
+              Add entries from the sidebar to
+              get started.
             </p>
           </div>
         </div>
       )}
-
-      {/* Spin button */}
-      <button
-        type="button"
-        disabled={
-          items.length === 0 ||
-          isSpinning
-        }
-        onClick={spin}
-        className="absolute bottom-8 left-1/2 z-30 inline-flex h-11 min-w-36 -translate-x-1/2 items-center justify-center rounded-xl bg-blue-600 px-7 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {isSpinning ? "Spinning..." : "Spin"}
-      </button>
     </div>
   )
 }
