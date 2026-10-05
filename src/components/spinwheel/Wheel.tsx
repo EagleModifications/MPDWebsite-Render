@@ -27,6 +27,10 @@ type WheelProps = {
   afterVolume?: number
   duringSound?: string
   duringVolume?: number
+  spinSlowly?: boolean
+  spinTime?: number
+  centerImage?: string
+  imageSize?: "S" | "M" | "L"
 }
 
 
@@ -381,6 +385,15 @@ function playAfterSpinSound(sound: string, volume: number) {
 /** Fast launch with a smooth, natural ease-out into the final slice. */
 const cubicOut = (t: number) => 1 - Math.pow(1 - t, 3)
 
+/* Constant cruising speed with a short, fully smooth stop. */
+const cruiseThenStop = (t: number) => {
+  const cruiseEnd = 0.82
+  if (t <= cruiseEnd) return t
+  const u = (t - cruiseEnd) / (1 - cruiseEnd)
+  const eased = u * u * (3 - 2 * u)
+  return cruiseEnd + eased * (1 - cruiseEnd)
+}
+
 export default function Wheel({
   items,
   onResult,
@@ -390,6 +403,10 @@ export default function Wheel({
   afterVolume = 50,
   duringSound = "Ticking sound",
   duringVolume = 50,
+  spinSlowly = false,
+  spinTime = 10,
+  centerImage,
+  imageSize = "S",
 }: WheelProps) {
   const wheelTextId = useId().replace(/:/g, "")
 
@@ -403,6 +420,9 @@ export default function Wheel({
     useRef<HTMLDivElement | null>(null)
 
   const spinningRef =
+    useRef(false)
+
+  const cancelledSpinRef =
     useRef(false)
 
   const currentIndexRef =
@@ -419,6 +439,13 @@ export default function Wheel({
 
   const duringSoundRef = useRef(duringSound)
   const duringVolumeRef = useRef(duringVolume)
+  const spinSlowlyRef = useRef(spinSlowly)
+  const spinTimeRef = useRef(spinTime)
+
+  useEffect(() => { spinSlowlyRef.current = spinSlowly }, [spinSlowly])
+  useEffect(() => { spinTimeRef.current = spinTime }, [spinTime])
+  useEffect(() => { duringSoundRef.current = duringSound }, [duringSound])
+  useEffect(() => { duringVolumeRef.current = duringVolume }, [duringVolume])
 
 
   const [isSpinning, setIsSpinning] =
@@ -605,6 +632,17 @@ export default function Wheel({
   /* Spin                                                                   */
   /* ---------------------------------------------------------------------- */
 
+  const stopSpin = useCallback(() => {
+    const wheel = wheelRef.current
+    if (!wheel || !spinningRef.current) return
+
+    cancelledSpinRef.current = true
+    wheel.stop()
+    stopDuringSpinAudio()
+    spinningRef.current = false
+    setIsSpinning(false)
+  }, [stopDuringSpinAudio])
+
   const spin = useCallback(() => {
     const wheel =
       wheelRef.current
@@ -633,6 +671,7 @@ export default function Wheel({
           visibleItems.length,
       )
 
+    cancelledSpinRef.current = false
     spinningRef.current =
       true
 
@@ -648,13 +687,16 @@ export default function Wheel({
      * a little longer, with a controlled
      * multi-revolution spin.
      */
+    const duration = Math.max(1500, Math.min(60000, spinTimeRef.current * 1000))
+    const slowly = spinSlowlyRef.current
+
     wheel.spinToItem(
       selectedIndex,
-      4200,
+      slowly ? duration : Math.max(3200, Math.min(12000, duration)),
       true,
-      6,
+      slowly ? 3 : 6,
       1,
-      cubicOut,
+      slowly ? cruiseThenStop : cubicOut,
     )
   }, [
     getAudioContext,
@@ -682,6 +724,12 @@ export default function Wheel({
     const handleKeyDown = (
       event: globalThis.KeyboardEvent,
     ) => {
+      if (event.key === "Escape" && spinningRef.current) {
+        event.preventDefault()
+        stopSpin()
+        return
+      }
+
       if (
         event.ctrlKey &&
         event.key === "Enter"
@@ -707,6 +755,7 @@ export default function Wheel({
   }, [
     getAudioContext,
     spin,
+    stopSpin,
   ])
 
   /* ---------------------------------------------------------------------- */
@@ -777,6 +826,17 @@ export default function Wheel({
       }
     }
 
+    const longestLabel = visibleItems.reduce((max, item) => Math.max(max, item.label.trim().length), 0)
+    const count = visibleItems.length
+    const labelFontSize = Math.max(14, Math.min(42,
+      count >= 80 ? 18 :
+      count >= 50 ? 20 :
+      count >= 32 ? 23 :
+      count >= 20 ? 27 :
+      count >= 12 ? 32 :
+      count >= 8 ? 36 : 42,
+    ) - Math.max(0, longestLabel - 18) * 0.55)
+
     const wheel =
       new SpinWheel(
         container,
@@ -807,7 +867,7 @@ export default function Wheel({
           /*
            * Match Wheel of Names proportions.
            */
-          radius: 0.95,
+          radius: 0.97,
 
           /*
            * Pointer is exactly on
@@ -815,10 +875,10 @@ export default function Wheel({
            */
           pointerAngle: 0,
 
-          borderWidth: 1,
+          borderWidth: 0,
 
           borderColor:
-            "rgba(0,0,0,0.22)",
+            "transparent",
 
           /*
            * Keep the slices clean.
@@ -833,14 +893,14 @@ export default function Wheel({
            */
           itemLabelAlign: "right",
 
-          itemLabelRadius: 0.79,
+          itemLabelRadius: 0.80,
 
-          itemLabelRadiusMax: 0.3,
+          itemLabelRadiusMax: 0.34,
 
           itemLabelFont:
             "Arial, Helvetica, sans-serif",
 
-          itemLabelFontSizeMax: 42,
+          itemLabelFontSizeMax: labelFontSize,
 
           itemLabelStrokeWidth: 0,
 
@@ -898,6 +958,14 @@ export default function Wheel({
           /* -------------------------------------------------------------- */
 
           onRest: (event) => {
+            if (cancelledSpinRef.current) {
+              cancelledSpinRef.current = false
+              stopDuringSpinAudio()
+              spinningRef.current = false
+              setIsSpinning(false)
+              return
+            }
+
             /*
              * Read the final index directly
              * from the wheel rather than relying
@@ -1009,13 +1077,11 @@ export default function Wheel({
 
   const handleWheelClick =
     () => {
-      if (
-        visibleItems.length === 0 ||
-        spinningRef.current
-      ) {
+      if (visibleItems.length === 0) return
+      if (spinningRef.current) {
+        stopSpin()
         return
       }
-
       spin()
     }
 
@@ -1047,6 +1113,7 @@ export default function Wheel({
 
   return (
     <div
+      data-compact={compact}
       className="
         relative
         flex
@@ -1059,18 +1126,6 @@ export default function Wheel({
         bg-transparent
       "
     >
-      {/* Background */}
-      {!compact && (
-        <div
-          className="
-            pointer-events-none
-            absolute
-            inset-0
-            bg-[radial-gradient(circle_at_38%_38%,rgba(33,70,82,0.42),transparent_48%),radial-gradient(circle_at_80%_25%,rgba(81,42,91,0.32),transparent_45%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]
-          "
-        />
-      )}
-
       {/* ------------------------------------------------------------------ */}
       {/* Wheel                                                               */}
       {/* ------------------------------------------------------------------ */}
@@ -1097,30 +1152,9 @@ export default function Wheel({
             handleWheelKeyDown
           }
         >
-          {/* Actual wheel */}
-          {/* Dark outer rim / bevel.  The actual canvas stays inside this rim. */}
+          {/* Subtle Wheel of Names-style edge — no surrounding card/box. */}
           <div
-            className="
-              pointer-events-none
-              absolute
-              inset-[-10px]
-              rounded-full
-              border-[10px]
-              border-black/75
-              shadow-[0_16px_34px_rgba(0,0,0,0.62),inset_0_2px_3px_rgba(255,255,255,0.2),inset_0_-7px_12px_rgba(0,0,0,0.55)]
-            "
-          />
-
-          <div
-            className="
-              pointer-events-none
-              absolute
-              inset-[-3px]
-              rounded-full
-              border-[3px]
-              border-white/15
-              shadow-[0_2px_4px_rgba(255,255,255,0.08)]
-            "
+            className="pointer-events-none absolute inset-[-2px] rounded-full border-2 border-black/35 shadow-[0_7px_18px_rgba(0,0,0,0.42),inset_0_1px_2px_rgba(255,255,255,0.16)]"
           />
 
           <div
@@ -1189,24 +1223,19 @@ export default function Wheel({
           {/* Centre                                                           */}
           {/* ---------------------------------------------------------------- */}
 
-          <div
-            className="
-              pointer-events-none
-              absolute
-              left-1/2
-              top-1/2
-              z-40
-              h-[15%]
-              w-[15%]
-              -translate-x-1/2
-              -translate-y-1/2
-              rounded-full
-              border-[3px]
-              border-white/90
-              bg-white
-              shadow-[0_5px_14px_rgba(0,0,0,0.42),inset_0_1px_2px_rgba(0,0,0,0.12)]
-            "
-          />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 h-[15%] w-[15%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full border-[3px] border-white/95 bg-white shadow-[0_5px_14px_rgba(0,0,0,0.38),inset_0_1px_2px_rgba(0,0,0,0.12)]">
+            {centerImage && (
+              <img
+                src={centerImage}
+                alt=""
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 object-contain"
+                style={{
+                  width: imageSize === "L" ? "88%" : imageSize === "M" ? "70%" : "52%",
+                  height: imageSize === "L" ? "88%" : imageSize === "M" ? "70%" : "52%",
+                }}
+              />
+            )}
+          </div>
 
           {/* ---------------------------------------------------------------- */}
           {/* Wheel of Names idle text                                        */}
@@ -1338,10 +1367,7 @@ export default function Wheel({
             items-center
             justify-center
             rounded-full
-            border
-            border-white/10
-            bg-black/20
-            shadow-[0_15px_40px_rgba(0,0,0,0.45)]
+            bg-transparent
           "
         >
           <div className="px-6 text-center">
