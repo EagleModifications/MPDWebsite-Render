@@ -20,6 +20,8 @@ export type SpinWheelItem = {
 type WheelProps = {
   items: SpinWheelItem[]
   onResult?: (item: SpinWheelItem) => void
+  compact?: boolean
+  wheelCount?: number
 }
 
 type ConfettiPiece = {
@@ -601,6 +603,8 @@ function createConfetti(): ConfettiPiece[] {
 export default function Wheel({
   items,
   onResult,
+  compact = false,
+  wheelCount = 1,
 }: WheelProps) {
   const containerRef =
     useRef<HTMLDivElement | null>(null)
@@ -630,9 +634,6 @@ export default function Wheel({
 
   const [isSpinning, setIsSpinning] =
     useState(false)
-
-  const [winner, setWinner] =
-    useState<SpinWheelItem | null>(null)
 
   const [pointerColor, setPointerColor] =
     useState("#5fc78b")
@@ -836,7 +837,6 @@ export default function Wheel({
       void audio.resume()
     }
 
-    setWinner(null)
     setConfetti([])
 
     lastTickIndexRef.current =
@@ -1131,10 +1131,6 @@ export default function Wheel({
             setIsSpinning(false)
 
             if (selectedItem) {
-              setWinner(
-                selectedItem,
-              )
-
               playWinnerSound(
                 audioContextRef.current,
               )
@@ -1244,11 +1240,6 @@ export default function Wheel({
   /* Winner                                                                  */
   /* ---------------------------------------------------------------------- */
 
-  const closeWinner =
-    () => {
-      setWinner(null)
-    }
-
   /* ---------------------------------------------------------------------- */
   /* Render                                                                  */
   /* ---------------------------------------------------------------------- */
@@ -1264,18 +1255,20 @@ export default function Wheel({
         items-center
         justify-center
         overflow-hidden
-        bg-[#080b0e]
+        bg-transparent
       "
     >
       {/* Background */}
-      <div
-        className="
-          pointer-events-none
-          absolute
-          inset-0
-          bg-[radial-gradient(circle_at_38%_38%,rgba(33,70,82,0.42),transparent_48%),radial-gradient(circle_at_80%_25%,rgba(81,42,91,0.32),transparent_45%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]
-        "
-      />
+      {!compact && (
+        <div
+          className="
+            pointer-events-none
+            absolute
+            inset-0
+            bg-[radial-gradient(circle_at_38%_38%,rgba(33,70,82,0.42),transparent_48%),radial-gradient(circle_at_80%_25%,rgba(81,42,91,0.32),transparent_45%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]
+          "
+        />
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* Confetti                                                            */}
@@ -1356,10 +1349,20 @@ export default function Wheel({
           className="
             relative
             aspect-square
-            w-[min(56vw,calc(100vh-145px),720px)]
-            max-w-[78%]
+            w-full
+            max-w-full
             overflow-visible
           "
+          style={{
+            width: compact
+              ? wheelCount <= 2
+                ? "min(42vw, calc(50vh - 150px), 520px)"
+                : wheelCount === 3
+                  ? "min(30vw, calc(33vh - 120px), 430px)"
+                  : "min(24vw, calc(25vh - 110px), 360px)"
+              : "min(56vw, 720px)",
+            maxWidth: compact ? "92%" : "78%",
+          }}
           onClick={
             handleWheelClick
           }
@@ -1464,8 +1467,7 @@ export default function Wheel({
           {/* Wheel of Names idle text                                        */}
           {/* ---------------------------------------------------------------- */}
 
-          {!isSpinning &&
-            !winner && (
+          {!isSpinning && (
               <svg
                 className="
                   pointer-events-none
@@ -1577,136 +1579,6 @@ export default function Wheel({
               </svg>
             )}
 
-          {/* ---------------------------------------------------------------- */}
-          {/* Winner popup                                                     */}
-          {/* ---------------------------------------------------------------- */}
-
-          {winner && (
-            <div
-              className="
-                pointer-events-auto
-                absolute
-                left-1/2
-                top-1/2
-                z-[70]
-                w-[min(430px,78%)]
-                -translate-x-1/2
-                -translate-y-1/2
-                overflow-hidden
-                rounded-[3px]
-                bg-[#191919]
-                shadow-[0_12px_40px_rgba(0,0,0,0.55)]
-              "
-              onClick={(event) =>
-                event.stopPropagation()
-              }
-            >
-              <div
-                className="
-                  flex
-                  h-[43px]
-                  items-center
-                  bg-[#79d99f]
-                  px-3
-                  text-[14px]
-                  font-bold
-                  text-[#111]
-                "
-              >
-                We have a winner!
-              </div>
-
-              <div
-                className="
-                  flex
-                  min-h-[88px]
-                  items-center
-                  justify-center
-                  px-5
-                  text-center
-                  text-[31px]
-                  font-normal
-                  tracking-[-0.8px]
-                  text-white
-                "
-              >
-                {winner.label}
-              </div>
-
-              <div
-                className="
-                  flex
-                  items-center
-                  justify-end
-                  gap-2
-                  px-3
-                  pb-7
-                  pt-0
-                "
-              >
-                <button
-                  type="button"
-                  onClick={
-                    closeWinner
-                  }
-                  className="
-                    rounded
-                    px-2.5
-                    py-1.5
-                    text-[10px]
-                    font-bold
-                    text-white
-                    transition
-                    hover:bg-white/10
-                  "
-                >
-                  Close
-                </button>
-
-                <button
-                  type="button"
-                  onClick={
-                    closeWinner
-                  }
-                  className="
-                    rounded-[2px]
-                    bg-[#5147bd]
-                    px-3
-                    py-1.5
-                    text-[10px]
-                    font-bold
-                    text-white
-                    shadow-sm
-                    transition
-                    hover:bg-[#5d53cf]
-                  "
-                >
-                  Remove
-                </button>
-
-                <button
-                  type="button"
-                  onClick={
-                    closeWinner
-                  }
-                  className="
-                    rounded-[2px]
-                    bg-[#5147bd]
-                    px-3
-                    py-1.5
-                    text-[10px]
-                    font-bold
-                    text-white
-                    shadow-sm
-                    transition
-                    hover:bg-[#5d53cf]
-                  "
-                >
-                  Hide
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <div
