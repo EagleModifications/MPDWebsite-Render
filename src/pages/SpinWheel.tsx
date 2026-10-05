@@ -36,6 +36,7 @@ export default function SpinWheel() {
   const [results, setResults] = useState<SpinResult[]>([])
   const [winners, setWinners] = useState<SpinResult[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [spinAllTrigger, setSpinAllTrigger] = useState(0)
 
   useEffect(() => {
     if (!activeWheelId && wheels[0]) {
@@ -105,6 +106,43 @@ export default function SpinWheel() {
   const clearResults = useCallback(() => {
     setResults([])
   }, [])
+
+  const spinAllWheels = useCallback(() => {
+    setSpinAllTrigger((value) => value + 1)
+  }, [])
+
+  const renameWheel = useCallback((wheelId: string, name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+
+    setWheels((current) =>
+      current.map((wheel) =>
+        wheel.id === wheelId
+          ? { ...wheel, name: trimmed }
+          : wheel,
+      ),
+    )
+  }, [])
+
+  const removeWheel = useCallback((wheelId: string) => {
+    setWheels((current) => {
+      if (current.length <= 1) return current
+
+      return current.filter((wheel) => wheel.id !== wheelId)
+    })
+
+    setActiveWheelId((active) => {
+      if (active !== wheelId) return active
+      return wheels.find((wheel) => wheel.id !== wheelId)?.id ?? ""
+    })
+
+    setWinners((current) =>
+      current.filter((winner) => winner.wheelId !== wheelId),
+    )
+    setResults((current) =>
+      current.filter((result) => result.wheelId !== wheelId),
+    )
+  }, [wheels])
 
   const closeWinnerPopup = useCallback(() => {
     setWinners([])
@@ -224,6 +262,7 @@ export default function SpinWheel() {
                     items={wheel.items}
                     compact={wheels.length > 1}
                     wheelCount={wheels.length}
+                    spinTrigger={spinAllTrigger}
                     onResult={(item) =>
                       handleResult(wheel.id, item)
                     }
@@ -252,6 +291,9 @@ export default function SpinWheel() {
           }
           onClearResults={clearResults}
           onNewWheel={addWheel}
+          onSpinAllWheels={spinAllWheels}
+          onRenameWheel={renameWheel}
+          onRemoveWheel={removeWheel}
         />
 
         <button
