@@ -24,16 +24,18 @@ type WheelProps = {
 
 type ConfettiPiece = {
   id: number
-  x: number
-  y: number
+  startX: number
+  startY: number
+  endX: number
+  endY: number
   size: number
   rotation: number
   delay: number
   duration: number
-  drift: number
   color: string
   width: number
   height: number
+  scale: number
 }
 
 const CONFETTI_COLORS = [
@@ -62,12 +64,16 @@ function createRandomColor() {
 /* -------------------------------------------------------------------------- */
 
 function useRandomItemColors(items: SpinWheelItem[]) {
-  const colorsRef = useRef(new Map<string, string>())
+  const colorsRef = useRef(
+    new Map<string, string>(),
+  )
 
   return useMemo(() => {
     const colors = colorsRef.current
 
-    const ids = new Set(items.map((item) => item.id))
+    const ids = new Set(
+      items.map((item) => item.id),
+    )
 
     for (const id of colors.keys()) {
       if (!ids.has(id)) {
@@ -82,6 +88,14 @@ function useRandomItemColors(items: SpinWheelItem[]) {
           item.color ?? createRandomColor(),
         )
       }
+
+      /*
+       * If an explicit colour was supplied by the
+       * entry editor, always use it.
+       */
+      if (item.color) {
+        colors.set(item.id, item.color)
+      }
     }
 
     return new Map(colors)
@@ -92,6 +106,40 @@ function useRandomItemColors(items: SpinWheelItem[]) {
 /* Audio                                                                      */
 /* -------------------------------------------------------------------------- */
 
+type AudioContextWithWebkit = typeof AudioContext & {
+  new (): AudioContext
+}
+
+function getAudioContextClass() {
+  if (
+    typeof window === "undefined"
+  ) {
+    return null
+  }
+
+  const windowWithWebkit =
+    window as Window & {
+      webkitAudioContext?: AudioContextWithWebkit
+    }
+
+  return (
+    window.AudioContext ??
+    windowWithWebkit.webkitAudioContext ??
+    null
+  )
+}
+
+/*
+ * Short mechanical wheel click.
+ *
+ * This deliberately uses:
+ * - a triangle oscillator
+ * - a tiny burst of filtered noise
+ * - a very short envelope
+ *
+ * This sounds much closer to the sharp click heard
+ * when Wheel of Names passes an entry.
+ */
 function playTick(
   audioContext: AudioContext | null,
 ) {
@@ -103,60 +151,8 @@ function playTick(
     void audioContext.resume()
   }
 
-  const now = audioContext.currentTime
-
-  const oscillator =
-    audioContext.createOscillator()
-
-  const gain =
-    audioContext.createGain()
-
-  oscillator.type = "square"
-
-  oscillator.frequency.setValueAtTime(
-    1700,
-    now,
-  )
-
-  oscillator.frequency.exponentialRampToValueAtTime(
-    850,
-    now + 0.022,
-  )
-
-  gain.gain.setValueAtTime(
-    0.0001,
-    now,
-  )
-
-  gain.gain.exponentialRampToValueAtTime(
-    0.028,
-    now + 0.0015,
-  )
-
-  gain.gain.exponentialRampToValueAtTime(
-    0.0001,
-    now + 0.032,
-  )
-
-  oscillator.connect(gain)
-  gain.connect(audioContext.destination)
-
-  oscillator.start(now)
-  oscillator.stop(now + 0.038)
-}
-
-function playApplause(
-  audioContext: AudioContext | null,
-) {
-  if (!audioContext) {
-    return
-  }
-
-  if (audioContext.state === "suspended") {
-    void audioContext.resume()
-  }
-
-  const now = audioContext.currentTime
+  const now =
+    audioContext.currentTime
 
   const master =
     audioContext.createGain()
@@ -167,30 +163,260 @@ function playApplause(
   )
 
   master.gain.exponentialRampToValueAtTime(
-    0.055,
-    now + 0.08,
+    0.075,
+    now + 0.001,
   )
 
   master.gain.exponentialRampToValueAtTime(
     0.0001,
-    now + 1.15,
+    now + 0.045,
   )
 
   master.connect(
     audioContext.destination,
   )
 
+  /* Tonal click */
+
+  const oscillator =
+    audioContext.createOscillator()
+
+  const oscillatorGain =
+    audioContext.createGain()
+
+  oscillator.type = "triangle"
+
+  oscillator.frequency.setValueAtTime(
+    1450,
+    now,
+  )
+
+  oscillator.frequency.exponentialRampToValueAtTime(
+    620,
+    now + 0.028,
+  )
+
+  oscillatorGain.gain.setValueAtTime(
+    0.0001,
+    now,
+  )
+
+  oscillatorGain.gain.exponentialRampToValueAtTime(
+    0.7,
+    now + 0.001,
+  )
+
+  oscillatorGain.gain.exponentialRampToValueAtTime(
+    0.0001,
+    now + 0.035,
+  )
+
+  oscillator.connect(
+    oscillatorGain,
+  )
+
+  oscillatorGain.connect(master)
+
+  oscillator.start(now)
+  oscillator.stop(now + 0.045)
+
+  /* Mechanical noise */
+
+  const duration = 0.035
+
+  const bufferSize =
+    Math.floor(
+      audioContext.sampleRate *
+        duration,
+    )
+
+  const buffer =
+    audioContext.createBuffer(
+      1,
+      bufferSize,
+      audioContext.sampleRate,
+    )
+
+  const data =
+    buffer.getChannelData(0)
+
   for (
     let index = 0;
-    index < 34;
+    index < bufferSize;
+    index += 1
+  ) {
+    const envelope =
+      Math.pow(
+        1 - index / bufferSize,
+        3,
+      )
+
+    data[index] =
+      (Math.random() * 2 - 1) *
+      envelope
+  }
+
+  const source =
+    audioContext.createBufferSource()
+
+  const filter =
+    audioContext.createBiquadFilter()
+
+  const noiseGain =
+    audioContext.createGain()
+
+  source.buffer = buffer
+
+  filter.type = "highpass"
+  filter.frequency.value = 1800
+  filter.Q.value = 0.8
+
+  noiseGain.gain.setValueAtTime(
+    0.0001,
+    now,
+  )
+
+  noiseGain.gain.exponentialRampToValueAtTime(
+    0.22,
+    now + 0.001,
+  )
+
+  noiseGain.gain.exponentialRampToValueAtTime(
+    0.0001,
+    now + duration,
+  )
+
+  source.connect(filter)
+  filter.connect(noiseGain)
+  noiseGain.connect(master)
+
+  source.start(now)
+  source.stop(
+    now + duration + 0.005,
+  )
+}
+
+/*
+ * Short celebratory sound.
+ *
+ * This is intentionally musical rather than
+ * sounding like broadband static.
+ */
+function playWinnerSound(
+  audioContext: AudioContext | null,
+) {
+  if (!audioContext) {
+    return
+  }
+
+  if (audioContext.state === "suspended") {
+    void audioContext.resume()
+  }
+
+  const now =
+    audioContext.currentTime
+
+  const master =
+    audioContext.createGain()
+
+  master.gain.setValueAtTime(
+    0.0001,
+    now,
+  )
+
+  master.gain.exponentialRampToValueAtTime(
+    0.085,
+    now + 0.035,
+  )
+
+  master.gain.exponentialRampToValueAtTime(
+    0.0001,
+    now + 1.05,
+  )
+
+  master.connect(
+    audioContext.destination,
+  )
+
+  /*
+   * Three-note winner chime.
+   */
+  const notes = [
+    {
+      frequency: 523.25,
+      start: 0,
+      duration: 0.24,
+    },
+    {
+      frequency: 659.25,
+      start: 0.12,
+      duration: 0.3,
+    },
+    {
+      frequency: 783.99,
+      start: 0.25,
+      duration: 0.55,
+    },
+  ]
+
+  for (const note of notes) {
+    const oscillator =
+      audioContext.createOscillator()
+
+    const gain =
+      audioContext.createGain()
+
+    oscillator.type = "sine"
+
+    const start =
+      now + note.start
+
+    const end =
+      start + note.duration
+
+    oscillator.frequency.setValueAtTime(
+      note.frequency,
+      start,
+    )
+
+    gain.gain.setValueAtTime(
+      0.0001,
+      start,
+    )
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.55,
+      start + 0.025,
+    )
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      end,
+    )
+
+    oscillator.connect(gain)
+    gain.connect(master)
+
+    oscillator.start(start)
+    oscillator.stop(end + 0.03)
+  }
+
+  /*
+   * Very subtle clap-like texture underneath
+   * the chime so the result doesn't sound sterile.
+   */
+  for (
+    let index = 0;
+    index < 18;
     index += 1
   ) {
     const offset =
-      Math.random() * 0.85
+      0.18 +
+      Math.random() * 0.75
 
     const duration =
-      0.035 +
-      Math.random() * 0.07
+      0.025 +
+      Math.random() * 0.045
 
     const bufferSize =
       Math.floor(
@@ -214,8 +440,10 @@ function playApplause(
       sample += 1
     ) {
       const envelope =
-        1 -
-        sample / bufferSize
+        Math.pow(
+          1 - sample / bufferSize,
+          4,
+        )
 
       data[sample] =
         (Math.random() * 2 - 1) *
@@ -231,18 +459,18 @@ function playApplause(
     const gain =
       audioContext.createGain()
 
+    const start =
+      now + offset
+
     source.buffer = buffer
 
     filter.type = "bandpass"
 
     filter.frequency.value =
-      1100 +
-      Math.random() * 2200
+      1600 +
+      Math.random() * 1800
 
-    filter.Q.value = 0.65
-
-    const start =
-      now + offset
+    filter.Q.value = 1.2
 
     gain.gain.setValueAtTime(
       0.0001,
@@ -250,9 +478,8 @@ function playApplause(
     )
 
     gain.gain.exponentialRampToValueAtTime(
-      0.008 +
-        Math.random() * 0.014,
-      start + 0.005,
+      0.035,
+      start + 0.003,
     )
 
     gain.gain.exponentialRampToValueAtTime(
@@ -278,11 +505,41 @@ function playApplause(
 function createConfetti(): ConfettiPiece[] {
   return Array.from(
     {
-      length: 85,
+      length: 105,
     },
     (_, index) => {
+      const angle =
+        Math.random() *
+        Math.PI *
+        2
+
+      const distance =
+        10 +
+        Math.random() * 48
+
+      const startX =
+        50 +
+        Math.cos(angle) *
+          (3 + Math.random() * 4)
+
+      const startY =
+        50 +
+        Math.sin(angle) *
+          (3 + Math.random() * 4)
+
+      const endX =
+        50 +
+        Math.cos(angle) *
+          distance
+
+      const endY =
+        42 +
+        Math.sin(angle) *
+          distance
+
       const size =
-        4 + Math.random() * 5
+        3 +
+        Math.random() * 4
 
       return {
         id:
@@ -292,28 +549,24 @@ function createConfetti(): ConfettiPiece[] {
             Math.random() * 10000,
           ),
 
-        x:
-          Math.random() * 100,
-
-        y:
-          -5 -
-          Math.random() * 18,
+        startX,
+        startY,
+        endX,
+        endY,
 
         size,
 
         rotation:
-          Math.random() * 360,
+          Math.random() * 720 -
+          360,
 
         delay:
-          Math.random() * 0.55,
+          Math.random() *
+          0.28,
 
         duration:
-          2.4 +
-          Math.random() * 1.8,
-
-        drift:
-          -140 +
-          Math.random() * 280,
+          1.8 +
+          Math.random() * 1.6,
 
         color:
           CONFETTI_COLORS[
@@ -325,13 +578,17 @@ function createConfetti(): ConfettiPiece[] {
 
         width:
           size *
-          (0.65 +
-            Math.random() * 0.65),
+          (0.7 +
+            Math.random() * 0.7),
 
         height:
           size *
-          (1.3 +
-            Math.random() * 1.2),
+          (1.4 +
+            Math.random() * 1.5),
+
+        scale:
+          0.7 +
+          Math.random() * 0.7,
       }
     },
   )
@@ -350,6 +607,9 @@ export default function Wheel({
 
   const wheelRef =
     useRef<SpinWheel | null>(null)
+
+  const pointerRef =
+    useRef<HTMLDivElement | null>(null)
 
   const spinningRef =
     useRef(false)
@@ -380,12 +640,8 @@ export default function Wheel({
   const [confetti, setConfetti] =
     useState<ConfettiPiece[]>([])
 
-  const randomColors =
-    useRandomItemColors(items)
-
   /*
-   * Hidden entries do not appear on
-   * the actual wheel.
+   * Hidden entries are not rendered.
    */
   const visibleItems = useMemo(
     () =>
@@ -395,12 +651,17 @@ export default function Wheel({
     [items],
   )
 
+  const randomColors =
+    useRandomItemColors(
+      visibleItems,
+    )
+
   const visibleColors = useMemo(
     () =>
       visibleItems.map(
         (item) =>
-          randomColors.get(item.id) ??
           item.color ??
+          randomColors.get(item.id) ??
           "#60a5fa",
       ),
     [
@@ -416,6 +677,14 @@ export default function Wheel({
     itemsRef.current =
       visibleItems
   }, [visibleItems])
+
+  const colorsRef =
+    useRef(visibleColors)
+
+  useEffect(() => {
+    colorsRef.current =
+      visibleColors
+  }, [visibleColors])
 
   const onResultRef =
     useRef(onResult)
@@ -442,12 +711,7 @@ export default function Wheel({
         !audioContextRef.current
       ) {
         const AudioContextClass =
-          window.AudioContext ??
-          (
-            window as Window & {
-              webkitAudioContext?: typeof AudioContext
-            }
-          ).webkitAudioContext
+          getAudioContextClass()
 
         if (!AudioContextClass) {
           return null
@@ -471,18 +735,56 @@ export default function Wheel({
   /* Pointer                                                                */
   /* ---------------------------------------------------------------------- */
 
-  const updatePointerColor =
+  /*
+   * This updates the DOM immediately.
+   *
+   * Previously this was only React state, which could
+   * leave the arrow one frame behind the actual slice.
+   */
+  const setPointerForIndex =
     useCallback(
       (index: number) => {
-        const color =
-          visibleColors[index]
+        const colors =
+          colorsRef.current
 
-        if (color) {
-          setPointerColor(color)
+        if (
+          colors.length === 0
+        ) {
+          return
+        }
+
+        const safeIndex =
+          ((index %
+            colors.length) +
+            colors.length) %
+          colors.length
+
+        const color =
+          colors[safeIndex]
+
+        if (!color) {
+          return
+        }
+
+        pointerColorRef.current =
+          color
+
+        setPointerColor(color)
+
+        if (
+          pointerRef.current
+        ) {
+          pointerRef.current.style.setProperty(
+            "--pointer-color",
+            color,
+          )
         }
       },
-      [visibleColors],
+      [],
     )
+
+  const pointerColorRef =
+    useRef("#5fc78b")
 
   /* ---------------------------------------------------------------------- */
   /* Confetti                                                               */
@@ -508,7 +810,7 @@ export default function Wheel({
 
           confettiTimerRef.current =
             null
-        }, 4700)
+        }, 3900)
     }, [])
 
   /* ---------------------------------------------------------------------- */
@@ -546,15 +848,21 @@ export default function Wheel({
           visibleItems.length,
       )
 
-    spinningRef.current = true
+    spinningRef.current =
+      true
 
     setIsSpinning(true)
 
+    /*
+     * Match the recording more closely:
+     * a little longer, with a controlled
+     * multi-revolution spin.
+     */
     wheel.spinToItem(
       selectedIndex,
-      4400,
+      4600,
       true,
-      6,
+      5,
       1,
     )
   }, [
@@ -613,7 +921,8 @@ export default function Wheel({
 
     wheelRef.current = null
 
-    spinningRef.current = false
+    spinningRef.current =
+      false
 
     setIsSpinning(false)
 
@@ -625,6 +934,9 @@ export default function Wheel({
       setPointerColor(
         "#5fc78b",
       )
+
+      pointerColorRef.current =
+        "#5fc78b"
 
       return
     }
@@ -639,12 +951,26 @@ export default function Wheel({
       initialIndex
 
     const initialColor =
-      visibleColors[initialIndex]
+      visibleColors[
+        initialIndex
+      ]
 
     if (initialColor) {
       setPointerColor(
         initialColor,
       )
+
+      pointerColorRef.current =
+        initialColor
+
+      if (
+        pointerRef.current
+      ) {
+        pointerRef.current.style.setProperty(
+          "--pointer-color",
+          initialColor,
+        )
+      }
     }
 
     const wheel =
@@ -675,26 +1001,23 @@ export default function Wheel({
             ),
 
           /*
-           * Wheel of Names uses a very
-           * clean, almost full-size circle.
+           * Match Wheel of Names proportions.
            */
-          radius: 0.985,
+          radius: 0.95,
 
           /*
-           * Pointer is on the right.
+           * Pointer is exactly on
+           * the right-hand side.
            */
           pointerAngle: 0,
 
-          /*
-           * Thin outer edge.
-           */
           borderWidth: 1,
 
           borderColor:
             "rgba(0,0,0,0.22)",
 
           /*
-           * No obvious segment outlines.
+           * Keep the slices clean.
            */
           lineWidth: 0,
 
@@ -702,8 +1025,7 @@ export default function Wheel({
             "transparent",
 
           /*
-           * This is the important part
-           * for the Wheel of Names look.
+           * Wheel of Names style labels.
            */
           itemLabelAlign: "right",
 
@@ -716,19 +1038,10 @@ export default function Wheel({
 
           itemLabelFontSizeMax: 42,
 
-          /*
-           * No white outline.
-           * The recording has clean black
-           * lettering directly on the wheel.
-           */
           itemLabelStrokeWidth: 0,
 
           itemLabelBaselineOffset: 0,
 
-          /*
-           * The React wrapper handles
-           * the click itself.
-           */
           isInteractive: false,
 
           rotationResistance: -35,
@@ -736,7 +1049,7 @@ export default function Wheel({
           rotationSpeedMax: 1000,
 
           /* -------------------------------------------------------------- */
-          /* Segment change                                                  */
+          /* Current item                                                     */
           /* -------------------------------------------------------------- */
 
           onCurrentIndexChange:
@@ -747,10 +1060,19 @@ export default function Wheel({
               currentIndexRef.current =
                 index
 
-              updatePointerColor(
+              /*
+               * Use the actual index reported
+               * by spin-wheel. This is explicitly
+               * the item the pointer is pointing at.
+               */
+              setPointerForIndex(
                 index,
               )
 
+              /*
+               * Only play one click per
+               * newly pointed-at segment.
+               */
               if (
                 lastTickIndexRef.current !==
                 index
@@ -769,12 +1091,27 @@ export default function Wheel({
             },
 
           /* -------------------------------------------------------------- */
-          /* Winner                                                           */
+          /* Rest                                                             */
           /* -------------------------------------------------------------- */
 
           onRest: (event) => {
-            const selectedIndex =
+            /*
+             * Read the final index directly
+             * from the wheel rather than relying
+             * on stale state.
+             */
+            const finalIndex =
+              wheel.getCurrentIndex()
+
+            const eventIndex =
               event.currentIndex
+
+            const selectedIndex =
+              Number.isInteger(
+                finalIndex,
+              )
+                ? finalIndex
+                : eventIndex
 
             const selectedItem =
               itemsRef.current[
@@ -784,7 +1121,7 @@ export default function Wheel({
             currentIndexRef.current =
               selectedIndex
 
-            updatePointerColor(
+            setPointerForIndex(
               selectedIndex,
             )
 
@@ -798,7 +1135,7 @@ export default function Wheel({
                 selectedItem,
               )
 
-              playApplause(
+              playWinnerSound(
                 audioContextRef.current,
               )
 
@@ -815,13 +1152,17 @@ export default function Wheel({
     wheelRef.current =
       wheel
 
+    /*
+     * Synchronise the pointer with the
+     * actual rendered wheel immediately.
+     */
     const actualIndex =
       wheel.getCurrentIndex()
 
     currentIndexRef.current =
       actualIndex
 
-    updatePointerColor(
+    setPointerForIndex(
       actualIndex,
     )
 
@@ -839,7 +1180,7 @@ export default function Wheel({
   }, [
     visibleItems,
     visibleColors,
-    updatePointerColor,
+    setPointerForIndex,
     launchConfetti,
   ])
 
@@ -900,7 +1241,7 @@ export default function Wheel({
     }
 
   /* ---------------------------------------------------------------------- */
-  /* Winner actions                                                          */
+  /* Winner                                                                  */
   /* ---------------------------------------------------------------------- */
 
   const closeWinner =
@@ -926,10 +1267,7 @@ export default function Wheel({
         bg-[#080b0e]
       "
     >
-      {/* ------------------------------------------------------------------ */}
-      {/* Wheel of Names style background                                    */}
-      {/* ------------------------------------------------------------------ */}
-
+      {/* Background */}
       <div
         className="
           pointer-events-none
@@ -959,10 +1297,10 @@ export default function Wheel({
               const style: CSSProperties =
                 {
                   left:
-                    `${piece.x}%`,
+                    `${piece.startX}%`,
 
                   top:
-                    `${piece.y}%`,
+                    `${piece.startY}%`,
 
                   width:
                     `${piece.width}px`,
@@ -973,17 +1311,23 @@ export default function Wheel({
                   backgroundColor:
                     piece.color,
 
+                  ["--confetti-x" as string]:
+                    `${piece.endX - piece.startX}%`,
+
+                  ["--confetti-y" as string]:
+                    `${piece.endY - piece.startY}vh`,
+
+                  ["--confetti-rotation" as string]:
+                    `${piece.rotation}deg`,
+
+                  ["--confetti-scale" as string]:
+                    piece.scale,
+
                   animationDelay:
                     `${piece.delay}s`,
 
                   animationDuration:
                     `${piece.duration}s`,
-
-                  ["--confetti-drift" as string]:
-                    `${piece.drift}px`,
-
-                  ["--confetti-rotation" as string]:
-                    `${piece.rotation}deg`,
                 }
 
               return (
@@ -993,8 +1337,7 @@ export default function Wheel({
                     absolute
                     rounded-[1px]
                     opacity-0
-                    shadow-[0_1px_3px_rgba(0,0,0,0.35)]
-                    animate-[mpd-confetti-fall_linear_forwards]
+                    animate-[mpd-confetti-burst_ease-out_forwards]
                   "
                   style={style}
                 />
@@ -1044,78 +1387,60 @@ export default function Wheel({
           {/* ---------------------------------------------------------------- */}
 
           <div
+            ref={pointerRef}
             className="
               pointer-events-none
               absolute
-              right-[-10px]
+              right-[-5px]
               top-1/2
               z-40
+              h-[22px]
+              w-[26px]
               -translate-y-1/2
             "
+            style={
+              {
+                "--pointer-color":
+                  pointerColor,
+              } as CSSProperties
+            }
             aria-hidden="true"
           >
+            {/* Dark outline */}
             <div
               className="
-                relative
-                h-[42px]
-                w-[46px]
+                absolute
+                inset-0
               "
               style={{
-                filter:
-                  "drop-shadow(0 2px 3px rgba(0,0,0,0.65))",
+                clipPath:
+                  "polygon(100% 0, 0 50%, 100% 100%, 82% 50%)",
+
+                background:
+                  "rgba(22,35,29,0.9)",
               }}
-            >
-              {/* Dark outline */}
-              <div
-                className="
-                  absolute
-                  inset-0
-                "
-                style={{
-                  clipPath:
-                    "polygon(100% 0, 0 50%, 100% 100%, 79% 50%)",
+            />
 
-                  background:
-                    "rgba(20,32,27,0.85)",
-                }}
-              />
+            {/* Exact slice colour */}
+            <div
+              className="
+                absolute
+                inset-[1.5px]
+                transition-colors
+                duration-75
+              "
+              style={{
+                clipPath:
+                  "polygon(100% 0, 0 50%, 100% 100%, 82% 50%)",
 
-              {/* Actual pointer */}
-              <div
-                className="
-                  absolute
-                  inset-[2px]
-                "
-                style={{
-                  clipPath:
-                    "polygon(100% 0, 0 50%, 100% 100%, 79% 50%)",
-
-                  background:
-                    pointerColor,
-
-                  transition:
-                    "background-color 90ms ease",
-                }}
-              />
-
-              {/* Soft pointer highlight */}
-              <div
-                className="
-                  absolute
-                  left-[19%]
-                  top-[20%]
-                  h-[15%]
-                  w-[47%]
-                  rounded-full
-                  bg-white/20
-                  blur-[1px]
-                "
-              />
-            </div>
+                background:
+                  "var(--pointer-color)",
+              }}
+            />
           </div>
 
           {/* ---------------------------------------------------------------- */}
-          {/* White centre                                                     */}
+          {/* Centre                                                           */}
           {/* ---------------------------------------------------------------- */}
 
           <div
@@ -1136,7 +1461,7 @@ export default function Wheel({
           />
 
           {/* ---------------------------------------------------------------- */}
-          {/* Instructions                                                     */}
+          {/* Wheel of Names idle text                                        */}
           {/* ---------------------------------------------------------------- */}
 
           {!isSpinning &&
@@ -1155,93 +1480,95 @@ export default function Wheel({
                 aria-hidden="true"
               >
                 <defs>
+                  {/* Exact upper arc used by the recording */}
                   <path
-                    id="wheel-text-top"
+                    id="wheel-click-text"
                     d="
                       M 285 405
-                      Q 500 245 715 405
+                      Q 500 275 715 405
                     "
                     fill="none"
                   />
 
+                  {/* Lower instruction arc */}
                   <path
-                    id="wheel-text-bottom"
+                    id="wheel-control-text"
                     d="
-                      M 315 595
-                      Q 500 710 685 595
+                      M 325 590
+                      Q 500 700 675 590
                     "
                     fill="none"
                   />
                 </defs>
 
-                {/* Top text outline */}
+                {/* Click to spin shadow */}
                 <text
                   fill="#ffffff"
-                  fontSize="48"
-                  fontWeight="800"
+                  fontSize="47"
+                  fontWeight="700"
                   fontFamily="Arial, Helvetica, sans-serif"
-                  letterSpacing="-1.2"
+                  letterSpacing="-1"
                   textAnchor="middle"
                   paintOrder="stroke"
-                  stroke="rgba(0,0,0,0.55)"
+                  stroke="rgba(0,0,0,0.6)"
                   strokeWidth="5"
                 >
                   <textPath
-                    href="#wheel-text-top"
+                    href="#wheel-click-text"
                     startOffset="50%"
                   >
                     Click to spin
                   </textPath>
                 </text>
 
-                {/* Top text */}
+                {/* Click to spin */}
                 <text
                   fill="#ffffff"
-                  fontSize="48"
-                  fontWeight="800"
+                  fontSize="47"
+                  fontWeight="700"
                   fontFamily="Arial, Helvetica, sans-serif"
-                  letterSpacing="-1.2"
+                  letterSpacing="-1"
                   textAnchor="middle"
                 >
                   <textPath
-                    href="#wheel-text-top"
+                    href="#wheel-click-text"
                     startOffset="50%"
                   >
                     Click to spin
                   </textPath>
                 </text>
 
-                {/* Bottom text outline */}
+                {/* Ctrl + Enter shadow */}
                 <text
                   fill="#ffffff"
-                  fontSize="32"
-                  fontWeight="800"
+                  fontSize="30"
+                  fontWeight="700"
                   fontFamily="Arial, Helvetica, sans-serif"
-                  letterSpacing="-0.5"
+                  letterSpacing="-0.35"
                   textAnchor="middle"
                   paintOrder="stroke"
-                  stroke="rgba(0,0,0,0.55)"
+                  stroke="rgba(0,0,0,0.6)"
                   strokeWidth="4"
                 >
                   <textPath
-                    href="#wheel-text-bottom"
+                    href="#wheel-control-text"
                     startOffset="50%"
                   >
                     or press ctrl+enter
                   </textPath>
                 </text>
 
-                {/* Bottom text */}
+                {/* Ctrl + Enter */}
                 <text
                   fill="#ffffff"
-                  fontSize="32"
-                  fontWeight="800"
+                  fontSize="30"
+                  fontWeight="700"
                   fontFamily="Arial, Helvetica, sans-serif"
-                  letterSpacing="-0.5"
+                  letterSpacing="-0.35"
                   textAnchor="middle"
                 >
                   <textPath
-                    href="#wheel-text-bottom"
+                    href="#wheel-control-text"
                     startOffset="50%"
                   >
                     or press ctrl+enter
@@ -1274,7 +1601,6 @@ export default function Wheel({
                 event.stopPropagation()
               }
             >
-              {/* Green header */}
               <div
                 className="
                   flex
@@ -1290,7 +1616,6 @@ export default function Wheel({
                 We have a winner!
               </div>
 
-              {/* Winner name */}
               <div
                 className="
                   flex
@@ -1308,7 +1633,6 @@ export default function Wheel({
                 {winner.label}
               </div>
 
-              {/* Actions */}
               <div
                 className="
                   flex
@@ -1414,16 +1738,17 @@ export default function Wheel({
       )}
 
       {/* ------------------------------------------------------------------ */}
-      {/* Confetti animation                                                  */}
+      {/* Animations                                                          */}
       {/* ------------------------------------------------------------------ */}
 
       <style>
         {`
-          @keyframes mpd-confetti-fall {
+          @keyframes mpd-confetti-burst {
             0% {
               opacity: 0;
               transform:
-                translate3d(0, -20px, 0)
+                translate3d(0, 0, 0)
+                scale(0.35)
                 rotate(0deg);
             }
 
@@ -1431,7 +1756,7 @@ export default function Wheel({
               opacity: 1;
             }
 
-            55% {
+            70% {
               opacity: 1;
             }
 
@@ -1439,13 +1764,12 @@ export default function Wheel({
               opacity: 0;
               transform:
                 translate3d(
-                  var(--confetti-drift),
-                  105vh,
+                  var(--confetti-x),
+                  var(--confetti-y),
                   0
                 )
-                rotate(
-                  var(--confetti-rotation)
-                );
+                scale(var(--confetti-scale))
+                rotate(var(--confetti-rotation));
             }
           }
         `}
