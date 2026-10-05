@@ -1,45 +1,71 @@
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { Dices } from "lucide-react"
 
 import Navbar from "@/components/home/Navbar"
 
-import SpinWheelCanvas, {
+import Sidebar from "@/components/spinwheel/Sidebar"
+import Wheel, {
   type SpinWheelItem,
 } from "@/components/spinwheel/Wheel"
-import SpinWheelSidebar from "@/components/spinwheel/Sidebar"
 
 export default function SpinWheel() {
   const [items, setItems] = useState<SpinWheelItem[]>([])
+  const [results, setResults] = useState<string[]>([])
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  const handleResult = useCallback((item: SpinWheelItem) => {
+    setResults((current) => [item.label, ...current])
+  }, [])
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
+    <div className="min-h-screen overflow-hidden bg-background text-foreground">
       <Navbar />
 
-      <main className="min-h-[calc(100vh-5rem)] pt-20">
-        <div className="mx-auto flex w-full max-w-[1900px] flex-col px-4 py-5 sm:px-6 lg:px-8 lg:py-6 xl:px-10">
-          <div className="mb-5">
-            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-500">
+      <main className="relative h-[calc(100vh-5rem)] min-h-[650px] pt-20">
+        <div
+          className={`absolute inset-0 transition-[padding] duration-300 ${
+            sidebarOpen ? "pl-0 lg:pl-[468px]" : "pl-0"
+          }`}
+        >
+          <Wheel
+            items={items}
+            onResult={handleResult}
+          />
+        </div>
+
+        <Sidebar
+          open={sidebarOpen}
+          items={items}
+          results={results}
+          onChange={setItems}
+          onClearResults={() => setResults([])}
+        />
+
+        <button
+          type="button"
+          onClick={() => setSidebarOpen((open) => !open)}
+          aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          className={`absolute top-1/2 z-[70] flex h-14 w-8 -translate-y-1/2 items-center justify-center rounded-r-xl border border-l-0 border-border/80 bg-card/95 text-muted-foreground shadow-xl backdrop-blur transition-[left] duration-300 hover:bg-muted hover:text-foreground ${
+            sidebarOpen ? "left-[468px]" : "left-0"
+          }`}
+        >
+          <span
+            className={`text-2xl leading-none transition-transform duration-300 ${
+              sidebarOpen ? "rotate-180" : ""
+            }`}
+          >
+            ›
+          </span>
+        </button>
+
+        <div className="pointer-events-none absolute right-5 top-5 z-20">
+          <div className="rounded-xl border border-border/70 bg-card/80 px-3 py-2 shadow-sm backdrop-blur">
+            <div className="flex items-center gap-2 text-xs font-bold text-blue-500">
               <Dices className="h-4 w-4" />
-              TOOLS
+              MPD TOOLS
             </div>
-
-            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-              Spin Wheel
-            </h1>
-
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Create a custom wheel and randomly select an entry.
-            </p>
           </div>
-
-          <section className="grid min-h-[calc(100vh-10.5rem)] gap-4 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_410px]">
-            <SpinWheelCanvas items={items} />
-
-            <SpinWheelSidebar
-              items={items}
-              onChange={setItems}
-            />
-          </section>
         </div>
       </main>
     </div>
