@@ -14,7 +14,7 @@ import { useRequireAuth } from "@/hooks/useRequireAuth"
 type IconType = ComponentType<{ className?: string }>
 
 export default function Dashboard() {
-  const { loading, user } = useRequireAuth("view")
+  const { loading, user } = useRequireAuth("dashboard")
 
   if (loading) {
     return (
