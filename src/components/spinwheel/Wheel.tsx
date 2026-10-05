@@ -388,30 +388,40 @@ function playAfterSpinSound(sound: string, volume: number) {
  * continuous at 50%, so there is no visible jerk when braking begins.
  */
 const halfThenSmoothStop = (t: number) => {
-  if (t <= 0.5) return t
-
   /*
-   * First half: perfectly constant angular speed.
+   * Smooth constant-speed phase followed by a monotonic glide.
    *
-   * Second half: a 7th-order braking curve.  It is constructed so that:
-   *   - position is continuous at 50%,
-   *   - velocity is continuous at 50%,
-   *   - acceleration is zero at 50%,
-   *   - jerk is zero at 50%,
-   *   - velocity, acceleration and jerk all reach zero at the final frame.
-   *
-   * That is much smoother than a normal ease-out because braking does not
-   * suddenly kick in when the wheel reaches the halfway point.
+   * The first 35% stays at one constant angular velocity. From there,
+   * velocity only decreases; it never accelerates during the braking phase.
+   * A quintic smoothstep controls the velocity falloff, so acceleration and
+   * jerk are both zero where braking starts and the wheel eases all the way
+   * into a soft zero-velocity stop.
    */
-  const u = (t - 0.5) * 2
-  const eased =
-    0.5 * u +
-    25 * u ** 4 -
-    (123 / 2) * u ** 5 +
-    52 * u ** 6 -
-    15 * u ** 7
+  const brakeStart = 0.35
+  const clamped = Math.max(0, Math.min(1, t))
 
-  return 0.5 + 0.5 * eased
+  if (clamped <= brakeStart) {
+    const peakVelocity = 2 / (1 + brakeStart)
+    return peakVelocity * clamped
+  }
+
+  const u = (clamped - brakeStart) / (1 - brakeStart)
+  const peakVelocity = 2 / (1 + brakeStart)
+
+  // Integral of (1 - smoothstep(u)), normalized so G(1) = 1.
+  const glideProgress =
+    2 * u -
+    5 * u ** 4 +
+    6 * u ** 5 -
+    2 * u ** 6
+
+  return (
+    peakVelocity *
+    (
+      brakeStart +
+      ((1 - brakeStart) / 2) * glideProgress
+    )
+  )
 }
 
 type SpinWheelInternals = {
@@ -823,17 +833,25 @@ export default function Wheel({
     const configuredDuration = Math.max(1500, Math.min(60000, spinTimeRef.current * 1000))
     const slowly = spinSlowlyRef.current
 
-    /* Slow mode keeps the configured timing. Normal mode is much quicker,
-       while both use the same halfway-braking curve. */
+    /*
+     * Match the reference animation:
+     * - Slow mode is deliberately relaxed and steady.
+     * - Normal mode is clearly faster, but not an abrupt "fast then brake"
+     *   animation.
+     * - Both spend the first ~35% at a steady velocity and then enter the
+     *   same long, continuous glide to zero.
+     */
     const duration = slowly
-      ? configuredDuration
-      : Math.max(3200, Math.min(6000, configuredDuration * 0.45))
+      ? Math.max(8000, Math.min(12000, configuredDuration))
+      : Math.max(5200, Math.min(7000, configuredDuration * 0.62))
+
+    const revolutions = slowly ? 5 : 8
 
     wheel.spinToItem(
       selectedIndex,
       duration,
       true,
-      6,
+      revolutions,
       1,
       halfThenSmoothStop,
     )
@@ -1049,7 +1067,7 @@ export default function Wheel({
 
           isInteractive: false,
 
-          rotationResistance: -35,
+          rotationResistance: 0,
 
           rotationSpeedMax: 1000,
 
@@ -1319,11 +1337,11 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-18px]
+              right-[-24px]
               top-1/2
               z-50
-              h-[54px]
-              w-[70px]
+              h-[48px]
+              w-[62px]
               -translate-y-1/2
             "
             style={
@@ -1337,18 +1355,17 @@ export default function Wheel({
             <div
               className="absolute inset-0 drop-shadow-[0_4px_5px_rgba(0,0,0,0.58)]"
               style={{
-                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 86% 50%)",
-                background: "linear-gradient(180deg,#e5e7eb 0%,#64748b 46%,#1e293b 100%)",
+                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
+                background: "#111827",
               }}
             />
 
             {/* Exact colour of the entry currently under the pointer. */}
             <div
-              className="absolute inset-[4px]"
+              className="absolute inset-[3px]"
               style={{
-                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 86% 50%)",
-                background: "linear-gradient(180deg, color-mix(in srgb, var(--pointer-color) 78%, white), var(--pointer-color) 48%, color-mix(in srgb, var(--pointer-color) 72%, black))",
-                boxShadow: "inset 0 2px 2px rgba(255,255,255,0.45), inset 0 -2px 3px rgba(0,0,0,0.38)",
+                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
+                background: "var(--pointer-color)",
               }}
             />
 
