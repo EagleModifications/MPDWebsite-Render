@@ -437,7 +437,42 @@ function CustomMultiSelect({
 }
 
 function getGalleryMediaUrl(media: GalleryMedia) {
+  const storageId = media.storageId?.trim()
+
+  if (storageId && /^[a-f0-9]{24}$/i.test(storageId)) {
+    return `/api/gallery/file/${storageId}`
+  }
+
   return media.url
+}
+
+function normalizeGalleryItems(items: GalleryItem[]) {
+  return items.map((item) => ({
+    ...item,
+    media: item.media.map((media) => {
+      const storageId = media.storageId?.trim()
+
+      if (
+        storageId &&
+        /^[a-f0-9]{24}$/i.test(storageId)
+      ) {
+        const currentUrl =
+          `/api/gallery/file/${storageId}`
+
+        return {
+          ...media,
+          url: currentUrl,
+          fallbackUrl:
+            media.url &&
+            media.url !== currentUrl
+              ? media.url
+              : media.fallbackUrl,
+        }
+      }
+
+      return media
+    }),
+  }))
 }
 
 function getYouTubeVideoId(value: string) {
@@ -760,7 +795,9 @@ export default function Gallery() {
 
         setItems(
           Array.isArray(data.items)
-            ? data.items
+            ? normalizeGalleryItems(
+                data.items as GalleryItem[],
+              )
             : [],
         )
 
@@ -1361,7 +1398,9 @@ export default function Gallery() {
         )
       } else {
         setItems((current) => [
-          data.item,
+          normalizeGalleryItems([
+            data.item as GalleryItem,
+          ])[0],
           ...current,
         ])
 
