@@ -29,7 +29,6 @@ import {
 import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
 import { logAction, registerActionLogRoutes } from "./actionLogs"
 import { registerRosterListRoutes } from "./rosterLists"
-import { registerWheelOfNamesRoutes } from "./wheelOfNames"
 import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
@@ -4367,9 +4366,6 @@ export function createApp() {
   // Action Logs API. Logs are kept in-memory for the last 14 days.
   registerActionLogRoutes(app)
   registerRosterListRoutes(app)
-
-  // Wheel of Names API. The API key stays server-side and is never exposed to React.
-  registerWheelOfNamesRoutes(app)
 
   app.get("/health", (_req, res) => {
     res.status(200).json({
