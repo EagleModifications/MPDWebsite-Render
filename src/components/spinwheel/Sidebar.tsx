@@ -16,10 +16,10 @@ import {
   Check,
   ChevronDown,
   Download,
-  FolderOpen,
   Image as ImageIcon,
   Minus,
   Palette,
+  Pencil,
   Plus,
   Scale,
   Shuffle,
@@ -50,6 +50,9 @@ type SidebarProps = {
   onChange: (items: SpinWheelItem[]) => void
   onClearResults: () => void
   onNewWheel: () => void
+  onSpinAllWheels: () => void
+  onRenameWheel: (wheelId: string, name: string) => void
+  onRemoveWheel: (wheelId: string) => void
 }
 
 type Tab = "entries" | "results"
@@ -1095,6 +1098,9 @@ export default function Sidebar({
   onChange,
   onClearResults,
   onNewWheel,
+  onSpinAllWheels,
+  onRenameWheel,
+  onRemoveWheel,
 }: SidebarProps) {
   const [tab, setTab] =
     useState<Tab>("entries")
@@ -1973,7 +1979,28 @@ export default function Sidebar({
     onNewWheel()
   }
 
-  const handleOpenWheel = () => {
+  const handleRenameActiveWheel = () => {
+    const wheel = wheels.find((entry) => entry.id === activeWheelId)
+    if (!wheel) return
+
+    const nextName = window.prompt("Rename wheel", wheel.name)
+    if (nextName !== null) {
+      onRenameWheel(wheel.id, nextName)
+    }
+    setWheelMenuOpen(false)
+  }
+
+  const handleRemoveActiveWheel = () => {
+    if (wheels.length <= 1) {
+      setWheelMenuOpen(false)
+      return
+    }
+
+    onRemoveWheel(activeWheelId)
+    setWheelMenuOpen(false)
+  }
+
+  const handleCustomizeActiveWheel = () => {
     setWheelMenuOpen(false)
   }
 
@@ -2005,6 +2032,10 @@ export default function Sidebar({
     items.filter(
       (item) => item.hidden,
     ).length
+
+  const activeWheel = wheels.find(
+    (wheel) => wheel.id === activeWheelId,
+  )
 
   const settingsProbability =
     useMemo(() => {
@@ -2556,58 +2587,73 @@ export default function Sidebar({
               )}
 
               <div className="shrink-0 border-t border-border/70 bg-muted/10 px-4 py-3">
-                <div
-                  ref={wheelMenuRef}
-                  className="relative inline-flex"
-                >
-                  <button
-                    type="button"
-                    onClick={
-                      handleNewWheel
-                    }
-                    className="inline-flex h-10 items-center gap-2 rounded-l-lg border border-blue-500/20 bg-blue-500/10 px-4 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-500/15"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add wheel
-                  </button>
-
-                  <button
-                    type="button"
-                    aria-label="More wheel options"
-                    aria-expanded={
-                      wheelMenuOpen
-                    }
-                    onClick={
-                      toggleWheelMenu
-                    }
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-r-lg border border-l-0 border-blue-500/20 bg-blue-500/10 text-blue-500 transition-colors hover:bg-blue-500/15"
-                  >
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform ${
-                        wheelMenuOpen
-                          ? "rotate-180"
-                          : ""
-                      }`}
-                    />
-                  </button>
-
-                  {wheelMenuOpen && (
-                    <div className="absolute bottom-12 left-0 z-[90] w-60 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-2xl">
-                      <button
-                        type="button"
-                        onClick={
-                          handleOpenWheel
-                        }
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
-                      >
-                        <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-
-                        <span className="text-sm font-medium">
-                          Open wheel
-                        </span>
-                      </button>
-                    </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {wheels.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={onSpinAllWheels}
+                      className="inline-flex h-10 items-center gap-2 rounded-md border border-border/60 bg-[#34306d] px-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#403a82]"
+                    >
+                      <span className="text-[17px] leading-none">↻</span>
+                      Spin all wheels
+                    </button>
                   )}
+
+                  <div ref={wheelMenuRef} className="relative inline-flex">
+                    <button
+                      type="button"
+                      onClick={handleNewWheel}
+                      className="inline-flex h-10 items-center gap-2 rounded-l-md border border-[#34306d] bg-[#34306d] px-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#403a82]"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add wheel
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label="More wheel options"
+                      aria-expanded={wheelMenuOpen}
+                      onClick={toggleWheelMenu}
+                      className="inline-flex h-10 w-9 items-center justify-center rounded-r-md border border-l border-white/10 bg-[#34306d] text-white transition hover:bg-[#403a82]"
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${wheelMenuOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {wheelMenuOpen && (
+                      <div className="absolute bottom-12 left-0 z-[90] w-[178px] overflow-hidden rounded-md border border-border bg-[#202020] p-1.5 shadow-2xl">
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handleCustomizeActiveWheel}
+                            className="flex h-9 items-center justify-center gap-1 rounded-sm bg-[#34306d] px-1.5 text-[10px] font-bold text-white transition hover:bg-[#403a82]"
+                          >
+                            <Palette className="h-3.5 w-3.5" />
+                            Customize {activeWheel?.name?.toLowerCase() ?? "wheel"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleRenameActiveWheel}
+                            className="flex h-9 items-center justify-center gap-1 rounded-sm bg-[#34306d] px-1.5 text-[10px] font-bold text-white transition hover:bg-[#403a82]"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Rename {activeWheel?.name?.toLowerCase() ?? "wheel"}
+                          </button>
+
+                          {wheels.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveActiveWheel}
+                              className="col-span-2 flex h-9 items-center gap-2 rounded-sm px-3 text-left text-xs font-bold text-white transition hover:bg-white/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Remove {activeWheel?.name?.toLowerCase() ?? "wheel"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </>
