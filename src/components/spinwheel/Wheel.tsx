@@ -1307,7 +1307,7 @@ export default function Wheel({
           {/* The wheel itself is clean — no surrounding card or border. */}
           <div
             ref={containerRef}
-            className="absolute inset-0 overflow-visible rounded-full"
+            className="absolute inset-0 overflow-visible rounded-full shadow-[0_10px_18px_rgba(0,0,0,0.42),0_2px_4px_rgba(255,255,255,0.10)]"
           />
 
           {/* ---------------------------------------------------------------- */}
@@ -1319,11 +1319,11 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-24px]
+              right-[-40px]
               top-1/2
               z-50
-              h-[48px]
-              w-[62px]
+              h-[42px]
+              w-[52px]
               -translate-y-1/2
             "
             style={
@@ -1335,7 +1335,7 @@ export default function Wheel({
           >
             {/* Deep outline gives the arrow the same raised/bevelled look as the reference. */}
             <div
-              className="absolute inset-0 drop-shadow-[0_4px_5px_rgba(0,0,0,0.58)]"
+              className="absolute inset-0 drop-shadow-[0_5px_7px_rgba(0,0,0,0.68)]"
               style={{
                 clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
                 background: "#111827",
@@ -1344,7 +1344,7 @@ export default function Wheel({
 
             {/* Exact colour of the entry currently under the pointer. */}
             <div
-              className="absolute inset-[3px]"
+              className="absolute inset-[2.5px]"
               style={{
                 clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
                 background: "var(--pointer-color)",
@@ -1353,10 +1353,10 @@ export default function Wheel({
 
             {/* Small highlight along the upper edge. */}
             <div
-              className="absolute inset-[6px] opacity-45"
+              className="absolute inset-[5px] opacity-50"
               style={{
                 clipPath: "polygon(100% 0, 0 50%, 100% 100%, 88% 50%)",
-                background: "linear-gradient(180deg,rgba(255,255,255,0.72),rgba(255,255,255,0) 48%)",
+                background: "linear-gradient(180deg,rgba(255,255,255,0.82),rgba(255,255,255,0.08) 46%,rgba(0,0,0,0.18) 100%)",
               }}
             />
           </div>
