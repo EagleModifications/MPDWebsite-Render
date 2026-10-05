@@ -717,47 +717,38 @@ export default function SpinWheel() {
       <Navbar />
 
       <main className="relative min-h-screen pt-20">
-        <div className="pointer-events-none absolute left-4 top-4 z-[220] flex items-center gap-2">
-          <button
-            type="button"
-            onClick={requestCustomize}
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:bg-black/75"
-            aria-label="Customize wheel"
-            title="Customize wheel"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-
-          <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/10 bg-black/45 p-1.5 shadow-lg backdrop-blur-xl">
-            <button type="button" onClick={requestCustomize} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
-              <Palette className="h-4 w-4" />
-              Customize
-            </button>
-            <button type="button" onClick={requestNewWheel} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
-              <FilePlus2 className="h-4 w-4" />
-              New
-            </button>
-            <button type="button" onClick={() => openFileInputRef.current?.click()} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
-              <FolderOpen className="h-4 w-4" />
-              Open
-            </button>
-            <div className="relative">
-              <button type="button" onClick={() => setSaveMenuOpen((value) => !value)} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10" aria-expanded={saveMenuOpen}>
-                <Save className="h-4 w-4" />
-                Save
-                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${saveMenuOpen ? "rotate-180" : ""}`} />
+        {sidebarOpen && (
+          <div className="pointer-events-none absolute right-4 top-[5.25rem] z-[190] w-[468px] max-w-[calc(100vw-32px)]">
+            <div className="pointer-events-auto flex h-11 items-center justify-end overflow-hidden rounded-t-2xl border border-border/70 bg-card px-1.5 shadow-xl">
+              <button type="button" onClick={requestCustomize} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-foreground transition hover:bg-muted">
+                <Palette className="h-4 w-4" />
+                Customize
               </button>
-              {saveMenuOpen && (
-                <div className="absolute left-0 top-[calc(100%+6px)] z-[300] w-36 overflow-hidden rounded-lg border border-white/10 bg-[#181818] p-1 shadow-2xl">
-                  <button type="button" onClick={() => saveWheelFile("wheel")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .wheel</button>
-                  <button type="button" onClick={() => saveWheelFile("json")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .json</button>
-                </div>
-              )}
+              <button type="button" onClick={requestNewWheel} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-foreground transition hover:bg-muted">
+                <FilePlus2 className="h-4 w-4" />
+                New
+              </button>
+              <button type="button" onClick={() => openFileInputRef.current?.click()} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-foreground transition hover:bg-muted">
+                <FolderOpen className="h-4 w-4" />
+                Open
+              </button>
+              <div className="relative">
+                <button type="button" onClick={() => setSaveMenuOpen((value) => !value)} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-foreground transition hover:bg-muted" aria-expanded={saveMenuOpen}>
+                  <Save className="h-4 w-4" />
+                  Save
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${saveMenuOpen ? "rotate-180" : ""}`} />
+                </button>
+                {saveMenuOpen && (
+                  <div className="absolute right-0 top-[calc(100%+6px)] z-[300] w-36 overflow-hidden rounded-lg border border-border/70 bg-card p-1 shadow-2xl">
+                    <button type="button" onClick={() => saveWheelFile("wheel")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-foreground hover:bg-muted">Save .wheel</button>
+                    <button type="button" onClick={() => saveWheelFile("json")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-foreground hover:bg-muted">Save .json</button>
+                  </div>
+                )}
+              </div>
             </div>
+            <input ref={openFileInputRef} type="file" accept=".wheel,.json,application/json" className="hidden" onChange={openWheelFile} />
           </div>
-
-          <input ref={openFileInputRef} type="file" accept=".wheel,.json,application/json" className="hidden" onChange={openWheelFile} />
-        </div>
+        )}
         <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_35%_35%,rgba(33,70,82,0.42),transparent_45%),radial-gradient(circle_at_78%_25%,rgba(81,42,91,0.28),transparent_42%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]">
           <div
             className={`absolute inset-0 min-h-0 overflow-hidden pt-16 transition-[padding] duration-300 ${
