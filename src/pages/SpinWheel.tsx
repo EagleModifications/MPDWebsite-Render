@@ -75,34 +75,73 @@ function createEntries(names: string[]): WheelEntry[] {
 }
 
 export default function SpinWheel() {
-  const wheelContainerRef = useRef<HTMLDivElement | null>(null)
+  const wheelContainerRef =
+    useRef<HTMLDivElement | null>(null)
+
   const wheelRef = useRef<Wheel | null>(null)
 
   const isSpinningRef = useRef(false)
   const idleRotationRef = useRef(false)
   const hideSelectedRef = useRef(false)
 
-  const visibleEntriesRef = useRef<WheelEntry[]>([])
   const entriesRef = useRef<WheelEntry[]>([])
+  const visibleEntriesRef =
+    useRef<WheelEntry[]>([])
 
-  const [entries, setEntries] = useState<WheelEntry[]>(() =>
-    createEntries(DEFAULT_NAMES),
-  )
+  const [entries, setEntries] = useState<
+    WheelEntry[]
+  >(() => createEntries(DEFAULT_NAMES))
 
-  const [results, setResults] = useState<SpinResult[]>([])
-  const [activeTab, setActiveTab] = useState<"entries" | "results">(
-    "entries",
-  )
-  const [isSpinning, setIsSpinning] = useState(false)
-  const [pointerColor, setPointerColor] = useState("#ffffff")
-  const [showAdvanced, setShowAdvanced] = useState(false)
-  const [showMenu, setShowMenu] = useState(false)
-  const [newEntry, setNewEntry] = useState("")
-  const [fullscreen, setFullscreen] = useState(false)
+  const [results, setResults] = useState<
+    SpinResult[]
+  >([])
 
+  const [activeTab, setActiveTab] = useState<
+    "entries" | "results"
+  >("entries")
+
+  const [isSpinning, setIsSpinning] =
+    useState(false)
+
+  const [pointerColor, setPointerColor] =
+    useState("#ffffff")
+
+  const [showAdvanced, setShowAdvanced] =
+    useState(false)
+
+  const [showMenu, setShowMenu] =
+    useState(false)
+
+  const [newEntry, setNewEntry] =
+    useState("")
+
+  const [fullscreen, setFullscreen] =
+    useState(false)
+
+  /*
+   * Keep refs synchronized with React state.
+   */
+  useEffect(() => {
+    entriesRef.current = entries
+
+    visibleEntriesRef.current =
+      entries.filter(
+        (entry) => !entry.hidden,
+      )
+  }, [entries])
+
+  /*
+   * Update the pointer colour based on the
+   * segment currently underneath the pointer.
+   */
   const updatePointerColor = useCallback(
-    (index: number, source?: WheelEntry[]) => {
-      const currentEntries = source ?? visibleEntriesRef.current
+    (
+      index: number,
+      source?: WheelEntry[],
+    ) => {
+      const currentEntries =
+        source ?? visibleEntriesRef.current
+
       const entry = currentEntries[index]
 
       if (entry) {
@@ -112,6 +151,11 @@ export default function SpinWheel() {
     [],
   )
 
+  /*
+   * Start continuous idle rotation.
+   *
+   * The wheel instance is intentionally reused.
+   */
   const startIdleRotation = useCallback(() => {
     const wheel = wheelRef.current
 
@@ -130,74 +174,57 @@ export default function SpinWheel() {
     wheel.spin(IDLE_SPEED)
   }, [])
 
-  const stopIdleRotation = useCallback(() => {
-    const wheel = wheelRef.current
-
-    if (!wheel) {
-      return
-    }
-
-    idleRotationRef.current = false
-    wheel.stop()
-  }, [])
-
-  /*
-   * Keep the refs synchronized with React state.
-   *
-   * This is important because the Wheel instance is intentionally
-   * NOT recreated when Shuffle or Sort changes the entries.
-   */
-  useEffect(() => {
-    entriesRef.current = entries
-
-    const visibleEntries = entries.filter(
-      (entry) => !entry.hidden,
-    )
-
-    visibleEntriesRef.current = visibleEntries
-  }, [entries])
-
   /*
    * CREATE THE WHEEL ONCE.
    *
-   * Do not put `entries`, `isSpinning`, `results`, etc. in this
-   * dependency array.
-   *
-   * Recreating the Wheel was the reason Shuffle/Sort used to
-   * stop/reset the rotation.
+   * IMPORTANT:
+   * Do not put entries/isSpinning/results in
+   * this effect's dependency list.
    */
   useEffect(() => {
-    const container = wheelContainerRef.current
+    const container =
+      wheelContainerRef.current
 
-    if (!container || wheelRef.current) {
+    if (
+      !container ||
+      wheelRef.current
+    ) {
       return
     }
 
-    const initialEntries = entriesRef.current.filter(
-      (entry) => !entry.hidden,
-    )
+    const initialEntries =
+      entriesRef.current.filter(
+        (entry) => !entry.hidden,
+      )
 
-    visibleEntriesRef.current = initialEntries
+    visibleEntriesRef.current =
+      initialEntries
 
     const wheel = new Wheel(container, {
-      items: initialEntries.map((entry) => ({
-        label: entry.label,
-        backgroundColor: entry.color,
-        labelColor: "#111111",
-      })),
+      items: initialEntries.map(
+        (entry) => ({
+          label: entry.label,
+          backgroundColor: entry.color,
+          labelColor: "#111111",
+        }),
+      ),
 
       /*
-       * Our DOM pointer is on the RIGHT side of the wheel.
+       * Pointer is on the right side.
        */
       pointerAngle: 90,
 
+      /*
+       * Wheel size.
+       */
       radius: 0.91,
 
       lineWidth: 1,
-      lineColor: "rgba(255,255,255,0.24)",
+      lineColor:
+        "rgba(255,255,255,0.24)",
 
       /*
-       * Text
+       * Labels.
        */
       itemLabelRotation: 0,
       itemLabelAlign: "center",
@@ -210,8 +237,8 @@ export default function SpinWheel() {
       itemLabelColors: ["#111111"],
 
       /*
-       * Keep the canvas sharp without creating a huge
-       * high-DPI rendering performance hit.
+       * Keep canvas reasonably sharp without
+       * unnecessarily large rendering costs.
        */
       pixelRatio:
         typeof window !== "undefined"
@@ -222,22 +249,21 @@ export default function SpinWheel() {
           : 1,
 
       /*
-       * 0 = continuous spinning.
+       * Zero resistance means the wheel can
+       * continuously rotate.
        */
       rotationResistance: 0,
 
       rotationSpeedMax: 160,
 
       /*
-       * Fires whenever the pointer enters another segment.
+       * Update pointer colour whenever the
+       * wheel crosses another segment.
        */
       onCurrentIndexChange: (event) => {
-        const currentEntries =
-          visibleEntriesRef.current
-
         updatePointerColor(
           event.currentIndex,
-          currentEntries,
+          visibleEntriesRef.current,
         )
       },
 
@@ -277,6 +303,9 @@ export default function SpinWheel() {
           ...current,
         ])
 
+        /*
+         * Hide the winner when enabled.
+         */
         if (hideSelectedRef.current) {
           setEntries((current) =>
             current.map((entry) =>
@@ -290,11 +319,13 @@ export default function SpinWheel() {
           )
         }
 
-        toast.success(`${winner.label} won!`)
+        toast.success(
+          `${winner.label} won!`,
+        )
 
         /*
-         * Give the result a tiny moment before returning
-         * to the continuous idle rotation.
+         * Return to idle rotation after
+         * a short pause.
          */
         window.setTimeout(() => {
           startIdleRotation()
@@ -314,17 +345,20 @@ export default function SpinWheel() {
 
     startIdleRotation()
 
+    /*
+     * Destroy the wheel only when the page
+     * itself unmounts.
+     */
     return () => {
-      /*
-       * Only destroy the wheel when this component actually
-       * unmounts.
-       *
-       * NEVER destroy it just because entries changed.
-       */
       wheel.stop()
-      wheel.remove()
+
+      /*
+       * `remove()` is not required for the
+       * spin-wheel instance lifecycle.
+       */
       wheelRef.current = null
       idleRotationRef.current = false
+      isSpinningRef.current = false
     }
   }, [
     startIdleRotation,
@@ -332,15 +366,10 @@ export default function SpinWheel() {
   ])
 
   /*
-   * UPDATE THE EXISTING WHEEL WHEN ENTRIES CHANGE.
+   * UPDATE EXISTING WHEEL ITEMS.
    *
-   * This is the important Shuffle/Sort fix.
-   *
-   * We change `wheel.items` instead of doing:
-   *
-   *     new Wheel(...)
-   *
-   * This means the existing rotation continues.
+   * This is what allows Shuffle/Sort to change
+   * the entries without recreating the wheel.
    */
   useEffect(() => {
     const wheel = wheelRef.current
@@ -349,14 +378,14 @@ export default function SpinWheel() {
       return
     }
 
-    const visibleEntries = entries.filter(
-      (entry) => !entry.hidden,
-    )
+    const visible =
+      entries.filter(
+        (entry) => !entry.hidden,
+      )
 
-    visibleEntriesRef.current =
-      visibleEntries
+    visibleEntriesRef.current = visible
 
-    wheel.items = visibleEntries.map(
+    wheel.items = visible.map(
       (entry) => ({
         label: entry.label,
         backgroundColor: entry.color,
@@ -364,26 +393,38 @@ export default function SpinWheel() {
       }),
     )
 
-    if (visibleEntries.length === 0) {
+    if (visible.length === 0) {
       setPointerColor("#ffffff")
       return
     }
 
-    /*
-     * Get whichever item is currently underneath
-     * the pointer after the item update.
-     */
     const currentIndex =
       wheel.getCurrentIndex()
 
     updatePointerColor(
       currentIndex,
-      visibleEntries,
+      visible,
     )
-  }, [entries, updatePointerColor])
+
+    /*
+     * If the wheel isn't currently doing the
+     * controlled winner animation, make sure
+     * idle rotation remains active.
+     */
+    if (
+      !isSpinningRef.current &&
+      !idleRotationRef.current
+    ) {
+      startIdleRotation()
+    }
+  }, [
+    entries,
+    startIdleRotation,
+    updatePointerColor,
+  ])
 
   /*
-   * SPIN
+   * MAIN SPIN.
    */
   const spin = useCallback(() => {
     const wheel = wheelRef.current
@@ -400,13 +441,15 @@ export default function SpinWheel() {
       visibleEntriesRef.current
 
     if (currentEntries.length === 0) {
-      toast.error("Add at least one entry first.")
+      toast.error(
+        "Add at least one entry first.",
+      )
       return
     }
 
     /*
-     * Stop the infinite idle momentum before starting
-     * the controlled winner animation.
+     * Stop the continuous idle rotation
+     * before the controlled spin.
      */
     wheel.stop()
 
@@ -416,18 +459,15 @@ export default function SpinWheel() {
     setIsSpinning(true)
 
     /*
-     * Choose the winner.
-     *
-     * The wheel is then told to animate to exactly that
-     * item for five seconds.
+     * Random winner.
      */
     const winnerIndex = Math.floor(
-      Math.random() * currentEntries.length,
+      Math.random() *
+        currentEntries.length,
     )
 
     /*
-     * Make sure the pointer colour immediately represents
-     * the target segment.
+     * Immediately update pointer colour.
      */
     updatePointerColor(
       winnerIndex,
@@ -435,17 +475,23 @@ export default function SpinWheel() {
     )
 
     /*
-     * Smooth quartic ease-out.
-     *
-     * Fast at the beginning and progressively smoother
-     * as it approaches the winner.
+     * Smooth ease-out animation.
      */
     const easeOutQuart = (
       progress: number,
     ) => {
-      return 1 - Math.pow(1 - progress, 4)
+      return (
+        1 -
+        Math.pow(
+          1 - progress,
+          4,
+        )
+      )
     }
 
+    /*
+     * Five second controlled winner spin.
+     */
     wheel.spinToItem(
       winnerIndex,
       WIN_SPIN_DURATION,
@@ -457,7 +503,7 @@ export default function SpinWheel() {
   }, [updatePointerColor])
 
   /*
-   * CTRL + ENTER
+   * CTRL + ENTER.
    */
   useEffect(() => {
     const handleKeyDown = (
@@ -489,11 +535,10 @@ export default function SpinWheel() {
   }, [spin])
 
   /*
-   * SHUFFLE
+   * SHUFFLE.
    *
-   * This only changes React state.
-   *
-   * The existing Wheel instance remains alive.
+   * IMPORTANT:
+   * This does NOT call wheel.stop().
    */
   const shuffleEntries = useCallback(() => {
     if (isSpinningRef.current) {
@@ -507,13 +552,16 @@ export default function SpinWheel() {
       const shuffled = [...current]
 
       for (
-        let index = shuffled.length - 1;
+        let index =
+          shuffled.length - 1;
         index > 0;
         index--
       ) {
-        const randomIndex = Math.floor(
-          Math.random() * (index + 1),
-        )
+        const randomIndex =
+          Math.floor(
+            Math.random() *
+              (index + 1),
+          )
 
         ;[
           shuffled[index],
@@ -529,9 +577,10 @@ export default function SpinWheel() {
   }, [])
 
   /*
-   * SORT
+   * SORT.
    *
-   * Again, we never stop the wheel here.
+   * IMPORTANT:
+   * This also does NOT call wheel.stop().
    */
   const sortEntries = useCallback(() => {
     if (isSpinningRef.current) {
@@ -542,58 +591,69 @@ export default function SpinWheel() {
     }
 
     setEntries((current) =>
-      [...current].sort((a, b) =>
-        a.label.localeCompare(
-          b.label,
-          undefined,
-          {
-            numeric: true,
-            sensitivity: "base",
-          },
-        ),
+      [...current].sort(
+        (a, b) =>
+          a.label.localeCompare(
+            b.label,
+            undefined,
+            {
+              numeric: true,
+              sensitivity: "base",
+            },
+          ),
       ),
     )
   }, [])
 
   /*
-   * TEXTAREA EDITING
+   * TEXTAREA EDITING.
    */
-  const updateEntriesFromText = useCallback(
-    (value: string) => {
-      const lines = value
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
+  const updateEntriesFromText =
+    useCallback(
+      (value: string) => {
+        const lines = value
+          .split(/\r?\n/)
+          .map((line) =>
+            line.trim(),
+          )
+          .filter(Boolean)
 
-      setEntries((current) => {
-        return lines.map((label, index) => {
-          const existing =
-            current[index]
+        setEntries((current) =>
+          lines.map(
+            (label, index) => {
+              const existing =
+                current[index]
 
-          return {
-            id:
-              existing?.id ??
-              `${Date.now()}-${index}-${Math.random()
-                .toString(36)
-                .slice(2)}`,
-            label,
-            color:
-              existing?.color ??
-              COLORS[index % COLORS.length],
-            hidden:
-              existing?.hidden ?? false,
-          }
-        })
-      })
-    },
-    [],
-  )
+              return {
+                id:
+                  existing?.id ??
+                  `${Date.now()}-${index}-${Math.random()
+                    .toString(36)
+                    .slice(2)}`,
+                label,
+                color:
+                  existing?.color ??
+                  COLORS[
+                    index %
+                      COLORS.length
+                  ],
+                hidden:
+                  existing?.hidden ??
+                  false,
+              }
+            },
+          ),
+        )
+      },
+      [],
+    )
 
   /*
-   * ADD ENTRY
+   * ADD ENTRY.
    */
   const addEntry = useCallback(() => {
-    const label = newEntry.trim()
+    const label =
+      newEntry.trim()
 
     if (!label) {
       return
@@ -607,8 +667,10 @@ export default function SpinWheel() {
           .slice(2)}`,
         label,
         color:
-          COLORS[current.length %
-            COLORS.length],
+          COLORS[
+            current.length %
+              COLORS.length
+          ],
         hidden: false,
       },
     ])
@@ -617,7 +679,7 @@ export default function SpinWheel() {
   }, [newEntry])
 
   /*
-   * REMOVE ALL
+   * CLEAR ENTRIES.
    */
   const clearEntries = useCallback(() => {
     if (isSpinningRef.current) {
@@ -631,32 +693,39 @@ export default function SpinWheel() {
   }, [])
 
   /*
-   * RESTORE DEFAULTS
+   * RESTORE DEFAULTS.
    */
-  const restoreDefaults = useCallback(() => {
-    if (isSpinningRef.current) {
-      toast.info(
-        "Wait for the current spin to finish.",
+  const restoreDefaults =
+    useCallback(() => {
+      if (isSpinningRef.current) {
+        toast.info(
+          "Wait for the current spin to finish.",
+        )
+        return
+      }
+
+      setEntries(
+        createEntries(
+          DEFAULT_NAMES,
+        ),
       )
-      return
-    }
 
-    setEntries(
-      createEntries(DEFAULT_NAMES),
-    )
-
-    toast.success(
-      "Default entries restored.",
-    )
-  }, [])
+      toast.success(
+        "Default entries restored.",
+      )
+    }, [])
 
   /*
-   * COPY ENTRIES
+   * COPY ENTRIES.
    */
   const copyEntries = useCallback(() => {
     const text = entries
-      .filter((entry) => !entry.hidden)
-      .map((entry) => entry.label)
+      .filter(
+        (entry) => !entry.hidden,
+      )
+      .map(
+        (entry) => entry.label,
+      )
       .join("\n")
 
     if (!navigator.clipboard) {
@@ -681,26 +750,34 @@ export default function SpinWheel() {
   }, [entries])
 
   /*
-   * FULLSCREEN
+   * FULLSCREEN.
    */
-  const toggleFullscreen = useCallback(() => {
-    setFullscreen((current) => !current)
-  }, [])
+  const toggleFullscreen =
+    useCallback(() => {
+      setFullscreen(
+        (current) => !current,
+      )
+    }, [])
 
   /*
-   * RESULTS CLEAR
+   * CLEAR RESULTS.
    */
-  const clearResults = useCallback(() => {
-    setResults([])
-  }, [])
+  const clearResults =
+    useCallback(() => {
+      setResults([])
+    }, [])
 
-  const visibleEntries = entries.filter(
-    (entry) => !entry.hidden,
-  )
+  const visibleEntries =
+    entries.filter(
+      (entry) => !entry.hidden,
+    )
 
-  const entryText = visibleEntries
-    .map((entry) => entry.label)
-    .join("\n")
+  const entryText =
+    visibleEntries
+      .map(
+        (entry) => entry.label,
+      )
+      .join("\n")
 
   return (
     <div
@@ -712,17 +789,13 @@ export default function SpinWheel() {
           : "top-[var(--navbar-height,0px)]",
       ].join(" ")}
     >
-      {/* ===================================================== */}
-      {/* WHEEL                                                  */}
-      {/* ===================================================== */}
+      {/* ================================================= */}
+      {/* WHEEL                                             */}
+      {/* ================================================= */}
 
       <main
         className="relative min-w-0 flex-1 overflow-hidden"
         onClick={(event) => {
-          /*
-           * Don't accidentally spin when clicking controls
-           * positioned over the wheel.
-           */
           const target =
             event.target as HTMLElement
 
@@ -749,7 +822,7 @@ export default function SpinWheel() {
           "
         />
 
-        {/* Subtle vignette */}
+        {/* Vignette */}
         <div
           className="
             pointer-events-none
@@ -759,7 +832,7 @@ export default function SpinWheel() {
           "
         />
 
-        {/* Wheel canvas */}
+        {/* Wheel */}
         <div
           ref={wheelContainerRef}
           className="
@@ -770,10 +843,7 @@ export default function SpinWheel() {
           "
         />
 
-        {/* ================================================= */}
-        {/* TOP LEFT TYPE BUTTON                              */}
-        {/* ================================================= */}
-
+        {/* Text settings */}
         <button
           type="button"
           aria-label="Wheel text settings"
@@ -802,10 +872,7 @@ export default function SpinWheel() {
           <Type className="h-5 w-5" />
         </button>
 
-        {/* ================================================= */}
-        {/* CENTER TEXT                                       */}
-        {/* ================================================= */}
-
+        {/* Center text */}
         <div
           className="
             pointer-events-none
@@ -838,7 +905,6 @@ export default function SpinWheel() {
                 className="
                   mt-2
                   text-[13px]
-                  font-normal
                   leading-none
                   text-white/75
                   drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]
@@ -850,10 +916,7 @@ export default function SpinWheel() {
           </div>
         </div>
 
-        {/* ================================================= */}
-        {/* RIGHT POINTER                                     */}
-        {/* ================================================= */}
-
+        {/* Right pointer */}
         <div
           className="
             pointer-events-none
@@ -883,10 +946,7 @@ export default function SpinWheel() {
           />
         </div>
 
-        {/* ================================================= */}
-        {/* SPINNING INDICATOR                                */}
-        {/* ================================================= */}
-
+        {/* Spin status */}
         {isSpinning && (
           <div
             className="
@@ -914,9 +974,9 @@ export default function SpinWheel() {
         )}
       </main>
 
-      {/* ===================================================== */}
-      {/* SIDEBAR                                                */}
-      {/* ===================================================== */}
+      {/* ================================================= */}
+      {/* SIDEBAR                                           */}
+      {/* ================================================= */}
 
       <aside
         className="
@@ -933,10 +993,7 @@ export default function SpinWheel() {
           xl:w-[420px]
         "
       >
-        {/* ================================================= */}
-        {/* HEADER                                            */}
-        {/* ================================================= */}
-
+        {/* Header */}
         <div
           className="
             flex
@@ -953,18 +1010,22 @@ export default function SpinWheel() {
             <button
               type="button"
               onClick={() =>
-                setActiveTab("entries")
+                setActiveTab(
+                  "entries",
+                )
               }
               className={[
                 "relative px-3 py-4 text-sm font-medium transition",
-                activeTab === "entries"
+                activeTab ===
+                "entries"
                   ? "text-white"
                   : "text-white/45 hover:text-white/75",
               ].join(" ")}
             >
               Entries
 
-              {activeTab === "entries" && (
+              {activeTab ===
+                "entries" && (
                 <span
                   className="
                     absolute
@@ -982,11 +1043,14 @@ export default function SpinWheel() {
             <button
               type="button"
               onClick={() =>
-                setActiveTab("results")
+                setActiveTab(
+                  "results",
+                )
               }
               className={[
                 "relative px-3 py-4 text-sm font-medium transition",
-                activeTab === "results"
+                activeTab ===
+                "results"
                   ? "text-white"
                   : "text-white/45 hover:text-white/75",
               ].join(" ")}
@@ -1009,7 +1073,8 @@ export default function SpinWheel() {
                 </span>
               )}
 
-              {activeTab === "results" && (
+              {activeTab ===
+                "results" && (
                 <span
                   className="
                     absolute
@@ -1025,12 +1090,14 @@ export default function SpinWheel() {
             </button>
           </div>
 
+          {/* More */}
           <div className="relative">
             <button
               type="button"
               onClick={() =>
                 setShowMenu(
-                  (current) => !current,
+                  (current) =>
+                    !current,
                 )
               }
               className="
@@ -1170,6 +1237,7 @@ export default function SpinWheel() {
                   "
                 >
                   <Maximize2 className="h-4 w-4" />
+
                   {fullscreen
                     ? "Exit fullscreen"
                     : "Fullscreen"}
@@ -1179,11 +1247,9 @@ export default function SpinWheel() {
           </div>
         </div>
 
-        {/* ================================================= */}
-        {/* TOOLBAR                                           */}
-        {/* ================================================= */}
-
-        {activeTab === "entries" && (
+        {/* Toolbar */}
+        {activeTab ===
+          "entries" && (
           <div
             className="
               flex
@@ -1198,7 +1264,9 @@ export default function SpinWheel() {
           >
             <button
               type="button"
-              onClick={shuffleEntries}
+              onClick={
+                shuffleEntries
+              }
               disabled={isSpinning}
               className="
                 flex
@@ -1223,7 +1291,9 @@ export default function SpinWheel() {
 
             <button
               type="button"
-              onClick={sortEntries}
+              onClick={
+                sortEntries
+              }
               disabled={isSpinning}
               className="
                 flex
@@ -1271,7 +1341,8 @@ export default function SpinWheel() {
               type="button"
               onClick={() =>
                 setShowAdvanced(
-                  (current) => !current,
+                  (current) =>
+                    !current,
                 )
               }
               className={[
@@ -1286,12 +1357,10 @@ export default function SpinWheel() {
           </div>
         )}
 
-        {/* ================================================= */}
-        {/* ADVANCED                                          */}
-        {/* ================================================= */}
-
+        {/* Advanced */}
         {showAdvanced &&
-          activeTab === "entries" && (
+          activeTab ===
+            "entries" && (
             <div
               className="
                 shrink-0
@@ -1310,7 +1379,9 @@ export default function SpinWheel() {
                 <button
                   type="button"
                   onClick={() =>
-                    setShowAdvanced(false)
+                    setShowAdvanced(
+                      false,
+                    )
                   }
                   className="text-xs text-white/40 hover:text-white"
                 >
@@ -1331,6 +1402,7 @@ export default function SpinWheel() {
                   <div className="text-[11px] text-white/40">
                     Spin duration
                   </div>
+
                   <div className="mt-1 text-sm font-medium">
                     5 seconds
                   </div>
@@ -1348,17 +1420,33 @@ export default function SpinWheel() {
                   <div className="text-[11px] text-white/40">
                     Revolutions
                   </div>
+
                   <div className="mt-1 text-sm font-medium">
                     {WIN_REVOLUTIONS}
                   </div>
                 </div>
               </div>
 
-              <label className="mt-3 flex cursor-pointer items-center justify-between rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2.5">
+              <label
+                className="
+                  mt-3
+                  flex
+                  cursor-pointer
+                  items-center
+                  justify-between
+                  rounded-lg
+                  border
+                  border-white/10
+                  bg-white/[0.025]
+                  px-3
+                  py-2.5
+                "
+              >
                 <div>
                   <div className="text-xs font-medium text-white/80">
                     Hide selected
                   </div>
+
                   <div className="mt-0.5 text-[10px] text-white/35">
                     Remove winners from future spins
                   </div>
@@ -1366,8 +1454,12 @@ export default function SpinWheel() {
 
                 <input
                   type="checkbox"
-                  checked={hideSelectedRef.current}
-                  onChange={(event) => {
+                  checked={
+                    hideSelectedRef.current
+                  }
+                  onChange={(
+                    event,
+                  ) => {
                     hideSelectedRef.current =
                       event.target.checked
                   }}
@@ -1377,11 +1469,9 @@ export default function SpinWheel() {
             </div>
           )}
 
-        {/* ================================================= */}
-        {/* CONTENT                                           */}
-        {/* ================================================= */}
-
-        {activeTab === "entries" ? (
+        {/* Content */}
+        {activeTab ===
+        "entries" ? (
           <div className="flex min-h-0 flex-1 flex-col">
             {/* Entry count */}
             <div
@@ -1396,7 +1486,8 @@ export default function SpinWheel() {
             >
               <div className="text-xs text-white/45">
                 {visibleEntries.length}{" "}
-                {visibleEntries.length === 1
+                {visibleEntries.length ===
+                1
                   ? "entry"
                   : "entries"}
               </div>
@@ -1406,11 +1497,13 @@ export default function SpinWheel() {
               </div>
             </div>
 
-            {/* Text area */}
+            {/* Textarea */}
             <div className="min-h-0 flex-1 px-4 pb-3">
               <textarea
                 value={entryText}
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateEntriesFromText(
                     event.target.value,
                   )
@@ -1451,13 +1544,20 @@ export default function SpinWheel() {
               <div className="flex gap-2">
                 <input
                   value={newEntry}
-                  onChange={(event) =>
+                  onChange={(
+                    event,
+                  ) =>
                     setNewEntry(
                       event.target.value,
                     )
                   }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
+                  onKeyDown={(
+                    event,
+                  ) => {
+                    if (
+                      event.key ===
+                      "Enter"
+                    ) {
                       event.preventDefault()
                       addEntry()
                     }
@@ -1504,11 +1604,8 @@ export default function SpinWheel() {
             </div>
           </div>
         ) : (
-          /* ================================================= */
-          /* RESULTS                                           */
-          /* ================================================= */
-
           <div className="flex min-h-0 flex-1 flex-col">
+            {/* Results header */}
             <div
               className="
                 flex
@@ -1525,15 +1622,19 @@ export default function SpinWheel() {
                 <div className="text-sm font-medium">
                   Winners
                 </div>
+
                 <div className="mt-0.5 text-xs text-white/35">
                   Your previous results
                 </div>
               </div>
 
-              {results.length > 0 && (
+              {results.length >
+                0 && (
                 <button
                   type="button"
-                  onClick={clearResults}
+                  onClick={
+                    clearResults
+                  }
                   className="
                     text-xs
                     text-white/40
@@ -1546,8 +1647,10 @@ export default function SpinWheel() {
               )}
             </div>
 
+            {/* Results */}
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              {results.length === 0 ? (
+              {results.length ===
+              0 ? (
                 <div
                   className="
                     flex
@@ -1578,14 +1681,18 @@ export default function SpinWheel() {
                   </div>
 
                   <div className="mt-1 max-w-[220px] text-xs leading-5 text-white/25">
-                    Spin the wheel to see your first
+                    Spin the wheel to
+                    see your first
                     winner here.
                   </div>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {results.map(
-                    (result, index) => (
+                    (
+                      result,
+                      index,
+                    ) => (
                       <div
                         key={`${result.id}-${result.timestamp}`}
                         className="
@@ -1620,7 +1727,9 @@ export default function SpinWheel() {
 
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-medium text-white">
-                            {result.label}
+                            {
+                              result.label
+                            }
                           </div>
 
                           <div className="mt-0.5 text-[10px] text-white/30">
@@ -1646,10 +1755,7 @@ export default function SpinWheel() {
           </div>
         )}
 
-        {/* ================================================= */}
-        {/* BOTTOM SPIN BUTTON                                 */}
-        {/* ================================================= */}
-
+        {/* Bottom spin button */}
         <div
           className="
             shrink-0
@@ -1664,7 +1770,8 @@ export default function SpinWheel() {
             onClick={spin}
             disabled={
               isSpinning ||
-              visibleEntries.length === 0
+              visibleEntries.length ===
+                0
             }
             className="
               flex
