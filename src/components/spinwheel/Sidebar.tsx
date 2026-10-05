@@ -35,7 +35,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 
-import type { SpinWheelItem } from "./Wheel"
+import { DURING_SOUND_FILES, type SpinWheelItem } from "./Wheel"
 
 type WheelSummary = {
   id: string
@@ -64,6 +64,14 @@ type SidebarProps = {
   afterVolumeByWheel: Record<string, number>
   onAfterSoundChange: (wheelId: string, sound: string) => void
   onAfterVolumeChange: (wheelId: string, volume: number) => void
+  spinSlowlyByWheel: Record<string, boolean>
+  onSpinSlowlyChange: (wheelId: string, enabled: boolean) => void
+  spinTimeByWheel: Record<string, number>
+  onSpinTimeChange: (wheelId: string, seconds: number) => void
+  centerImageByWheel: Record<string, string | undefined>
+  onCenterImageChange: (wheelId: string, image: string | undefined) => void
+  imageSizeByWheel: Record<string, "S" | "M" | "L">
+  onImageSizeChange: (wheelId: string, size: "S" | "M" | "L") => void
 }
 
 type Tab = "entries" | "results"
@@ -118,7 +126,7 @@ const COLORS = [
   "#94a3b8",
 ]
 
-const WHEEL_THEMES = [
+const WHEEL_THEMES: Array<[string, string[]]> = [
   ["Default", ["#3b82f6", "#64748b", "#0ea5e9", "#334155", "#60a5fa", "#94a3b8"]],
   ["Classic", ["#2563eb", "#ef4444", "#facc15", "#22c55e", "#8b5cf6", "#f97316"]],
   ["Rainbow", ["#7c3aed", "#2563eb", "#06b6d4", "#22c55e", "#facc15", "#ef4444"]],
@@ -1183,6 +1191,15 @@ function WheelCustomizeDialog({
   afterVolume,
   onAfterSoundChange,
   onAfterVolumeChange,
+  spinSlowly,
+  onSpinSlowlyChange,
+  spinTime,
+  onSpinTimeChange,
+  centerImage,
+  onCenterImageChange,
+  imageSize,
+  onImageSizeChange,
+  currentColors,
 }: {
   open: boolean
   wheelNumber: number
@@ -1194,14 +1211,21 @@ function WheelCustomizeDialog({
   afterVolume: number
   onAfterSoundChange: (sound: string) => void
   onAfterVolumeChange: (volume: number) => void
+  spinSlowly: boolean
+  onSpinSlowlyChange: (enabled: boolean) => void
+  spinTime: number
+  onSpinTimeChange: (seconds: number) => void
+  centerImage?: string
+  onCenterImageChange: (image: string | undefined) => void
+  imageSize: "S" | "M" | "L"
+  onImageSizeChange: (size: "S" | "M" | "L") => void
+  currentColors: string[]
 }) {
   const [tab, setTab] = useState<"during" | "after" | "appearance">("during")
   const [duringSound, setDuringSound] = useState("Ticking sound")
   const [duringVolume, setDuringVolume] = useState(50)
   const [displayDuplicates, setDisplayDuplicates] = useState(true)
-  const [spinSlowly, setSpinSlowly] = useState(false)
   const [showTitle, setShowTitle] = useState(true)
-  const [spinTime, setSpinTime] = useState(10)
   const [maxVisible, setMaxVisible] = useState(1000)
 
   const [autoRemove, setAutoRemove] = useState(false)
@@ -1215,8 +1239,6 @@ function WheelCustomizeDialog({
   const [availableColors, setAvailableColors] = useState<string[]>(COLORS)
   const [selectedColors, setSelectedColors] = useState<string[]>(COLORS)
   const [themeOpen, setThemeOpen] = useState(false)
-  const [centerImage, setCenterImage] = useState<string | undefined>()
-  const [imageSize, setImageSize] = useState("S")
   const [gradient, setGradient] = useState(true)
   const [contours, setContours] = useState(false)
   const [wheelShadow, setWheelShadow] = useState(true)
@@ -1225,6 +1247,25 @@ function WheelCustomizeDialog({
 
   const centerImageInputRef = useRef<HTMLInputElement | null>(null)
   const previewAudioRef = useRef<HTMLAudioElement | null>(null)
+  const duringPreviewAudioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    const safeColors = currentColors.length > 0 ? Array.from(new Set(currentColors)) : COLORS
+    const currentSet = new Set(safeColors)
+    const matchingTheme = WHEEL_THEMES.find(([, colors]) =>
+      colors.length === safeColors.length && colors.every((color) => currentSet.has(color)),
+    )
+
+    if (matchingTheme) {
+      const themeColors = [...matchingTheme[1]]
+      setAvailableColors(themeColors)
+      setSelectedColors(themeColors)
+    } else {
+      setSelectedColors(safeColors)
+    }
+  }, [open, currentColors])
 
   useEffect(() => {
     if (!open) return
@@ -1256,7 +1297,7 @@ function WheelCustomizeDialog({
 
     const reader = new FileReader()
     reader.onload = () => {
-      if (typeof reader.result === "string") setCenterImage(reader.result)
+      if (typeof reader.result === "string") onCenterImageChange(reader.result)
     }
     reader.readAsDataURL(file)
     event.target.value = ""
@@ -1298,6 +1339,30 @@ function WheelCustomizeDialog({
       </div>
     </div>
   )
+
+  const previewDuringSound = () => {
+    if (duringPreviewAudioRef.current) {
+      duringPreviewAudioRef.current.pause()
+      duringPreviewAudioRef.current.currentTime = 0
+      duringPreviewAudioRef.current = null
+    }
+    if (duringSound === "No sound" || duringSound === "Ticking sound") return
+    const path = DURING_SOUND_FILES[duringSound]
+    if (!path) return
+    const audio = new Audio(`/sounds/during-spin/${path}`)
+    audio.volume = duringVolume / 100
+    audio.loop = true
+    duringPreviewAudioRef.current = audio
+    void audio.play().catch(() => undefined)
+  }
+
+  const stopDuringPreviewSound = () => {
+    const audio = duringPreviewAudioRef.current
+    if (!audio) return
+    audio.pause()
+    audio.currentTime = 0
+    duringPreviewAudioRef.current = null
+  }
 
   const previewAfterSound = () => {
     if (previewAudioRef.current) {
@@ -1415,10 +1480,10 @@ function WheelCustomizeDialog({
                   <div className="min-w-0 flex-1">
                     <SoundDropdown value={duringSound} onChange={setDuringSound} />
                   </div>
-                  <button type="button" aria-label="Preview sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                  <button type="button" aria-label="Preview sound" onClick={previewDuringSound} className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
                     <Play className="h-5 w-5 fill-current" />
                   </button>
-                  <button type="button" aria-label="Stop sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                  <button type="button" aria-label="Stop sound" onClick={stopDuringPreviewSound} className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
                     <Square className="h-4 w-4 fill-current" />
                   </button>
                 </div>
@@ -1432,14 +1497,14 @@ function WheelCustomizeDialog({
               <div className="border-t border-border/70 py-5">
                 <div className="flex flex-wrap gap-x-7 gap-y-4">
                   {check(displayDuplicates, setDisplayDuplicates, "Display duplicates")}
-                  {check(spinSlowly, setSpinSlowly, "Spin slowly")}
+                  {check(spinSlowly, onSpinSlowlyChange, "Spin slowly")}
                   {check(showTitle, setShowTitle, "Show title")}
                 </div>
               </div>
 
               <div className="border-t border-border/70 py-5">
                 <div className="mb-3 text-sm font-semibold">Spin time (seconds)</div>
-                {slider(spinTime, 1, 60, 1, setSpinTime, ["1", "10", "20", "30", "40", "50", "60"])}
+                {slider(spinTime, 1, 60, 1, onSpinTimeChange, ["1", "10", "20", "30", "40", "50", "60"])}
               </div>
 
               <div className="border-t border-border/70 pt-5">
@@ -1522,7 +1587,7 @@ function WheelCustomizeDialog({
                   className="group flex flex-col items-center gap-3 rounded-lg p-2 transition hover:bg-muted/40"
                 >
                   <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-border/70 bg-muted shadow-sm">
-                    {centerImage ? <img src={centerImage} alt="" className="h-full w-full object-cover" /> : <ImageIcon className="h-6 w-6 text-muted-foreground" />}
+                    {centerImage ? <img src={centerImage} alt="" className="h-full w-full object-contain" /> : <ImageIcon className="h-6 w-6 text-muted-foreground" />}
                   </div>
                   <span className="text-sm font-semibold">Wheel background image</span>
                   <span className={`h-1.5 w-14 rounded-full transition ${useBackgroundImage ? "bg-blue-500" : "bg-muted"}`} />
@@ -1605,7 +1670,7 @@ function WheelCustomizeDialog({
                 </div>
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   Image size
-                  <select value={imageSize} onChange={(event) => setImageSize(event.target.value)} className="h-10 rounded-md border border-border/70 bg-muted/70 px-3 text-sm outline-none focus:border-blue-500/60">
+                  <select value={imageSize} onChange={(event) => onImageSizeChange(event.target.value as "S" | "M" | "L")} className="h-10 rounded-md border border-border/70 bg-muted/70 px-3 text-sm outline-none focus:border-blue-500/60">
                     <option>S</option><option>M</option><option>L</option>
                   </select>
                 </div>
@@ -1652,6 +1717,14 @@ export default function Sidebar({
   afterVolumeByWheel,
   onAfterSoundChange,
   onAfterVolumeChange,
+  spinSlowlyByWheel,
+  onSpinSlowlyChange,
+  spinTimeByWheel,
+  onSpinTimeChange,
+  centerImageByWheel,
+  onCenterImageChange,
+  imageSizeByWheel,
+  onImageSizeChange,
 }: SidebarProps) {
   const [tab, setTab] =
     useState<Tab>("entries")
@@ -1660,6 +1733,11 @@ export default function Sidebar({
     items
       .map((item) => item.label)
       .join("\n"),
+  )
+
+  const currentEntryColors = useMemo(
+    () => Array.from(new Set(items.map((item) => item.color).filter((color): color is string => Boolean(color)))),
+    [items],
   )
 
   const [advanced, setAdvanced] =
@@ -3375,6 +3453,15 @@ export default function Sidebar({
         afterVolume={afterVolumeByWheel[activeWheelId] ?? 50}
         onAfterSoundChange={(sound) => onAfterSoundChange(activeWheelId, sound)}
         onAfterVolumeChange={(volume) => onAfterVolumeChange(activeWheelId, volume)}
+        spinSlowly={spinSlowlyByWheel[activeWheelId] ?? false}
+        onSpinSlowlyChange={(enabled) => onSpinSlowlyChange(activeWheelId, enabled)}
+        spinTime={spinTimeByWheel[activeWheelId] ?? 10}
+        onSpinTimeChange={(seconds) => onSpinTimeChange(activeWheelId, seconds)}
+        centerImage={centerImageByWheel[activeWheelId]}
+        onCenterImageChange={(image) => onCenterImageChange(activeWheelId, image)}
+        imageSize={imageSizeByWheel[activeWheelId] ?? "S"}
+        onImageSizeChange={(size) => onImageSizeChange(activeWheelId, size)}
+        currentColors={currentEntryColors}
         onColorsChange={(colors) => {
           const next = items.map((item, index) => ({
             ...item,
