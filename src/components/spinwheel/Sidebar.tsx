@@ -34,10 +34,19 @@ import { Button } from "@/components/ui/button"
 
 import type { SpinWheelItem } from "./Wheel"
 
+type WheelSummary = {
+  id: string
+  name: string
+  items: SpinWheelItem[]
+}
+
 type SidebarProps = {
   open: boolean
   items: SpinWheelItem[]
   results: string[]
+  wheels: WheelSummary[]
+  activeWheelId: string
+  onSelectWheel: (wheelId: string) => void
   onChange: (items: SpinWheelItem[]) => void
   onClearResults: () => void
   onNewWheel: () => void
@@ -1080,6 +1089,9 @@ export default function Sidebar({
   open,
   items,
   results,
+  wheels,
+  activeWheelId,
+  onSelectWheel,
   onChange,
   onClearResults,
   onNewWheel,
@@ -1957,6 +1969,7 @@ export default function Sidebar({
     setText("")
     setWheelMenuOpen(false)
     setImageMenuOpen(false)
+    setTab("entries")
     onNewWheel()
   }
 
@@ -2018,31 +2031,34 @@ export default function Sidebar({
         }`}
       >
         <div className="flex h-full flex-col">
-          <div className="flex h-12 shrink-0 items-end border-b border-border/70 bg-card/80 px-1">
+          <div className="flex h-12 shrink-0 items-end overflow-x-auto border-b border-border/70 bg-card/80 px-1">
+            {wheels.map((wheel) => (
+              <button
+                key={wheel.id}
+                type="button"
+                onClick={() => {
+                  onSelectWheel(wheel.id)
+                  setTab("entries")
+                }}
+                className={`flex h-12 shrink-0 items-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors ${
+                  tab === "entries" &&
+                  activeWheelId === wheel.id
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {wheel.name}
+
+                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-muted-foreground/20 px-1.5 text-[11px] font-bold leading-none text-muted-foreground">
+                  {wheel.items.length}
+                </span>
+              </button>
+            ))}
+
             <button
               type="button"
-              onClick={() =>
-                setTab("entries")
-              }
-              className={`flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors ${
-                tab === "entries"
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Entries
-
-              <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-muted-foreground/20 px-1.5 text-[11px] font-bold leading-none text-muted-foreground">
-                {items.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setTab("results")
-              }
-              className={`flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors ${
+              onClick={() => setTab("results")}
+              className={`flex h-12 shrink-0 items-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors ${
                 tab === "results"
                   ? "border-foreground text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
