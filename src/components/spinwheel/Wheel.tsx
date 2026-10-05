@@ -21,7 +21,6 @@ type WheelProps = {
   items: SpinWheelItem[]
   onResult?: (item: SpinWheelItem) => void
   compact?: boolean
-  wheelCount?: number
   spinTrigger?: number
 }
 
@@ -605,7 +604,6 @@ export default function Wheel({
   items,
   onResult,
   compact = false,
-  wheelCount = 1,
   spinTrigger = 0,
 }: WheelProps) {
   const containerRef =
