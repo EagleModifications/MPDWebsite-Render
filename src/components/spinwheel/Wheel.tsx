@@ -390,18 +390,14 @@ function playAfterSpinSound(sound: string, volume: number) {
 const halfThenSmoothStop = (t: number) => {
   if (t <= 0.5) return t
 
-  // First half is constant speed. The second half starts with the exact
-  // same velocity, then eases continuously to a complete stop.
-  // g(u) = u + 10u^3 - 25u^4 + 21u^5 - 6u^6
-  // has matching velocity/acceleration at the halfway point and a very
-  // gentle final glide instead of the visible speed drop in the old curve.
+  // Quintic continuation: position and velocity match at 50%, while
+  // acceleration eases to zero at the final stop.
   const u = (t - 0.5) * 2
   const eased =
     u +
-    10 * u ** 3 -
-    25 * u ** 4 +
-    21 * u ** 5 -
-    6 * u ** 6
+    3 * u ** 2 -
+    5 * u ** 3 +
+    2 * u ** 4
 
   return 0.5 + 0.5 * eased
 }
@@ -834,14 +830,16 @@ export default function Wheel({
     /* Slow mode keeps the configured timing. Normal mode is much quicker,
        while both use the same halfway-braking curve. */
     const duration = slowly
-      ? configuredDuration
-      : Math.max(4200, Math.min(5600, configuredDuration * 0.50))
+      ? Math.max(6500, Math.min(60000, configuredDuration))
+      : Math.max(2600, Math.min(3800, configuredDuration * 0.32))
+
+    const revolutions = slowly ? 7 : 10
 
     wheel.spinToItem(
       selectedIndex,
       duration,
       true,
-      6,
+      revolutions,
       1,
       halfThenSmoothStop,
     )
@@ -1354,7 +1352,7 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-24px]
+              right-[-34px]
               top-1/2
               z-50
               h-[48px]
