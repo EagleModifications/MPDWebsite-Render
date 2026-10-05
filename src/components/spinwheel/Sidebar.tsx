@@ -21,8 +21,6 @@ import {
   Minus,
   Palette,
   Pencil,
-  Play,
-  Square,
   Plus,
   Scale,
   Shuffle,
@@ -35,7 +33,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 
-import { DURING_SOUND_FILES, type SpinWheelItem } from "./Wheel"
+import type { SpinWheelItem } from "./Wheel"
 
 type WheelSummary = {
   id: string
@@ -55,26 +53,10 @@ type SidebarProps = {
   onRenameWheel: (wheelId: string, name: string) => void
   onRemoveWheel: (wheelId: string) => void
   onAddWheel: () => void
-  canAddWheel: boolean
   onSpinAllWheels: () => void
   onOpenWheel: () => void
   animateWinningEntryByWheel: Record<string, boolean>
   onAnimateWinningEntryChange: (wheelId: string, enabled: boolean) => void
-  launchConfettiByWheel: Record<string, boolean>
-  onLaunchConfettiChange: (wheelId: string, enabled: boolean) => void
-  afterSoundByWheel: Record<string, string>
-  afterVolumeByWheel: Record<string, number>
-  onAfterSoundChange: (wheelId: string, sound: string) => void
-  onAfterVolumeChange: (wheelId: string, volume: number) => void
-  spinSlowlyByWheel: Record<string, boolean>
-  onSpinSlowlyChange: (wheelId: string, enabled: boolean) => void
-  spinTimeByWheel: Record<string, number>
-  onSpinTimeChange: (wheelId: string, seconds: number) => void
-  centerImageByWheel: Record<string, string | undefined>
-  onCenterImageChange: (wheelId: string, image: string | undefined) => void
-  imageSizeByWheel: Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL">
-  onImageSizeChange: (wheelId: string, size: "XS" | "S" | "M" | "L" | "XL" | "XXL") => void
-  customizeRequest?: number
 }
 
 type Tab = "entries" | "results"
@@ -128,77 +110,6 @@ const COLORS = [
   "#60a5fa",
   "#94a3b8",
 ]
-
-const WHEEL_THEMES: Array<[string, string[]]> = [
-  ["Default", ["#3b82f6", "#64748b", "#0ea5e9", "#334155", "#60a5fa", "#94a3b8"]],
-  ["Classic", ["#2563eb", "#ef4444", "#facc15", "#22c55e", "#8b5cf6", "#f97316"]],
-  ["Rainbow", ["#7c3aed", "#2563eb", "#06b6d4", "#22c55e", "#facc15", "#ef4444"]],
-  ["Unicorn", ["#c026d3", "#ec4899", "#f9a8d4", "#fde68a", "#c4b5fd", "#e2e8f0"]],
-  ["Circus", ["#06b6d4", "#facc15", "#fb7185", "#f97316", "#ec4899", "#22c55e"]],
-  ["Fruit Salad", ["#f97316", "#fb923c", "#facc15", "#84cc16", "#4ade80", "#22c55e"]],
-  ["Building Blocks", ["#06b6d4", "#38bdf8", "#fde68a", "#fb7185", "#f97316", "#ef4444"]],
-  ["Splash", ["#38bdf8", "#67e8f9", "#a5f3fc", "#2563eb", "#c084fc", "#94a3b8"]],
-  ["Retro Pop", ["#fb7185", "#fef3c7", "#67e8f9", "#22d3ee", "#bef264", "#84cc16"]],
-  ["Playground", ["#3b82f6", "#facc15", "#fb923c", "#f43f5e", "#c084fc", "#22c55e"]],
-  ["Picnic", ["#f59e0b", "#facc15", "#a3e635", "#4ade80", "#22c55e", "#84cc16"]],
-  ["Sugar Rush", ["#ec4899", "#f472b6", "#fde047", "#facc15", "#fb7185", "#86efac"]],
-  ["Popsicle", ["#60a5fa", "#34d399", "#fde047", "#f97316", "#fb7185", "#c084fc"]],
-  ["Cotton Candy", ["#bae6fd", "#ddd6fe", "#bbf7d0", "#fbcfe8", "#f9a8d4", "#e0f2fe"]],
-  ["Marshmallow", ["#86efac", "#c4b5fd", "#f9a8d4", "#fde2e4", "#bfdbfe", "#d9f99d"]],
-  ["Lilac Dreams", ["#d8b4fe", "#c4b5fd", "#a78bfa", "#f5d0fe", "#fbcfe8", "#ede9fe"]],
-  ["Blush & Peach", ["#d8b4fe", "#fed7aa", "#fdba74", "#fb923c", "#fb7185", "#f43f5e"]],
-  ["Seaside", ["#a7f3d0", "#fed7aa", "#bae6fd", "#67e8f9", "#22d3ee", "#38bdf8"]],
-  ["Soft Sage", ["#d1fae5", "#dcfce7", "#bbf7d0", "#a7f3d0", "#d9f99d", "#f0fdf4"]],
-  ["Office Hours", ["#fca5a5", "#fde68a", "#cbd5e1", "#94a3b8", "#6366f1", "#475569"]],
-  ["Information Blues", ["#94a3b8", "#cbd5e1", "#e2e8f0", "#64748b", "#3b82f6", "#1d4ed8"]],
-  ["Ice & Slate", ["#0284c7", "#38bdf8", "#7dd3fc", "#cbd5e1", "#e5e7eb", "#f3f4f6"]],
-  ["Moon", ["#27272a", "#52525b", "#a1a1aa", "#d4d4d8", "#e4e4e7", "#f4f4f5"]],
-  ["Modern Muted", ["#a7c4bc", "#d1d5db", "#e7e5e4", "#f5f5f4", "#fecdd3", "#94a3b8"]],
-  ["Deep Dive", ["#020617", "#0f172a", "#0e7490", "#0369a1", "#155e75", "#164e63"]],
-  ["Jungle", ["#166534", "#15803d", "#4d7c0f", "#84cc16", "#a3a3a3", "#c08457"]],
-  ["Autumn Foliage", ["#c2410c", "#ea580c", "#f59e0b", "#d97706", "#84cc16", "#a16207"]],
-  ["Woodland", ["#9a6654", "#7c5c4b", "#78534a", "#d6a77a", "#c49a6c", "#e2c19a"]],
-  ["Savanna", ["#fef3c7", "#fde68a", "#b45309", "#d97706", "#92400e", "#78716c"]],
-  ["Canyon", ["#a8a29e", "#d97757", "#fb923c", "#ea580c", "#7c2d12", "#57534e"]],
-  ["Succulent Garden", ["#9ca3af", "#86a58a", "#d9f99d", "#fed7aa", "#fef3c7", "#a7f3d0"]],
-  ["Pond Life", ["#4d7c0f", "#65a30d", "#facc15", "#fb7185", "#f9a8d4", "#86efac"]],
-  ["Koi Fish", ["#f97316", "#f8fafc", "#facc15", "#ef4444", "#fb923c", "#334155"]],
-  ["Rainforest", ["#06b6d4", "#14b8a6", "#0f766e", "#e2e8f0", "#67e8f9", "#22c55e"]],
-  ["Oasis", ["#fde68a", "#fbbf24", "#365f55", "#4d7c6f", "#86a98b", "#94a3b8"]],
-  ["Deep Sea", ["#4338ca", "#67e8f9", "#cffafe", "#e0f2fe", "#5eead4", "#0f766e"]],
-  ["Moss & Fern", ["#3f6212", "#4d7c0f", "#65a30d", "#84cc16", "#a3e635", "#bef264"]],
-  ["Midnight", ["#082f49", "#1e3a5f", "#64748b", "#9f1239", "#fb7185", "#fed7aa"]],
-  ["Neon Nights", ["#f0abfc", "#d946ef", "#8b5cf6", "#7c3aed", "#4338ca", "#1d4ed8"]],
-  ["Deep Forest", ["#475569", "#6366f1", "#cbd5e1", "#3f6212", "#166534", "#365314"]],
-  ["Galactic", ["#a5b4fc", "#7c3aed", "#4c1d95", "#312e81", "#581c87", "#475569"]],
-  ["Urban Ops", ["#737373", "#171717", "#0f172a", "#7dd3fc", "#e5e7eb", "#f5f5f5"]],
-  ["Abyss", ["#38bdf8", "#0891b2", "#164e63", "#0f3d56", "#c084fc", "#e9d5ff"]],
-  ["Fire & Ice", ["#60a5fa", "#3b82f6", "#fed7aa", "#fb923c", "#f97316", "#ea580c"]],
-  ["Sunshine", ["#f8fafc", "#fde68a", "#facc15", "#f59e0b", "#ea580c", "#dc2626"]],
-  ["Heatwave", ["#dc2626", "#f97316", "#fb923c", "#fde68a", "#facc15", "#bef264"]],
-  ["Solstice", ["#991b1b", "#dc2626", "#f97316", "#fde68a", "#facc15", "#fb923c"]],
-  ["Golden Hour", ["#d97706", "#f59e0b", "#facc15", "#eab308", "#fde047", "#fef08a"]],
-  ["Sorbet", ["#4f46e5", "#6366f1", "#ec4899", "#fda4af", "#fdba74", "#fde68a"]],
-  ["Valentine's Day", ["#ef4444", "#ec4899", "#f9a8d4", "#fecdd3", "#fff1f2", "#be123c"]],
-  ["Saint Patrick's Day", ["#16a34a", "#f8fafc", "#f59e0b", "#facc15", "#166534", "#4ade80"]],
-  ["Easter", ["#f9a8d4", "#fef3c7", "#bbf7d0", "#bfdbfe", "#ddd6fe", "#fbcfe8"]],
-  ["Halloween", ["#f97316", "#111827", "#a21caf", "#84cc16", "#facc15", "#7c2d12"]],
-  ["Christmas", ["#15803d", "#dc2626", "#facc15", "#f8fafc", "#166534", "#b91c1c"]],
-  ["New Year", ["#111827", "#facc15", "#f8fafc", "#64748b", "#1e3a8a", "#e5e7eb"]],
-  ["Classic Rainbow", ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#8b5cf6"]],
-  ["Asexual", ["#111827", "#a3a3a3", "#f8fafc", "#7c2d8a", "#52525b", "#d4d4d8"]],
-  ["Bisexual", ["#ec4899", "#a855f7", "#2563eb", "#c026d3", "#7c3aed", "#1d4ed8"]],
-  ["Demisexual", ["#111827", "#f8fafc", "#7e22ce", "#a3a3a3", "#e5e7eb", "#4c1d95"]],
-  ["Gay", ["#059669", "#86efac", "#f8fafc", "#60a5fa", "#4c1d95", "#22c55e"]],
-  ["Lesbian", ["#f97316", "#fb923c", "#f8fafc", "#f472b6", "#db2777", "#be185d"]],
-  ["Pansexual", ["#ec4899", "#facc15", "#0ea5e9", "#db2777", "#fde047", "#0284c7"]],
-  ["Agender", ["#111827", "#d4d4d8", "#f8fafc", "#bef264", "#52525b", "#a3a3a3"]],
-  ["Genderfluid", ["#f472b6", "#f8fafc", "#c026d3", "#111827", "#4338ca", "#a78bfa"]],
-  ["Genderqueer", ["#a78bfa", "#f8fafc", "#65a30d", "#7e22ce", "#bef264", "#e9d5ff"]],
-  ["Intersex", ["#a21caf", "#facc15", "#7e22ce", "#fde047", "#581c87", "#fef08a"]],
-  ["Non-binary", ["#facc15", "#f8fafc", "#a855f7", "#111827", "#fde047", "#c084fc"]],
-  ["Transgender", ["#5eead4", "#f9a8d4", "#f8fafc", "#fbcfe8", "#67e8f9", "#38bdf8"]],
-] as const
 
 const COLOR_GALLERY = [
   "#ffffff",
@@ -328,7 +239,6 @@ function setEntryExtras(
 function createItemsFromText(
   text: string,
   existingItems: SpinWheelItem[],
-  palette: string[] = COLORS,
 ): SpinWheelItem[] {
   return text
     .split(/\r?\n/)
@@ -341,7 +251,7 @@ function createItemsFromText(
       label,
       color:
         existingItems[index]?.color ??
-        palette[index % Math.max(1, palette.length)] ?? COLORS[index % COLORS.length],
+        COLORS[index % COLORS.length],
       weight:
         existingItems[index]?.weight ??
         1,
@@ -1184,102 +1094,31 @@ function SoundDropdown({
 }
 
 
-function AppearanceDropdown({
-  value,
-  options,
-  onChange,
-}: {
-  value: string
-  options: string[]
-  onChange: (value: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target
-      if (target instanceof Node && !ref.current?.contains(target)) setOpen(false)
-    }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
-  }, [open])
-
-  return (
-    <div ref={ref} className="relative">
-      <button type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} className="flex h-10 min-w-[84px] items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/60 px-3 text-sm font-semibold text-foreground outline-none transition-colors hover:bg-muted focus:border-blue-500/60">
-        <span>{value}</span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-[420] min-w-full overflow-hidden rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl">
-          <div className="max-h-[260px] overflow-y-auto">
-            {options.map((option) => (
-              <button key={option} type="button" role="option" aria-selected={option === value} onClick={() => { onChange(option); setOpen(false) }} className={`flex h-9 w-full items-center justify-between rounded-lg px-3 text-left text-xs font-semibold transition-colors ${option === value ? "bg-blue-500/10 text-blue-500" : "text-foreground hover:bg-muted"}`}>
-                <span>{option}</span>
-                {option === value && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 function WheelCustomizeDialog({
   open,
   wheelNumber,
   onClose,
   animateWinner,
   onAnimateWinnerChange,
-  launchConfetti,
-  onLaunchConfettiChange,
-  onColorsChange,
-  afterSound,
-  afterVolume,
-  onAfterSoundChange,
-  onAfterVolumeChange,
-  spinSlowly,
-  onSpinSlowlyChange,
-  spinTime,
-  onSpinTimeChange,
-  centerImage,
-  onCenterImageChange,
-  imageSize,
-  onImageSizeChange,
-  currentColors,
 }: {
   open: boolean
   wheelNumber: number
   onClose: () => void
   animateWinner: boolean
   onAnimateWinnerChange: (enabled: boolean) => void
-  launchConfetti: boolean
-  onLaunchConfettiChange: (enabled: boolean) => void
-  onColorsChange: (colors: string[]) => void
-  afterSound: string
-  afterVolume: number
-  onAfterSoundChange: (sound: string) => void
-  onAfterVolumeChange: (volume: number) => void
-  spinSlowly: boolean
-  onSpinSlowlyChange: (enabled: boolean) => void
-  spinTime: number
-  onSpinTimeChange: (seconds: number) => void
-  centerImage?: string
-  onCenterImageChange: (image: string | undefined) => void
-  imageSize: "XS" | "S" | "M" | "L" | "XL" | "XXL"
-  onImageSizeChange: (size: "XS" | "S" | "M" | "L" | "XL" | "XXL") => void
-  currentColors: string[]
 }) {
   const [tab, setTab] = useState<"during" | "after" | "appearance">("during")
   const [duringSound, setDuringSound] = useState("Ticking sound")
   const [duringVolume, setDuringVolume] = useState(50)
   const [displayDuplicates, setDisplayDuplicates] = useState(true)
+  const [spinSlowly, setSpinSlowly] = useState(true)
   const [showTitle, setShowTitle] = useState(true)
+  const [spinTime, setSpinTime] = useState(10)
   const [maxVisible, setMaxVisible] = useState(1000)
 
+  const [afterSound, setAfterSound] = useState("Subdued applause")
+  const [afterVolume, setAfterVolume] = useState(50)
+  const [launchConfetti, setLaunchConfetti] = useState(true)
   const [autoRemove, setAutoRemove] = useState(false)
   const [displayPopup, setDisplayPopup] = useState(true)
   const [popupMessage, setPopupMessage] = useState("We have a winner!")
@@ -1288,9 +1127,15 @@ function WheelCustomizeDialog({
 
   const [oneColorPerSection, setOneColorPerSection] = useState(true)
   const [useBackgroundImage, setUseBackgroundImage] = useState(true)
-  const [availableColors, setAvailableColors] = useState<string[]>(COLORS)
-  const [selectedColors, setSelectedColors] = useState<string[]>(COLORS)
-  const [themeOpen, setThemeOpen] = useState(false)
+  const [selectedColors, setSelectedColors] = useState([
+    "#38aee0",
+    "#7be0ae",
+    "#f7dc68",
+    "#ae75c8",
+  ])
+  const [centerImage, setCenterImage] = useState<string | undefined>()
+  const [imageSize, setImageSize] = useState("S")
+  const [pageBackgroundColor, setPageBackgroundColor] = useState("#ffffff")
   const [gradient, setGradient] = useState(true)
   const [contours, setContours] = useState(false)
   const [wheelShadow, setWheelShadow] = useState(true)
@@ -1298,26 +1143,6 @@ function WheelCustomizeDialog({
   const [alwaysShowText, setAlwaysShowText] = useState("Always show text on the wheel")
 
   const centerImageInputRef = useRef<HTMLInputElement | null>(null)
-  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
-  const duringPreviewAudioRef = useRef<HTMLAudioElement | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-
-    const safeColors = currentColors.length > 0 ? Array.from(new Set(currentColors)) : COLORS
-    const currentSet = new Set(safeColors)
-    const matchingTheme = WHEEL_THEMES.find(([, colors]) =>
-      colors.length === safeColors.length && colors.every((color) => currentSet.has(color)),
-    )
-
-    if (matchingTheme) {
-      const themeColors = [...matchingTheme[1]]
-      setAvailableColors(themeColors)
-      setSelectedColors(themeColors)
-    } else {
-      setSelectedColors(safeColors)
-    }
-  }, [open, currentColors])
 
   useEffect(() => {
     if (!open) return
@@ -1333,14 +1158,11 @@ function WheelCustomizeDialog({
   if (!open) return null
 
   const toggleColor = (color: string) => {
-    setSelectedColors((current) => {
-      const next = current.includes(color)
+    setSelectedColors((current) =>
+      current.includes(color)
         ? current.filter((entry) => entry !== color)
-        : [...current, color]
-      const safe = next.length > 0 ? next : [color]
-      onColorsChange(safe)
-      return safe
-    })
+        : [...current, color],
+    )
   }
 
   const handleCenterImage = (event: ChangeEvent<HTMLInputElement>) => {
@@ -1349,7 +1171,7 @@ function WheelCustomizeDialog({
 
     const reader = new FileReader()
     reader.onload = () => {
-      if (typeof reader.result === "string") onCenterImageChange(reader.result)
+      if (typeof reader.result === "string") setCenterImage(reader.result)
     }
     reader.readAsDataURL(file)
     event.target.value = ""
@@ -1391,97 +1213,6 @@ function WheelCustomizeDialog({
       </div>
     </div>
   )
-
-  const previewDuringSound = () => {
-    if (duringPreviewAudioRef.current) {
-      duringPreviewAudioRef.current.pause()
-      duringPreviewAudioRef.current.currentTime = 0
-      duringPreviewAudioRef.current = null
-    }
-    if (duringSound === "No sound" || duringSound === "Ticking sound") return
-    const path = DURING_SOUND_FILES[duringSound]
-    if (!path) return
-    const audio = new Audio(`/sounds/during-spin/${path}`)
-    audio.volume = duringVolume / 100
-    audio.loop = true
-    duringPreviewAudioRef.current = audio
-    void audio.play().catch(() => undefined)
-  }
-
-  const stopDuringPreviewSound = () => {
-    const audio = duringPreviewAudioRef.current
-    if (!audio) return
-    audio.pause()
-    audio.currentTime = 0
-    duringPreviewAudioRef.current = null
-  }
-
-  const previewAfterSound = () => {
-    if (previewAudioRef.current) {
-      previewAudioRef.current.pause()
-      previewAudioRef.current.currentTime = 0
-    }
-    if (afterSound === "No sound" || afterSound === "Inherit from wheel" || afterSound.startsWith("Speak result")) return
-    const files: Record<string, string> = {
-      "Subdued applause": "subdued-applause.mp3",
-      "Joke punchline": "joke-punchline.mp3",
-      "Announcement bell": "announcement-bell.mp3",
-      "Twinkling star": "twinkling-star.mp3",
-      "Correct answer ding": "correct-answer-ding.mp3",
-      "Synth bell": "synth-bell.mp3",
-      "Notification bell": "notification-bell.mp3",
-      "Loud applause": "loud-applause.mp3",
-      "Fanfare": "fanfare.mp3",
-      "Bell ringing": "bell-ringing.mp3",
-      "Cymbals": "cymbals.mp3",
-      "Thunder": "thunder.mp3",
-      "Cash register": "cash-register.mp3",
-      "Evil laugh": "evil-laugh.mp3",
-      "Microwave ding": "microwave-ding.mp3",
-      "Old phone ringing": "old-phone-ringing.mp3",
-      "Alarm clock": "alarm-clock.mp3",
-      "Fireworks": "fireworks.mp3",
-      "Game win ding": "game-win-ding.mp3",
-      "Wrong answer": "wrong-answer.mp3",
-      "Punch": "punch.mp3",
-      "Cat meow": "cat-meow.mp3",
-      "Wolf howl": "wolf-howl.mp3",
-      "Horse": "horse.mp3",
-      "Lion roar": "lion-roar.mp3",
-      "Sad trombone": "sad-trombone.mp3",
-      "Cinematic drum impact": "cinematic-drum-impact.mp3",
-      "Water splash": "water-splash.mp3",
-      "Gong": "gong.mp3",
-      "Doorbell": "doorbell.mp3",
-      "Church bell": "church-bell.mp3",
-      "Referee whistle": "referee-whistle.mp3",
-      "Boing": "boing.mp3",
-      "Angel choir": "angel-choir.mp3",
-      "Harp strum": "harp-strum.mp3",
-      "Breaker switch": "breaker-switch.mp3",
-      "Camera shutter & flash": "camera-shutter-flash.mp3",
-      "Lost game": "lost-game.mp3",
-      "Horror scream": "horror-scream.mp3",
-    }
-    const file = files[afterSound]
-    if (!file) return
-    const audio = new Audio(`/sounds/afterspin/${file}`)
-    audio.volume = afterVolume / 100
-    audio.onerror = () => {
-      const fallback = new Audio(`/sounds/after-spin/${file}`)
-      fallback.volume = afterVolume / 100
-      previewAudioRef.current = fallback
-      void fallback.play().catch(() => undefined)
-    }
-    previewAudioRef.current = audio
-    void audio.play().catch(() => undefined)
-  }
-
-  const stopPreviewSound = () => {
-    if (!previewAudioRef.current) return
-    previewAudioRef.current.pause()
-    previewAudioRef.current.currentTime = 0
-  }
 
   return (
     <div
@@ -1532,11 +1263,11 @@ function WheelCustomizeDialog({
                   <div className="min-w-0 flex-1">
                     <SoundDropdown value={duringSound} onChange={setDuringSound} />
                   </div>
-                  <button type="button" aria-label="Preview sound" onClick={previewDuringSound} className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
-                    <Play className="h-5 w-5 fill-current" />
+                  <button type="button" aria-label="Preview sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                    <span className="ml-0.5 text-xl leading-none">▶</span>
                   </button>
-                  <button type="button" aria-label="Stop sound" onClick={stopDuringPreviewSound} className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
-                    <Square className="h-4 w-4 fill-current" />
+                  <button type="button" aria-label="Stop sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                    <span className="text-lg leading-none">■</span>
                   </button>
                 </div>
 
@@ -1548,15 +1279,15 @@ function WheelCustomizeDialog({
 
               <div className="border-t border-border/70 py-5">
                 <div className="flex flex-wrap gap-x-7 gap-y-4">
-                  {check(displayDuplicates, setDisplayDuplicates, "Display duplicates")}
-                  {check(spinSlowly, onSpinSlowlyChange, "Spin slowly")}
+                  {check(displayDuplicates, setDisplayDuplicates, "Display duplicates", <span className="flex h-4 w-4 items-center justify-center rounded-full bg-muted-foreground/40 text-[10px] text-background">?</span>)}
+                  {check(spinSlowly, setSpinSlowly, "Spin slowly")}
                   {check(showTitle, setShowTitle, "Show title")}
                 </div>
               </div>
 
               <div className="border-t border-border/70 py-5">
                 <div className="mb-3 text-sm font-semibold">Spin time (seconds)</div>
-                {slider(spinTime, 1, 60, 1, onSpinTimeChange, ["1", "10", "20", "30", "40", "50", "60"])}
+                {slider(spinTime, 1, 60, 1, setSpinTime, ["1", "10", "20", "30", "40", "50", "60"])}
               </div>
 
               <div className="border-t border-border/70 pt-5">
@@ -1577,26 +1308,26 @@ function WheelCustomizeDialog({
                 <label className="text-sm font-semibold">Sound</label>
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <SoundDropdown value={afterSound} onChange={onAfterSoundChange} />
+                    <SoundDropdown value={afterSound} onChange={setAfterSound} />
                   </div>
-                  <button type="button" aria-label="Preview sound" onClick={previewAfterSound} className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
-                    <Play className="h-5 w-5 fill-current" />
+                  <button type="button" aria-label="Preview sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                    <span className="ml-0.5 text-xl leading-none">▶</span>
                   </button>
-                  <button type="button" aria-label="Stop sound" onClick={stopPreviewSound} className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
-                    <Square className="h-4 w-4 fill-current" />
+                  <button type="button" aria-label="Stop sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                    <span className="text-lg leading-none">■</span>
                   </button>
                 </div>
 
                 <label className="text-sm font-semibold">Volume</label>
                 <div>
-                  {slider(afterVolume, 0, 100, 1, (value) => onAfterVolumeChange(value), ["0%", "25%", "50%", "75%", "100%"])}
+                  {slider(afterVolume, 0, 100, 1, setAfterVolume, ["0%", "25%", "50%", "75%", "100%"])}
                 </div>
               </div>
 
               <div className="border-t border-border/70 py-5">
                 <div className="flex flex-wrap gap-x-7 gap-y-4">
                   {check(animateWinner, onAnimateWinnerChange, "Animate winning entry")}
-                  {check(launchConfetti, onLaunchConfettiChange, "Launch confetti")}
+                  {check(launchConfetti, setLaunchConfetti, "Launch confetti")}
                   {check(autoRemove, setAutoRemove, "Auto-remove winner after 5 seconds")}
                 </div>
               </div>
@@ -1640,106 +1371,68 @@ function WheelCustomizeDialog({
                   className="group flex flex-col items-center gap-3 rounded-lg p-2 transition hover:bg-muted/40"
                 >
                   <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-border/70 bg-muted shadow-sm">
-                    {centerImage ? <img src={centerImage} alt="" className="h-full w-full object-contain" /> : <ImageIcon className="h-6 w-6 text-muted-foreground" />}
+                    {centerImage ? <img src={centerImage} alt="" className="h-full w-full object-cover" /> : <ImageIcon className="h-6 w-6 text-muted-foreground" />}
                   </div>
                   <span className="text-sm font-semibold">Wheel background image</span>
                   <span className={`h-1.5 w-14 rounded-full transition ${useBackgroundImage ? "bg-blue-500" : "bg-muted"}`} />
                 </button>
               </div>
 
-              <div className="relative border-b border-border/70 py-5">
-                <button
-                  type="button"
-                  onClick={() => setThemeOpen((value) => !value)}
-                  className="flex h-10 min-w-[220px] items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/60 px-3 text-sm font-semibold text-foreground shadow-sm transition hover:bg-muted"
-                >
+              <div className="border-b border-border/70 py-5">
+                <button type="button" className="flex h-9 items-center gap-3 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500">
                   Apply a theme
-                  <ChevronDown className={`h-4 w-4 transition-transform ${themeOpen ? "rotate-180" : ""}`} />
+                  <ChevronDown className="h-4 w-4" />
                 </button>
-
-                {themeOpen && (
-                  <div className="absolute left-0 top-[calc(100%+6px)] z-[420] w-[285px] overflow-hidden rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl">
-                    <div className="max-h-[520px] overflow-y-auto">
-                      {WHEEL_THEMES.map(([name, colors]) => (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => {
-                            const next = [...colors]
-                            setAvailableColors(next)
-                            setSelectedColors(next)
-                            onColorsChange(next)
-                            setThemeOpen(false)
-                          }}
-                          className="flex min-h-10 w-full items-center justify-between gap-4 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-foreground transition hover:bg-muted"
-                        >
-                          <span>{name}</span>
-                          <span className="flex shrink-0 gap-1">
-                            {colors.map((color) => (
-                              <span key={color} className="h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
-                            ))}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="border-b border-border/70 py-5">
                 <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
                   Customize colors
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-muted-foreground/40 text-[10px] text-background">?</span>
                 </div>
 
-                <div className="flex flex-wrap gap-4">
-                  {availableColors.map((color) => {
-                    const checked = selectedColors.includes(color)
-                    return (
-                      <label key={color} className="flex cursor-pointer items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleColor(color)}
-                          className="h-5 w-5 cursor-pointer rounded border-border accent-blue-500"
-                        />
-                        <span
-                          className="flex h-9 w-12 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm transition hover:bg-blue-500"
-                          style={{ backgroundColor: color }}
-                        >
-                          <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.45)]" />
-                        </span>
-                      </label>
-                    )
-                  })}
+                <div className="flex flex-wrap gap-3">
+                  {selectedColors.map((color, index) => (
+                    <button
+                      key={`${color}-${index}`}
+                      type="button"
+                      onClick={() => toggleColor(color)}
+                      className="flex h-10 w-20 items-center justify-center rounded-md border border-border/70 shadow-sm transition hover:brightness-105"
+                      style={{ backgroundColor: color }}
+                    >
+                      <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.45)]" />
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="grid grid-cols-[1fr_auto] items-center gap-6 border-b border-border/70 py-5">
-                <div className="flex min-w-0 items-center gap-3 text-sm font-semibold">
-                  <span className="whitespace-nowrap">Image at the center of the wheel</span>
-                  <button
-                    type="button"
-                    onClick={() => centerImageInputRef.current?.click()}
-                    className="flex h-10 w-12 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/60 text-foreground shadow-sm transition hover:bg-muted"
-                    aria-label="Choose center image"
-                    title="Choose center image"
-                  >
+              <div className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border/70 py-5">
+                <div className="flex items-center gap-3 text-sm font-semibold">Image at the center of the wheel
+                  <button type="button" onClick={() => centerImageInputRef.current?.click()} className="flex h-10 w-24 items-center justify-center gap-2 rounded-md bg-blue-600 text-white transition hover:bg-blue-500">
                     <ImageIcon className="h-4 w-4" />
+                    <ChevronDown className="h-4 w-4" />
                   </button>
                   <input ref={centerImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleCenterImage} />
                 </div>
-
-                <div className="flex shrink-0 items-center gap-3 text-sm font-semibold">
-                  <span>Image size</span>
-                  <AppearanceDropdown
-                    value={imageSize}
-                    options={["XS", "S", "M", "L", "XL", "XXL"]}
-                    onChange={(value) => onImageSizeChange(value as "XS" | "S" | "M" | "L" | "XL" | "XXL")}
-                  />
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  Image size
+                  <select value={imageSize} onChange={(event) => setImageSize(event.target.value)} className="h-10 rounded-md border border-border/70 bg-muted/70 px-3 text-sm outline-none focus:border-blue-500/60">
+                    <option>S</option><option>M</option><option>L</option>
+                  </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-x-8 gap-y-4 bg-muted/20 p-4">
+                <button
+                  type="button"
+                  onClick={() => setPageBackgroundColor((current) => current === "#ffffff" ? "#111111" : "#ffffff")}
+                  className="flex items-center gap-3 text-left text-sm font-medium"
+                >
+                  <span className="flex h-10 w-12 items-center justify-center rounded-md border border-border/70 bg-background" style={{ backgroundColor: pageBackgroundColor }}>
+                    <Palette className="h-4 w-4" />
+                  </span>
+                  Page background color
+                </button>
                 {check(contours, setContours, "Contours")}
                 {check(gradient, setGradient, "Display a color gradient on the page")}
                 {check(wheelShadow, setWheelShadow, "Wheel shadow")}
@@ -1771,26 +1464,10 @@ export default function Sidebar({
   onRenameWheel,
   onRemoveWheel,
   onAddWheel,
-  canAddWheel,
   onSpinAllWheels,
   onOpenWheel,
   animateWinningEntryByWheel,
   onAnimateWinningEntryChange,
-  launchConfettiByWheel,
-  onLaunchConfettiChange,
-  afterSoundByWheel,
-  afterVolumeByWheel,
-  onAfterSoundChange,
-  onAfterVolumeChange,
-  spinSlowlyByWheel,
-  onSpinSlowlyChange,
-  spinTimeByWheel,
-  onSpinTimeChange,
-  centerImageByWheel,
-  onCenterImageChange,
-  imageSizeByWheel,
-  onImageSizeChange,
-  customizeRequest = 0,
 }: SidebarProps) {
   const [tab, setTab] =
     useState<Tab>("entries")
@@ -1799,11 +1476,6 @@ export default function Sidebar({
     items
       .map((item) => item.label)
       .join("\n"),
-  )
-
-  const currentEntryColors = useMemo(
-    () => Array.from(new Set(items.map((item) => item.color).filter((color): color is string => Boolean(color)))),
-    [items],
   )
 
   const [advanced, setAdvanced] =
@@ -1815,19 +1487,8 @@ export default function Sidebar({
   const [wheelMenuOpen, setWheelMenuOpen] =
     useState(false)
 
-  const [removeWheelConfirmOpen, setRemoveWheelConfirmOpen] =
-    useState(false)
-
   const [customizeWheelOpen, setCustomizeWheelOpen] =
     useState(false)
-
-  const previousCustomizeRequestRef = useRef(customizeRequest)
-
-  useEffect(() => {
-    if (customizeRequest === previousCustomizeRequestRef.current) return
-    previousCustomizeRequestRef.current = customizeRequest
-    setCustomizeWheelOpen(true)
-  }, [customizeRequest])
 
   const textEditingRef =
     useRef(false)
@@ -1984,7 +1645,6 @@ export default function Sidebar({
       createItemsFromText(
         value,
         items,
-        currentEntryColors.length > 0 ? currentEntryColors : COLORS,
       ),
     )
   }
@@ -2086,9 +1746,10 @@ export default function Sidebar({
               "",
             ),
           color:
-            (currentEntryColors.length > 0 ? currentEntryColors : COLORS)[
-              (items.length + index) %
-                (currentEntryColors.length > 0 ? currentEntryColors.length : COLORS.length)
+            COLORS[
+              (items.length +
+                index) %
+                COLORS.length
             ],
           weight: 1,
           hidden: false,
@@ -2171,9 +1832,9 @@ export default function Sidebar({
       id: crypto.randomUUID(),
       label: `Entry ${items.length + 1}`,
       color:
-        (currentEntryColors.length > 0 ? currentEntryColors : COLORS)[
+        COLORS[
           items.length %
-            (currentEntryColors.length > 0 ? currentEntryColors.length : COLORS.length)
+            COLORS.length
         ],
       weight: 1,
       hidden: false,
@@ -2695,13 +2356,8 @@ export default function Sidebar({
       return
     }
 
-    setWheelMenuOpen(false)
-    setRemoveWheelConfirmOpen(true)
-  }
-
-  const confirmRemoveActiveWheel = () => {
     onRemoveWheel(activeWheelId)
-    setRemoveWheelConfirmOpen(false)
+    setWheelMenuOpen(false)
   }
 
   const handleCustomizeActiveWheel = () => {
@@ -2755,7 +2411,7 @@ export default function Sidebar({
   return (
     <>
       <aside
-        className={`absolute bottom-4 right-4 top-32 z-[150] flex h-auto w-[468px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
+        className={`absolute top-[64px] bottom-0 right-0 z-[150] flex h-full w-[468px] max-w-[calc(100vw-8px)] flex-col border-l border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
           open
             ? "translate-x-0"
             : "translate-x-full"
@@ -3372,13 +3028,11 @@ export default function Sidebar({
                     <div className="flex h-9">
                       <button
                         type="button"
-                        disabled={!canAddWheel}
-                        title={canAddWheel ? "Add wheel" : "Maximum of 10 wheels"}
                         onClick={() => {
                           onAddWheel()
                           setWheelMenuOpen(false)
                         }}
-                        className="flex items-center gap-1.5 rounded-l-md border-r border-white/15 bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-blue-600"
+                        className="flex items-center gap-1.5 rounded-l-md border-r border-white/15 bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
                       >
                         <Plus className="h-4 w-4" />
                         Add wheel
@@ -3420,13 +3074,11 @@ export default function Sidebar({
                   <div className="flex h-9">
                     <button
                       type="button"
-                      disabled={!canAddWheel}
-                      title={canAddWheel ? "Add wheel" : "Maximum of 10 wheels"}
                       onClick={() => {
                         onAddWheel()
                         setWheelMenuOpen(false)
                       }}
-                      className="flex items-center gap-1.5 rounded-l-md border-r border-white/15 bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-blue-600"
+                      className="flex items-center gap-1.5 rounded-l-md border-r border-white/15 bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
                     >
                       <Plus className="h-4 w-4" />
                       Add wheel
@@ -3497,24 +3149,6 @@ export default function Sidebar({
         </div>
       </aside>
 
-      {removeWheelConfirmOpen && (
-        <div
-          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setRemoveWheelConfirmOpen(false)
-          }}
-        >
-          <div className="w-full max-w-[420px] rounded-xl border border-border/70 bg-card p-5 text-foreground shadow-2xl">
-            <h2 className="text-base font-semibold">Remove wheel?</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Are you sure you want to remove Wheel {activeWheelNumber}? This cannot be undone.</p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setRemoveWheelConfirmOpen(false)} className="h-10 rounded-md px-4 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
-              <button type="button" onClick={confirmRemoveActiveWheel} className="h-10 rounded-md bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-500">Remove</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <WheelCustomizeDialog
         open={customizeWheelOpen}
         wheelNumber={activeWheelNumber}
@@ -3523,30 +3157,6 @@ export default function Sidebar({
         onAnimateWinnerChange={(enabled) =>
           onAnimateWinningEntryChange(activeWheelId, enabled)
         }
-        launchConfetti={launchConfettiByWheel[activeWheelId] ?? false}
-        onLaunchConfettiChange={(enabled) =>
-          onLaunchConfettiChange(activeWheelId, enabled)
-        }
-        afterSound={afterSoundByWheel[activeWheelId] ?? "Subdued applause"}
-        afterVolume={afterVolumeByWheel[activeWheelId] ?? 50}
-        onAfterSoundChange={(sound) => onAfterSoundChange(activeWheelId, sound)}
-        onAfterVolumeChange={(volume) => onAfterVolumeChange(activeWheelId, volume)}
-        spinSlowly={spinSlowlyByWheel[activeWheelId] ?? false}
-        onSpinSlowlyChange={(enabled) => onSpinSlowlyChange(activeWheelId, enabled)}
-        spinTime={spinTimeByWheel[activeWheelId] ?? 10}
-        onSpinTimeChange={(seconds) => onSpinTimeChange(activeWheelId, seconds)}
-        centerImage={centerImageByWheel[activeWheelId]}
-        onCenterImageChange={(image) => onCenterImageChange(activeWheelId, image)}
-        imageSize={imageSizeByWheel[activeWheelId] ?? "S"}
-        onImageSizeChange={(size) => onImageSizeChange(activeWheelId, size)}
-        currentColors={currentEntryColors}
-        onColorsChange={(colors) => {
-          const next = items.map((item, index) => ({
-            ...item,
-            color: colors[index % colors.length],
-          }))
-          onChange(next)
-        }}
       />
 
       <input
@@ -3824,7 +3434,7 @@ export default function Sidebar({
                             !current,
                         )
                       }
-                      className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-lg bg-blue-600 text-white shadow-sm transition hover:bg-blue-500"
+                      className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-lg border border-border/70 shadow-sm transition hover:brightness-105"
                       style={{
                         backgroundColor:
                           settingsDraft.color ??
