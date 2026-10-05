@@ -36,7 +36,26 @@ export default function SpinWheel() {
   const [results, setResults] = useState<SpinResult[]>([])
   const [winners, setWinners] = useState<SpinResult[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  /*
+   * This is deliberately stored per wheel because the Customize wheel
+   * dialog is also per wheel. Enabling "Animate winning entry" on Wheel 2
+   * must not automatically enable it on Wheel 1.
+   */
+  const [animateWinningEntryByWheel, setAnimateWinningEntryByWheel] =
+    useState<Record<string, boolean>>({})
+
+  /*
+   * The large background winner animation is separate from the winner
+   * popup. The popup remains exactly as before; this state only controls
+   * the large winner name that grows and fades behind it.
+   */
+  const [animatedWinner, setAnimatedWinner] =
+    useState<SpinResult | null>(null)
+
   const wheelAreaRef = useRef<HTMLDivElement | null>(null)
+  const winnerAnimationTimeoutRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!activeWheelId && wheels[0]) {
@@ -51,6 +70,14 @@ export default function SpinWheel() {
       setActiveWheelId(wheels[0]?.id ?? "")
     }
   }, [activeWheelId, wheels])
+
+  useEffect(() => {
+    return () => {
+      if (winnerAnimationTimeoutRef.current) {
+        clearTimeout(winnerAnimationTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const handleWheelChange = useCallback(
     (wheelId: string, items: SpinWheelItem[]) => {
@@ -93,13 +120,64 @@ export default function SpinWheel() {
         ),
         result,
       ])
+
+      /*
+       * "Animate winning entry" is the switch that controls this exact
+       * animation. When it is disabled, the normal winner popup still
+       * appears, but the large background winner text is not rendered.
+       */
+      if (animateWinningEntryByWheel[wheelId]) {
+        if (winnerAnimationTimeoutRef.current) {
+          clearTimeout(winnerAnimationTimeoutRef.current)
+        }
+
+        setAnimatedWinner(result)
+
+        winnerAnimationTimeoutRef.current = setTimeout(() => {
+          setAnimatedWinner(null)
+          winnerAnimationTimeoutRef.current = null
+        }, 1900)
+      } else {
+        setAnimatedWinner(null)
+
+        if (winnerAnimationTimeoutRef.current) {
+          clearTimeout(winnerAnimationTimeoutRef.current)
+          winnerAnimationTimeoutRef.current = null
+        }
+      }
     },
-    [wheels],
+    [animateWinningEntryByWheel, wheels],
+  )
+
+  const handleAnimateWinningEntryChange = useCallback(
+    (wheelId: string, enabled: boolean) => {
+      setAnimateWinningEntryByWheel((current) => ({
+        ...current,
+        [wheelId]: enabled,
+      }))
+
+      /*
+       * If the user turns the option off while an animation is currently
+       * playing, stop the animation immediately.
+       */
+      if (!enabled && animatedWinner?.wheelId === wheelId) {
+        setAnimatedWinner(null)
+
+        if (winnerAnimationTimeoutRef.current) {
+          clearTimeout(winnerAnimationTimeoutRef.current)
+          winnerAnimationTimeoutRef.current = null
+        }
+      }
+    },
+    [animatedWinner],
   )
 
   const renameWheel = useCallback((wheelId: string, name: string) => {
     const trimmed = name.trim()
-    if (!trimmed) return
+
+    if (!trimmed) {
+      return
+    }
 
     setWheels((current) =>
       current.map((wheel) =>
@@ -112,35 +190,64 @@ export default function SpinWheel() {
 
   const removeWheel = useCallback((wheelId: string) => {
     setWheels((current) => {
-      if (current.length <= 1) return current
+      if (current.length <= 1) {
+        return current
+      }
 
       return current.filter((wheel) => wheel.id !== wheelId)
     })
 
     setActiveWheelId((active) => {
-      if (active !== wheelId) return active
-      return wheels.find((wheel) => wheel.id !== wheelId)?.id ?? ""
+      if (active !== wheelId) {
+        return active
+      }
+
+      return wheels.find(
+        (wheel) => wheel.id !== wheelId,
+      )?.id ?? ""
+    })
+
+    setAnimateWinningEntryByWheel((current) => {
+      const next = { ...current }
+      delete next[wheelId]
+      return next
     })
 
     setWinners((current) =>
       current.filter((winner) => winner.wheelId !== wheelId),
     )
+
     setResults((current) =>
       current.filter((result) => result.wheelId !== wheelId),
     )
-  }, [wheels])
+
+    if (animatedWinner?.wheelId === wheelId) {
+      setAnimatedWinner(null)
+
+      if (winnerAnimationTimeoutRef.current) {
+        clearTimeout(winnerAnimationTimeoutRef.current)
+        winnerAnimationTimeoutRef.current = null
+      }
+    }
+  }, [animatedWinner, wheels])
 
   const addWheel = useCallback(() => {
     const nextWheel = createWheel(wheels.length + 1)
-    setWheels((current) => [...current, nextWheel])
+
+    setWheels((current) => [
+      ...current,
+      nextWheel,
+    ])
+
     setActiveWheelId(nextWheel.id)
     setSidebarOpen(true)
   }, [wheels.length])
 
   const spinAllWheels = useCallback(() => {
-    const wheelButtons = wheelAreaRef.current?.querySelectorAll<HTMLDivElement>(
-      '[role="button"][tabindex="0"]',
-    )
+    const wheelButtons =
+      wheelAreaRef.current?.querySelectorAll<HTMLDivElement>(
+        '[role="button"][tabindex="0"]',
+      )
 
     wheelButtons?.forEach((button) => button.click())
   }, [])
@@ -155,7 +262,9 @@ export default function SpinWheel() {
 
   const closeWinner = useCallback((resultId: string) => {
     setWinners((current) =>
-      current.filter((winner) => winner.id !== resultId),
+      current.filter(
+        (winner) => winner.id !== resultId,
+      ),
     )
   }, [])
 
@@ -174,7 +283,9 @@ export default function SpinWheel() {
     )
 
     setWinners((current) =>
-      current.filter((winner) => winner.id !== result.id),
+      current.filter(
+        (winner) => winner.id !== result.id,
+      ),
     )
   }, [])
 
@@ -195,7 +306,9 @@ export default function SpinWheel() {
     )
 
     setWinners((current) =>
-      current.filter((winner) => winner.id !== result.id),
+      current.filter(
+        (winner) => winner.id !== result.id,
+      ),
     )
   }, [])
 
@@ -211,9 +324,16 @@ export default function SpinWheel() {
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown)
+    window.addEventListener(
+      "keydown",
+      handleKeyDown,
+    )
+
     return () =>
-      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      )
   }, [closeWinnerPopup, winners.length])
 
   const orderedWinners = useMemo(
@@ -225,6 +345,7 @@ export default function SpinWheel() {
         const bIndex = wheels.findIndex(
           (wheel) => wheel.id === b.wheelId,
         )
+
         return aIndex - bIndex
       }),
     [winners, wheels],
@@ -252,6 +373,7 @@ export default function SpinWheel() {
             }`}
           >
             <div
+              ref={wheelAreaRef}
               className={`grid h-full min-h-0 w-full gap-2 p-2 pr-4 ${
                 wheels.length === 1
                   ? "grid-cols-1 grid-rows-1"
@@ -267,7 +389,10 @@ export default function SpinWheel() {
                     items={wheel.items}
                     compact={wheels.length > 1}
                     onResult={(item) =>
-                      handleResult(wheel.id, item)
+                      handleResult(
+                        wheel.id,
+                        item,
+                      )
                     }
                   />
                 </div>
@@ -279,8 +404,10 @@ export default function SpinWheel() {
         <Sidebar
           open={sidebarOpen}
           items={
-            wheels.find((wheel) => wheel.id === activeWheelId)
-              ?.items ?? []
+            wheels.find(
+              (wheel) =>
+                wheel.id === activeWheelId,
+            )?.items ?? []
           }
           results={results.map(
             (result) =>
@@ -290,14 +417,25 @@ export default function SpinWheel() {
           activeWheelId={activeWheelId}
           onSelectWheel={setActiveWheelId}
           onChange={(items) =>
-            handleWheelChange(activeWheelId, items)
+            handleWheelChange(
+              activeWheelId,
+              items,
+            )
           }
           onClearResults={clearResults}
           onRenameWheel={renameWheel}
           onRemoveWheel={removeWheel}
           onAddWheel={addWheel}
           onSpinAllWheels={spinAllWheels}
-          onOpenWheel={() => setSidebarOpen(false)}
+          onOpenWheel={() =>
+            setSidebarOpen(false)
+          }
+          animateWinningEntryByWheel={
+            animateWinningEntryByWheel
+          }
+          onAnimateWinningEntryChange={
+            handleAnimateWinningEntryChange
+          }
         />
 
         <button
@@ -339,12 +477,75 @@ export default function SpinWheel() {
           </div>
         </div>
 
+        {/*
+         * Wheel of Names-style background winner animation.
+         *
+         * It sits below the winner dialog (z-500) and above the wheel
+         * content. The text starts small, grows very large, and fades
+         * away. It is completely disabled unless the per-wheel setting
+         * "Animate winning entry" is enabled.
+         */}
+        {animatedWinner && (
+          <>
+            <style>
+              {`
+                @keyframes mpdWinnerEntryAnimation {
+                  0% {
+                    transform: translate(-50%, -50%) scale(0.22);
+                    opacity: 0;
+                  }
+
+                  12% {
+                    opacity: 0.14;
+                  }
+
+                  48% {
+                    transform: translate(-50%, -50%) scale(1);
+                    opacity: 0.12;
+                  }
+
+                  100% {
+                    transform: translate(-50%, -50%) scale(3.15);
+                    opacity: 0;
+                  }
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                  .mpd-winner-entry-animation {
+                    animation: none !important;
+                    opacity: 0 !important;
+                  }
+                }
+              `}
+            </style>
+
+            <div
+              key={animatedWinner.id}
+              aria-hidden="true"
+              className="pointer-events-none fixed inset-0 z-[450] overflow-hidden"
+            >
+              <div
+                className="mpd-winner-entry-animation absolute left-1/2 top-1/2 max-w-[95vw] whitespace-nowrap text-center text-[clamp(4rem,13vw,12rem)] font-extrabold leading-none tracking-[-0.06em] text-white"
+                style={{
+                  animation:
+                    "mpdWinnerEntryAnimation 1.9s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+                }}
+              >
+                {animatedWinner.item.label}
+              </div>
+            </div>
+          </>
+        )}
+
         {orderedWinners.length > 0 && (
           <div
             className="fixed inset-0 z-[500] flex items-center justify-center p-4"
             role="presentation"
             onMouseDown={(event) => {
-              if (event.target === event.currentTarget) {
+              if (
+                event.target ===
+                event.currentTarget
+              ) {
                 closeWinnerPopup()
               }
             }}
@@ -379,52 +580,60 @@ export default function SpinWheel() {
               </div>
 
               <div className="divide-y divide-white/10">
-                {orderedWinners.map((result) => (
-                  <div
-                    key={result.id}
-                    className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-4 sm:grid-cols-[110px_1fr_auto]"
-                  >
-                    <div className="text-xs font-bold uppercase tracking-wide text-white/45">
-                      {result.wheelName}
+                {orderedWinners.map(
+                  (result) => (
+                    <div
+                      key={result.id}
+                      className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-4 sm:grid-cols-[110px_1fr_auto]"
+                    >
+                      <div className="text-xs font-bold uppercase tracking-wide text-white/45">
+                        {result.wheelName}
+                      </div>
+
+                      <div className="min-w-0 truncate text-center text-[25px] font-normal tracking-[-0.5px] text-white sm:text-left">
+                        {result.item.label}
+                      </div>
+
+                      <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            closeWinner(
+                              result.id,
+                            )
+                          }
+                          className="rounded px-2.5 py-1.5 text-[10px] font-bold text-white transition hover:bg-white/10"
+                        >
+                          Close
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeWinner(
+                              result,
+                            )
+                          }
+                          className="rounded-[2px] bg-[#5147bd] px-3 py-1.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#5d53cf]"
+                        >
+                          Remove
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            hideWinner(
+                              result,
+                            )
+                          }
+                          className="rounded-[2px] bg-[#5147bd] px-3 py-1.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#5d53cf]"
+                        >
+                          Hide
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="min-w-0 truncate text-center text-[25px] font-normal tracking-[-0.5px] text-white sm:text-left">
-                      {result.item.label}
-                    </div>
-
-                    <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          closeWinner(result.id)
-                        }
-                        className="rounded px-2.5 py-1.5 text-[10px] font-bold text-white transition hover:bg-white/10"
-                      >
-                        Close
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          removeWinner(result)
-                        }
-                        className="rounded-[2px] bg-[#5147bd] px-3 py-1.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#5d53cf]"
-                      >
-                        Remove
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          hideWinner(result)
-                        }
-                        className="rounded-[2px] bg-[#5147bd] px-3 py-1.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#5d53cf]"
-                      >
-                        Hide
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             </div>
           </div>
