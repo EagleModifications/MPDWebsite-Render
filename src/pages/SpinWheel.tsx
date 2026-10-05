@@ -138,62 +138,55 @@ export default function SpinWheel() {
   )
 
   const launchWinnerCelebration = useCallback(() => {
-    // Wheel of Names-style celebration: repeated fireworks from changing
-    // positions for five seconds. Each burst then naturally falls away.
+    /* One small fireworks burst every ~1/3 second for five seconds. */
     const end = Date.now() + 5000
-    confettiEndRef.current = end
-    lastConfettiBurstRef.current = 0
 
     if (confettiFrameRef.current !== null) {
       cancelAnimationFrame(confettiFrameRef.current)
       confettiFrameRef.current = null
     }
 
-    const frame = () => {
+    confettiEndRef.current = end
+    lastConfettiBurstRef.current = 0
+
+    const fire = () => {
       const now = Date.now()
+
       if (now >= confettiEndRef.current) {
         confettiFrameRef.current = null
         return
       }
 
-      // Fire a few bursts at a time rather than on every animation frame.
-      // This gives the fireworks their separate "pop" moments without
-      // flooding the canvas with thousands of particles.
-      if (now - lastConfettiBurstRef.current >= 110) {
+      if (now - lastConfettiBurstRef.current >= 333) {
         lastConfettiBurstRef.current = now
 
-        const bursts = 2 + Math.floor(Math.random() * 2)
-        for (let i = 0; i < bursts; i += 1) {
-          const x = 0.06 + Math.random() * 0.88
-          const y = 0.08 + Math.random() * 0.62
-          const direction = Math.random() > 0.5 ? 1 : -1
+        const x = 0.05 + Math.random() * 0.90
+        const y = 0.05 + Math.random() * 0.78
 
-          confetti({
-            particleCount: 30 + Math.floor(Math.random() * 20),
-            angle: direction > 0
-              ? 55 + Math.random() * 35
-              : 95 + Math.random() * 35,
-            spread: 42 + Math.random() * 60,
-            startVelocity: 42 + Math.random() * 30,
-            decay: 0.91 + Math.random() * 0.025,
-            gravity: 0.78 + Math.random() * 0.28,
-            drift: (Math.random() - 0.5) * 0.8,
-            scalar: 0.75 + Math.random() * 0.45,
-            ticks: 180 + Math.floor(Math.random() * 100),
-            origin: { x, y },
-            colors: [
-              "#3b82f6", "#60a5fa", "#0ea5e9", "#22c55e",
-              "#facc15", "#f97316", "#ef4444", "#a855f7",
-            ],
-            zIndex: 1000,
-          })
-        }
+        confetti({
+          particleCount: 34 + Math.floor(Math.random() * 10),
+          angle: 90,
+          spread: 360,
+          startVelocity: 27 + Math.random() * 8,
+          decay: 0.90 + Math.random() * 0.025,
+          gravity: 0.90 + Math.random() * 0.25,
+          drift: (Math.random() - 0.5) * 0.45,
+          scalar: 0.70 + Math.random() * 0.28,
+          ticks: 55 + Math.floor(Math.random() * 20),
+          origin: { x, y },
+          colors: [
+            '#3b82f6', '#60a5fa', '#0ea5e9', '#22c55e',
+            '#facc15', '#f97316', '#ef4444', '#a855f7',
+            '#f472b6',
+          ],
+          zIndex: 1000,
+        })
       }
 
-      confettiFrameRef.current = requestAnimationFrame(frame)
+      confettiFrameRef.current = requestAnimationFrame(fire)
     }
 
-    frame()
+    fire()
   }, [])
 
   const handleResult = useCallback(
@@ -566,18 +559,15 @@ export default function SpinWheel() {
           >
             <div
               ref={wheelAreaRef}
-              className={`grid h-full min-h-0 w-full overflow-visible ${
-                wheels.length === 1
-                  ? "grid-cols-1 grid-rows-1 p-2"
-                  : "grid-cols-2 auto-rows-fr gap-x-6 gap-y-4 p-5 lg:gap-x-8 lg:gap-y-5 lg:p-7"
-              }`}
+              className="grid h-full min-h-0 w-full grid-rows-1 gap-x-2 overflow-visible p-2 lg:gap-x-3 lg:p-3"
+              style={{
+                gridTemplateColumns: `repeat(${Math.max(1, wheels.length)}, minmax(0, 1fr))`,
+              }}
             >
               {wheels.map((wheel) => (
                 <div
                   key={wheel.id}
-                  className={`relative flex min-h-0 min-w-0 items-center justify-center overflow-visible bg-transparent ${
-                    wheels.length > 1 ? "p-2 lg:p-3" : ""
-                  }`}
+                  className="relative flex min-h-0 min-w-0 items-center justify-center overflow-visible bg-transparent"
                 >
                   <Wheel
                     items={wheel.items}
