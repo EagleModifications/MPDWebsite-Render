@@ -43,6 +43,11 @@ const navItems: NavItem[] = [
     permission: "gallery",
   },
   {
+    name: "Spin Wheel",
+    href: "/spin-wheel",
+    public: true,
+  },
+  {
     name: "Dashboard",
     href: "/dashboard",
     permission: [
