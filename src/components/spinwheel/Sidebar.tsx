@@ -6,6 +6,7 @@ import {
   type ChangeEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react"
 import {
   ArrowDown,
@@ -171,6 +172,7 @@ const COLOR_GALLERY = [
 
 const SOUND_OPTIONS = [
   "Inherit from wheel",
+  "Ticking sound",
   "No sound",
   "Random sound",
   "Subdued applause",
@@ -1089,6 +1091,362 @@ function SoundDropdown({
   )
 }
 
+
+function WheelCustomizeDialog({
+  open,
+  wheelNumber,
+  onClose,
+}: {
+  open: boolean
+  wheelNumber: number
+  onClose: () => void
+}) {
+  const [tab, setTab] = useState<"during" | "after" | "appearance">("during")
+  const [duringSound, setDuringSound] = useState("Ticking sound")
+  const [duringVolume, setDuringVolume] = useState(50)
+  const [displayDuplicates, setDisplayDuplicates] = useState(true)
+  const [spinSlowly, setSpinSlowly] = useState(true)
+  const [showTitle, setShowTitle] = useState(true)
+  const [spinTime, setSpinTime] = useState(10)
+  const [maxVisible, setMaxVisible] = useState(1000)
+
+  const [afterSound, setAfterSound] = useState("Subdued applause")
+  const [afterVolume, setAfterVolume] = useState(50)
+  const [animateWinner, setAnimateWinner] = useState(false)
+  const [launchConfetti, setLaunchConfetti] = useState(true)
+  const [autoRemove, setAutoRemove] = useState(false)
+  const [displayPopup, setDisplayPopup] = useState(true)
+  const [popupMessage, setPopupMessage] = useState("We have a winner!")
+  const [displayRemoveButton, setDisplayRemoveButton] = useState(true)
+  const [clickRemoveSound, setClickRemoveSound] = useState(false)
+
+  const [oneColorPerSection, setOneColorPerSection] = useState(true)
+  const [useBackgroundImage, setUseBackgroundImage] = useState(true)
+  const [selectedColors, setSelectedColors] = useState([
+    "#38aee0",
+    "#7be0ae",
+    "#f7dc68",
+    "#ae75c8",
+  ])
+  const [centerImage, setCenterImage] = useState<string | undefined>()
+  const [imageSize, setImageSize] = useState("S")
+  const [pageBackgroundColor, setPageBackgroundColor] = useState("#ffffff")
+  const [gradient, setGradient] = useState(true)
+  const [contours, setContours] = useState(false)
+  const [wheelShadow, setWheelShadow] = useState(true)
+  const [pointerChangesColor, setPointerChangesColor] = useState(true)
+  const [alwaysShowText, setAlwaysShowText] = useState("Always show text on the wheel")
+
+  const centerImageInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose()
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [open, onClose])
+
+  if (!open) return null
+
+  const toggleColor = (color: string) => {
+    setSelectedColors((current) =>
+      current.includes(color)
+        ? current.filter((entry) => entry !== color)
+        : [...current, color],
+    )
+  }
+
+  const handleCenterImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === "string") setCenterImage(reader.result)
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ""
+  }
+
+  const check = (checked: boolean, onChange: (value: boolean) => void, label: string, extra?: ReactNode) => (
+    <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-5 w-5 cursor-pointer rounded border-border accent-blue-500"
+      />
+      <span>{label}</span>
+      {extra}
+    </label>
+  )
+
+  const slider = (
+    value: number,
+    min: number,
+    max: number,
+    step: number,
+    onChange: (value: number) => void,
+    labels: string[],
+  ) => (
+    <div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="h-1.5 w-full cursor-pointer accent-blue-500"
+      />
+      <div className="mt-2 flex justify-between text-xs font-semibold text-muted-foreground">
+        {labels.map((label) => <span key={label}>{label}</span>)}
+      </div>
+    </div>
+  )
+
+  return (
+    <div
+      className="fixed inset-0 z-[400] flex items-center justify-center bg-background/65 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wheel-customize-title"
+        className="flex max-h-[calc(100vh-32px)] w-full max-w-[820px] flex-col overflow-hidden rounded-xl border border-border/70 bg-card text-foreground shadow-2xl"
+      >
+        <div className="flex h-14 shrink-0 items-center justify-center border-b border-border/70 bg-card/95">
+          <div className="flex h-full items-end">
+            {[
+              ["during", "During spin"],
+              ["after", "After spin"],
+              ["appearance", "Appearance"],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id as "during" | "after" | "appearance")}
+                className={`flex h-14 items-center border-b-2 px-5 text-sm font-semibold transition-colors ${
+                  tab === id
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto bg-background/40 p-4 sm:p-6">
+          {tab === "during" && (
+            <div className="space-y-0">
+              <div className="rounded-lg bg-yellow-300/90 px-4 py-3 text-sm leading-5 text-black">
+                You are in multi-wheel mode. The sound for this wheel (Wheel {wheelNumber}) will play when you press “Spin all wheels”.
+              </div>
+
+              <div className="grid grid-cols-[116px_1fr] items-center gap-x-4 gap-y-5 py-5">
+                <label className="text-sm font-semibold">Sound</label>
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <SoundDropdown value={duringSound} onChange={setDuringSound} />
+                  </div>
+                  <button type="button" aria-label="Preview sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                    <span className="ml-0.5 text-xl leading-none">▶</span>
+                  </button>
+                  <button type="button" aria-label="Stop sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                    <span className="text-lg leading-none">■</span>
+                  </button>
+                </div>
+
+                <label className="text-sm font-semibold">Volume</label>
+                <div>
+                  {slider(duringVolume, 0, 100, 1, setDuringVolume, ["0%", "25%", "50%", "75%", "100%"])}
+                </div>
+              </div>
+
+              <div className="border-t border-border/70 py-5">
+                <div className="flex flex-wrap gap-x-7 gap-y-4">
+                  {check(displayDuplicates, setDisplayDuplicates, "Display duplicates", <span className="flex h-4 w-4 items-center justify-center rounded-full bg-muted-foreground/40 text-[10px] text-background">?</span>)}
+                  {check(spinSlowly, setSpinSlowly, "Spin slowly")}
+                  {check(showTitle, setShowTitle, "Show title")}
+                </div>
+              </div>
+
+              <div className="border-t border-border/70 py-5">
+                <div className="mb-3 text-sm font-semibold">Spin time (seconds)</div>
+                {slider(spinTime, 1, 60, 1, setSpinTime, ["1", "10", "20", "30", "40", "50", "60"])}
+              </div>
+
+              <div className="border-t border-border/70 pt-5">
+                <div className="mb-1 text-sm font-semibold">Max number of names visible on the wheel</div>
+                <p className="mb-4 text-xs font-medium text-muted-foreground">All names in the text-box have the same chance of winning, regardless of this value.</p>
+                {slider(maxVisible, 4, 1000, 1, setMaxVisible, ["4", "100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"])}
+              </div>
+            </div>
+          )}
+
+          {tab === "after" && (
+            <div className="space-y-0">
+              <div className="rounded-lg bg-yellow-300/90 px-4 py-3 text-sm leading-5 text-black">
+                You are in multi-wheel mode. The “After spin” settings for this wheel (Wheel {wheelNumber}) will be used when you press “Spin all wheels”.
+              </div>
+
+              <div className="grid grid-cols-[116px_1fr] items-center gap-x-4 gap-y-5 py-5">
+                <label className="text-sm font-semibold">Sound</label>
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <SoundDropdown value={afterSound} onChange={setAfterSound} />
+                  </div>
+                  <button type="button" aria-label="Preview sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                    <span className="ml-0.5 text-xl leading-none">▶</span>
+                  </button>
+                  <button type="button" aria-label="Stop sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                    <span className="text-lg leading-none">■</span>
+                  </button>
+                </div>
+
+                <label className="text-sm font-semibold">Volume</label>
+                <div>
+                  {slider(afterVolume, 0, 100, 1, setAfterVolume, ["0%", "25%", "50%", "75%", "100%"])}
+                </div>
+              </div>
+
+              <div className="border-t border-border/70 py-5">
+                <div className="flex flex-wrap gap-x-7 gap-y-4">
+                  {check(animateWinner, setAnimateWinner, "Animate winning entry")}
+                  {check(launchConfetti, setLaunchConfetti, "Launch confetti")}
+                  {check(autoRemove, setAutoRemove, "Auto-remove winner after 5 seconds")}
+                </div>
+              </div>
+
+              <div className="border-t border-border/70 bg-muted/20 p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  {check(displayPopup, setDisplayPopup, "Display popup with message:")}
+                  <input
+                    value={popupMessage}
+                    onChange={(event) => setPopupMessage(event.target.value)}
+                    disabled={!displayPopup}
+                    className="h-10 min-w-[240px] flex-1 rounded-md border border-border/70 bg-muted/70 px-3 text-sm font-medium outline-none transition-colors focus:border-blue-500/60 disabled:opacity-50"
+                  />
+                </div>
+                <div className="mt-4 space-y-4 pl-1">
+                  {check(displayRemoveButton, setDisplayRemoveButton, 'Display the "Remove" button')}
+                  {check(clickRemoveSound, setClickRemoveSound, "Play a click sound when the winner is removed")}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === "appearance" && (
+            <div className="space-y-0">
+              <div className="grid grid-cols-2 gap-6 border-b border-border/70 pb-5">
+                <button
+                  type="button"
+                  onClick={() => setOneColorPerSection((value) => !value)}
+                  className="group flex flex-col items-center gap-3 rounded-lg p-2 transition hover:bg-muted/40"
+                >
+                  <div className="flex h-14 w-14 overflow-hidden rounded-full border-2 border-border/70 shadow-sm">
+                    {selectedColors.slice(0, 4).map((color) => <span key={color} className="flex-1" style={{ backgroundColor: color }} />)}
+                  </div>
+                  <span className="text-sm font-semibold">One color per section</span>
+                  <span className={`h-1.5 w-14 rounded-full transition ${oneColorPerSection ? "bg-blue-500" : "bg-muted"}`} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setUseBackgroundImage((value) => !value)}
+                  className="group flex flex-col items-center gap-3 rounded-lg p-2 transition hover:bg-muted/40"
+                >
+                  <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-border/70 bg-muted shadow-sm">
+                    {centerImage ? <img src={centerImage} alt="" className="h-full w-full object-cover" /> : <ImageIcon className="h-6 w-6 text-muted-foreground" />}
+                  </div>
+                  <span className="text-sm font-semibold">Wheel background image</span>
+                  <span className={`h-1.5 w-14 rounded-full transition ${useBackgroundImage ? "bg-blue-500" : "bg-muted"}`} />
+                </button>
+              </div>
+
+              <div className="border-b border-border/70 py-5">
+                <button type="button" className="flex h-9 items-center gap-3 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500">
+                  Apply a theme
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="border-b border-border/70 py-5">
+                <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
+                  Customize colors
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-muted-foreground/40 text-[10px] text-background">?</span>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {selectedColors.map((color, index) => (
+                    <button
+                      key={`${color}-${index}`}
+                      type="button"
+                      onClick={() => toggleColor(color)}
+                      className="flex h-10 w-20 items-center justify-center rounded-md border border-border/70 shadow-sm transition hover:brightness-105"
+                      style={{ backgroundColor: color }}
+                    >
+                      <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.45)]" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border/70 py-5">
+                <div className="flex items-center gap-3 text-sm font-semibold">Image at the center of the wheel
+                  <button type="button" onClick={() => centerImageInputRef.current?.click()} className="flex h-10 w-24 items-center justify-center gap-2 rounded-md bg-blue-600 text-white transition hover:bg-blue-500">
+                    <ImageIcon className="h-4 w-4" />
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  <input ref={centerImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleCenterImage} />
+                </div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  Image size
+                  <select value={imageSize} onChange={(event) => setImageSize(event.target.value)} className="h-10 rounded-md border border-border/70 bg-muted/70 px-3 text-sm outline-none focus:border-blue-500/60">
+                    <option>S</option><option>M</option><option>L</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-8 gap-y-4 bg-muted/20 p-4">
+                <button
+                  type="button"
+                  onClick={() => setPageBackgroundColor((current) => current === "#ffffff" ? "#111111" : "#ffffff")}
+                  className="flex items-center gap-3 text-left text-sm font-medium"
+                >
+                  <span className="flex h-10 w-12 items-center justify-center rounded-md border border-border/70 bg-background" style={{ backgroundColor: pageBackgroundColor }}>
+                    <Palette className="h-4 w-4" />
+                  </span>
+                  Page background color
+                </button>
+                {check(contours, setContours, "Contours")}
+                {check(gradient, setGradient, "Display a color gradient on the page")}
+                {check(wheelShadow, setWheelShadow, "Wheel shadow")}
+                <button type="button" onClick={() => setAlwaysShowText((value) => value === "Always show text on the wheel" ? "Only show text while spinning" : "Always show text on the wheel")} className="flex h-10 items-center justify-between rounded-md bg-muted/70 px-3 text-left text-sm font-semibold">{alwaysShowText}<ChevronDown className="h-4 w-4 text-muted-foreground" /></button>
+                {check(pointerChangesColor, setPointerChangesColor, "Pointer changes color")}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex h-16 shrink-0 items-center justify-end gap-2 border-t border-border/70 bg-card px-5">
+          <button type="button" onClick={onClose} className="h-10 rounded-md px-4 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
+          <button type="button" onClick={onClose} className="h-10 rounded-md bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500">OK</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Sidebar({
   open,
   items,
@@ -1120,6 +1478,9 @@ export default function Sidebar({
     useState(false)
 
   const [wheelMenuOpen, setWheelMenuOpen] =
+    useState(false)
+
+  const [customizeWheelOpen, setCustomizeWheelOpen] =
     useState(false)
 
   const textEditingRef =
@@ -1994,6 +2355,7 @@ export default function Sidebar({
 
   const handleCustomizeActiveWheel = () => {
     setWheelMenuOpen(false)
+    setCustomizeWheelOpen(true)
   }
 
   const toggleWheelMenu = (event: ReactMouseEvent) => {
@@ -2746,43 +3108,45 @@ export default function Sidebar({
               )}
 
               {wheels.length > 1 && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={handleCustomizeActiveWheel}
-                    className="flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                    className="flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
                   >
-                    <Palette className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">Customize wheel {activeWheelNumber}</span>
+                    <Palette className="h-4 w-4 shrink-0" />
+                    Customize wheel {activeWheelNumber}
                   </button>
 
                   <button
                     type="button"
                     onClick={handleRenameActiveWheel}
-                    className="flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                    className="flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
                   >
-                    <Pencil className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">Rename wheel {activeWheelNumber}</span>
+                    <Pencil className="h-4 w-4 shrink-0" />
+                    Rename wheel {activeWheelNumber}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRemoveActiveWheel}
+                    className="flex h-9 items-center gap-1.5 rounded-md bg-red-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-red-500"
+                  >
+                    <Trash2 className="h-4 w-4 shrink-0" />
+                    Remove wheel {activeWheelNumber}
                   </button>
                 </div>
-              )}
-
-              {wheels.length > 1 && (
-                <button
-                  type="button"
-                  onClick={handleRemoveActiveWheel}
-                  className="mt-2 flex h-9 w-full min-w-0 items-center justify-center gap-1.5 rounded-md bg-red-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-500"
-                >
-                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">
-                    Remove wheel {activeWheelNumber}
-                  </span>
-                </button>
               )}
             </div>
           </div>
         </div>
       </aside>
+
+      <WheelCustomizeDialog
+        open={customizeWheelOpen}
+        wheelNumber={activeWheelNumber}
+        onClose={() => setCustomizeWheelOpen(false)}
+      />
 
       <input
         ref={entryImageInputRef}
