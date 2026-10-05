@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
-import { ChevronDown, Dices, FilePlus2, FolderOpen, Palette, Pencil, Save, X } from "lucide-react"
+import { ChevronDown, FilePlus2, FolderOpen, Palette, Pencil, Save, X } from "lucide-react"
 import confetti from "canvas-confetti"
 
 import Navbar from "@/components/home/Navbar"
@@ -15,27 +15,6 @@ type WheelState = {
 }
 
 const MAX_WHEELS = 10
-
-type SaveFilePickerOptions = {
-  suggestedName?: string
-  types?: Array<{
-    description?: string
-    accept: Record<string, string[]>
-  }>
-}
-
-type SaveFilePickerHandle = {
-  createWritable: () => Promise<{
-    write: (data: Blob | string) => Promise<void>
-    close: () => Promise<void>
-  }>
-}
-
-type SaveFilePickerWindow = Window & {
-  showSaveFilePicker?: (
-    options?: SaveFilePickerOptions,
-  ) => Promise<SaveFilePickerHandle>
-}
 
 type SpinResult = {
   id: string
@@ -120,6 +99,7 @@ export default function SpinWheel() {
   const confettiFrameRef = useRef<number | null>(null)
   const lastConfettiBurstRef = useRef(0)
   const [customizeRequest, setCustomizeRequest] = useState(0)
+  const [newConfirmOpen, setNewConfirmOpen] = useState(false)
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const openFileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -456,6 +436,10 @@ export default function SpinWheel() {
     setCustomizeRequest((value) => value + 1)
   }, [])
 
+  const requestNewWheel = useCallback(() => {
+    setNewConfirmOpen(true)
+  }, [])
+
   const openWheelFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ""
@@ -517,7 +501,7 @@ export default function SpinWheel() {
     })
   }, [])
 
-  const saveWheelFile = useCallback(async (extension: "wheel" | "json") => {
+  const saveWheelFile = useCallback((extension: "wheel" | "json") => {
     const payload = {
       version: 1,
       wheels,
@@ -533,51 +517,7 @@ export default function SpinWheel() {
       },
     }
 
-    const content = JSON.stringify(payload, null, 2)
-    const pickerWindow = window as SaveFilePickerWindow
-
-    if (pickerWindow.showSaveFilePicker) {
-      try {
-        /*
-         * Give the native Windows save dialog a filename WITHOUT an
-         * extension. The selected file type supplies the extension, which
-         * prevents the old ".json.json" filename problem.
-         */
-        const handle = await pickerWindow.showSaveFilePicker({
-          suggestedName: "metro-pd-wheel",
-          types: [
-            extension === "wheel"
-              ? {
-                  description: "Metro PD Wheel",
-                  accept: {
-                    "application/octet-stream": [".wheel"],
-                  },
-                }
-              : {
-                  description: "JSON Wheel",
-                  accept: {
-                    "application/json": [".json"],
-                  },
-                },
-          ],
-        })
-
-        const writable = await handle.createWritable()
-        await writable.write(new Blob([content], { type: "application/json" }))
-        await writable.close()
-        setSaveMenuOpen(false)
-        return
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          setSaveMenuOpen(false)
-          return
-        }
-        console.error(error)
-      }
-    }
-
-    /* Fallback for browsers without the File System Access API. */
-    const blob = new Blob([content], { type: "application/json" })
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
     anchor.href = url
@@ -777,87 +717,56 @@ export default function SpinWheel() {
       <Navbar />
 
       <main className="relative min-h-screen pt-20">
-        {/* Page header — kept below the real site navbar, like the Events page. */}
-        <div className="relative z-[180] mx-auto flex w-full items-end justify-between gap-6 px-5 pb-4 pt-5 lg:px-7">
-          <div className="min-w-0">
-            <div className="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-blue-500">
-              <Dices className="h-4 w-4" />
-              TOOLS
-            </div>
-            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Spin Wheel</h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Create and spin custom wheels for Metro Police Department activities, selections, and events.
-            </p>
-          </div>
-
-          <div className="relative flex shrink-0 items-center gap-1 rounded-xl border border-border/70 bg-card/90 p-1 shadow-sm backdrop-blur-xl">
-            <button
-              type="button"
-              onClick={requestCustomize}
-              className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
-            >
-              <Palette className="h-4 w-4" />
-              Customize
-            </button>
-            <button
-              type="button"
-              onClick={requestNewWheel}
-              className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
-            >
-              <FilePlus2 className="h-4 w-4" />
-              New
-            </button>
-            <button
-              type="button"
-              onClick={() => openFileInputRef.current?.click()}
-              className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
-            >
-              <FolderOpen className="h-4 w-4" />
-              Open
-            </button>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setSaveMenuOpen((value) => !value)}
-                className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
-                aria-expanded={saveMenuOpen}
-              >
-                <Save className="h-4 w-4" />
-                Save
-                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${saveMenuOpen ? "rotate-180" : ""}`} />
-              </button>
-              {saveMenuOpen && (
-                <div className="absolute right-0 top-[calc(100%+6px)] z-[400] w-40 overflow-hidden rounded-xl border border-border/70 bg-popover p-1 shadow-xl">
-                  <button type="button" onClick={() => void saveWheelFile("wheel")} className="flex h-9 w-full items-center rounded-lg px-3 text-left text-xs font-semibold text-foreground hover:bg-muted">Save .wheel</button>
-                  <button type="button" onClick={() => void saveWheelFile("json")} className="flex h-9 w-full items-center rounded-lg px-3 text-left text-xs font-semibold text-foreground hover:bg-muted">Save .json</button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* The pencil stays at the page's top-left, like Wheel of Names. */}
+        <div className="pointer-events-none absolute left-4 top-4 z-[220] flex items-center gap-2">
           <button
             type="button"
             onClick={requestCustomize}
-            className="absolute left-4 top-4 hidden h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card/90 text-foreground shadow-sm backdrop-blur-xl transition-colors hover:bg-muted lg:flex"
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:bg-black/75"
             aria-label="Customize wheel"
             title="Customize wheel"
           >
             <Pencil className="h-4 w-4" />
           </button>
 
+          <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/10 bg-black/45 p-1.5 shadow-lg backdrop-blur-xl">
+            <button type="button" onClick={requestCustomize} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
+              <Palette className="h-4 w-4" />
+              Customize
+            </button>
+            <button type="button" onClick={requestNewWheel} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
+              <FilePlus2 className="h-4 w-4" />
+              New
+            </button>
+            <button type="button" onClick={() => openFileInputRef.current?.click()} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
+              <FolderOpen className="h-4 w-4" />
+              Open
+            </button>
+            <div className="relative">
+              <button type="button" onClick={() => setSaveMenuOpen((value) => !value)} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10" aria-expanded={saveMenuOpen}>
+                <Save className="h-4 w-4" />
+                Save
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${saveMenuOpen ? "rotate-180" : ""}`} />
+              </button>
+              {saveMenuOpen && (
+                <div className="absolute left-0 top-[calc(100%+6px)] z-[300] w-36 overflow-hidden rounded-lg border border-white/10 bg-[#181818] p-1 shadow-2xl">
+                  <button type="button" onClick={() => saveWheelFile("wheel")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .wheel</button>
+                  <button type="button" onClick={() => saveWheelFile("json")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .json</button>
+                </div>
+              )}
+            </div>
+          </div>
+
           <input ref={openFileInputRef} type="file" accept=".wheel,.json,application/json" className="hidden" onChange={openWheelFile} />
         </div>
-
         <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_35%_35%,rgba(33,70,82,0.42),transparent_45%),radial-gradient(circle_at_78%_25%,rgba(81,42,91,0.28),transparent_42%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]">
           <div
-            className={`absolute inset-x-0 bottom-0 top-40 min-h-0 overflow-hidden transition-[padding] duration-300 ${
+            className={`absolute inset-0 min-h-0 overflow-hidden pt-16 transition-[padding] duration-300 ${
               sidebarOpen ? "lg:pr-[500px]" : ""
             }`}
           >
             <div
               ref={wheelAreaRef}
-              className="grid h-full min-h-0 w-full grid-rows-1 gap-x-2 overflow-visible px-3 pb-4 pt-2 lg:gap-x-3 lg:px-5 lg:pb-6 lg:pt-6"
+              className="grid h-full min-h-0 w-full grid-rows-1 gap-x-2 overflow-visible p-2 lg:gap-x-3 lg:p-3"
               style={{
                 gridTemplateColumns: `repeat(${Math.max(1, wheels.length)}, minmax(0, 1fr))`,
               }}
@@ -876,7 +785,12 @@ export default function SpinWheel() {
                     spinTime={spinTimeByWheel[wheel.id] ?? 10}
                     centerImage={centerImageByWheel[wheel.id]}
                     imageSize={imageSizeByWheel[wheel.id] ?? "S"}
-                    onResult={(item) => handleResult(wheel.id, item)}
+                    onResult={(item) =>
+                      handleResult(
+                        wheel.id,
+                        item,
+                      )
+                    }
                   />
                 </div>
               ))}
@@ -956,10 +870,10 @@ export default function SpinWheel() {
               ? "Hide sidebar"
               : "Show sidebar"
           }
-          className={`absolute top-[58%] z-[200] hidden h-14 w-8 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-white/10 bg-black/50 text-muted-foreground shadow-xl backdrop-blur transition-[right] duration-300 hover:bg-black/70 hover:text-foreground lg:flex ${
+          className={`absolute top-1/2 z-[200] hidden h-14 w-8 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-white/10 bg-black/50 text-muted-foreground shadow-xl backdrop-blur transition-[right] duration-300 hover:bg-black/70 hover:text-foreground lg:flex ${
             sidebarOpen
-              ? "right-[500px]"
-              : "right-3"
+              ? "right-[480px]"
+              : "right-1"
           }`}
         >
           <span
@@ -1029,6 +943,55 @@ export default function SpinWheel() {
               </div>
             </div>
           </>
+        )}
+
+        {newConfirmOpen && (
+          <div
+            className="fixed inset-0 z-[900] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setNewConfirmOpen(false)
+              }
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="new-wheel-dialog-title"
+              className="w-full max-w-[420px] rounded-xl border border-white/10 bg-[#181818] p-5 shadow-2xl"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <h2
+                id="new-wheel-dialog-title"
+                className="text-base font-bold text-white"
+              >
+                Start a new wheel?
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-white/60">
+                This will clear your current wheels, entries, results, and settings. This action cannot be undone.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNewConfirmOpen(false)}
+                  className="h-9 rounded-lg border border-white/10 px-3 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewConfirmOpen(false)
+                    resetToNewWheel()
+                  }}
+                  className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white transition hover:bg-blue-500"
+                >
+                  New wheel
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {orderedWinners.length > 0 && (
