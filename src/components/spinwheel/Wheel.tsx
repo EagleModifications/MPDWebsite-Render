@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -28,34 +29,6 @@ type WheelProps = {
   duringVolume?: number
 }
 
-type ConfettiPiece = {
-  id: number
-  startX: number
-  startY: number
-  endX: number
-  endY: number
-  size: number
-  rotation: number
-  delay: number
-  duration: number
-  color: string
-  width: number
-  height: number
-  scale: number
-}
-
-const CONFETTI_COLORS = [
-  "#3b82f6",
-  "#60a5fa",
-  "#22c55e",
-  "#86efac",
-  "#facc15",
-  "#fde68a",
-  "#f472b6",
-  "#c084fc",
-  "#fb7185",
-  "#38bdf8",
-]
 
 function createRandomColor() {
   const hue = Math.floor(Math.random() * 360)
@@ -316,7 +289,7 @@ export const DURING_SOUND_CATEGORIES: Record<string, Record<string, string>> = {
 }
 
 export const DURING_SOUND_FILES: Record<string, string> = Object.fromEntries(
-  Object.entries(DURING_SOUND_CATEGORIES).flatMap(([category, files]) =>
+  Object.entries(DURING_SOUND_CATEGORIES).flatMap(([, files]) =>
     Object.entries(files).map(([name, path]) => [name, path]),
   ),
 )
@@ -340,22 +313,6 @@ function pickDuringSound(sound: string) {
 
 function isTickingSound(sound: string) {
   return sound === "Ticking sound"
-}
-
-function playDuringSoundPreview(sound: string, volume: number, audioRef: { current: HTMLAudioElement | null }) {
-  if (audioRef.current) {
-    audioRef.current.pause()
-    audioRef.current.currentTime = 0
-  }
-
-  const file = pickDuringSound(sound)
-  if (!file) return
-
-  const audio = new Audio(`/sounds/during-spin/${file}`)
-  audio.volume = Math.max(0, Math.min(1, volume / 100))
-  audio.loop = !isTickingSound(sound)
-  audioRef.current = audio
-  void audio.play().catch(() => undefined)
 }
 
 const AFTER_SPIN_SOUND_FILES: Record<string, string> = {
@@ -418,104 +375,11 @@ function playAfterSpinSound(sound: string, volume: number) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Confetti                                                                   */
-/* -------------------------------------------------------------------------- */
-
-function createConfetti(): ConfettiPiece[] {
-  return Array.from(
-    {
-      length: 105,
-    },
-    (_, index) => {
-      const angle =
-        Math.random() *
-        Math.PI *
-        2
-
-      const distance =
-        10 +
-        Math.random() * 48
-
-      const startX =
-        50 +
-        Math.cos(angle) *
-          (3 + Math.random() * 4)
-
-      const startY =
-        50 +
-        Math.sin(angle) *
-          (3 + Math.random() * 4)
-
-      const endX =
-        50 +
-        Math.cos(angle) *
-          distance
-
-      const endY =
-        42 +
-        Math.sin(angle) *
-          distance
-
-      const size =
-        3 +
-        Math.random() * 4
-
-      return {
-        id:
-          Date.now() +
-          index +
-          Math.floor(
-            Math.random() * 10000,
-          ),
-
-        startX,
-        startY,
-        endX,
-        endY,
-
-        size,
-
-        rotation:
-          Math.random() * 720 -
-          360,
-
-        delay:
-          Math.random() *
-          0.28,
-
-        duration:
-          1.8 +
-          Math.random() * 1.6,
-
-        color:
-          CONFETTI_COLORS[
-            Math.floor(
-              Math.random() *
-                CONFETTI_COLORS.length,
-            )
-          ],
-
-        width:
-          size *
-          (0.7 +
-            Math.random() * 0.7),
-
-        height:
-          size *
-          (1.4 +
-            Math.random() * 1.5),
-
-        scale:
-          0.7 +
-          Math.random() * 0.7,
-      }
-    },
-  )
-}
-
-/* -------------------------------------------------------------------------- */
 /* Wheel                                                                      */
 /* -------------------------------------------------------------------------- */
+
+/** Fast launch with a smooth, natural ease-out into the final slice. */
+const cubicOut = (t: number) => 1 - Math.pow(1 - t, 3)
 
 export default function Wheel({
   items,
@@ -527,6 +391,8 @@ export default function Wheel({
   duringSound = "Ticking sound",
   duringVolume = 50,
 }: WheelProps) {
+  const wheelTextId = useId().replace(/:/g, "")
+
   const containerRef =
     useRef<HTMLDivElement | null>(null)
 
@@ -554,10 +420,6 @@ export default function Wheel({
   const duringSoundRef = useRef(duringSound)
   const duringVolumeRef = useRef(duringVolume)
 
-  const confettiTimerRef =
-    useRef<ReturnType<
-      typeof setTimeout
-    > | null>(null)
 
   const [isSpinning, setIsSpinning] =
     useState(false)
@@ -565,8 +427,6 @@ export default function Wheel({
   const [pointerColor, setPointerColor] =
     useState("#5fc78b")
 
-  const [confetti, setConfetti] =
-    useState<ConfettiPiece[]>([])
 
   /*
    * Hidden entries are not rendered.
@@ -714,47 +574,13 @@ export default function Wheel({
   const pointerColorRef =
     useRef("#5fc78b")
 
-  /* ---------------------------------------------------------------------- */
-  /* Confetti                                                               */
-  /* ---------------------------------------------------------------------- */
-
-  const launchConfetti =
-    useCallback(() => {
-      if (
-        confettiTimerRef.current
-      ) {
-        clearTimeout(
-          confettiTimerRef.current,
-        )
-      }
-
-      setConfetti(
-        createConfetti(),
-      )
-
-      confettiTimerRef.current =
-        setTimeout(() => {
-          setConfetti([])
-
-          confettiTimerRef.current =
-            null
-        }, 3900)
-    }, [])
-
-  useEffect(() => {
-    duringSoundRef.current = duringSound
-  }, [duringSound])
-
-  useEffect(() => {
-    duringVolumeRef.current = duringVolume
-    if (duringSpinAudioRef.current) {
-      duringSpinAudioRef.current.volume = Math.max(0, Math.min(1, duringVolume / 100))
-    }
-  }, [duringVolume])
-
   const stopDuringSpinAudio = useCallback(() => {
     const audio = duringSpinAudioRef.current
-    if (!audio) return
+
+    if (!audio) {
+      return
+    }
+
     audio.pause()
     audio.currentTime = 0
     duringSpinAudioRef.current = null
@@ -798,8 +624,6 @@ export default function Wheel({
       void audio.resume()
     }
 
-    setConfetti([])
-
     lastTickIndexRef.current =
       null
 
@@ -826,10 +650,11 @@ export default function Wheel({
      */
     wheel.spinToItem(
       selectedIndex,
-      4600,
+      4200,
       true,
-      5,
+      6,
       1,
+      cubicOut,
     )
   }, [
     getAudioContext,
@@ -1116,8 +941,6 @@ export default function Wheel({
                 afterVolume,
               )
 
-              launchConfetti()
-
               onResultRef.current?.(
                 selectedItem,
               )
@@ -1159,7 +982,6 @@ export default function Wheel({
     visibleColors,
     setPointerForIndex,
     stopDuringSpinAudio,
-    launchConfetti,
     afterSound,
     afterVolume,
   ])
@@ -1170,13 +992,6 @@ export default function Wheel({
 
   useEffect(() => {
     return () => {
-      if (
-        confettiTimerRef.current
-      ) {
-        clearTimeout(
-          confettiTimerRef.current,
-        )
-      }
 
       stopDuringSpinAudio()
 
@@ -1257,76 +1072,6 @@ export default function Wheel({
       )}
 
       {/* ------------------------------------------------------------------ */}
-      {/* Confetti                                                            */}
-      {/* ------------------------------------------------------------------ */}
-
-      {confetti.length > 0 && (
-        <div
-          className="
-            pointer-events-none
-            absolute
-            inset-0
-            z-[80]
-            overflow-hidden
-          "
-          aria-hidden="true"
-        >
-          {confetti.map(
-            (piece) => {
-              const style: CSSProperties =
-                {
-                  left:
-                    `${piece.startX}%`,
-
-                  top:
-                    `${piece.startY}%`,
-
-                  width:
-                    `${piece.width}px`,
-
-                  height:
-                    `${piece.height}px`,
-
-                  backgroundColor:
-                    piece.color,
-
-                  ["--confetti-x" as string]:
-                    `${piece.endX - piece.startX}%`,
-
-                  ["--confetti-y" as string]:
-                    `${piece.endY - piece.startY}vh`,
-
-                  ["--confetti-rotation" as string]:
-                    `${piece.rotation}deg`,
-
-                  ["--confetti-scale" as string]:
-                    piece.scale,
-
-                  animationDelay:
-                    `${piece.delay}s`,
-
-                  animationDuration:
-                    `${piece.duration}s`,
-                }
-
-              return (
-                <span
-                  key={piece.id}
-                  className="
-                    absolute
-                    rounded-[1px]
-                    opacity-0
-                    animate-[mpd-confetti-burst_ease-out_forwards]
-                  "
-                  style={style}
-                />
-              )
-            },
-          )}
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------------ */}
       {/* Wheel                                                               */}
       {/* ------------------------------------------------------------------ */}
 
@@ -1353,6 +1098,31 @@ export default function Wheel({
           }
         >
           {/* Actual wheel */}
+          {/* Dark outer rim / bevel.  The actual canvas stays inside this rim. */}
+          <div
+            className="
+              pointer-events-none
+              absolute
+              inset-[-10px]
+              rounded-full
+              border-[10px]
+              border-black/75
+              shadow-[0_16px_34px_rgba(0,0,0,0.62),inset_0_2px_3px_rgba(255,255,255,0.2),inset_0_-7px_12px_rgba(0,0,0,0.55)]
+            "
+          />
+
+          <div
+            className="
+              pointer-events-none
+              absolute
+              inset-[-3px]
+              rounded-full
+              border-[3px]
+              border-white/15
+              shadow-[0_2px_4px_rgba(255,255,255,0.08)]
+            "
+          />
+
           <div
             ref={containerRef}
             className="
@@ -1360,7 +1130,7 @@ export default function Wheel({
               inset-0
               overflow-visible
               rounded-full
-              shadow-[0_8px_25px_rgba(0,0,0,0.45)]
+              shadow-[0_10px_28px_rgba(0,0,0,0.48)]
             "
           />
 
@@ -1373,50 +1143,44 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-5px]
+              right-[-17px]
               top-1/2
-              z-40
-              h-[22px]
-              w-[26px]
+              z-50
+              h-[54px]
+              w-[70px]
               -translate-y-1/2
             "
             style={
               {
-                "--pointer-color":
-                  pointerColor,
+                "--pointer-color": pointerColor,
               } as CSSProperties
             }
             aria-hidden="true"
           >
-            {/* Dark outline */}
+            {/* Deep outline gives the arrow the same raised/bevelled look as the reference. */}
             <div
-              className="
-                absolute
-                inset-0
-              "
+              className="absolute inset-0 drop-shadow-[0_4px_5px_rgba(0,0,0,0.58)]"
               style={{
-                clipPath:
-                  "polygon(100% 0, 0 50%, 100% 100%, 82% 50%)",
-
-                background:
-                  "rgba(22,35,29,0.9)",
+                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
+                background: "linear-gradient(180deg,#111827 0%,#030712 48%,#111827 100%)",
               }}
             />
 
-            {/* Exact slice colour */}
+            {/* Exact colour of the entry currently under the pointer. */}
             <div
-              className="
-                absolute
-                inset-[1.5px]
-                transition-colors
-                duration-75
-              "
+              className="absolute inset-[3px] transition-[background] duration-75"
               style={{
-                clipPath:
-                  "polygon(100% 0, 0 50%, 100% 100%, 82% 50%)",
+                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
+                background: "var(--pointer-color)",
+              }}
+            />
 
-                background:
-                  "var(--pointer-color)",
+            {/* Small highlight along the upper edge. */}
+            <div
+              className="absolute inset-[6px] opacity-45"
+              style={{
+                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 88% 50%)",
+                background: "linear-gradient(180deg,rgba(255,255,255,0.72),rgba(255,255,255,0) 48%)",
               }}
             />
           </div>
@@ -1431,14 +1195,16 @@ export default function Wheel({
               absolute
               left-1/2
               top-1/2
-              z-30
-              h-[12%]
-              w-[12%]
+              z-40
+              h-[15%]
+              w-[15%]
               -translate-x-1/2
               -translate-y-1/2
               rounded-full
+              border-[3px]
+              border-white/90
               bg-white
-              shadow-[0_2px_8px_rgba(0,0,0,0.28)]
+              shadow-[0_5px_14px_rgba(0,0,0,0.42),inset_0_1px_2px_rgba(0,0,0,0.12)]
             "
           />
 
@@ -1463,20 +1229,20 @@ export default function Wheel({
                 <defs>
                   {/* Exact upper arc used by the recording */}
                   <path
-                    id="wheel-click-text"
+                    id={`wheel-click-text-${wheelTextId}`}
                     d="
-                      M 285 405
-                      Q 500 275 715 405
+                      M 265 405
+                      Q 500 245 735 405
                     "
                     fill="none"
                   />
 
                   {/* Lower instruction arc */}
                   <path
-                    id="wheel-control-text"
+                    id={`wheel-control-text-${wheelTextId}`}
                     d="
-                      M 325 590
-                      Q 500 700 675 590
+                      M 300 590
+                      Q 500 735 700 590
                     "
                     fill="none"
                   />
@@ -1485,17 +1251,17 @@ export default function Wheel({
                 {/* Click to spin shadow */}
                 <text
                   fill="#ffffff"
-                  fontSize="47"
+                  fontSize="50"
                   fontWeight="700"
                   fontFamily="Arial, Helvetica, sans-serif"
                   letterSpacing="-1"
                   textAnchor="middle"
                   paintOrder="stroke"
                   stroke="rgba(0,0,0,0.6)"
-                  strokeWidth="5"
+                  strokeWidth="6"
                 >
                   <textPath
-                    href="#wheel-click-text"
+                    href={`#wheel-click-text-${wheelTextId}`}
                     startOffset="50%"
                   >
                     Click to spin
@@ -1505,14 +1271,14 @@ export default function Wheel({
                 {/* Click to spin */}
                 <text
                   fill="#ffffff"
-                  fontSize="47"
+                  fontSize="50"
                   fontWeight="700"
                   fontFamily="Arial, Helvetica, sans-serif"
                   letterSpacing="-1"
                   textAnchor="middle"
                 >
                   <textPath
-                    href="#wheel-click-text"
+                    href={`#wheel-click-text-${wheelTextId}`}
                     startOffset="50%"
                   >
                     Click to spin
@@ -1522,17 +1288,17 @@ export default function Wheel({
                 {/* Ctrl + Enter shadow */}
                 <text
                   fill="#ffffff"
-                  fontSize="30"
+                  fontSize="31"
                   fontWeight="700"
                   fontFamily="Arial, Helvetica, sans-serif"
                   letterSpacing="-0.35"
                   textAnchor="middle"
                   paintOrder="stroke"
                   stroke="rgba(0,0,0,0.6)"
-                  strokeWidth="4"
+                  strokeWidth="5"
                 >
                   <textPath
-                    href="#wheel-control-text"
+                    href={`#wheel-control-text-${wheelTextId}`}
                     startOffset="50%"
                   >
                     or press ctrl+enter
@@ -1542,14 +1308,14 @@ export default function Wheel({
                 {/* Ctrl + Enter */}
                 <text
                   fill="#ffffff"
-                  fontSize="30"
+                  fontSize="31"
                   fontWeight="700"
                   fontFamily="Arial, Helvetica, sans-serif"
                   letterSpacing="-0.35"
                   textAnchor="middle"
                 >
                   <textPath
-                    href="#wheel-control-text"
+                    href={`#wheel-control-text-${wheelTextId}`}
                     startOffset="50%"
                   >
                     or press ctrl+enter
@@ -1595,39 +1361,6 @@ export default function Wheel({
       {/* Animations                                                          */}
       {/* ------------------------------------------------------------------ */}
 
-      <style>
-        {`
-          @keyframes mpd-confetti-burst {
-            0% {
-              opacity: 0;
-              transform:
-                translate3d(0, 0, 0)
-                scale(0.35)
-                rotate(0deg);
-            }
-
-            8% {
-              opacity: 1;
-            }
-
-            70% {
-              opacity: 1;
-            }
-
-            100% {
-              opacity: 0;
-              transform:
-                translate3d(
-                  var(--confetti-x),
-                  var(--confetti-y),
-                  0
-                )
-                scale(var(--confetti-scale))
-                rotate(var(--confetti-rotation));
-            }
-          }
-        `}
-      </style>
     </div>
   )
 }
