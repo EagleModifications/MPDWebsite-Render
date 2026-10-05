@@ -57,25 +57,6 @@ type SidebarProps = {
   onOpenWheel: () => void
   animateWinningEntryByWheel: Record<string, boolean>
   onAnimateWinningEntryChange: (wheelId: string, enabled: boolean) => void
-
-  // Optional wheel settings supplied by SpinWheel. These are kept in the
-  // parent so they can be shared, saved, and restored with a wheel link.
-  launchConfettiByWheel?: Record<string, boolean>
-  onLaunchConfettiChange?: (wheelId: string, enabled: boolean) => void
-  afterSoundByWheel?: Record<string, string>
-  afterVolumeByWheel?: Record<string, number>
-  onAfterSoundChange?: (wheelId: string, value: string) => void
-  onAfterVolumeChange?: (wheelId: string, value: number) => void
-  spinSlowlyByWheel?: Record<string, boolean>
-  onSpinSlowlyChange?: (wheelId: string, enabled: boolean) => void
-  spinTimeByWheel?: Record<string, number>
-  onSpinTimeChange?: (wheelId: string, value: number) => void
-  centerImageByWheel?: Record<string, string | undefined>
-  onCenterImageChange?: (wheelId: string, value: string | undefined) => void
-  imageSizeByWheel?: Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL">
-  onImageSizeChange?: (wheelId: string, value: "XS" | "S" | "M" | "L" | "XL" | "XXL") => void
-  customizeRequest?: number
-  canAddWheel?: boolean
 }
 
 type Tab = "entries" | "results"
@@ -2430,7 +2411,7 @@ export default function Sidebar({
   return (
     <>
       <aside
-        className={`absolute inset-y-0 right-0 z-[150] flex h-full w-[468px] max-w-[calc(100vw-8px)] flex-col border-l border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
+        className={`absolute top-[64px] bottom-0 right-0 z-[150] flex h-full w-[468px] max-w-[calc(100vw-8px)] flex-col border-l border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
           open
             ? "translate-x-0"
             : "translate-x-full"
