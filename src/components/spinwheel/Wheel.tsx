@@ -22,6 +22,8 @@ type WheelProps = {
   onResult?: (item: SpinWheelItem) => void
   compact?: boolean
   spinTrigger?: number
+  afterSound?: string
+  afterVolume?: number
 }
 
 type ConfettiPiece = {
@@ -298,206 +300,68 @@ function playTick(
   )
 }
 
-/*
- * Short celebratory sound.
- *
- * This is intentionally musical rather than
- * sounding like broadband static.
- */
-function playWinnerSound(
-  audioContext: AudioContext | null,
-) {
-  if (!audioContext) {
-    return
+const AFTER_SPIN_SOUND_FILES: Record<string, string> = {
+  "Subdued applause": "subdued-applause.mp3",
+  "Joke punchline": "joke-punchline.mp3",
+  "Announcement bell": "announcement-bell.mp3",
+  "Twinkling star": "twinkling-star.mp3",
+  "Correct answer ding": "correct-answer-ding.mp3",
+  "Synth bell": "synth-bell.mp3",
+  "Notification bell": "notification-bell.mp3",
+  "Loud applause": "loud-applause.mp3",
+  "Fanfare": "fanfare.mp3",
+  "Bell ringing": "bell-ringing.mp3",
+  "Cymbals": "cymbals.mp3",
+  "Thunder": "thunder.mp3",
+  "Cash register": "cash-register.mp3",
+  "Evil laugh": "evil-laugh.mp3",
+  "Microwave ding": "microwave-ding.mp3",
+  "Old phone ringing": "old-phone-ringing.mp3",
+  "Alarm clock": "alarm-clock.mp3",
+  "Fireworks": "fireworks.mp3",
+  "Game win ding": "game-win-ding.mp3",
+  "Wrong answer": "wrong-answer.mp3",
+  "Punch": "punch.mp3",
+  "Cat meow": "cat-meow.mp3",
+  "Wolf howl": "wolf-howl.mp3",
+  "Horse": "horse.mp3",
+  "Lion roar": "lion-roar.mp3",
+  "Sad trombone": "sad-trombone.mp3",
+  "Cinematic drum impact": "cinematic-drum-impact.mp3",
+  "Water splash": "water-splash.mp3",
+  "Gong": "gong.mp3",
+  "Doorbell": "doorbell.mp3",
+  "Church bell": "church-bell.mp3",
+  "Referee whistle": "referee-whistle.mp3",
+  "Boing": "boing.mp3",
+  "Angel choir": "angel-choir.mp3",
+  "Harp strum": "harp-strum.mp3",
+  "Breaker switch": "breaker-switch.mp3",
+  "Camera shutter & flash": "camera-shutter-flash.mp3",
+  "Lost game": "lost-game.mp3",
+  "Horror scream": "horror-scream.mp3",
+}
+
+function playAfterSpinSound(sound: string, volume: number) {
+  if (sound === "No sound" || sound === "Inherit from wheel" || sound.startsWith("Speak result")) return
+
+  let file = AFTER_SPIN_SOUND_FILES[sound]
+
+  if (sound === "Random sound") {
+    const files = Object.values(AFTER_SPIN_SOUND_FILES)
+    file = files[Math.floor(Math.random() * files.length)]
   }
 
-  if (audioContext.state === "suspended") {
-    void audioContext.resume()
+  if (!file) return
+
+  const audio = new Audio(`/sounds/afterspin/${file}`)
+  audio.volume = Math.max(0, Math.min(1, volume / 100))
+  audio.onerror = () => {
+    const fallback = new Audio(`/sounds/after-spin/${file}`)
+    fallback.volume = Math.max(0, Math.min(1, volume / 100))
+    void fallback.play().catch(() => undefined)
   }
-
-  const now =
-    audioContext.currentTime
-
-  const master =
-    audioContext.createGain()
-
-  master.gain.setValueAtTime(
-    0.0001,
-    now,
-  )
-
-  master.gain.exponentialRampToValueAtTime(
-    0.085,
-    now + 0.035,
-  )
-
-  master.gain.exponentialRampToValueAtTime(
-    0.0001,
-    now + 1.05,
-  )
-
-  master.connect(
-    audioContext.destination,
-  )
-
-  /*
-   * Three-note winner chime.
-   */
-  const notes = [
-    {
-      frequency: 523.25,
-      start: 0,
-      duration: 0.24,
-    },
-    {
-      frequency: 659.25,
-      start: 0.12,
-      duration: 0.3,
-    },
-    {
-      frequency: 783.99,
-      start: 0.25,
-      duration: 0.55,
-    },
-  ]
-
-  for (const note of notes) {
-    const oscillator =
-      audioContext.createOscillator()
-
-    const gain =
-      audioContext.createGain()
-
-    oscillator.type = "sine"
-
-    const start =
-      now + note.start
-
-    const end =
-      start + note.duration
-
-    oscillator.frequency.setValueAtTime(
-      note.frequency,
-      start,
-    )
-
-    gain.gain.setValueAtTime(
-      0.0001,
-      start,
-    )
-
-    gain.gain.exponentialRampToValueAtTime(
-      0.55,
-      start + 0.025,
-    )
-
-    gain.gain.exponentialRampToValueAtTime(
-      0.0001,
-      end,
-    )
-
-    oscillator.connect(gain)
-    gain.connect(master)
-
-    oscillator.start(start)
-    oscillator.stop(end + 0.03)
-  }
-
-  /*
-   * Very subtle clap-like texture underneath
-   * the chime so the result doesn't sound sterile.
-   */
-  for (
-    let index = 0;
-    index < 18;
-    index += 1
-  ) {
-    const offset =
-      0.18 +
-      Math.random() * 0.75
-
-    const duration =
-      0.025 +
-      Math.random() * 0.045
-
-    const bufferSize =
-      Math.floor(
-        audioContext.sampleRate *
-          duration,
-      )
-
-    const buffer =
-      audioContext.createBuffer(
-        1,
-        bufferSize,
-        audioContext.sampleRate,
-      )
-
-    const data =
-      buffer.getChannelData(0)
-
-    for (
-      let sample = 0;
-      sample < bufferSize;
-      sample += 1
-    ) {
-      const envelope =
-        Math.pow(
-          1 - sample / bufferSize,
-          4,
-        )
-
-      data[sample] =
-        (Math.random() * 2 - 1) *
-        envelope
-    }
-
-    const source =
-      audioContext.createBufferSource()
-
-    const filter =
-      audioContext.createBiquadFilter()
-
-    const gain =
-      audioContext.createGain()
-
-    const start =
-      now + offset
-
-    source.buffer = buffer
-
-    filter.type = "bandpass"
-
-    filter.frequency.value =
-      1600 +
-      Math.random() * 1800
-
-    filter.Q.value = 1.2
-
-    gain.gain.setValueAtTime(
-      0.0001,
-      start,
-    )
-
-    gain.gain.exponentialRampToValueAtTime(
-      0.035,
-      start + 0.003,
-    )
-
-    gain.gain.exponentialRampToValueAtTime(
-      0.0001,
-      start + duration,
-    )
-
-    source.connect(filter)
-    filter.connect(gain)
-    gain.connect(master)
-
-    source.start(start)
-    source.stop(
-      start + duration + 0.01,
-    )
-  }
+  void audio.play().catch(() => undefined)
 }
 
 /* -------------------------------------------------------------------------- */
@@ -605,6 +469,8 @@ export default function Wheel({
   onResult,
   compact = false,
   spinTrigger = 0,
+  afterSound = "Subdued applause",
+  afterVolume = 50,
 }: WheelProps) {
   const containerRef =
     useRef<HTMLDivElement | null>(null)
@@ -1143,8 +1009,9 @@ export default function Wheel({
             setIsSpinning(false)
 
             if (selectedItem) {
-              playWinnerSound(
-                audioContextRef.current,
+              playAfterSpinSound(
+                afterSound,
+                afterVolume,
               )
 
               launchConfetti()
@@ -1190,6 +1057,8 @@ export default function Wheel({
     visibleColors,
     setPointerForIndex,
     launchConfetti,
+    afterSound,
+    afterVolume,
   ])
 
   /* ---------------------------------------------------------------------- */
