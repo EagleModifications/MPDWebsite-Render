@@ -13,6 +13,7 @@ import {
   Plus,
   Shuffle,
   Sparkles,
+  Trash2,
   Trophy,
   Type,
 } from "lucide-react"
@@ -59,49 +60,53 @@ const DEFAULT_NAMES = [
 ]
 
 /*
- * Wheel of Names-style idle movement.
+ * spin-wheel uses degrees per second.
  *
- * spin-wheel uses degrees/second.
- * A low value keeps the idle movement subtle.
+ * A low idle speed gives the same subtle continuous movement
+ * as Wheel of Names rather than looking like a normal spin.
  */
 const IDLE_SPEED = 7
-
 const WIN_SPIN_DURATION = 5000
 const WIN_REVOLUTIONS = 6
 
-function createId(index = 0) {
-  return `${Date.now()}-${index}-${Math.random()
-    .toString(36)
-    .slice(2)}`
-}
-
 function createEntries(names: string[]): WheelEntry[] {
-  return names.map((name, index) => ({
-    id: createId(index),
-    label: name,
+  return names.map((label, index) => ({
+    id: `${Date.now()}-${index}-${Math.random()
+      .toString(36)
+      .slice(2, 9)}`,
+    label,
     color: COLORS[index % COLORS.length],
     hidden: false,
   }))
+}
+
+function normalizeNames(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+}
+
+function createRandomId(): string {
+  return `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`
 }
 
 export default function SpinWheel() {
   const wheelContainerRef =
     useRef<HTMLDivElement | null>(null)
 
-  const wheelRef =
-    useRef<Wheel | null>(null)
-
-  const resizeObserverRef =
-    useRef<ResizeObserver | null>(null)
-
-  const pointerAnimationFrameRef =
-    useRef<number | null>(null)
+  const wheelRef = useRef<Wheel | null>(null)
 
   const isSpinningRef =
     useRef(false)
 
   const idleRotationRef =
     useRef(false)
+
+  const idleRestartTimerRef =
+    useRef<number | null>(null)
 
   const hideSelectedRef =
     useRef(false)
@@ -129,19 +134,7 @@ export default function SpinWheel() {
     useState(false)
 
   const [pointerColor, setPointerColor] =
-    useState("#f5d45d")
-
-  /*
-   * The pointer is positioned from the actual
-   * wheel canvas instead of using a hard-coded
-   * right offset.
-   */
-  const [pointerPosition, setPointerPosition] =
-    useState({
-      left: 0,
-      top: 0,
-      visible: false,
-    })
+    useState("#ffffff")
 
   const [showAdvanced, setShowAdvanced] =
     useState(false)
@@ -155,224 +148,79 @@ export default function SpinWheel() {
   const [fullscreen, setFullscreen] =
     useState(false)
 
-  /*
-   * Keep refs synchronized with React state.
-   */
-  useEffect(() => {
-    entriesRef.current = entries
+  const [spinDuration, setSpinDuration] =
+    useState(WIN_SPIN_DURATION)
 
-    visibleEntriesRef.current =
-      entries.filter(
-        (entry) => !entry.hidden,
+  const [spinRevolutions, setSpinRevolutions] =
+    useState(WIN_REVOLUTIONS)
+
+  const [hideSelected, setHideSelected] =
+    useState(false)
+
+  const visibleEntries = entries.filter(
+    (entry) => !entry.hidden,
+  )
+
+  entriesRef.current = entries
+  visibleEntriesRef.current =
+    visibleEntries
+
+  hideSelectedRef.current =
+    hideSelected
+
+  /*
+   * Keep the pointer color synced with the
+   * segment currently underneath it.
+   */
+  const updatePointerColor = useCallback(
+    (
+      index: number,
+      currentEntries: WheelEntry[],
+    ) => {
+      const entry =
+        currentEntries[index]
+
+      setPointerColor(
+        entry?.color ?? "#ffffff",
       )
-  }, [entries])
+    },
+    [],
+  )
 
   /*
-   * Update pointer colour from the segment
-   * currently under the pointer.
+   * Cancel only the delayed restart.
+   *
+   * We deliberately do NOT have a stopIdleRotation
+   * function anymore. The wheel is stopped directly
+   * with wheel.stop() whenever a real spin starts.
+   *
+   * This fixes TS6133 because there is no unused
+   * stopIdleRotation function.
    */
-  const updatePointerColor =
-    useCallback(
-      (
-        index: number,
-        source?: WheelEntry[],
-      ) => {
-        const currentEntries =
-          source ??
-          visibleEntriesRef.current
-
-        const entry =
-          currentEntries[index]
-
-        if (entry) {
-          setPointerColor(entry.color)
-        }
-      },
-      [],
-    )
-
-  /*
-   * --------------------------------------------------
-   * FIND THE REAL WHEEL EDGE
-   * --------------------------------------------------
-   *
-   * spin-wheel creates a canvas that contains the
-   * wheel. The canvas itself is larger than the
-   * actual circle.
-   *
-   * We inspect the middle row of the canvas and find
-   * the last non-transparent pixel. This gives us the
-   * exact rendered right edge of the wheel.
-   *
-   * This means the pointer remains correctly aligned
-   * when the browser/window is resized.
-   */
-  const updatePointerPosition =
+  const clearIdleRestartTimer =
     useCallback(() => {
-      const container =
-        wheelContainerRef.current
-
-      if (!container) {
-        return
-      }
-
-      const canvas =
-        container.querySelector(
-          "canvas",
-        ) as HTMLCanvasElement | null
-
-      if (!canvas) {
-        setPointerPosition(
-          (current) => ({
-            ...current,
-            visible: false,
-          }),
+      if (
+        idleRestartTimerRef.current !== null
+      ) {
+        window.clearTimeout(
+          idleRestartTimerRef.current,
         )
 
-        return
-      }
-
-      const containerRect =
-        container.getBoundingClientRect()
-
-      const canvasRect =
-        canvas.getBoundingClientRect()
-
-      if (
-        canvas.width === 0 ||
-        canvas.height === 0 ||
-        canvasRect.width === 0 ||
-        canvasRect.height === 0
-      ) {
-        return
-      }
-
-      try {
-        const context =
-          canvas.getContext("2d", {
-            willReadFrequently: true,
-          })
-
-        if (!context) {
-          return
-        }
-
-        /*
-         * Look at the horizontal center of the
-         * canvas. At this row the wheel is a simple
-         * circle, so the final non-transparent pixel
-         * represents the right-hand wheel edge.
-         */
-        const y =
-          Math.floor(
-            canvas.height / 2,
-          )
-
-        const pixels =
-          context.getImageData(
-            0,
-            y,
-            canvas.width,
-            1,
-          ).data
-
-        let rightMostPixel = -1
-
-        for (
-          let x = canvas.width - 1;
-          x >= 0;
-          x--
-        ) {
-          const alpha =
-            pixels[x * 4 + 3]
-
-          if (alpha > 8) {
-            rightMostPixel = x
-            break
-          }
-        }
-
-        if (rightMostPixel < 0) {
-          return
-        }
-
-        /*
-         * Convert canvas pixels into CSS pixels.
-         */
-        const scaleX =
-          canvasRect.width /
-          canvas.width
-
-        const wheelRight =
-          canvasRect.left +
-          rightMostPixel * scaleX
-
-        const wheelCenterY =
-          canvasRect.top +
-          canvasRect.height / 2
-
-        setPointerPosition({
-          left:
-            wheelRight -
-            containerRect.left,
-          top:
-            wheelCenterY -
-            containerRect.top,
-          visible: true,
-        })
-      } catch {
-        /*
-         * If canvas inspection fails, simply keep
-         * the previous pointer position.
-         */
+        idleRestartTimerRef.current =
+          null
       }
     }, [])
 
   /*
-   * Schedule pointer measurement on the next
-   * animation frame.
-   */
-  const schedulePointerPosition =
-    useCallback(() => {
-      if (
-        pointerAnimationFrameRef.current !==
-        null
-      ) {
-        cancelAnimationFrame(
-          pointerAnimationFrameRef.current,
-        )
-      }
-
-      pointerAnimationFrameRef.current =
-        requestAnimationFrame(() => {
-          pointerAnimationFrameRef.current =
-            null
-
-          updatePointerPosition()
-        })
-    }, [updatePointerPosition])
-
-  /*
-   * --------------------------------------------------
-   * IDLE ROTATION
-   * --------------------------------------------------
-   *
-   * This intentionally uses spin-wheel's native
-   * continuous spin mode.
-   *
-   * rotationResistance = 0 means it does not
-   * naturally slow down or stop.
+   * Start the subtle continuous idle rotation.
    */
   const startIdleRotation =
     useCallback(() => {
       const wheel =
         wheelRef.current
 
-      if (!wheel) {
-        return
-      }
-
       if (
+        !wheel ||
         isSpinningRef.current ||
         visibleEntriesRef.current.length ===
           0
@@ -380,70 +228,72 @@ export default function SpinWheel() {
         return
       }
 
-      /*
-       * Do not accidentally start multiple
-       * animation loops.
-       */
-      if (
-        idleRotationRef.current &&
-        wheel.rotationSpeed !== 0
-      ) {
-        return
-      }
+      clearIdleRestartTimer()
 
+      /*
+       * spin() with rotationResistance 0
+       * continues indefinitely.
+       */
       idleRotationRef.current = true
-
       wheel.rotationResistance = 0
-
-      /*
-       * Positive = clockwise.
-       */
+      wheel.rotationSpeedMax = 160
       wheel.spin(IDLE_SPEED)
-    }, [])
+    }, [clearIdleRestartTimer])
 
   /*
-   * Stop idle rotation only.
+   * Schedule idle rotation after a winner.
    */
-  const stopIdleRotation =
-    useCallback(() => {
-      const wheel =
-        wheelRef.current
+  const scheduleIdleRotation =
+    useCallback(
+      (delay: number) => {
+        clearIdleRestartTimer()
 
-      if (!wheel) {
-        return
-      }
+        idleRestartTimerRef.current =
+          window.setTimeout(() => {
+            idleRestartTimerRef.current =
+              null
 
-      wheel.stop()
+            if (
+              !isSpinningRef.current &&
+              visibleEntriesRef.current
+                .length > 0
+            ) {
+              idleRotationRef.current =
+                false
 
-      idleRotationRef.current = false
-    }, [])
+              startIdleRotation()
+            }
+          }, delay)
+      },
+      [
+        clearIdleRestartTimer,
+        startIdleRotation,
+      ],
+    )
 
   /*
-   * --------------------------------------------------
-   * CREATE WHEEL
-   * --------------------------------------------------
+   * Build the Wheel instance.
    */
   useEffect(() => {
     const container =
       wheelContainerRef.current
 
-    if (
-      !container ||
-      wheelRef.current
-    ) {
+    if (!container) {
       return
     }
 
+    /*
+     * Prevent duplicate canvases if React
+     * remounts this effect.
+     */
+    container.innerHTML = ""
+
     const initialEntries =
-      entriesRef.current.filter(
-        (entry) => !entry.hidden,
-      )
+      visibleEntriesRef.current
 
-    visibleEntriesRef.current =
-      initialEntries
-
-    const wheel =
-      new Wheel(container, {
+    const wheel = new Wheel(
+      container,
+      {
         items: initialEntries.map(
           (entry) => ({
             label: entry.label,
@@ -454,69 +304,58 @@ export default function SpinWheel() {
         ),
 
         /*
-         * Wheel of Names pointer position:
-         * right side of the wheel.
+         * 90 degrees is the right side of the
+         * wheel in spin-wheel's coordinate system.
          */
         pointerAngle: 90,
 
         /*
-         * Size.
+         * Wheel occupies 91% of the container.
+         * The CSS pointer below uses the same
+         * radius so its tip touches the wheel.
          */
         radius: 0.91,
 
-        /*
-         * Thin dark/transparent segment
-         * boundaries like Wheel of Names.
-         */
         lineWidth: 1,
+
         lineColor:
-          "rgba(0,0,0,0.22)",
+          "rgba(255,255,255,0.30)",
 
         /*
-         * Labels follow the wheel rotation.
-         *
-         * spin-wheel rotates these labels with
-         * the wheel canvas, giving the radial/
-         * arched-looking Wheel of Names effect.
+         * Keep labels upright relative to their
+         * wheel segment. As the wheel rotates,
+         * the labels rotate around the wheel too.
          */
         itemLabelRotation: 0,
+
         itemLabelAlign: "center",
+
         itemLabelRadius: 0.67,
+
         itemLabelRadiusMax: 0.19,
+
         itemLabelFontSizeMax: 30,
+
         itemLabelStrokeWidth: 0,
+
         itemLabelFont:
           "Arial, Helvetica, sans-serif",
+
         itemLabelColors: ["#111111"],
 
-        /*
-         * Keep the canvas sharp.
-         */
-        pixelRatio:
-          typeof window !== "undefined"
-            ? Math.min(
-                2,
-                window.devicePixelRatio ||
-                  1,
-              )
-            : 1,
+        pixelRatio: Math.min(
+          2,
+          window.devicePixelRatio || 1,
+        ),
 
-        /*
-         * IMPORTANT:
-         *
-         * Zero resistance means native
-         * spin() continues forever.
-         */
         rotationResistance: 0,
 
         rotationSpeedMax: 160,
 
-        /*
-         * Keep pointer colour synchronized
-         * with the currently selected segment.
-         */
         onCurrentIndexChange: (
-          event,
+          event: {
+            currentIndex: number
+          },
         ) => {
           updatePointerColor(
             event.currentIndex,
@@ -524,19 +363,20 @@ export default function SpinWheel() {
           )
         },
 
-        /*
-         * Winner spin finished.
-         */
-        onRest: (event) => {
-          if (
-            !isSpinningRef.current
-          ) {
+        onRest: (
+          event: {
+            currentIndex: number
+          },
+        ) => {
+          /*
+           * Ignore the rest event caused by
+           * manually stopping the idle wheel.
+           */
+          if (!isSpinningRef.current) {
             return
           }
 
-          isSpinningRef.current =
-            false
-
+          isSpinningRef.current = false
           idleRotationRef.current =
             false
 
@@ -551,41 +391,28 @@ export default function SpinWheel() {
             ]
 
           if (!winner) {
-            window.setTimeout(() => {
-              startIdleRotation()
-            }, 500)
-
+            scheduleIdleRotation(400)
             return
           }
 
-          /*
-           * Add result.
-           */
           setResults((current) => [
             {
-              id: winner.id,
+              id: createRandomId(),
               label: winner.label,
               timestamp: Date.now(),
             },
             ...current,
           ])
 
-          /*
-           * Hide selected winner if enabled.
-           */
-          if (
-            hideSelectedRef.current
-          ) {
+          if (hideSelectedRef.current) {
             setEntries((current) =>
-              current.map(
-                (entry) =>
-                  entry.id ===
-                  winner.id
-                    ? {
-                        ...entry,
-                        hidden: true,
-                      }
-                    : entry,
+              current.map((entry) =>
+                entry.id === winner.id
+                  ? {
+                      ...entry,
+                      hidden: true,
+                    }
+                  : entry,
               ),
             )
           }
@@ -594,118 +421,66 @@ export default function SpinWheel() {
             `${winner.label} won!`,
           )
 
-          /*
-           * Restart idle rotation after
-           * the winner has been displayed.
-           */
-          window.setTimeout(() => {
-            startIdleRotation()
-          }, 700)
+          scheduleIdleRotation(700)
         },
-      })
+      },
+    )
 
     wheelRef.current = wheel
 
-    /*
-     * Initial pointer colour.
-     */
-    updatePointerColor(
-      wheel.getCurrentIndex(),
-      initialEntries,
-    )
-
-    /*
-     * The canvas needs one frame to render before
-     * we can calculate the exact wheel edge.
-     */
-    schedulePointerPosition()
-
-    /*
-     * Observe the wheel container.
-     */
-    resizeObserverRef.current =
-      new ResizeObserver(() => {
-        schedulePointerPosition()
-      })
-
-    resizeObserverRef.current.observe(
-      container,
-    )
-
-    /*
-     * START IDLE ROTATION AFTER INITIALIZATION.
-     *
-     * This is deliberately delayed one frame.
-     * It prevents the first entries synchronization
-     * from immediately killing the idle spin.
-     */
-    const idleTimer =
-      window.setTimeout(() => {
-        startIdleRotation()
-      }, 100)
-
-    /*
-     * Cleanup.
-     */
-    return () => {
-      window.clearTimeout(
-        idleTimer,
+    if (initialEntries.length > 0) {
+      updatePointerColor(
+        wheel.getCurrentIndex(),
+        initialEntries,
       )
+    }
 
+    /*
+     * Start idle rotation after the wheel has
+     * actually been mounted.
+     */
+    requestAnimationFrame(() => {
       if (
-        pointerAnimationFrameRef.current !==
-        null
+        wheelRef.current === wheel &&
+        !isSpinningRef.current &&
+        visibleEntriesRef.current.length >
+          0
       ) {
-        cancelAnimationFrame(
-          pointerAnimationFrameRef.current,
-        )
+        idleRotationRef.current =
+          false
 
-        pointerAnimationFrameRef.current =
-          null
+        startIdleRotation()
       }
+    })
 
-      resizeObserverRef.current?.disconnect()
-
-      resizeObserverRef.current =
-        null
+    return () => {
+      clearIdleRestartTimer()
 
       wheel.stop()
-
-      /*
-       * spin-wheel provides remove() to unregister
-       * its canvas/event handlers.
-       */
-      wheel.remove()
-
-      wheelRef.current = null
 
       idleRotationRef.current =
         false
 
-      isSpinningRef.current =
-        false
+      if (wheelRef.current === wheel) {
+        wheelRef.current = null
+      }
+
+      wheel.remove()
     }
   }, [
-    schedulePointerPosition,
+    clearIdleRestartTimer,
+    scheduleIdleRotation,
     startIdleRotation,
     updatePointerColor,
   ])
 
   /*
-   * --------------------------------------------------
-   * UPDATE WHEEL ITEMS
-   * --------------------------------------------------
+   * Update wheel items whenever entries change.
    *
-   * The previous version had a subtle bug here:
-   *
-   * 1. idle spin starts
-   * 2. React updates entries
-   * 3. wheel.items is replaced
-   * 4. spin-wheel stops/reinitializes animation
-   * 5. idleRotationRef still says "true"
-   * 6. startIdleRotation refuses to restart it
-   *
-   * We explicitly stop -> update -> restart.
+   * Important:
+   * Setting wheel.items recreates the segments.
+   * That can stop the current idle animation,
+   * so we explicitly restart it afterwards.
    */
   useEffect(() => {
     const wheel =
@@ -724,27 +499,17 @@ export default function SpinWheel() {
       visible
 
     /*
-     * If we're editing the list while the winner
-     * animation isn't running, safely rebuild the
-     * items and then restart idle rotation.
+     * Stop the old idle animation before
+     * replacing the wheel items.
      */
-    const wasIdle =
-      idleRotationRef.current
-
     if (
-      wasIdle &&
       !isSpinningRef.current
     ) {
       wheel.stop()
-
       idleRotationRef.current =
         false
     }
 
-    /*
-     * Never interrupt the controlled winner
-     * animation.
-     */
     wheel.items = visible.map(
       (entry) => ({
         label: entry.label,
@@ -754,17 +519,11 @@ export default function SpinWheel() {
       }),
     )
 
-    schedulePointerPosition()
-
     if (visible.length === 0) {
       setPointerColor("#ffffff")
       return
     }
 
-    /*
-     * Current index can change after replacing
-     * the item list.
-     */
     const currentIndex =
       wheel.getCurrentIndex()
 
@@ -774,63 +533,90 @@ export default function SpinWheel() {
     )
 
     /*
-     * ALWAYS ensure idle rotation is running
-     * when the wheel is not performing a winner
-     * spin.
+     * Always restart idle after changing
+     * the items.
      */
     if (
       !isSpinningRef.current
     ) {
-      window.setTimeout(() => {
+      requestAnimationFrame(() => {
         if (
+          !isSpinningRef.current &&
           wheelRef.current === wheel &&
-          !isSpinningRef.current
+          visibleEntriesRef.current
+            .length > 0
         ) {
+          idleRotationRef.current =
+            false
+
           startIdleRotation()
         }
-      }, 20)
+      })
     }
   }, [
     entries,
-    schedulePointerPosition,
     startIdleRotation,
     updatePointerColor,
   ])
 
   /*
-   * --------------------------------------------------
-   * MAIN WINNER SPIN
-   * --------------------------------------------------
+   * Keep the wheel responsive when the page
+   * or sidebar changes size.
+   */
+  useEffect(() => {
+    const container =
+      wheelContainerRef.current
+
+    const wheel =
+      wheelRef.current
+
+    if (!container || !wheel) {
+      return
+    }
+
+    const resizeObserver =
+      new ResizeObserver(() => {
+        wheel.resize()
+      })
+
+    resizeObserver.observe(
+      container,
+    )
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [])
+
+  /*
+   * Main spin function.
    */
   const spin = useCallback(() => {
     const wheel =
       wheelRef.current
 
+    const currentEntries =
+      visibleEntriesRef.current
+
     if (!wheel) {
       return
     }
 
-    if (
-      isSpinningRef.current
-    ) {
+    if (isSpinningRef.current) {
       return
     }
 
-    const currentEntries =
-      visibleEntriesRef.current
-
-    if (
-      currentEntries.length ===
-      0
-    ) {
+    if (currentEntries.length === 0) {
       toast.error(
-        "Add at least one entry first.",
+        "Add at least one entry before spinning.",
       )
       return
     }
 
+    clearIdleRestartTimer()
+
     /*
-     * Stop continuous idle rotation.
+     * Stop the continuous idle rotation.
      */
     wheel.stop()
 
@@ -843,7 +629,7 @@ export default function SpinWheel() {
     setIsSpinning(true)
 
     /*
-     * Choose winner.
+     * Pick the winner before spinning.
      */
     const winnerIndex =
       Math.floor(
@@ -851,59 +637,43 @@ export default function SpinWheel() {
           currentEntries.length,
       )
 
-    /*
-     * DO NOT immediately change pointer
-     * colour to the winner.
-     *
-     * onCurrentIndexChange will update the
-     * pointer as the wheel physically passes
-     * each segment.
-     */
-
-    /*
-     * Smooth ease-out.
-     */
-    const easeOutQuart = (
-      progress: number,
-    ) =>
-      1 -
-      Math.pow(
-        1 - progress,
-        4,
-      )
+    updatePointerColor(
+      winnerIndex,
+      currentEntries,
+    )
 
     wheel.spinToItem(
       winnerIndex,
-      WIN_SPIN_DURATION,
+      spinDuration,
       true,
-      WIN_REVOLUTIONS,
+      spinRevolutions,
       1,
-      easeOutQuart,
+      (progress: number) =>
+        1 -
+        Math.pow(1 - progress, 4),
     )
-  }, [])
+  }, [
+    clearIdleRestartTimer,
+    spinDuration,
+    spinRevolutions,
+    updatePointerColor,
+  ])
 
   /*
-   * --------------------------------------------------
-   * CTRL + ENTER
-   * --------------------------------------------------
+   * Ctrl + Enter / Cmd + Enter.
    */
   useEffect(() => {
-    const handleKeyDown = (
-      event: KeyboardEvent,
-    ) => {
-      if (
-        event.ctrlKey &&
-        event.key === "Enter"
-      ) {
-        event.preventDefault()
-
+    const handleKeyDown =
+      (event: KeyboardEvent) => {
         if (
-          !isSpinningRef.current
+          (event.ctrlKey ||
+            event.metaKey) &&
+          event.key === "Enter"
         ) {
+          event.preventDefault()
           spin()
         }
       }
-    }
 
     window.addEventListener(
       "keydown",
@@ -919,29 +689,114 @@ export default function SpinWheel() {
   }, [spin])
 
   /*
-   * --------------------------------------------------
-   * SHUFFLE
-   * --------------------------------------------------
+   * Prevent the wheel's click-to-spin
+   * from firing when a control is clicked.
    */
+  const handleMainClick =
+    useCallback(
+      (
+        event: React.MouseEvent<HTMLDivElement>,
+      ) => {
+        const target =
+          event.target as HTMLElement
+
+        if (
+          target.closest(
+            "button, input, textarea, select, a",
+          )
+        ) {
+          return
+        }
+
+        spin()
+      },
+      [spin],
+    )
+
+  /*
+   * Replace the entries from the textarea.
+   */
+  const updateEntriesFromText =
+    useCallback(
+      (value: string) => {
+        const names =
+          normalizeNames(value)
+
+        setEntries((current) => {
+          return names.map(
+            (name, index) => {
+              const existing =
+                current.find(
+                  (entry) =>
+                    entry.label === name,
+                )
+
+              return (
+                existing ?? {
+                  id: createRandomId(),
+                  label: name,
+                  color:
+                    COLORS[
+                      index %
+                        COLORS.length
+                    ],
+                  hidden: false,
+                }
+              )
+            },
+          )
+        })
+      },
+      [],
+    )
+
+  const addEntry = useCallback(() => {
+    const label =
+      newEntry.trim()
+
+    if (!label) {
+      return
+    }
+
+    setEntries((current) => [
+      ...current,
+      {
+        id: createRandomId(),
+        label,
+        color:
+          COLORS[
+            current.length %
+              COLORS.length
+          ],
+        hidden: false,
+      },
+    ])
+
+    setNewEntry("")
+  }, [newEntry])
+
+  const removeEntry =
+    useCallback((id: string) => {
+      setEntries((current) =>
+        current.filter(
+          (entry) =>
+            entry.id !== id,
+        ),
+      )
+    }, [])
+
   const shuffleEntries =
     useCallback(() => {
-      if (
-        isSpinningRef.current
-      ) {
-        toast.info(
-          "Wait for the current spin to finish.",
-        )
+      if (isSpinningRef.current) {
         return
       }
 
       setEntries((current) => {
-        const shuffled = [
-          ...current,
-        ]
+        const copy = [...current]
 
         for (
           let index =
-            shuffled.length - 1;
+            copy.length - 1;
           index > 0;
           index--
         ) {
@@ -952,31 +807,21 @@ export default function SpinWheel() {
             )
 
           ;[
-            shuffled[index],
-            shuffled[randomIndex],
+            copy[index],
+            copy[randomIndex],
           ] = [
-            shuffled[randomIndex],
-            shuffled[index],
+            copy[randomIndex],
+            copy[index],
           ]
         }
 
-        return shuffled
+        return copy
       })
     }, [])
 
-  /*
-   * --------------------------------------------------
-   * SORT
-   * --------------------------------------------------
-   */
   const sortEntries =
     useCallback(() => {
-      if (
-        isSpinningRef.current
-      ) {
-        toast.info(
-          "Wait for the current spin to finish.",
-        )
+      if (isSpinningRef.current) {
         return
       }
 
@@ -988,690 +833,254 @@ export default function SpinWheel() {
               undefined,
               {
                 numeric: true,
-                sensitivity:
-                  "base",
+                sensitivity: "base",
               },
             ),
         ),
       )
     }, [])
 
-  /*
-   * --------------------------------------------------
-   * TEXTAREA
-   * --------------------------------------------------
-   */
-  const updateEntriesFromText =
-    useCallback(
-      (value: string) => {
-        const lines = value
-          .split(/\r?\n/)
-          .map((line) =>
-            line.trim(),
-          )
-          .filter(Boolean)
-
-        setEntries((current) =>
-          lines.map(
-            (label, index) => {
-              const existing =
-                current[index]
-
-              return {
-                id:
-                  existing?.id ??
-                  createId(index),
-
-                label,
-
-                color:
-                  existing?.color ??
-                  COLORS[
-                    index %
-                      COLORS.length
-                  ],
-
-                hidden:
-                  existing?.hidden ??
-                  false,
-              }
-            },
-          ),
-        )
-      },
-      [],
-    )
-
-  /*
-   * --------------------------------------------------
-   * ADD ENTRY
-   * --------------------------------------------------
-   */
-  const addEntry =
-    useCallback(() => {
-      const label =
-        newEntry.trim()
-
-      if (!label) {
-        return
-      }
-
-      setEntries((current) => [
-        ...current,
-        {
-          id: createId(
-            current.length,
-          ),
-          label,
-          color:
-            COLORS[
-              current.length %
-                COLORS.length
-            ],
-          hidden: false,
-        },
-      ])
-
-      setNewEntry("")
-    }, [newEntry])
-
-  /*
-   * --------------------------------------------------
-   * CLEAR
-   * --------------------------------------------------
-   */
   const clearEntries =
     useCallback(() => {
-      if (
-        isSpinningRef.current
-      ) {
-        toast.info(
-          "Wait for the current spin to finish.",
-        )
+      if (isSpinningRef.current) {
         return
       }
 
       setEntries([])
+      setResults([])
+      setNewEntry("")
     }, [])
 
-  /*
-   * --------------------------------------------------
-   * RESTORE DEFAULTS
-   * --------------------------------------------------
-   */
   const restoreDefaults =
     useCallback(() => {
-      if (
-        isSpinningRef.current
-      ) {
-        toast.info(
-          "Wait for the current spin to finish.",
-        )
+      if (isSpinningRef.current) {
         return
       }
 
       setEntries(
-        createEntries(
-          DEFAULT_NAMES,
-        ),
+        createEntries(DEFAULT_NAMES),
       )
 
-      toast.success(
-        "Default entries restored.",
+      setResults([])
+
+      setSpinDuration(
+        WIN_SPIN_DURATION,
       )
+
+      setSpinRevolutions(
+        WIN_REVOLUTIONS,
+      )
+
+      setHideSelected(false)
+
+      setShowMenu(false)
     }, [])
 
-  /*
-   * --------------------------------------------------
-   * COPY
-   * --------------------------------------------------
-   */
   const copyEntries =
-    useCallback(() => {
-      const text = entries
-        .filter(
-          (entry) =>
-            !entry.hidden,
-        )
-        .map(
-          (entry) =>
-            entry.label,
-        )
-        .join("\n")
+    useCallback(async () => {
+      const text =
+        entries
+          .filter(
+            (entry) =>
+              !entry.hidden,
+          )
+          .map(
+            (entry) =>
+              entry.label,
+          )
+          .join("\n")
 
-      if (!navigator.clipboard) {
-        toast.error(
-          "Clipboard access is unavailable.",
+      try {
+        await navigator.clipboard.writeText(
+          text,
         )
-        return
+
+        toast.success(
+          "Entries copied to clipboard.",
+        )
+      } catch {
+        toast.error(
+          "Unable to copy entries.",
+        )
       }
 
-      void navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          toast.success(
-            "Entries copied to clipboard.",
-          )
-        })
-        .catch(() => {
-          toast.error(
-            "Unable to copy entries.",
-          )
-        })
+      setShowMenu(false)
     }, [entries])
 
-  /*
-   * --------------------------------------------------
-   * FULLSCREEN
-   * --------------------------------------------------
-   */
   const toggleFullscreen =
-    useCallback(() => {
-      setFullscreen(
-        (current) => !current,
-      )
+    useCallback(async () => {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen()
+          setFullscreen(true)
+        } else {
+          await document.exitFullscreen()
+          setFullscreen(false)
+        }
+      } catch {
+        toast.error(
+          "Fullscreen is not available.",
+        )
+      }
     }, [])
 
   /*
-   * --------------------------------------------------
-   * CLEAR RESULTS
-   * --------------------------------------------------
+   * Keep fullscreen state correct if the user
+   * exits with Escape.
    */
-  const clearResults =
-    useCallback(() => {
-      setResults([])
-    }, [])
+  useEffect(() => {
+    const handleFullscreen =
+      () => {
+        setFullscreen(
+          Boolean(
+            document.fullscreenElement,
+          ),
+        )
+      }
 
-  const visibleEntries =
-    entries.filter(
-      (entry) => !entry.hidden,
+    document.addEventListener(
+      "fullscreenchange",
+      handleFullscreen,
     )
 
-  const entryText =
-    visibleEntries
+    return () => {
+      document.removeEventListener(
+        "fullscreenchange",
+        handleFullscreen,
+      )
+    }
+  }, [])
+
+  /*
+   * Cleanup timers.
+   */
+  useEffect(() => {
+    return () => {
+      clearIdleRestartTimer()
+
+      const wheel =
+        wheelRef.current
+
+      if (wheel) {
+        wheel.stop()
+        wheel.remove()
+      }
+
+      wheelRef.current = null
+    }
+  }, [clearIdleRestartTimer])
+
+  const textareaValue =
+    entries
       .map(
-        (entry) => entry.label,
+        (entry) =>
+          entry.label,
       )
       .join("\n")
 
   return (
     <div
       className={[
-        "fixed inset-0 z-40 flex overflow-hidden",
-        "bg-[#0b1115] text-white",
+        "min-h-screen w-full overflow-hidden",
+        "bg-[#090909] text-white",
         fullscreen
-          ? ""
-          : "top-[var(--navbar-height,0px)]",
+          ? "fixed inset-0 z-[9999]"
+          : "",
       ].join(" ")}
+      onClick={handleMainClick}
     >
-      {/* ================================================= */}
-      {/* WHEEL AREA                                        */}
-      {/* ================================================= */}
+      <div className="flex h-screen min-h-[700px] w-full">
+        {/* ─────────────────────────────
+            MAIN WHEEL AREA
+        ───────────────────────────── */}
 
-      <main
-        className="relative min-w-0 flex-1 overflow-hidden"
-        onClick={(event) => {
-          const target =
-            event.target as HTMLElement
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+          {/* Background glow */}
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute left-1/2 top-1/2 h-[900px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500/[0.035] blur-[130px]" />
 
-          if (
-            target.closest(
-              "button,input,textarea,[role='button']",
-            )
-          ) {
-            return
-          }
-
-          if (
-            !isSpinningRef.current
-          ) {
-            spin()
-          }
-        }}
-      >
-        {/* Wheel of Names style background */}
-        <div
-          className="
-            pointer-events-none
-            absolute
-            inset-0
-            bg-[radial-gradient(circle_at_50%_50%,#20313b_0%,#14222a_48%,#0b1115_100%)]
-          "
-        />
-
-        <div
-          className="
-            pointer-events-none
-            absolute
-            inset-0
-            bg-[radial-gradient(circle,transparent_42%,rgba(0,0,0,0.28)_100%)]
-          "
-        />
-
-        {/* Actual wheel */}
-        <div
-          ref={wheelContainerRef}
-          className="
-            absolute
-            inset-0
-            h-full
-            w-full
-          "
-        />
-
-        {/* Text settings button */}
-        <button
-          type="button"
-          aria-label="Wheel text settings"
-          className="
-            absolute
-            left-4
-            top-4
-            z-[70]
-            flex
-            h-10
-            w-10
-            items-center
-            justify-center
-            rounded-full
-            border
-            border-white/15
-            bg-[#30365e]
-            text-white
-            shadow-lg
-            transition
-            hover:bg-[#3b4270]
-          "
-        >
-          <Type className="h-5 w-5" />
-        </button>
-
-        {/* Center text */}
-        <div
-          className="
-            pointer-events-none
-            absolute
-            inset-0
-            z-[40]
-            flex
-            items-center
-            justify-center
-          "
-        >
-          <div className="flex flex-col items-center text-center">
-            <div
-              className="
-                text-[26px]
-                font-semibold
-                leading-none
-                tracking-[-0.03em]
-                text-white
-                drop-shadow-[0_2px_5px_rgba(0,0,0,0.95)]
-              "
-            >
-              {isSpinning
-                ? "Spinning..."
-                : "Click to spin"}
-            </div>
-
-            {!isSpinning && (
-              <div
-                className="
-                  mt-3
-                  text-[13px]
-                  font-semibold
-                  leading-none
-                  text-white/90
-                  drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]
-                "
-              >
-                or press ctrl+enter
-              </div>
-            )}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.025),transparent_55%)]" />
           </div>
-        </div>
 
-        {/* ================================================= */}
-        {/* POINTER                                            */}
-        {/* ================================================= */}
-
-        {pointerPosition.visible && (
-          <div
-            className="
-              pointer-events-none
-              absolute
-              z-[80]
-              -translate-y-1/2
-            "
-            style={{
-              left: pointerPosition.left,
-              top: pointerPosition.top,
-            }}
-          >
-            <div
-              className="
-                h-0
-                w-0
-                border-y-[23px]
-                border-l-0
-                border-r-[48px]
-                border-y-transparent
-                drop-shadow-[0_2px_7px_rgba(0,0,0,0.65)]
-              "
-              style={{
-                borderRightColor:
-                  pointerColor,
-                transition:
-                  "border-right-color 120ms ease-out",
-              }}
-            />
-          </div>
-        )}
-
-        {/* Spin status */}
-        {isSpinning && (
-          <div
-            className="
-              pointer-events-none
-              absolute
-              bottom-6
-              left-1/2
-              z-[70]
-              -translate-x-1/2
-              rounded-full
-              border
-              border-white/10
-              bg-black/45
-              px-4
-              py-2
-              text-xs
-              font-medium
-              text-white/80
-              shadow-lg
-              backdrop-blur-md
-            "
-          >
-            Spinning for 5 seconds
-          </div>
-        )}
-      </main>
-
-      {/* ================================================= */}
-      {/* SIDEBAR                                           */}
-      {/* ================================================= */}
-
-      <aside
-        className="
-          relative
-          flex
-          w-[330px]
-          shrink-0
-          flex-col
-          border-l
-          border-white/10
-          bg-[#111111]
-          sm:w-[360px]
-          lg:w-[390px]
-          xl:w-[420px]
-        "
-      >
-        {/* Header */}
-        <div
-          className="
-            flex
-            h-[58px]
-            shrink-0
-            items-center
-            justify-between
-            border-b
-            border-white/10
-            px-3
-          "
-        >
-          <div className="flex items-center">
+          {/* Top-left type button */}
+          <div className="absolute left-5 top-5 z-50">
             <button
               type="button"
-              onClick={() =>
-                setActiveTab(
-                  "entries",
-                )
-              }
-              className={[
-                "relative px-3 py-4 text-sm font-semibold transition",
-                activeTab ===
-                "entries"
-                  ? "text-white"
-                  : "text-white/45 hover:text-white/80",
-              ].join(" ")}
+              title="Text entries"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#171717] text-white shadow-lg transition hover:border-white/20 hover:bg-[#202020]"
             >
-              Entries
-
-              <span
-                className="
-                  ml-1.5
-                  rounded-full
-                  bg-white/10
-                  px-1.5
-                  py-0.5
-                  text-[10px]
-                  text-white/60
-                "
-              >
-                {visibleEntries.length}
-              </span>
-
-              {activeTab ===
-                "entries" && (
-                <span
-                  className="
-                    absolute
-                    bottom-0
-                    left-2
-                    right-2
-                    h-[2px]
-                    rounded-full
-                    bg-white
-                  "
-                />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setActiveTab(
-                  "results",
-                )
-              }
-              className={[
-                "relative px-3 py-4 text-sm font-semibold transition",
-                activeTab ===
-                "results"
-                  ? "text-white"
-                  : "text-white/45 hover:text-white/80",
-              ].join(" ")}
-            >
-              Results
-
-              <span
-                className="
-                  ml-1.5
-                  rounded-full
-                  bg-white/10
-                  px-1.5
-                  py-0.5
-                  text-[10px]
-                  text-white/60
-                "
-              >
-                {results.length}
-              </span>
-
-              {activeTab ===
-                "results" && (
-                <span
-                  className="
-                    absolute
-                    bottom-0
-                    left-2
-                    right-2
-                    h-[2px]
-                    rounded-full
-                    bg-white
-                  "
-                />
-              )}
+              <Type size={18} />
             </button>
           </div>
 
-          {/* More */}
-          <div className="relative">
+          {/* Top-right utility */}
+          <div className="absolute right-5 top-5 z-50">
             <button
               type="button"
-              onClick={() =>
+              title="More options"
+              onClick={(event) => {
+                event.stopPropagation()
                 setShowMenu(
-                  (current) =>
-                    !current,
+                  (current) => !current,
                 )
-              }
-              className="
-                flex
-                h-9
-                w-9
-                items-center
-                justify-center
-                rounded-lg
-                text-white/55
-                transition
-                hover:bg-white/5
-                hover:text-white
-              "
-              aria-label="More options"
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#171717] text-white shadow-lg transition hover:border-white/20 hover:bg-[#202020]"
             >
-              <MoreHorizontal className="h-5 w-5" />
+              <MoreHorizontal
+                size={19}
+              />
             </button>
 
             {showMenu && (
               <div
-                className="
-                  absolute
-                  right-0
-                  top-11
-                  z-[100]
-                  w-52
-                  overflow-hidden
-                  rounded-xl
-                  border
-                  border-white/10
-                  bg-[#1a1a1a]
-                  p-1
-                  shadow-2xl
-                "
+                onClick={(event) =>
+                  event.stopPropagation()
+                }
+                className="absolute right-0 top-12 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#181818] p-1.5 shadow-2xl"
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    restoreDefaults()
-                    setShowMenu(false)
-                  }}
-                  className="
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-lg
-                    px-3
-                    py-2.5
-                    text-left
-                    text-sm
-                    text-white/80
-                    transition
-                    hover:bg-white/5
-                    hover:text-white
-                  "
+                  onClick={restoreDefaults}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-white transition hover:bg-white/5"
                 >
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles
+                    size={16}
+                  />
                   Restore defaults
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    copyEntries()
-                    setShowMenu(false)
-                  }}
-                  className="
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-lg
-                    px-3
-                    py-2.5
-                    text-left
-                    text-sm
-                    text-white/80
-                    transition
-                    hover:bg-white/5
-                    hover:text-white
-                  "
+                  onClick={copyEntries}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-white transition hover:bg-white/5"
                 >
-                  <Clipboard className="h-4 w-4" />
+                  <Clipboard
+                    size={16}
+                  />
                   Copy entries
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    clearEntries()
-                    setShowMenu(false)
-                  }}
-                  className="
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-lg
-                    px-3
-                    py-2.5
-                    text-left
-                    text-sm
-                    text-white/80
-                    transition
-                    hover:bg-white/5
-                    hover:text-white
-                  "
+                  onClick={clearEntries}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-red-400 transition hover:bg-red-500/10"
                 >
-                  <Trophy className="h-4 w-4" />
+                  <Trash2
+                    size={16}
+                  />
                   Clear entries
                 </button>
 
-                <div className="my-1 border-t border-white/10" />
+                <div className="my-1 border-t border-white/5" />
 
                 <button
                   type="button"
-                  onClick={() => {
-                    toggleFullscreen()
-                    setShowMenu(false)
-                  }}
-                  className="
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-lg
-                    px-3
-                    py-2.5
-                    text-left
-                    text-sm
-                    text-white/80
-                    transition
-                    hover:bg-white/5
-                    hover:text-white
-                  "
+                  onClick={toggleFullscreen}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-white transition hover:bg-white/5"
                 >
-                  <Maximize2 className="h-4 w-4" />
-
+                  <Maximize2
+                    size={16}
+                  />
                   {fullscreen
                     ? "Exit fullscreen"
                     : "Fullscreen"}
@@ -1679,578 +1088,542 @@ export default function SpinWheel() {
               </div>
             )}
           </div>
-        </div>
 
-        {/* Toolbar */}
-        {activeTab ===
-          "entries" && (
-          <div
-            className="
-              flex
-              shrink-0
-              items-center
-              gap-1
-              border-b
-              border-white/10
-              px-3
-              py-2
-            "
-          >
-            <button
-              type="button"
-              onClick={
-                shuffleEntries
-              }
-              disabled={isSpinning}
-              className="
-                flex
-                items-center
-                gap-1.5
-                rounded-lg
-                bg-[#4d4d80]
-                px-3
-                py-2
-                text-xs
-                font-semibold
-                text-white
-                transition
-                hover:bg-[#5a5a91]
-                disabled:cursor-not-allowed
-                disabled:opacity-40
-              "
-            >
-              <Shuffle className="h-4 w-4" />
-              Shuffle
-            </button>
+          {/* Wheel content */}
+          <div className="relative flex min-h-0 flex-1 items-center justify-center px-6 py-12">
+            <div className="relative aspect-square w-[min(76vh,calc(100vw-430px),720px)] min-w-[420px] max-w-[720px]">
+              {/* Wheel shadow */}
+              <div className="pointer-events-none absolute inset-[5%] rounded-full bg-black/60 blur-[35px]" />
 
-            <button
-              type="button"
-              onClick={
-                sortEntries
-              }
-              disabled={isSpinning}
-              className="
-                flex
-                items-center
-                gap-1.5
-                rounded-lg
-                bg-[#4d4d80]
-                px-3
-                py-2
-                text-xs
-                font-semibold
-                text-white
-                transition
-                hover:bg-[#5a5a91]
-                disabled:cursor-not-allowed
-                disabled:opacity-40
-              "
-            >
-              <ChevronDown className="h-4 w-4" />
-              Sort
-            </button>
-
-            <button
-              type="button"
-              className="
-                flex
-                items-center
-                gap-1.5
-                rounded-lg
-                bg-[#4d4d80]
-                px-3
-                py-2
-                text-xs
-                font-semibold
-                text-white
-                transition
-                hover:bg-[#5a5a91]
-              "
-            >
-              <ImagePlus className="h-4 w-4" />
-              Add image
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setShowAdvanced(
-                  (current) =>
-                    !current,
-                )
-              }
-              className="
-                ml-auto
-                flex
-                items-center
-                gap-2
-                rounded-lg
-                px-2.5
-                py-2
-                text-xs
-                font-medium
-                text-white/70
-                transition
-                hover:bg-white/5
-                hover:text-white
-              "
-            >
-              <span
-                className="
-                  h-4
-                  w-4
-                  rounded-sm
-                  border
-                  border-white/50
-                "
+              {/* Actual spin-wheel container */}
+              <div
+                ref={wheelContainerRef}
+                className="relative z-10 h-full w-full overflow-visible"
               />
 
-              Advanced
-            </button>
-          </div>
-        )}
+              {/* ───────────────────────
+                  FIXED RIGHT POINTER
+                  ───────────────────────
 
-        {/* Advanced */}
-        {showAdvanced &&
-          activeTab ===
-            "entries" && (
-            <div
-              className="
-                shrink-0
-                border-b
-                border-white/10
-                bg-[#0d0d0d]
-                px-4
-                py-3
-              "
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-xs font-semibold text-white/80">
-                  Spin settings
-                </span>
+                  radius = 0.91
+
+                  The wheel radius therefore occupies
+                  45.5% of the container width from
+                  the center.
+
+                  50% + 45.5% = 95.5%.
+
+                  The left edge/tip of the triangle is
+                  placed exactly there, so the arrow
+                  touches the wheel instead of floating
+                  at the edge of the page.
+              */}
+              <div
+                className="pointer-events-none absolute left-[95.5%] top-1/2 z-[80] -translate-y-1/2"
+                style={{
+                  filter:
+                    "drop-shadow(0 3px 8px rgba(0,0,0,.65))",
+                }}
+              >
+                <div
+                  className="h-0 w-0 border-y-[23px] border-l-0 border-r-[48px] border-y-transparent"
+                  style={{
+                    borderRightColor:
+                      pointerColor,
+                    transition:
+                      "border-right-color 120ms ease-out",
+                  }}
+                />
+              </div>
+
+              {/* Center overlay */}
+              <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
+                <div className="rounded-full bg-white px-5 py-2.5 text-center text-sm font-bold text-black shadow-[0_5px_25px_rgba(0,0,0,.25)]">
+                  {isSpinning
+                    ? "Spinning..."
+                    : "Click to spin"}
+                </div>
+
+                <div className="mt-2 rounded-full bg-black/50 px-3 py-1 text-[10px] font-medium text-white/60 backdrop-blur-md">
+                  or press ctrl+enter
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* ─────────────────────────────
+            RIGHT SIDEBAR
+        ───────────────────────────── */}
+
+        <aside
+          className="relative z-[100] flex h-full w-[380px] shrink-0 flex-col border-l border-white/10 bg-[#111111]"
+          onClick={(event) =>
+            event.stopPropagation()
+          }
+        >
+          {/* Tabs */}
+          <div className="flex h-[61px] shrink-0 items-center border-b border-white/10 px-4">
+            <div className="flex items-center rounded-lg bg-[#191919] p-1">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveTab("entries")
+                }
+                className={[
+                  "rounded-md px-4 py-2 text-sm font-semibold transition",
+                  activeTab ===
+                  "entries"
+                    ? "bg-[#292929] text-white shadow-sm"
+                    : "text-white/45 hover:text-white/75",
+                ].join(" ")}
+              >
+                Entries
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveTab("results")
+                }
+                className={[
+                  "rounded-md px-4 py-2 text-sm font-semibold transition",
+                  activeTab ===
+                  "results"
+                    ? "bg-[#292929] text-white shadow-sm"
+                    : "text-white/45 hover:text-white/75",
+                ].join(" ")}
+              >
+                Results
+              </button>
+            </div>
+
+            <div className="ml-auto">
+              <button
+                type="button"
+                title="More"
+                onClick={() =>
+                  setShowMenu(
+                    (current) => !current,
+                  )
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-white/50 transition hover:bg-white/5 hover:text-white"
+              >
+                <MoreHorizontal
+                  size={18}
+                />
+              </button>
+            </div>
+          </div>
+
+          {activeTab ===
+          "entries" ? (
+            <>
+              {/* Toolbar */}
+              <div className="flex shrink-0 items-center gap-1.5 border-b border-white/10 px-4 py-3">
+                <button
+                  type="button"
+                  title="Shuffle"
+                  disabled={isSpinning}
+                  onClick={shuffleEntries}
+                  className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-[#191919] px-3 text-xs font-semibold text-white/75 transition hover:bg-[#222] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Shuffle
+                    size={14}
+                  />
+                  Shuffle
+                </button>
 
                 <button
                   type="button"
+                  title="Sort"
+                  disabled={isSpinning}
+                  onClick={sortEntries}
+                  className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-[#191919] px-3 text-xs font-semibold text-white/75 transition hover:bg-[#222] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronDown
+                    size={14}
+                  />
+                  Sort
+                </button>
+
+                <button
+                  type="button"
+                  title="Add image"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-[#191919] text-white/60 transition hover:bg-[#222] hover:text-white"
+                >
+                  <ImagePlus
+                    size={15}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Advanced"
                   onClick={() =>
                     setShowAdvanced(
-                      false,
+                      (current) =>
+                        !current,
                     )
                   }
-                  className="text-xs text-white/40 hover:text-white"
+                  className={[
+                    "ml-auto flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition",
+                    showAdvanced
+                      ? "border-blue-500/40 bg-blue-500/10 text-blue-400"
+                      : "border-white/10 bg-[#191919] text-white/60 hover:bg-[#222] hover:text-white",
+                  ].join(" ")}
                 >
-                  Close
+                  Advanced
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div
-                  className="
-                    rounded-lg
-                    border
-                    border-white/10
-                    bg-white/[0.025]
-                    p-3
-                  "
-                >
-                  <div className="text-[11px] text-white/40">
-                    Spin duration
+              {/* Advanced */}
+              {showAdvanced && (
+                <div className="shrink-0 border-b border-white/10 bg-[#0e0e0e] px-4 py-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-semibold text-white/45">
+                        Spin duration
+                      </span>
+
+                      <div className="flex items-center rounded-lg border border-white/10 bg-[#181818]">
+                        <input
+                          type="number"
+                          min={1000}
+                          max={30000}
+                          step={500}
+                          value={
+                            spinDuration
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            setSpinDuration(
+                              Math.min(
+                                30000,
+                                Math.max(
+                                  1000,
+                                  Number(
+                                    event
+                                      .target
+                                      .value,
+                                  ) || 1000,
+                                ),
+                              ),
+                            )
+                          }
+                          className="h-9 w-full bg-transparent px-3 text-sm text-white outline-none"
+                        />
+
+                        <span className="pr-3 text-[10px] text-white/35">
+                          ms
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-semibold text-white/45">
+                        Revolutions
+                      </span>
+
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={
+                          spinRevolutions
+                        }
+                        onChange={(
+                          event,
+                        ) =>
+                          setSpinRevolutions(
+                            Math.min(
+                              20,
+                              Math.max(
+                                1,
+                                Number(
+                                  event
+                                    .target
+                                    .value,
+                                ) || 1,
+                              ),
+                            ),
+                          )
+                        }
+                        className="h-9 w-full rounded-lg border border-white/10 bg-[#181818] px-3 text-sm text-white outline-none focus:border-blue-500/50"
+                      />
+                    </label>
                   </div>
 
-                  <div className="mt-1 text-sm font-medium">
-                    5 seconds
-                  </div>
+                  <label className="mt-4 flex cursor-pointer items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={
+                        hideSelected
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setHideSelected(
+                          event.target
+                            .checked,
+                        )
+                      }
+                      className="h-4 w-4 accent-blue-500"
+                    />
+
+                    <span>
+                      <span className="block text-xs font-semibold text-white/80">
+                        Hide selected
+                      </span>
+
+                      <span className="block text-[10px] text-white/35">
+                        Remove the winner from future spins.
+                      </span>
+                    </span>
+                  </label>
                 </div>
+              )}
 
-                <div
-                  className="
-                    rounded-lg
-                    border
-                    border-white/10
-                    bg-white/[0.025]
-                    p-3
-                  "
-                >
-                  <div className="text-[11px] text-white/40">
-                    Revolutions
-                  </div>
-
-                  <div className="mt-1 text-sm font-medium">
-                    {WIN_REVOLUTIONS}
-                  </div>
-                </div>
-              </div>
-
-              <label
-                className="
-                  mt-3
-                  flex
-                  cursor-pointer
-                  items-center
-                  justify-between
-                  rounded-lg
-                  border
-                  border-white/10
-                  bg-white/[0.025]
-                  px-3
-                  py-2.5
-                "
-              >
-                <div>
-                  <div className="text-xs font-medium text-white/80">
-                    Hide selected
-                  </div>
-
-                  <div className="mt-0.5 text-[10px] text-white/35">
-                    Remove winners from future spins
-                  </div>
-                </div>
-
-                <input
-                  type="checkbox"
-                  checked={
-                    hideSelectedRef.current
+              {/* Entries editor */}
+              <div className="min-h-0 flex-1 p-4">
+                <textarea
+                  value={
+                    textareaValue
                   }
-                  onChange={(
-                    event,
-                  ) => {
-                    hideSelectedRef.current =
-                      event.target.checked
-                  }}
-                  className="h-4 w-4 accent-blue-500"
-                />
-              </label>
-            </div>
-          )}
-
-        {/* Content */}
-        {activeTab ===
-        "entries" ? (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div
-              className="
-                flex
-                shrink-0
-                items-center
-                justify-between
-                px-4
-                py-3
-              "
-            >
-              <div className="text-xs text-white/55">
-                {visibleEntries.length}{" "}
-                {visibleEntries.length ===
-                1
-                  ? "entry"
-                  : "entries"}
-              </div>
-
-              <div className="text-[10px] text-white/35">
-                One entry per line
-              </div>
-            </div>
-
-            <div className="min-h-0 flex-1 px-4 pb-3">
-              <textarea
-                value={entryText}
-                onChange={(
-                  event,
-                ) =>
-                  updateEntriesFromText(
-                    event.target.value,
-                  )
-                }
-                spellCheck={false}
-                className="
-                  h-full
-                  min-h-[180px]
-                  w-full
-                  resize-none
-                  rounded-xl
-                  border
-                  border-white/15
-                  bg-[#181818]
-                  p-4
-                  text-sm
-                  leading-7
-                  text-white
-                  outline-none
-                  placeholder:text-white/25
-                  focus:border-white/25
-                  focus:ring-1
-                  focus:ring-white/10
-                "
-                placeholder="Enter names here..."
-              />
-            </div>
-
-            <div
-              className="
-                shrink-0
-                border-t
-                border-white/10
-                p-3
-              "
-            >
-              <div className="flex gap-2">
-                <input
-                  value={newEntry}
+                  disabled={isSpinning}
                   onChange={(
                     event,
                   ) =>
-                    setNewEntry(
-                      event.target.value,
+                    updateEntriesFromText(
+                      event.target
+                        .value,
                     )
                   }
-                  onKeyDown={(
-                    event,
-                  ) => {
-                    if (
-                      event.key ===
-                      "Enter"
-                    ) {
-                      event.preventDefault()
-                      addEntry()
-                    }
-                  }}
-                  placeholder="Add an entry..."
-                  className="
-                    min-w-0
-                    flex-1
-                    rounded-lg
-                    border
-                    border-white/10
-                    bg-[#181818]
-                    px-3
-                    py-2.5
-                    text-sm
-                    text-white
-                    outline-none
-                    placeholder:text-white/25
-                    focus:border-white/20
-                  "
+                  placeholder="Enter one entry per line..."
+                  spellCheck={false}
+                  className="h-full min-h-[280px] w-full resize-none rounded-xl border border-white/10 bg-[#181818] p-4 text-sm leading-6 text-white outline-none transition placeholder:text-white/20 focus:border-blue-500/40"
                 />
-
-                <button
-                  type="button"
-                  onClick={addEntry}
-                  className="
-                    flex
-                    h-10
-                    w-10
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-lg
-                    bg-white
-                    text-black
-                    transition
-                    hover:bg-white/90
-                  "
-                  aria-label="Add entry"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div
-              className="
-                flex
-                shrink-0
-                items-center
-                justify-between
-                border-b
-                border-white/10
-                px-4
-                py-3
-              "
-            >
-              <div>
-                <div className="text-sm font-medium">
-                  Winners
-                </div>
-
-                <div className="mt-0.5 text-xs text-white/35">
-                  Your previous results
-                </div>
               </div>
 
-              {results.length >
-                0 && (
-                <button
-                  type="button"
-                  onClick={
-                    clearResults
-                  }
-                  className="
-                    text-xs
-                    text-white/40
-                    transition
-                    hover:text-white
-                  "
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+              {/* Add entry */}
+              <div className="shrink-0 border-t border-white/10 p-4">
+                <div className="flex gap-2">
+                  <input
+                    value={newEntry}
+                    onChange={(
+                      event,
+                    ) =>
+                      setNewEntry(
+                        event.target
+                          .value,
+                      )
+                    }
+                    onKeyDown={(
+                      event,
+                    ) => {
+                      if (
+                        event.key ===
+                        "Enter"
+                      ) {
+                        event.preventDefault()
+                        addEntry()
+                      }
+                    }}
+                    placeholder="Add an entry..."
+                    className="h-10 min-w-0 flex-1 rounded-lg border border-white/10 bg-[#191919] px-3 text-sm text-white outline-none placeholder:text-white/25 focus:border-blue-500/50"
+                  />
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              {results.length ===
-              0 ? (
-                <div
-                  className="
-                    flex
-                    h-full
-                    min-h-[240px]
-                    flex-col
-                    items-center
-                    justify-center
-                    text-center
-                  "
-                >
-                  <div
-                    className="
-                      flex
-                      h-12
-                      w-12
-                      items-center
-                      justify-center
-                      rounded-full
-                      bg-white/5
-                    "
+                  <button
+                    type="button"
+                    onClick={
+                      addEntry
+                    }
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white transition hover:bg-blue-400"
                   >
-                    <Trophy className="h-5 w-5 text-white/30" />
-                  </div>
-
-                  <div className="mt-4 text-sm text-white/55">
-                    No results yet
-                  </div>
-
-                  <div className="mt-1 max-w-[220px] text-xs leading-5 text-white/25">
-                    Spin the wheel to
-                    see your first
-                    winner here.
-                  </div>
+                    <Plus
+                      size={18}
+                    />
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {results.map(
-                    (
-                      result,
-                      index,
-                    ) => (
-                      <div
-                        key={`${result.id}-${result.timestamp}`}
-                        className="
-                          flex
-                          items-center
-                          gap-3
-                          rounded-xl
-                          border
-                          border-white/10
-                          bg-[#181818]
-                          px-3
-                          py-3
-                        "
-                      >
+
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-[11px] text-white/30">
+                    {
+                      visibleEntries.length
+                    }{" "}
+                    {visibleEntries.length ===
+                    1
+                      ? "entry"
+                      : "entries"}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEntries(
+                        (current) =>
+                          current.map(
+                            (
+                              entry,
+                            ) => ({
+                              ...entry,
+                              hidden:
+                                false,
+                            }),
+                          ),
+                      )
+                    }
+                    className="text-[11px] font-medium text-blue-400 transition hover:text-blue-300"
+                  >
+                    Show all
+                  </button>
+                </div>
+              </div>
+
+              {/* Spin button */}
+              <div className="shrink-0 border-t border-white/10 p-4">
+                <button
+                  type="button"
+                  disabled={
+                    isSpinning ||
+                    visibleEntries.length ===
+                      0
+                  }
+                  onClick={spin}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-white font-bold text-black shadow-lg transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Sparkles
+                    size={17}
+                  />
+
+                  {isSpinning
+                    ? "Spinning..."
+                    : "Spin the wheel"}
+                </button>
+              </div>
+            </>
+          ) : (
+            /* ─────────────────────
+               RESULTS
+            ───────────────────── */
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-4">
+                <div>
+                  <h2 className="text-sm font-bold text-white">
+                    Results
+                  </h2>
+
+                  <p className="mt-0.5 text-[11px] text-white/35">
+                    Previous winners
+                  </p>
+                </div>
+
+                {results.length >
+                  0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setResults(
+                        [],
+                      )
+                    }
+                    className="text-[11px] font-semibold text-red-400 transition hover:text-red-300"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                {results.length ===
+                0 ? (
+                  <div className="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
+                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-white/25">
+                      <Trophy
+                        size={21}
+                      />
+                    </div>
+
+                    <p className="text-sm font-semibold text-white/60">
+                      No results yet
+                    </p>
+
+                    <p className="mt-1 max-w-[220px] text-xs leading-5 text-white/30">
+                      Spin the wheel and your winners will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {results.map(
+                      (
+                        result,
+                        index,
+                      ) => (
                         <div
-                          className="
-                            flex
-                            h-8
-                            w-8
-                            shrink-0
-                            items-center
-                            justify-center
-                            rounded-full
-                            bg-white/5
-                            text-xs
-                            font-semibold
-                            text-white/50
-                          "
+                          key={
+                            result.id
+                          }
+                          className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#181818] p-3"
                         >
-                          {index + 1}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium text-white">
-                            {
-                              result.label
-                            }
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-xs font-bold text-blue-400">
+                            {index +
+                              1}
                           </div>
 
-                          <div className="mt-0.5 text-[10px] text-white/30">
-                            {new Date(
-                              result.timestamp,
-                            ).toLocaleTimeString(
-                              [],
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-white">
                               {
-                                hour: "2-digit",
-                                minute:
-                                  "2-digit",
-                              },
-                            )}
+                                result.label
+                              }
+                            </p>
+
+                            <p className="mt-0.5 text-[10px] text-white/30">
+                              {new Date(
+                                result.timestamp,
+                              ).toLocaleTimeString(
+                                [],
+                                {
+                                  hour: "2-digit",
+                                  minute:
+                                    "2-digit",
+                                },
+                              )}
+                            </p>
                           </div>
+
+                          <Trophy
+                            size={15}
+                            className="shrink-0 text-white/20"
+                          />
                         </div>
+                      ),
+                    )}
+                  </div>
+                )}
+              </div>
 
-                        <Trophy className="h-4 w-4 shrink-0 text-white/25" />
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
+              <div className="shrink-0 border-t border-white/10 p-4">
+                <button
+                  type="button"
+                  disabled={
+                    isSpinning ||
+                    visibleEntries.length ===
+                      0
+                  }
+                  onClick={spin}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-white font-bold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Sparkles
+                    size={17}
+                  />
+                  Spin the wheel
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-
-        {/* Bottom spin */}
-        <div
-          className="
-            shrink-0
-            border-t
-            border-white/10
-            bg-[#111111]
-            p-3
-          "
-        >
-          <button
-            type="button"
-            onClick={spin}
-            disabled={
-              isSpinning ||
-              visibleEntries.length ===
-                0
-            }
-            className="
-              flex
-              w-full
-              items-center
-              justify-center
-              gap-2
-              rounded-xl
-              bg-white
-              px-4
-              py-3
-              text-sm
-              font-semibold
-              text-black
-              shadow-lg
-              transition
-              hover:bg-white/90
-              active:scale-[0.99]
-              disabled:cursor-not-allowed
-              disabled:opacity-40
-            "
-          >
-            <Sparkles className="h-4 w-4" />
-
-            {isSpinning
-              ? "Spinning..."
-              : "Spin the wheel"}
-          </button>
-        </div>
-      </aside>
+          )}
+        </aside>
+      </div>
     </div>
   )
 }
