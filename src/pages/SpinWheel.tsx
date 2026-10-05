@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Dices, X } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
+import { ChevronDown, FilePlus2, FolderOpen, Palette, Pencil, Save, X } from "lucide-react"
 import confetti from "canvas-confetti"
 
 import Navbar from "@/components/home/Navbar"
@@ -82,7 +82,7 @@ export default function SpinWheel() {
   const [centerImageByWheel, setCenterImageByWheel] =
     useState<Record<string, string | undefined>>({})
   const [imageSizeByWheel, setImageSizeByWheel] =
-    useState<Record<string, "S" | "M" | "L">>({})
+    useState<Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL">>({})
 
   /*
    * The large background winner animation is separate from the winner
@@ -98,6 +98,9 @@ export default function SpinWheel() {
   const confettiEndRef = useRef(0)
   const confettiFrameRef = useRef<number | null>(null)
   const lastConfettiBurstRef = useRef(0)
+  const [customizeRequest, setCustomizeRequest] = useState(0)
+  const [saveMenuOpen, setSaveMenuOpen] = useState(false)
+  const openFileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (!activeWheelId && wheels[0]) {
@@ -405,9 +408,131 @@ export default function SpinWheel() {
     setCenterImageByWheel((current) => ({ ...current, [wheelId]: image }))
   }, [])
 
-  const handleImageSizeChange = useCallback((wheelId: string, size: "S" | "M" | "L") => {
+  const handleImageSizeChange = useCallback((wheelId: string, size: "XS" | "S" | "M" | "L" | "XL" | "XXL") => {
     setImageSizeByWheel((current) => ({ ...current, [wheelId]: size }))
   }, [])
+
+  const resetToNewWheel = useCallback(() => {
+    const nextWheel = createWheel(1)
+
+    setWheels([nextWheel])
+    setActiveWheelId(nextWheel.id)
+    setResults([])
+    setWinners([])
+    setAnimateWinningEntryByWheel({})
+    setLaunchConfettiByWheel({})
+    setAfterSoundByWheel({})
+    setAfterVolumeByWheel({})
+    setSpinSlowlyByWheel({})
+    setSpinTimeByWheel({})
+    setCenterImageByWheel({})
+    setImageSizeByWheel({})
+    setSidebarOpen(true)
+    setSaveMenuOpen(false)
+  }, [])
+
+  const requestCustomize = useCallback(() => {
+    setCustomizeRequest((value) => value + 1)
+  }, [])
+
+  const openWheelFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+
+    void file.text().then((raw) => {
+      try {
+        const parsed = JSON.parse(raw) as {
+          version?: number
+          wheels?: WheelState[]
+          settings?: {
+            animateWinningEntryByWheel?: Record<string, boolean>
+            launchConfettiByWheel?: Record<string, boolean>
+            afterSoundByWheel?: Record<string, string>
+            afterVolumeByWheel?: Record<string, number>
+            spinSlowlyByWheel?: Record<string, boolean>
+            spinTimeByWheel?: Record<string, number>
+            centerImageByWheel?: Record<string, string | undefined>
+            imageSizeByWheel?: Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL">
+          }
+        }
+
+        if (!Array.isArray(parsed.wheels) || parsed.wheels.length === 0 || parsed.wheels.length > MAX_WHEELS) {
+          throw new Error("Invalid wheel file")
+        }
+
+        const loaded = parsed.wheels.map((wheel, index) => ({
+          id: typeof wheel.id === "string" ? wheel.id : crypto.randomUUID(),
+          name: typeof wheel.name === "string" && wheel.name.trim() ? wheel.name : `Wheel ${index + 1}`,
+          items: Array.isArray(wheel.items)
+            ? wheel.items.map((item, itemIndex) => ({
+                id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
+                label: typeof item.label === "string" ? item.label : String(item.label ?? ""),
+                color: item.color,
+                weight: typeof item.weight === "number" ? item.weight : 1,
+                hidden: Boolean(item.hidden),
+              }))
+            : [],
+        }))
+
+        setWheels(loaded)
+        setActiveWheelId(loaded[0].id)
+        setResults([])
+        setWinners([])
+
+        const settings = parsed.settings ?? {}
+        setAnimateWinningEntryByWheel(settings.animateWinningEntryByWheel ?? {})
+        setLaunchConfettiByWheel(settings.launchConfettiByWheel ?? {})
+        setAfterSoundByWheel(settings.afterSoundByWheel ?? {})
+        setAfterVolumeByWheel(settings.afterVolumeByWheel ?? {})
+        setSpinSlowlyByWheel(settings.spinSlowlyByWheel ?? {})
+        setSpinTimeByWheel(settings.spinTimeByWheel ?? {})
+        setCenterImageByWheel(settings.centerImageByWheel ?? {})
+        setImageSizeByWheel(settings.imageSizeByWheel ?? {})
+        setSidebarOpen(true)
+      } catch {
+        window.alert("That file is not a valid wheel file.")
+      }
+    })
+  }, [])
+
+  const saveWheelFile = useCallback((extension: "wheel" | "json") => {
+    const payload = {
+      version: 1,
+      wheels,
+      settings: {
+        animateWinningEntryByWheel,
+        launchConfettiByWheel,
+        afterSoundByWheel,
+        afterVolumeByWheel,
+        spinSlowlyByWheel,
+        spinTimeByWheel,
+        centerImageByWheel,
+        imageSizeByWheel,
+      },
+    }
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `metro-pd-wheel.${extension}`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+    setSaveMenuOpen(false)
+  }, [
+    wheels,
+    animateWinningEntryByWheel,
+    launchConfettiByWheel,
+    afterSoundByWheel,
+    afterVolumeByWheel,
+    spinSlowlyByWheel,
+    spinTimeByWheel,
+    centerImageByWheel,
+    imageSizeByWheel,
+  ])
 
   const addWheel = useCallback(() => {
     if (wheels.length >= MAX_WHEELS) {
@@ -547,14 +672,55 @@ export default function SpinWheel() {
   )
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-[#080b0e] text-foreground">
+    <div className="relative min-h-screen overflow-x-hidden bg-[#080b0e] text-foreground">
       <Navbar />
 
-      <main className="relative min-h-0 flex-1 overflow-hidden">
+      <main className="relative min-h-screen pt-20">
+        <div className="pointer-events-none absolute left-4 top-4 z-[220] flex items-center gap-2">
+          <button
+            type="button"
+            onClick={requestCustomize}
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:bg-black/75"
+            aria-label="Customize wheel"
+            title="Customize wheel"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+
+          <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/10 bg-black/45 p-1.5 shadow-lg backdrop-blur-xl">
+            <button type="button" onClick={requestCustomize} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
+              <Palette className="h-4 w-4" />
+              Customize
+            </button>
+            <button type="button" onClick={resetToNewWheel} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
+              <FilePlus2 className="h-4 w-4" />
+              New
+            </button>
+            <button type="button" onClick={() => openFileInputRef.current?.click()} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
+              <FolderOpen className="h-4 w-4" />
+              Open
+            </button>
+            <div className="relative">
+              <button type="button" onClick={() => setSaveMenuOpen((value) => !value)} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10" aria-expanded={saveMenuOpen}>
+                <Save className="h-4 w-4" />
+                Save
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${saveMenuOpen ? "rotate-180" : ""}`} />
+              </button>
+              {saveMenuOpen && (
+                <div className="absolute left-0 top-[calc(100%+6px)] z-[300] w-36 overflow-hidden rounded-lg border border-white/10 bg-[#181818] p-1 shadow-2xl">
+                  <button type="button" onClick={() => saveWheelFile("wheel")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .wheel</button>
+                  <button type="button" onClick={() => saveWheelFile("json")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .json</button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <input ref={openFileInputRef} type="file" accept=".wheel,.json,application/json" className="hidden" onChange={openWheelFile} />
+        </div>
         <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_35%_35%,rgba(33,70,82,0.42),transparent_45%),radial-gradient(circle_at_78%_25%,rgba(81,42,91,0.28),transparent_42%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]">
           <div
-            className={`absolute inset-0 min-h-0 overflow-hidden transition-[padding] duration-300 ${
-              sidebarOpen ? "lg:pr-[560px]" : ""
+            className={`absolute inset-0 min-h-0 overflow-hidden pt-16 transition-[padding] duration-300 ${
+              sidebarOpen ? "lg:pr-[500px]" : ""
             }`}
           >
             <div
@@ -645,6 +811,7 @@ export default function SpinWheel() {
           onCenterImageChange={handleCenterImageChange}
           imageSizeByWheel={imageSizeByWheel}
           onImageSizeChange={handleImageSizeChange}
+          customizeRequest={customizeRequest}
         />
 
         <button
@@ -664,8 +831,8 @@ export default function SpinWheel() {
           }
           className={`absolute top-1/2 z-[200] hidden h-14 w-8 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-white/10 bg-black/50 text-muted-foreground shadow-xl backdrop-blur transition-[right] duration-300 hover:bg-black/70 hover:text-foreground lg:flex ${
             sidebarOpen
-              ? "right-[468px]"
-              : "right-0"
+              ? "right-[480px]"
+              : "right-1"
           }`}
         >
           <span
@@ -676,15 +843,6 @@ export default function SpinWheel() {
             ‹
           </span>
         </button>
-
-        <div className="pointer-events-none absolute left-5 top-5 z-20">
-          <div className="rounded-xl border border-white/10 bg-black/35 px-3 py-2 shadow-sm backdrop-blur">
-            <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
-              <Dices className="h-4 w-4" />
-              MPD TOOLS
-            </div>
-          </div>
-        </div>
 
         {/*
          * Wheel of Names-style background winner animation.
