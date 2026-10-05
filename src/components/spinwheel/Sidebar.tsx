@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -25,6 +24,7 @@ type SidebarProps = {
   results: string[]
   onChange: (items: SpinWheelItem[]) => void
   onClearResults: () => void
+  onNewWheel: () => void
 }
 
 type Tab = "entries" | "results"
@@ -37,6 +37,27 @@ const COLORS = [
   "#60a5fa",
   "#94a3b8",
 ]
+
+type SaveFilePickerOptions = {
+  suggestedName?: string
+  types?: Array<{
+    description?: string
+    accept: Record<string, string[]>
+  }>
+}
+
+type SaveFilePickerHandle = {
+  createWritable: () => Promise<{
+    write: (data: Blob | string) => Promise<void>
+    close: () => Promise<void>
+  }>
+}
+
+type SaveFilePickerWindow = Window & {
+  showSaveFilePicker?: (
+    options?: SaveFilePickerOptions,
+  ) => Promise<SaveFilePickerHandle>
+}
 
 function createItemsFromText(
   text: string,
@@ -68,24 +89,21 @@ export default function Sidebar({
   results,
   onChange,
   onClearResults,
+  onNewWheel,
 }: SidebarProps) {
   const [tab, setTab] =
     useState<Tab>("entries")
 
   /*
-   * IMPORTANT:
+   * Keep the textarea separate from the parsed entries.
    *
-   * The textarea has its own value.
-   *
-   * Previously the textarea was:
-   *
-   * items.map(...).join("\n")
-   *
-   * That caused Enter/newlines to disappear because
-   * empty lines were immediately filtered out.
+   * This allows normal new lines, blank lines and
+   * pressing Enter without the value being rewritten.
    */
   const [text, setText] = useState(() =>
-    items.map((item) => item.label).join("\n"),
+    items
+      .map((item) => item.label)
+      .join("\n"),
   )
 
   const [advanced, setAdvanced] =
@@ -94,28 +112,38 @@ export default function Sidebar({
   const [imageMenuOpen, setImageMenuOpen] =
     useState(false)
 
+  const [wheelMenuOpen, setWheelMenuOpen] =
+    useState(false)
+
   const fileInputRef =
     useRef<HTMLInputElement | null>(null)
 
-  /*
-   * Update the actual wheel whenever the text changes,
-   * but DO NOT rewrite the textarea value.
-   */
+  const imageMenuRef =
+    useRef<HTMLDivElement | null>(null)
+
+  const wheelMenuRef =
+    useRef<HTMLDivElement | null>(null)
+
   const handleTextChange = (
     value: string,
   ) => {
+    /*
+     * The raw textarea value is preserved exactly.
+     * Empty lines remain visible while typing.
+     */
     setText(value)
 
-    const nextItems =
-      createItemsFromText(value, items)
-
-    onChange(nextItems)
+    /*
+     * Only non-empty lines become wheel entries.
+     */
+    onChange(
+      createItemsFromText(
+        value,
+        items,
+      ),
+    )
   }
 
-  /*
-   * Shuffle the actual entries and update the
-   * textarea manually.
-   */
   const shuffleEntries = () => {
     if (items.length < 2) {
       return
@@ -151,9 +179,6 @@ export default function Sidebar({
     onChange(shuffled)
   }
 
-  /*
-   * Sort entries alphabetically.
-   */
   const sortEntries = () => {
     if (items.length < 2) {
       return
@@ -179,9 +204,6 @@ export default function Sidebar({
     onChange(sorted)
   }
 
-  /*
-   * Add uploaded images as entries.
-   */
   const handleImageFiles = (
     event: ChangeEvent<HTMLInputElement>,
   ) => {
@@ -228,16 +250,75 @@ export default function Sidebar({
     setImageMenuOpen(false)
   }
 
-  /*
-   * Export results.
-   */
-  const exportResults = () => {
+  const exportResults = async () => {
     if (results.length === 0) {
       return
     }
 
+    /*
+     * Results are already stored in chronological
+     * order, so export them exactly as displayed.
+     */
+    const content =
+      results.join("\r\n")
+
+    const saveWindow =
+      window as SaveFilePickerWindow
+
+    /*
+     * Chrome / Edge:
+     * open the native Save File dialog.
+     */
+    if (saveWindow.showSaveFilePicker) {
+      try {
+        const fileHandle =
+          await saveWindow.showSaveFilePicker(
+            {
+              suggestedName:
+                "spin-wheel-results.txt",
+
+              types: [
+                {
+                  description:
+                    "Text file",
+
+                  accept: {
+                    "text/plain": [
+                      ".txt",
+                    ],
+                  },
+                },
+              ],
+            },
+          )
+
+        const writable =
+          await fileHandle.createWritable()
+
+        await writable.write(content)
+        await writable.close()
+
+        return
+      } catch (error) {
+        /*
+         * User pressed Cancel.
+         * Do not download anything.
+         */
+        if (
+          error instanceof DOMException &&
+          error.name === "AbortError"
+        ) {
+          return
+        }
+      }
+    }
+
+    /*
+     * Browser fallback where the native
+     * Save File Picker isn't available.
+     */
     const blob = new Blob(
-      [results.join("\n")],
+      [content],
       {
         type: "text/plain;charset=utf-8",
       },
@@ -253,23 +334,34 @@ export default function Sidebar({
     anchor.download =
       "spin-wheel-results.txt"
 
+    document.body.appendChild(anchor)
     anchor.click()
+    anchor.remove()
 
     URL.revokeObjectURL(url)
   }
 
-  /*
-   * Keep the initial textarea value synced if
-   * the entries are changed externally.
-   *
-   * We intentionally don't use this while typing,
-   * because doing so would remove trailing newlines.
-   */
-  useEffect(() => {
-    if (items.length === 0 && text === "") {
-      return
-    }
-  }, [items, text])
+  const handleNewWheel = () => {
+    setText("")
+    setWheelMenuOpen(false)
+    onNewWheel()
+  }
+
+  const toggleWheelMenu = () => {
+    setWheelMenuOpen(
+      (current) => !current,
+    )
+
+    setImageMenuOpen(false)
+  }
+
+  const toggleImageMenu = () => {
+    setImageMenuOpen(
+      (current) => !current,
+    )
+
+    setWheelMenuOpen(false)
+  }
 
   return (
     <aside
@@ -321,7 +413,7 @@ export default function Sidebar({
 
         {tab === "entries" ? (
           <>
-            {/* Entry toolbar */}
+            {/* Toolbar */}
             <div className="shrink-0 border-b border-border/70 px-4 py-4">
               <div className="flex items-center gap-2">
                 <Button
@@ -344,7 +436,9 @@ export default function Sidebar({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={sortEntries}
+                  onClick={
+                    sortEntries
+                  }
                   disabled={
                     items.length < 2
                   }
@@ -355,16 +449,16 @@ export default function Sidebar({
                 </Button>
 
                 {/* Add image */}
-                <div className="relative">
+                <div
+                  ref={imageMenuRef}
+                  className="relative"
+                >
                   <Button
                     type="button"
                     variant="secondary"
                     size="sm"
-                    onClick={() =>
-                      setImageMenuOpen(
-                        (value) =>
-                          !value,
-                      )
+                    onClick={
+                      toggleImageMenu
                     }
                     className="h-9 gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 text-xs font-semibold text-blue-500 hover:bg-blue-500/15"
                   >
@@ -391,7 +485,6 @@ export default function Sidebar({
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium transition-colors hover:bg-muted"
                       >
                         <Upload className="h-4 w-4 text-muted-foreground" />
-
                         Upload images
                       </button>
                     </div>
@@ -427,9 +520,9 @@ export default function Sidebar({
               </div>
             </div>
 
-            {/* Advanced section */}
+            {/* Advanced */}
             {advanced && (
-              <div className="mx-4 mt-4 rounded-xl border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
+              <div className="mx-4 mt-4 shrink-0 rounded-xl border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
                 Advanced wheel settings.
               </div>
             )}
@@ -448,6 +541,70 @@ export default function Sidebar({
                 className="h-full min-h-[300px] w-full resize-none rounded-xl border border-border/70 bg-background/70 p-3 text-sm leading-[22px] text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/10"
               />
             </div>
+
+            {/* Add wheel split button */}
+            <div className="shrink-0 border-t border-border/70 bg-muted/10 px-4 py-4">
+              <div
+                ref={wheelMenuRef}
+                className="relative inline-flex"
+              >
+                {/* Main Add wheel interaction */}
+                <button
+                  type="button"
+                  onClick={
+                    handleNewWheel
+                  }
+                  className="inline-flex h-10 items-center gap-2 rounded-l-lg border border-blue-500/20 bg-blue-500/10 px-4 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-500/15"
+                >
+                  <span className="text-lg leading-none">
+                    +
+                  </span>
+
+                  Add wheel
+                </button>
+
+                {/* Separate dropdown interaction */}
+                <button
+                  type="button"
+                  aria-label="More wheel options"
+                  aria-expanded={
+                    wheelMenuOpen
+                  }
+                  onClick={
+                    toggleWheelMenu
+                  }
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-r-lg border border-l-0 border-blue-500/20 bg-blue-500/10 text-blue-500 transition-colors hover:bg-blue-500/15"
+                >
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      wheelMenuOpen
+                        ? "rotate-180"
+                        : ""
+                    }`}
+                  />
+                </button>
+
+                {wheelMenuOpen && (
+                  <div className="absolute bottom-12 left-0 z-[90] w-56 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-2xl">
+                    <button
+                      type="button"
+                      onClick={
+                        handleNewWheel
+                      }
+                      className="flex w-full flex-col rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                    >
+                      <span className="text-sm font-medium">
+                        New blank wheel
+                      </span>
+
+                      <span className="mt-0.5 text-xs text-muted-foreground">
+                        Start with an empty list
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </>
         ) : (
           <>
@@ -458,10 +615,8 @@ export default function Sidebar({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  disabled={
-                    results.length < 2
-                  }
-                  className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold hover:bg-muted"
+                  disabled
+                  className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold"
                 >
                   <ArrowUpDown className="h-3.5 w-3.5" />
                   Sort
@@ -504,15 +659,27 @@ export default function Sidebar({
             {/* Results */}
             <div className="min-h-0 flex-1 p-4">
               <div className="h-full min-h-[300px] overflow-y-auto rounded-xl border border-border/70 bg-background/70 p-3">
-                {results.map(
-                  (result, index) => (
-                    <div
-                      key={`${result}-${index}`}
-                      className="border-b border-border/40 py-1.5 text-sm last:border-0"
-                    >
-                      {result}
-                    </div>
-                  ),
+                {results.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
+                    No results yet.
+                  </div>
+                ) : (
+                  results.map(
+                    (result, index) => (
+                      <div
+                        key={`${result}-${index}`}
+                        className="flex items-center gap-3 border-b border-border/40 py-2.5 text-sm last:border-0"
+                      >
+                        <span className="w-7 shrink-0 text-right text-xs font-semibold text-muted-foreground">
+                          {index + 1}
+                        </span>
+
+                        <span className="min-w-0 truncate">
+                          {result}
+                        </span>
+                      </div>
+                    ),
+                  )
                 )}
               </div>
             </div>
