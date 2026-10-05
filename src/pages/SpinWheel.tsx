@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowDown,
-  ArrowLeft,
-  ArrowRight,
   ArrowUp,
   Check,
   ChevronDown,
@@ -251,7 +249,6 @@ export default function SpinWheel() {
   )
 
   const allSpinning = wheels.some((wheel) => wheel.spinning)
-  const activeTabLabel = activeTab === "results" ? "Results" : activeWheel?.name ?? "Wheel 1"
 
   const updateWheel = (id: string, updater: (wheel: Wheel) => Wheel) => {
     setWheels((current) => current.map((wheel) => (wheel.id === id ? updater(wheel) : wheel)))
@@ -673,7 +670,7 @@ export default function SpinWheel() {
             {entriesOpen && (
               <aside className="flex min-h-[680px] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-sm backdrop-blur">
                 <div className="flex shrink-0 items-center overflow-x-auto border-b border-border/70 bg-muted/10 px-2 pt-2">
-                  {wheels.map((wheel, index) => (
+                  {wheels.map((wheel) => (
                     <button
                       key={wheel.id}
                       type="button"
