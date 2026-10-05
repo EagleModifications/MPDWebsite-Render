@@ -1703,7 +1703,7 @@ function WheelCustomizeDialog({
                           className="h-5 w-5 cursor-pointer rounded border-border accent-blue-500"
                         />
                         <span
-                          className="flex h-9 w-12 items-center justify-center rounded-md border border-border/70 shadow-sm"
+                          className="flex h-9 w-12 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm transition hover:bg-blue-500"
                           style={{ backgroundColor: color }}
                         >
                           <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.45)]" />
@@ -3824,7 +3824,7 @@ export default function Sidebar({
                             !current,
                         )
                       }
-                      className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-lg border border-border/70 shadow-sm transition hover:brightness-105"
+                      className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-lg bg-blue-600 text-white shadow-sm transition hover:bg-blue-500"
                       style={{
                         backgroundColor:
                           settingsDraft.color ??
