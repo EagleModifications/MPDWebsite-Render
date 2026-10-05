@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Check,
-  ChevronDown,
   Copy,
   Dices,
-  Download,
-  Expand,
   FileDown,
   FileUp,
   History,
@@ -544,7 +541,6 @@ export default function SpinWheel() {
     const segment = wheelSegments[safeIndex]
     const segmentCenter = segment ? (segment.start + segment.end) / 2 : 0
     const desiredRotation = -segmentCenter - Math.PI / 2
-    const currentTurns = rotation / (Math.PI * 2)
     const desiredNormalized = ((desiredRotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)
     const currentNormalized = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)
     let delta = desiredNormalized - currentNormalized
