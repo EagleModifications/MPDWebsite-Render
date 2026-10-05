@@ -1,13 +1,17 @@
 import {
+  useEffect,
   useRef,
   useState,
   type ChangeEvent,
+  type MouseEvent as ReactMouseEvent,
 } from "react"
 
 import {
   ChevronDown,
   Download,
+  FolderOpen,
   Image as ImageIcon,
+  Plus,
   Shuffle,
   Upload,
   X,
@@ -116,6 +120,62 @@ export default function Sidebar({
 
   const wheelMenuRef =
     useRef<HTMLDivElement | null>(null)
+
+  /*
+   * Close dropdowns whenever the user clicks
+   * anywhere outside the currently open dropdown.
+   */
+  useEffect(() => {
+    if (
+      !imageMenuOpen &&
+      !wheelMenuOpen
+    ) {
+      return
+    }
+
+    const handleDocumentClick = (
+      event: MouseEvent,
+    ) => {
+      const target = event.target
+
+      if (!(target instanceof Node)) {
+        return
+      }
+
+      const clickedImageMenu =
+        imageMenuRef.current?.contains(
+          target,
+        ) ?? false
+
+      const clickedWheelMenu =
+        wheelMenuRef.current?.contains(
+          target,
+        ) ?? false
+
+      if (!clickedImageMenu) {
+        setImageMenuOpen(false)
+      }
+
+      if (!clickedWheelMenu) {
+        setWheelMenuOpen(false)
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleDocumentClick,
+    )
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleDocumentClick,
+      )
+    }
+  }, [
+    imageMenuOpen,
+    wheelMenuOpen,
+  ])
 
   const handleTextChange = (
     value: string,
@@ -289,10 +349,23 @@ export default function Sidebar({
   const handleNewWheel = () => {
     setText("")
     setWheelMenuOpen(false)
+    setImageMenuOpen(false)
     onNewWheel()
   }
 
-  const toggleImageMenu = () => {
+  const handleOpenWheel = () => {
+    setWheelMenuOpen(false)
+
+    // Placeholder for the wheel-opening
+    // functionality. This keeps the menu
+    // interaction ready for the file picker.
+  }
+
+  const toggleImageMenu = (
+    event: ReactMouseEvent,
+  ) => {
+    event.stopPropagation()
+
     setImageMenuOpen(
       (current) => !current,
     )
@@ -300,7 +373,11 @@ export default function Sidebar({
     setWheelMenuOpen(false)
   }
 
-  const toggleWheelMenu = () => {
+  const toggleWheelMenu = (
+    event: ReactMouseEvent,
+  ) => {
+    event.stopPropagation()
+
     setWheelMenuOpen(
       (current) => !current,
     )
@@ -377,6 +454,7 @@ export default function Sidebar({
                   Shuffle
                 </Button>
 
+                {/* Add image */}
                 <div
                   ref={imageMenuRef}
                   className="relative"
@@ -404,7 +482,7 @@ export default function Sidebar({
                   </Button>
 
                   {imageMenuOpen && (
-                    <div className="absolute left-0 top-11 z-[80] w-48 overflow-hidden rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl">
+                    <div className="absolute left-0 top-11 z-[80] w-56 overflow-hidden rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl">
                       <button
                         type="button"
                         onClick={() =>
@@ -413,6 +491,7 @@ export default function Sidebar({
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
                       >
                         <Upload className="h-4 w-4 text-muted-foreground" />
+
                         Add background image
                       </button>
 
@@ -424,6 +503,7 @@ export default function Sidebar({
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
                       >
                         <Upload className="h-4 w-4 text-muted-foreground" />
+
                         Add center image
                       </button>
 
@@ -435,6 +515,7 @@ export default function Sidebar({
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
                       >
                         <Upload className="h-4 w-4 text-muted-foreground" />
+
                         Add image as entry
                       </button>
                     </div>
@@ -504,9 +585,7 @@ export default function Sidebar({
                   }
                   className="inline-flex h-10 items-center gap-2 rounded-l-lg border border-blue-500/20 bg-blue-500/10 px-4 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-500/15"
                 >
-                  <span className="text-lg leading-none">
-                    +
-                  </span>
+                  <Plus className="h-4 w-4" />
 
                   Add wheel
                 </button>
@@ -532,21 +611,47 @@ export default function Sidebar({
                 </button>
 
                 {wheelMenuOpen && (
-                  <div className="absolute bottom-12 left-0 z-[90] w-56 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-2xl">
+                  <div className="absolute bottom-12 left-0 z-[90] w-60 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-2xl">
+                    {/* Open wheel */}
+                    <button
+                      type="button"
+                      onClick={
+                        handleOpenWheel
+                      }
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                    >
+                      <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">
+                          Open wheel
+                        </span>
+
+                        <span className="mt-0.5 text-xs text-muted-foreground">
+                          Open a saved wheel
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* New blank wheel */}
                     <button
                       type="button"
                       onClick={
                         handleNewWheel
                       }
-                      className="flex w-full flex-col rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
                     >
-                      <span className="text-sm font-medium">
-                        New blank wheel
-                      </span>
+                      <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
 
-                      <span className="mt-0.5 text-xs text-muted-foreground">
-                        Start with an empty list
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">
+                          New blank wheel
+                        </span>
+
+                        <span className="mt-0.5 text-xs text-muted-foreground">
+                          Start with an empty list
+                        </span>
+                      </div>
                     </button>
                   </div>
                 )}
