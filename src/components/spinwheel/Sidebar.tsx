@@ -351,11 +351,13 @@ function rgbToHsv(
     green,
     blue,
   )
+
   const min = Math.min(
     red,
     green,
     blue,
   )
+
   const difference = max - min
 
   let hue = 0
@@ -403,12 +405,14 @@ function hsvToHex(
   v: number,
 ) {
   const c = v * s
+
   const x =
     c *
     (1 -
       Math.abs(
         ((h / 60) % 2) - 1,
       ))
+
   const m = v - c
 
   let red = 0
@@ -489,11 +493,14 @@ function ColorPickerPopover({
     setHexValue(normalized)
 
     const rgb = hexToRgb(normalized)
-    setHue(rgbToHsv(
-      rgb.r,
-      rgb.g,
-      rgb.b,
-    ).h)
+
+    setHue(
+      rgbToHsv(
+        rgb.r,
+        rgb.g,
+        rgb.b,
+      ).h,
+    )
   }, [value])
 
   useEffect(() => {
@@ -533,6 +540,7 @@ function ColorPickerPopover({
     onChange(normalized)
 
     const rgb = hexToRgb(normalized)
+
     setHue(
       rgbToHsv(
         rgb.r,
@@ -581,7 +589,7 @@ function ColorPickerPopover({
 
     let nextHue =
       (Math.atan2(y, x) * 180) /
-      Math.PI +
+        Math.PI +
       90
 
     if (nextHue < 0) {
@@ -1025,7 +1033,8 @@ function SoundDropdown({
 
       {open && (
         <div className="absolute left-0 top-[calc(100%+6px)] z-[320] w-full overflow-hidden rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl">
-          <div className="max-h-[300px] overflow-y-auto pr-1">
+          {/* Only this area scrolls. The settings popup itself does not. */}
+          <div className="max-h-[240px] overflow-y-auto pr-1">
             {SOUND_OPTIONS.map(
               (sound) => {
                 const active =
@@ -1805,6 +1814,7 @@ export default function Sidebar({
       getExtras(item.id)
 
     setSettingsEntryIndex(index)
+
     setSettingsDraft({
       ...item,
     })
@@ -2097,6 +2107,7 @@ export default function Sidebar({
                     >
                       <ImageIcon className="h-3.5 w-3.5" />
                       Add image
+
                       <ChevronDown
                         className={`h-3.5 w-3.5 transition-transform ${
                           imageMenuOpen
@@ -2170,6 +2181,7 @@ export default function Sidebar({
                       }}
                       className="h-4 w-4 rounded border-border accent-blue-500"
                     />
+
                     Advanced
                   </label>
                 </div>
@@ -2680,7 +2692,7 @@ export default function Sidebar({
               role="dialog"
               aria-modal="true"
               aria-labelledby="advanced-entry-settings-title"
-              className="w-full max-w-[680px] overflow-hidden rounded-2xl border border-border/70 bg-card text-foreground shadow-2xl"
+              className="w-full max-w-[680px] overflow-visible rounded-2xl border border-border/70 bg-card text-foreground shadow-2xl"
             >
               <div className="flex h-[68px] items-center justify-between border-b border-border/70 bg-card px-5">
                 <div className="flex items-center gap-3">
@@ -2714,9 +2726,11 @@ export default function Sidebar({
                 </button>
               </div>
 
-              <div className="max-h-[calc(100vh-120px)] overflow-y-auto">
-                <div className="border-b border-border/70 px-5 py-4">
-                  <div className="flex items-center justify-center gap-5">
+              {/* Entry navigation is deliberately independent from the + button.
+                  The arrows/text stay together on the left, while + stays pinned right. */}
+              <div className="border-b border-border/70 px-5 py-4">
+                <div className="relative flex h-10 items-center">
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       aria-label="Previous entry"
@@ -2734,12 +2748,12 @@ export default function Sidebar({
                       <ArrowLeft className="h-4 w-4" />
                     </button>
 
-                    <div className="min-w-[120px] text-center">
+                    <div className="min-w-[64px] text-center">
                       <p className="text-xs font-medium text-muted-foreground">
                         Entry
                       </p>
 
-                      <p className="mt-0.5 text-sm font-semibold">
+                      <p className="mt-0.5 text-sm font-semibold leading-4">
                         {settingsEntryIndex +
                           1}{" "}
                         <span className="font-normal text-muted-foreground">
@@ -2764,381 +2778,383 @@ export default function Sidebar({
                     >
                       <ArrowRight className="h-4 w-4" />
                     </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    aria-label="Add entry"
+                    onClick={() => {
+                      const newItem: SpinWheelItem =
+                        {
+                          id: crypto.randomUUID(),
+                          label: `Entry ${items.length + 1}`,
+                          color:
+                            COLORS[
+                              items.length %
+                                COLORS.length
+                            ],
+                          weight: 1,
+                          hidden: false,
+                        }
+
+                      const nextItems = [
+                        ...items,
+                        newItem,
+                      ]
+
+                      textEditingRef.current =
+                        false
+
+                      setText(
+                        nextItems
+                          .map(
+                            (
+                              item,
+                            ) =>
+                              item.label,
+                          )
+                          .join("\n"),
+                      )
+
+                      onChange(
+                        nextItems,
+                      )
+
+                      setSettingsEntryIndex(
+                        nextItems.length -
+                          1,
+                      )
+
+                      setSettingsDraft({
+                        ...newItem,
+                      })
+
+                      setSettingsSound(
+                        "Inherit from wheel",
+                      )
+
+                      setSettingsPopupMessage(
+                        "",
+                      )
+
+                      setSettingsImage(
+                        undefined,
+                      )
+                    }}
+                    className="absolute right-0 top-0 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-500"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* No scroll container here.
+                  The only scrollable list in the settings popup is the sound dropdown. */}
+              <div className="px-5 py-4">
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-muted/30 px-4 py-3">
+                  <label className="flex cursor-pointer items-center gap-3 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={
+                        !settingsDraft.hidden
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        updateSettingsDraft(
+                          {
+                            hidden:
+                              !event
+                                .target
+                                .checked,
+                          },
+                        )
+                      }
+                      className="h-4 w-4 cursor-pointer rounded border-border accent-blue-500"
+                    />
+
+                    Visible
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={
+                        duplicateSettingsEntry
+                      }
+                      className="flex h-9 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 text-xs font-semibold transition-colors hover:bg-muted"
+                    >
+                      <span className="text-sm">
+                        ▣
+                      </span>
+                      Duplicate
+                    </button>
 
                     <button
                       type="button"
-                      aria-label="Add entry"
-                      onClick={() => {
-                        const newItem: SpinWheelItem =
-                          {
-                            id: crypto.randomUUID(),
-                            label: `Entry ${items.length + 1}`,
-                            color:
-                              COLORS[
-                                items.length %
-                                  COLORS.length
-                              ],
-                            weight: 1,
-                            hidden: false,
-                          }
-
-                        const nextItems = [
-                          ...items,
-                          newItem,
-                        ]
-
-                        textEditingRef.current =
-                          false
-
-                        setText(
-                          nextItems
-                            .map(
-                              (
-                                item,
-                              ) =>
-                                item.label,
-                            )
-                            .join("\n"),
-                        )
-
-                        onChange(
-                          nextItems,
-                        )
-
-                        setSettingsEntryIndex(
-                          nextItems.length -
-                            1,
-                        )
-
-                        setSettingsDraft({
-                          ...newItem,
-                        })
-
-                        setSettingsSound(
-                          "Inherit from wheel",
-                        )
-
-                        setSettingsPopupMessage(
-                          "",
-                        )
-
-                        setSettingsImage(
-                          undefined,
-                        )
-                      }}
-                      className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-500"
+                      onClick={
+                        deleteSettingsEntry
+                      }
+                      className="flex h-9 items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 text-xs font-semibold text-red-500 transition-colors hover:bg-red-500/15"
                     >
-                      <Plus className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
                     </button>
                   </div>
                 </div>
 
-                <div className="px-5 py-4">
-                  <div className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-muted/30 px-4 py-3">
-                    <label className="flex cursor-pointer items-center gap-3 text-sm font-medium">
-                      <input
-                        type="checkbox"
-                        checked={
-                          !settingsDraft.hidden
+                <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                  <label className="text-sm font-medium">
+                    Text
+                  </label>
+
+                  <input
+                    value={
+                      settingsDraft.label
+                    }
+                    onChange={(event) =>
+                      updateSettingsDraft(
+                        {
+                          label:
+                            event.target
+                              .value,
+                        },
+                      )
+                    }
+                    className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 px-3 text-sm outline-none transition-colors focus:border-blue-500/60 focus:bg-muted"
+                  />
+                </div>
+
+                <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                  <label className="text-sm font-medium">
+                    Color
+                  </label>
+
+                  <div className="relative flex items-center gap-3">
+                    <button
+                      type="button"
+                      aria-label="Change color"
+                      onClick={() =>
+                        setSettingsColorOpen(
+                          (current) =>
+                            !current,
+                        )
+                      }
+                      className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-lg border border-border/70 shadow-sm transition hover:brightness-105"
+                      style={{
+                        backgroundColor:
+                          settingsDraft.color ??
+                          "#3b82f6",
+                      }}
+                    >
+                      <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.45)]" />
+                    </button>
+
+                    {settingsColorOpen && (
+                      <ColorPickerPopover
+                        value={
+                          settingsDraft.color ??
+                          "#3b82f6"
                         }
                         onChange={(
-                          event,
+                          color,
                         ) =>
                           updateSettingsDraft(
                             {
-                              hidden:
-                                !event
-                                  .target
-                                  .checked,
+                              color,
                             },
                           )
                         }
-                        className="h-4 w-4 cursor-pointer rounded border-border accent-blue-500"
-                      />
-
-                      Visible
-                    </label>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={
-                          duplicateSettingsEntry
-                        }
-                        className="flex h-9 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 text-xs font-semibold transition-colors hover:bg-muted"
-                      >
-                        <span className="text-sm">
-                          ▣
-                        </span>
-                        Duplicate
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={
-                          deleteSettingsEntry
-                        }
-                        className="flex h-9 items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 text-xs font-semibold text-red-500 transition-colors hover:bg-red-500/15"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                    <label className="text-sm font-medium">
-                      Text
-                    </label>
-
-                    <input
-                      value={
-                        settingsDraft.label
-                      }
-                      onChange={(event) =>
-                        updateSettingsDraft(
-                          {
-                            label:
-                              event.target
-                                .value,
-                          },
-                        )
-                      }
-                      className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 px-3 text-sm outline-none transition-colors focus:border-blue-500/60 focus:bg-muted"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                    <label className="text-sm font-medium">
-                      Color
-                    </label>
-
-                    <div className="relative flex items-center gap-3">
-                      <button
-                        type="button"
-                        aria-label="Change color"
-                        onClick={() =>
+                        onClose={() =>
                           setSettingsColorOpen(
-                            (current) =>
-                              !current,
+                            false,
                           )
                         }
-                        className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-lg border border-border/70 shadow-sm transition hover:brightness-105"
-                        style={{
-                          backgroundColor:
-                            settingsDraft.color ??
-                            "#3b82f6",
-                        }}
-                      >
-                        <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.45)]" />
-                      </button>
+                      />
+                    )}
 
-                      {settingsColorOpen && (
-                        <ColorPickerPopover
-                          value={
-                            settingsDraft.color ??
-                            "#3b82f6"
+                    <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold transition-colors hover:bg-muted">
+                      <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                      Add image
+
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={
+                          handleSettingsImage
+                        }
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                  <label className="text-sm font-medium">
+                    Sound
+                  </label>
+
+                  <SoundDropdown
+                    value={
+                      settingsSound
+                    }
+                    onChange={
+                      setSettingsSound
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                  <label className="text-sm font-medium">
+                    Popup message
+                  </label>
+
+                  <input
+                    value={
+                      settingsPopupMessage
+                    }
+                    onChange={(event) =>
+                      setSettingsPopupMessage(
+                        event.target
+                          .value,
+                      )
+                    }
+                    placeholder="Optional message..."
+                    className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/60 focus:bg-muted"
+                  />
+                </div>
+
+                <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                  <label className="text-sm font-medium">
+                    Weight
+                  </label>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 flex-1 items-center rounded-lg border border-border/70 bg-muted/60">
+                      <Scale className="ml-3 h-4 w-4 text-muted-foreground" />
+
+                      <span className="ml-2 text-sm font-medium">
+                        {settingsDraft.weight ??
+                          1}
+                      </span>
+
+                      <div className="ml-auto flex items-center">
+                        <button
+                          type="button"
+                          disabled={
+                            (settingsDraft.weight ??
+                              1) <= 0
                           }
-                          onChange={(
-                            color,
-                          ) =>
+                          onClick={() =>
                             updateSettingsDraft(
                               {
-                                color,
-                              },
-                            )
-                          }
-                          onClose={() =>
-                            setSettingsColorOpen(
-                              false,
-                            )
-                          }
-                        />
-                      )}
-
-                      <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold transition-colors hover:bg-muted">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                        Add image
-
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={
-                            handleSettingsImage
-                          }
-                        />
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                    <label className="text-sm font-medium">
-                      Sound
-                    </label>
-
-                    <SoundDropdown
-                      value={
-                        settingsSound
-                      }
-                      onChange={
-                        setSettingsSound
-                      }
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                    <label className="text-sm font-medium">
-                      Popup message
-                    </label>
-
-                    <input
-                      value={
-                        settingsPopupMessage
-                      }
-                      onChange={(event) =>
-                        setSettingsPopupMessage(
-                          event.target
-                            .value,
-                        )
-                      }
-                      placeholder="Optional message..."
-                      className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/60 focus:bg-muted"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                    <label className="text-sm font-medium">
-                      Weight
-                    </label>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 flex-1 items-center rounded-lg border border-border/70 bg-muted/60">
-                        <Scale className="ml-3 h-4 w-4 text-muted-foreground" />
-
-                        <span className="ml-2 text-sm font-medium">
-                          {settingsDraft.weight ??
-                            1}
-                        </span>
-
-                        <div className="ml-auto flex items-center">
-                          <button
-                            type="button"
-                            disabled={
-                              (settingsDraft.weight ??
-                                1) <= 0
-                            }
-                            onClick={() =>
-                              updateSettingsDraft(
-                                {
-                                  weight:
-                                    Math.max(
-                                      0,
-                                      Math.round(
-                                        ((settingsDraft.weight ??
-                                          1) -
-                                          1) *
-                                          100,
-                                      ) /
-                                        100,
-                                    ),
-                                },
-                              )
-                            }
-                            className="flex h-10 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateSettingsDraft(
-                                {
-                                  weight:
+                                weight:
+                                  Math.max(
+                                    0,
                                     Math.round(
                                       ((settingsDraft.weight ??
-                                        1) +
+                                        1) -
                                         1) *
                                         100,
                                     ) /
-                                    100,
-                                },
-                              )
-                            }
-                            className="flex h-10 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="min-w-[100px] text-right">
-                        <span className="text-xs text-muted-foreground">
-                          Probability
-                        </span>
-
-                        <p className="text-sm font-semibold">
-                          {settingsProbability}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {settingsImage && (
-                    <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                      <span className="text-sm font-medium">
-                        Image
-                      </span>
-
-                      <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 overflow-hidden rounded-lg border border-border/70 bg-muted">
-                          <img
-                            src={
-                              settingsImage
-                            }
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
+                                      100,
+                                  ),
+                              },
+                            )
+                          }
+                          className="flex h-10 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
 
                         <button
                           type="button"
                           onClick={() =>
-                            setSettingsImage(
-                              undefined,
+                            updateSettingsDraft(
+                              {
+                                weight:
+                                  Math.round(
+                                    ((settingsDraft.weight ??
+                                      1) +
+                                      1) *
+                                      100,
+                                  ) /
+                                  100,
+                              },
                             )
                           }
-                          className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                          className="flex h-10 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                         >
-                          Remove image
+                          <Plus className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
-                  )}
+
+                    <div className="min-w-[100px] text-right">
+                      <span className="text-xs text-muted-foreground">
+                        Probability
+                      </span>
+
+                      <p className="text-sm font-semibold">
+                        {settingsProbability}%
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-5 py-4">
-                  <button
-                    type="button"
-                    onClick={
-                      closeSettings
-                    }
-                    className="h-10 rounded-lg px-4 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
+                {settingsImage && (
+                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                    <span className="text-sm font-medium">
+                      Image
+                    </span>
 
-                  <button
-                    type="button"
-                    onClick={
-                      saveSettings
-                    }
-                    className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-500"
-                  >
-                    Save changes
-                  </button>
-                </div>
+                    <div className="flex items-center gap-3">
+                      <div className="h-12 w-12 overflow-hidden rounded-lg border border-border/70 bg-muted">
+                        <img
+                          src={
+                            settingsImage
+                          }
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSettingsImage(
+                            undefined,
+                          )
+                        }
+                        className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        Remove image
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-5 py-4">
+                <button
+                  type="button"
+                  onClick={
+                    closeSettings
+                  }
+                  className="h-10 rounded-lg px-4 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    saveSettings
+                  }
+                  className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-500"
+                >
+                  Save changes
+                </button>
               </div>
             </div>
           </div>
