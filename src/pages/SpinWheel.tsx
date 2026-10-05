@@ -463,7 +463,7 @@ export default function SpinWheel() {
           id: typeof wheel.id === "string" ? wheel.id : crypto.randomUUID(),
           name: typeof wheel.name === "string" && wheel.name.trim() ? wheel.name : `Wheel ${index + 1}`,
           items: Array.isArray(wheel.items)
-            ? wheel.items.map((item, itemIndex) => ({
+            ? wheel.items.map((item) => ({
                 id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
                 label: typeof item.label === "string" ? item.label : String(item.label ?? ""),
                 color: item.color,
