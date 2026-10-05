@@ -390,9 +390,19 @@ function playAfterSpinSound(sound: string, volume: number) {
 const halfThenSmoothStop = (t: number) => {
   if (t <= 0.5) return t
 
+  /*
+   * Keep exactly the same constant angular speed through the first half.
+   * The second half uses a quintic curve whose velocity, acceleration and
+   * higher-order motion are eased toward zero, so braking begins smoothly
+   * at 50% and the final stop has no visible snap.
+   */
   const u = (t - 0.5) * 2
-  // u + u² - u³ has derivative 1 at the join and 0 at the end.
-  const eased = u + u * u - u * u * u
+  const eased =
+    0.5 * u +
+    (7 / 3) * u ** 2 -
+    4 * u ** 4 +
+    (13 / 6) * u ** 5
+
   return 0.5 + 0.5 * eased
 }
 
@@ -793,12 +803,18 @@ export default function Wheel({
      * a little longer, with a controlled
      * multi-revolution spin.
      */
-    const duration = Math.max(1500, Math.min(60000, spinTimeRef.current * 1000))
+    const configuredDuration = Math.max(1500, Math.min(60000, spinTimeRef.current * 1000))
     const slowly = spinSlowlyRef.current
+
+    /* Slow mode keeps the configured timing. Normal mode is much quicker,
+       while both use the same halfway-braking curve. */
+    const duration = slowly
+      ? configuredDuration
+      : Math.max(3200, Math.min(6000, configuredDuration * 0.45))
 
     wheel.spinToItem(
       selectedIndex,
-      slowly ? duration : Math.max(3200, Math.min(12000, duration)),
+      duration,
       true,
       6,
       1,
@@ -1001,9 +1017,9 @@ export default function Wheel({
            */
           itemLabelAlign: "right",
 
-          itemLabelRadius: 0.86,
+          itemLabelRadius: 0.90,
 
-          itemLabelRadiusMax: 0.20,
+          itemLabelRadiusMax: 0.14,
 
           itemLabelFont:
             "Arial, Helvetica, sans-serif",
@@ -1126,6 +1142,15 @@ export default function Wheel({
       )
 
     enablePerItemLabelSizing(wheel)
+
+    /*
+     * spin-wheel does not emit onCurrentIndexChange during its initial
+     * construction. Read the real pointer index once the wheel exists so
+     * the DOM arrow starts on the exact slice it is visually pointing at.
+     */
+    const actualInitialIndex = wheel.getCurrentIndex()
+    currentIndexRef.current = actualInitialIndex
+    setPointerForIndex(actualInitialIndex)
 
     wheelRef.current =
       wheel
@@ -1302,7 +1327,7 @@ export default function Wheel({
 
             {/* Exact colour of the entry currently under the pointer. */}
             <div
-              className="absolute inset-[3px] transition-[background] duration-75"
+              className="absolute inset-[3px]"
               style={{
                 clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
                 background: "var(--pointer-color)",
@@ -1323,7 +1348,7 @@ export default function Wheel({
           {/* Centre                                                           */}
           {/* ---------------------------------------------------------------- */}
 
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 h-[15%] w-[15%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full border-[3px] border-white/95 bg-white shadow-[0_5px_14px_rgba(0,0,0,0.38),inset_0_1px_2px_rgba(0,0,0,0.12)]">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 aspect-square h-[15%] w-auto -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full border-[3px] border-white/95 bg-white shadow-[0_5px_14px_rgba(0,0,0,0.38),inset_0_1px_2px_rgba(0,0,0,0.12)]">
             {centerImage && (
               <img
                 src={centerImage}
