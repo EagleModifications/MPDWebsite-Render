@@ -22,10 +22,10 @@ type WheelProps = {
   onResult?: (item: SpinWheelItem) => void
   compact?: boolean
   spinTrigger?: number
-  duringSound?: string
-  duringVolume?: number
   afterSound?: string
   afterVolume?: number
+  duringSound?: string
+  duringVolume?: number
 }
 
 type ConfettiPiece = {
@@ -112,31 +112,248 @@ function useRandomItemColors(items: SpinWheelItem[]) {
 /* Audio                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const DURING_SPIN_SOUND_FILES: Record<string, string> = {
-  "Ticking sound": "tick.mp3",
+type AudioContextWithWebkit = typeof AudioContext & {
+  new (): AudioContext
 }
 
-function playDuringSpinSound(
-  sound: string,
-  volume: number,
-  audioRef: { current: HTMLAudioElement | null },
-) {
-  if (sound === "No sound" || sound === "Inherit from wheel") return
-
-  const file = sound === "Random sound"
-    ? "tick.mp3"
-    : DURING_SPIN_SOUND_FILES[sound]
-
-  if (!file) return
-
-  const previous = audioRef.current
-  if (previous) {
-    previous.pause()
-    previous.currentTime = 0
+function getAudioContextClass() {
+  if (
+    typeof window === "undefined"
+  ) {
+    return null
   }
+
+  const windowWithWebkit =
+    window as Window & {
+      webkitAudioContext?: AudioContextWithWebkit
+    }
+
+  return (
+    window.AudioContext ??
+    windowWithWebkit.webkitAudioContext ??
+    null
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* During-spin audio                                                         */
+/* -------------------------------------------------------------------------- */
+
+function playTick(volume: number) {
+  const audio = new Audio("/sounds/during-spin/ding.mp3")
+  audio.volume = Math.max(0, Math.min(1, volume / 100))
+  void audio.play().catch(() => undefined)
+}
+
+export const DURING_SOUND_CATEGORIES: Record<string, Record<string, string>> = {
+  "Sound effects": {
+    "Ticking sound": "ding.mp3",
+    "Drum roll": "drum-roll.mp3",
+    "Microwave oven": "microwave-oven.mp3",
+  },
+  "Pop music": {
+    "A better life": "pop-music/a-better-life.mp3",
+    "Beyond the cloudy sky": "pop-music/beyond-the-cloudy-sky.mp3",
+    "Floor breaker": "pop-music/floor-breaker.mp3",
+    "Fun times all the time": "pop-music/fun-times-all-the-time.mp3",
+    "Heaven's smile": "pop-music/heavens-smile.mp3",
+    "Life of Riley": "pop-music/life-of-riley.mp3",
+    "Lush life": "pop-music/lush-life.mp3",
+    "Make the drive": "pop-music/make-the-drive.mp3",
+    "Spaceship": "pop-music/spaceship.mp3",
+    "Time and time again": "pop-music/time-and-time-again.mp3",
+    "Vibrance": "pop-music/vibrance.mp3",
+    "We can't slow down": "pop-music/we-cant-slow-down.mp3",
+  },
+  "Easy listening": {
+    "A simple way to be happy": "easy-listening/a-simple-way-to-be-happy.mp3",
+    "Genius minds": "easy-listening/genius-minds.mp3",
+    "Glitter blast": "easy-listening/glitter-blast.mp3",
+    "Groundwork": "easy-listening/groundwork.mp3",
+    "Happy bee": "easy-listening/happy-bee.mp3",
+    "Lucky in life": "easy-listening/lucky-in-life.mp3",
+    "Upbeat forever": "easy-listening/upbeat-forever.mp3",
+  },
+  "Cinematic music": {
+    "Enter sentinel": "cinematic-music/enter-sentinel.mp3",
+    "Fire with fire": "cinematic-music/fire-with-fire.mp3",
+    "Midnight diving": "cinematic-music/midnight-diving.mp3",
+    "Strength of the Titans": "cinematic-music/strength-of-the-titans.mp3",
+    "Ripples in time": "cinematic-music/ripples-in-time.mp3",
+    "Wretched destroyer": "cinematic-music/wretched-destroyer.mp3",
+  },
+  "Reggae & Reggaeton": {
+    "BehBuBah": "reggae-reggaeton/behbubah.mp3",
+    "Cairo reggaeton": "reggae-reggaeton/cairo-reggaeton.mp3",
+    "Dancing monkey": "reggae-reggaeton/dancing-monkey.mp3",
+    "Easy jam": "reggae-reggaeton/easy-jam.mp3",
+    "Steel drum": "reggae-reggaeton/steel-drum.mp3",
+    "Sun island waves": "reggae-reggaeton/sun-island-waves.mp3",
+  },
+  "8-Bit": {
+    "8 Bits racing car game theme": "8-bit/8-bits-racing-car-game-theme.mp3",
+    "Game of rings": "8-bit/game-of-rings.mp3",
+    "Sweet tale": "8-bit/sweet-tale.mp3",
+  },
+  "Folk": {
+    "Falling leaf": "folk/falling-leaf.mp3",
+    "Meeting the backcountry": "folk/meeting-the-backcountry.mp3",
+    "Steel and gold": "folk/steel-and-gold.mp3",
+    "Uke can swing": "folk/uke-can-swing.mp3",
+    "Window of opportunity": "folk/window-of-opportunity.mp3",
+  },
+  "Silent film score": {
+    "Amazing plan": "silent-film-score/amazing-plan.mp3",
+    "Le grand chase": "silent-film-score/le-grand-chase.mp3",
+    "Merry-go-round": "silent-film-score/merry-go-round.mp3",
+    "Super circus": "silent-film-score/super-circus.mp3",
+  },
+  "Dance & Techno": {
+    "Crazy clown": "dance-techno/crazy-clown.mp3",
+    "Defiant dance": "dance-techno/defiant-dance.mp3",
+    "Give me that": "dance-techno/give-me-that.mp3",
+    "Move forward": "dance-techno/move-forward.mp3",
+    "Overclock": "dance-techno/overclock.mp3",
+    "Race for survival": "dance-techno/race-for-survival.mp3",
+    "Raving energy": "dance-techno/raving-energy-faster.mp3",
+    "So bright": "dance-techno/so-bright.mp3",
+    "Strike out": "dance-techno/strike-out.mp3",
+    "Whistle & flow": "dance-techno/whistle-and-flow.mp3",
+  },
+  "Hip hop": {
+    "Bananas": "hip-hop/bananas.mp3",
+    "Drop zone": "hip-hop/drop-zone.mp3",
+    "Gassed up": "hip-hop/gassed-up.mp3",
+    "Going all the way": "hip-hop/going-all-the-way.mp3",
+    "Hard trap bounce": "hip-hop/hard-trap-bounce.mp3",
+    "Ice cream truck": "hip-hop/ice-cream-truck.mp3",
+    "It's alive": "hip-hop/its-alive.mp3",
+    "Put your hand up": "hip-hop/put-your-hand-up.mp3",
+    "Ready for some action": "hip-hop/ready-for-some-action.mp3",
+    "The trap mission": "hip-hop/the-trap-mission.mp3",
+  },
+  "Disco": {
+    "Mexican jackpot": "disco/mexican-jackpot.mp3",
+    "Ocean wave": "disco/ocean-wave.mp3",
+    "Saturn airlines": "disco/saturn-airlines.mp3",
+    "Stringed disco": "disco/stringed-disco.mp3",
+    "Vintage disco": "disco/vintage-disco.mp3",
+  },
+  "Electronica": {
+    "Ambient chillhop groove": "electronica/ambient-chillhop-groove.mp3",
+    "Beautiful Yumiko": "electronica/beautiful-yumiko.mp3",
+    "Better better": "electronica/better-better.mp3",
+    "Deep and dirty": "electronica/deep-and-dirty.mp3",
+    "On TV": "electronica/on-tv.mp3",
+    "Phat sketch": "electronica/phat-sketch.mp3",
+    "Son of a rocket": "electronica/son-of-a-rocket.mp3",
+  },
+  "Funk": {
+    "Bounce like this": "funk/bounce-like-this.mp3",
+    "Celebration": "funk/celebration.mp3",
+    "Funk overflow": "funk/funk-overflow.mp3",
+    "Funk the buzz": "funk/funk-the-buzz.mp3",
+    "Like we do it": "funk/like-we-do-it.mp3",
+  },
+  "Ballroom dancing": {
+    "Happy happy game show": "ballroom-dancing/happy-happy-game-show.mp3",
+    "Lobby time": "ballroom-dancing/lobby-time.mp3",
+    "The ballroom waltz": "ballroom-dancing/the-ballroom-waltz.mp3",
+  },
+  "Rock music": {
+    "Give it a try": "rock-music/give-it-a-try.mp3",
+    "In love with the good life": "rock-music/in-love-with-the-good-life.mp3",
+    "Learn to believe it": "rock-music/learn-to-believe-it.mp3",
+    "Welcome to the show": "rock-music/welcome-to-the-show.mp3",
+  },
+  "World music": {
+    "Arabic celebration": "world-music/arabic-celebration.mp3",
+    "Ban ban": "world-music/ban-ban.mp3",
+    "Banda macho": "world-music/banda-macho.mp3",
+    "Dance of the harpy": "world-music/dance-of-the-harpy.mp3",
+    "Dance with the moon": "world-music/dance-with-the-moon.mp3",
+    "Desert sand": "world-music/desert-sand.mp3",
+    "Diwali": "world-music/diwali.mp3",
+    "Every heartbeat": "world-music/every-heartbeat.mp3",
+    "Galway": "world-music/galway.mp3",
+    "Great Wall of China": "world-music/great-wall-of-china.mp3",
+    "Kage": "world-music/kage-shutterstock-543763-loop-4.mp3",
+    "Khaek mon Thai": "world-music/khaek-mon-thai-traditional.mp3",
+    "Ma re lah": "world-music/ma-re-lah.mp3",
+    "Modern India": "world-music/modern-india.mp3",
+    "Serviko": "world-music/serviko.mp3",
+    "Verano sensual": "world-music/verano-sensual.mp3",
+  },
+  "Rockabilly": {
+    "Dark pathways": "rockabilly/dark-pathways.mp3",
+    "Lone heart blues": "rockabilly/lone-heart-blues.mp3",
+    "Whiskey bar": "rockabilly/whiskey-bar.mp3",
+  },
+  "Polka": {
+    "Festive polka": "polka/festive-polka.mp3",
+    "Tiroler polka": "polka/tiroler-polka.mp3",
+  },
+  "Retro-Rock": {
+    "Fashion power": "retro-rock/fashion-power.mp3",
+    "Groovy shoes": "retro-rock/groovy-shoes.mp3",
+    "Small fry": "retro-rock/small-fry.mp3",
+    "Surf wax": "retro-rock/surf-wax.mp3",
+    "Surfing waves": "retro-rock/surfing-waves.mp3",
+  },
+  "Winter holiday music": {
+    "Auld Lang Syne": "winter-holiday-music/auld-lang-syne.mp3",
+    "Christmas energy": "winter-holiday-music/christmas-energy.mp3",
+    "Christmas soul": "winter-holiday-music/christmas-soul.mp3",
+    "Crispy snow": "winter-holiday-music/crispy-snow.mp3",
+    "Deck the halls": "winter-holiday-music/deck-the-halls.mp3",
+    "Dreidel song": "winter-holiday-music/dreidel-song.mp3",
+    "Holiday bustle": "winter-holiday-music/holiday-bustle.mp3",
+    "Jolly old Saint Nicholas": "winter-holiday-music/jolly-old-saint-nicholas.mp3",
+    "Log cabin Christmas": "winter-holiday-music/log-cabin-christmas.mp3",
+    "New Year's resolution": "winter-holiday-music/new-years-resolution.mp3",
+    "Oh Christmas tree": "winter-holiday-music/oh-christmas-tree.mp3",
+  },
+}
+
+export const DURING_SOUND_FILES: Record<string, string> = Object.fromEntries(
+  Object.entries(DURING_SOUND_CATEGORIES).flatMap(([category, files]) =>
+    Object.entries(files).map(([name, path]) => [name, path]),
+  ),
+)
+
+export const DURING_SOUND_CATEGORY_NAMES = Object.keys(DURING_SOUND_CATEGORIES)
+
+function pickDuringSound(sound: string) {
+  if (sound === "No sound") return null
+  if (sound === "Ticking sound") return "ding.mp3"
+
+  const randomCategory = sound.match(/^Random (.+)$/)?.[1]
+  if (randomCategory) {
+    const files = DURING_SOUND_CATEGORIES[randomCategory]
+    if (!files) return null
+    const values = Object.values(files)
+    return values[Math.floor(Math.random() * values.length)] ?? null
+  }
+
+  return DURING_SOUND_FILES[sound] ?? null
+}
+
+function isTickingSound(sound: string) {
+  return sound === "Ticking sound"
+}
+
+function playDuringSoundPreview(sound: string, volume: number, audioRef: { current: HTMLAudioElement | null }) {
+  if (audioRef.current) {
+    audioRef.current.pause()
+    audioRef.current.currentTime = 0
+  }
+
+  const file = pickDuringSound(sound)
+  if (!file) return
 
   const audio = new Audio(`/sounds/during-spin/${file}`)
   audio.volume = Math.max(0, Math.min(1, volume / 100))
+  audio.loop = !isTickingSound(sound)
   audioRef.current = audio
   void audio.play().catch(() => undefined)
 }
@@ -195,13 +412,8 @@ function playAfterSpinSound(sound: string, volume: number) {
 
   if (!file) return
 
-  const audio = new Audio(`/sounds/afterspin/${file}`)
+  const audio = new Audio(`/sounds/after-spin/${file}`)
   audio.volume = Math.max(0, Math.min(1, volume / 100))
-  audio.onerror = () => {
-    const fallback = new Audio(`/sounds/after-spin/${file}`)
-    fallback.volume = Math.max(0, Math.min(1, volume / 100))
-    void fallback.play().catch(() => undefined)
-  }
   void audio.play().catch(() => undefined)
 }
 
@@ -310,10 +522,10 @@ export default function Wheel({
   onResult,
   compact = false,
   spinTrigger = 0,
-  duringSound = "Ticking sound",
-  duringVolume = 50,
   afterSound = "Subdued applause",
   afterVolume = 50,
+  duringSound = "Ticking sound",
+  duringVolume = 50,
 }: WheelProps) {
   const containerRef =
     useRef<HTMLDivElement | null>(null)
@@ -330,11 +542,17 @@ export default function Wheel({
   const currentIndexRef =
     useRef(0)
 
+  const audioContextRef =
+    useRef<AudioContext | null>(null)
+
   const lastTickIndexRef =
     useRef<number | null>(null)
 
-  const duringAudioRef =
+  const duringSpinAudioRef =
     useRef<HTMLAudioElement | null>(null)
+
+  const duringSoundRef = useRef(duringSound)
+  const duringVolumeRef = useRef(duringVolume)
 
   const confettiTimerRef =
     useRef<ReturnType<
@@ -403,6 +621,43 @@ export default function Wheel({
     onResultRef.current =
       onResult
   }, [onResult])
+
+  /* ---------------------------------------------------------------------- */
+  /* Audio context                                                          */
+  /* ---------------------------------------------------------------------- */
+
+  const getAudioContext =
+    useCallback(() => {
+      if (
+        typeof window ===
+        "undefined"
+      ) {
+        return null
+      }
+
+      if (
+        !audioContextRef.current
+      ) {
+        const AudioContextClass =
+          getAudioContextClass()
+
+        if (!AudioContextClass) {
+          return null
+        }
+
+        audioContextRef.current =
+          new AudioContextClass()
+      }
+
+      if (
+        audioContextRef.current.state ===
+        "suspended"
+      ) {
+        void audioContextRef.current.resume()
+      }
+
+      return audioContextRef.current
+    }, [])
 
   /* ---------------------------------------------------------------------- */
   /* Pointer                                                                */
@@ -486,6 +741,40 @@ export default function Wheel({
         }, 3900)
     }, [])
 
+  useEffect(() => {
+    duringSoundRef.current = duringSound
+  }, [duringSound])
+
+  useEffect(() => {
+    duringVolumeRef.current = duringVolume
+    if (duringSpinAudioRef.current) {
+      duringSpinAudioRef.current.volume = Math.max(0, Math.min(1, duringVolume / 100))
+    }
+  }, [duringVolume])
+
+  const stopDuringSpinAudio = useCallback(() => {
+    const audio = duringSpinAudioRef.current
+    if (!audio) return
+    audio.pause()
+    audio.currentTime = 0
+    duringSpinAudioRef.current = null
+  }, [])
+
+  const startDuringSpinAudio = useCallback((sound: string, volume: number) => {
+    stopDuringSpinAudio()
+
+    if (sound === "No sound" || isTickingSound(sound)) return
+
+    const file = pickDuringSound(sound)
+    if (!file) return
+
+    const audio = new Audio(`/sounds/during-spin/${file}`)
+    audio.volume = Math.max(0, Math.min(1, volume / 100))
+    audio.loop = true
+    duringSpinAudioRef.current = audio
+    void audio.play().catch(() => undefined)
+  }, [stopDuringSpinAudio])
+
   /* ---------------------------------------------------------------------- */
   /* Spin                                                                   */
   /* ---------------------------------------------------------------------- */
@@ -500,6 +789,13 @@ export default function Wheel({
       spinningRef.current
     ) {
       return
+    }
+
+    const audio =
+      getAudioContext()
+
+    if (audio) {
+      void audio.resume()
     }
 
     setConfetti([])
@@ -518,6 +814,11 @@ export default function Wheel({
 
     setIsSpinning(true)
 
+    startDuringSpinAudio(
+      duringSoundRef.current,
+      duringVolumeRef.current,
+    )
+
     /*
      * Match the recording more closely:
      * a little longer, with a controlled
@@ -530,7 +831,11 @@ export default function Wheel({
       5,
       1,
     )
-  }, [visibleItems.length])
+  }, [
+    getAudioContext,
+    startDuringSpinAudio,
+    visibleItems.length,
+  ])
 
   const previousSpinTriggerRef = useRef(spinTrigger)
 
@@ -540,8 +845,9 @@ export default function Wheel({
     }
 
     previousSpinTriggerRef.current = spinTrigger
+    getAudioContext()
     spin()
-  }, [spin, spinTrigger])
+  }, [getAudioContext, spin, spinTrigger])
 
   /* ---------------------------------------------------------------------- */
   /* Ctrl + Enter                                                           */
@@ -557,6 +863,7 @@ export default function Wheel({
       ) {
         event.preventDefault()
 
+        getAudioContext()
         spin()
       }
     }
@@ -572,7 +879,10 @@ export default function Wheel({
         handleKeyDown,
       )
     }
-  }, [spin])
+  }, [
+    getAudioContext,
+    spin,
+  ])
 
   /* ---------------------------------------------------------------------- */
   /* Create wheel                                                           */
@@ -750,13 +1060,10 @@ export default function Wheel({
                   index
 
                 if (
-                  spinningRef.current
+                  spinningRef.current &&
+                  isTickingSound(duringSoundRef.current)
                 ) {
-                  playDuringSpinSound(
-                    duringSound,
-                    duringVolume,
-                    duringAudioRef,
-                  )
+                  playTick(duringVolumeRef.current)
                 }
               }
             },
@@ -795,6 +1102,8 @@ export default function Wheel({
             setPointerForIndex(
               selectedIndex,
             )
+
+            stopDuringSpinAudio()
 
             spinningRef.current =
               false
@@ -849,9 +1158,8 @@ export default function Wheel({
     visibleItems,
     visibleColors,
     setPointerForIndex,
+    stopDuringSpinAudio,
     launchConfetti,
-    duringSound,
-    duringVolume,
     afterSound,
     afterVolume,
   ])
@@ -870,13 +1178,15 @@ export default function Wheel({
         )
       }
 
-      if (duringAudioRef.current) {
-        duringAudioRef.current.pause()
-        duringAudioRef.current.currentTime = 0
-        duringAudioRef.current = null
+      stopDuringSpinAudio()
+
+      if (
+        audioContextRef.current
+      ) {
+        void audioContextRef.current.close()
       }
     }
-  }, [])
+  }, [stopDuringSpinAudio])
 
   /* ---------------------------------------------------------------------- */
   /* Wheel click                                                             */
