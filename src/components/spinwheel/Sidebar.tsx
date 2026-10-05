@@ -49,7 +49,6 @@ type SidebarProps = {
   onSelectWheel: (wheelId: string) => void
   onChange: (items: SpinWheelItem[]) => void
   onClearResults: () => void
-  onNewWheel: () => void
   onRenameWheel: (wheelId: string, name: string) => void
   onRemoveWheel: (wheelId: string) => void
   onOpenWheel: () => void
@@ -1097,7 +1096,6 @@ export default function Sidebar({
   onSelectWheel,
   onChange,
   onClearResults,
-  onNewWheel,
   onRenameWheel,
   onRemoveWheel,
   onOpenWheel,
@@ -1969,16 +1967,6 @@ export default function Sidebar({
       URL.revokeObjectURL(url)
     }
 
-  const handleNewWheel = () => {
-    textEditingRef.current = false
-
-    setText("")
-    setWheelMenuOpen(false)
-    setImageMenuOpen(false)
-    setTab("entries")
-    onNewWheel()
-  }
-
   const handleRenameActiveWheel = () => {
     const wheel = wheels.find((entry) => entry.id === activeWheelId)
     if (!wheel) return
@@ -2020,10 +2008,6 @@ export default function Sidebar({
     items.filter(
       (item) => item.hidden,
     ).length
-
-  const activeWheel = wheels.find(
-    (wheel) => wheel.id === activeWheelId,
-  )
 
   const activeWheelNumber = Math.max(
     1,
