@@ -173,10 +173,6 @@ export default function Sidebar({
   const [wheelMenuOpen, setWheelMenuOpen] =
     useState(false)
 
-  /*
-   * Keeps the textarea from being overwritten while
-   * the user is actively typing.
-   */
   const textEditingRef =
     useRef(false)
 
@@ -189,9 +185,6 @@ export default function Sidebar({
   const wheelMenuRef =
     useRef<HTMLDivElement | null>(null)
 
-  /*
-   * Advanced entry settings modal.
-   */
   const [
     settingsEntryIndex,
     setSettingsEntryIndex,
@@ -219,14 +212,6 @@ export default function Sidebar({
     undefined,
   )
 
-  /*
-   * Keep the normal textarea synchronized with
-   * external changes, but NEVER overwrite the
-   * textarea while the user is typing.
-   *
-   * This is what allows Enter to create a normal
-   * newline in the textarea.
-   */
   useEffect(() => {
     if (textEditingRef.current) {
       return
@@ -239,9 +224,6 @@ export default function Sidebar({
     )
   }, [items])
 
-  /*
-   * Close dropdowns when clicking outside.
-   */
   useEffect(() => {
     if (
       !imageMenuOpen &&
@@ -294,9 +276,6 @@ export default function Sidebar({
     wheelMenuOpen,
   ])
 
-  /*
-   * Close the settings modal with Escape.
-   */
   useEffect(() => {
     if (settingsEntryIndex === null) {
       return
@@ -326,11 +305,6 @@ export default function Sidebar({
   const handleTextChange = (
     value: string,
   ) => {
-    /*
-     * Set the ref BEFORE changing the parent.
-     * The items effect will therefore not replace
-     * the raw textarea value after Enter is pressed.
-     */
     textEditingRef.current = true
 
     setText(value)
@@ -353,9 +327,6 @@ export default function Sidebar({
     )
   }
 
-  /*
-   * Shuffle entries.
-   */
   const shuffleEntries = () => {
     if (items.length < 2) {
       return
@@ -394,9 +365,6 @@ export default function Sidebar({
     onChange(shuffled)
   }
 
-  /*
-   * Sort entries alphabetically.
-   */
   const sortEntries = () => {
     if (items.length < 2) {
       return
@@ -425,9 +393,6 @@ export default function Sidebar({
     onChange(sorted)
   }
 
-  /*
-   * Add image entries.
-   */
   const handleImageFiles = (
     event: ChangeEvent<HTMLInputElement>,
   ) => {
@@ -478,9 +443,6 @@ export default function Sidebar({
     setImageMenuOpen(false)
   }
 
-  /*
-   * Add a single entry.
-   */
   const addEntry = () => {
     const newItem: SpinWheelItem = {
       id: crypto.randomUUID(),
@@ -510,9 +472,6 @@ export default function Sidebar({
     onChange(nextItems)
   }
 
-  /*
-   * Update one entry.
-   */
   const updateEntry = (
     id: string,
     changes: Partial<SpinWheelItem>,
@@ -538,9 +497,6 @@ export default function Sidebar({
     onChange(nextItems)
   }
 
-  /*
-   * Remove an entry.
-   */
   const removeEntry = (
     id: string,
   ) => {
@@ -568,9 +524,6 @@ export default function Sidebar({
     }
   }
 
-  /*
-   * Move an entry up or down.
-   */
   const moveEntry = (
     index: number,
     direction: -1 | 1,
@@ -619,9 +572,6 @@ export default function Sidebar({
     }
   }
 
-  /*
-   * Change weight.
-   */
   const changeWeight = (
     id: string,
     amount: number,
@@ -663,9 +613,6 @@ export default function Sidebar({
     }
   }
 
-  /*
-   * Reveal every hidden entry.
-   */
   const revealHidden = () => {
     const nextItems =
       items.map((item) => ({
@@ -684,9 +631,6 @@ export default function Sidebar({
     onChange(nextItems)
   }
 
-  /*
-   * Open the advanced settings popup.
-   */
   const openSettings = (
     index: number,
   ) => {
@@ -720,10 +664,6 @@ export default function Sidebar({
     )
   }
 
-  /*
-   * Close settings without applying
-   * any changes to the entry.
-   */
   const closeSettings = () => {
     setSettingsEntryIndex(null)
     setSettingsDraft(null)
@@ -732,9 +672,6 @@ export default function Sidebar({
     setSettingsImage(undefined)
   }
 
-  /*
-   * Apply the advanced settings.
-   */
   const saveSettings = () => {
     if (
       settingsDraft === null
@@ -776,9 +713,6 @@ export default function Sidebar({
     closeSettings()
   }
 
-  /*
-   * Duplicate the current entry.
-   */
   const duplicateSettingsEntry = () => {
     if (
       settingsDraft === null ||
@@ -841,9 +775,6 @@ export default function Sidebar({
     })
   }
 
-  /*
-   * Delete current settings entry.
-   */
   const deleteSettingsEntry = () => {
     if (
       settingsDraft === null
@@ -856,9 +787,6 @@ export default function Sidebar({
     )
   }
 
-  /*
-   * Update the draft only.
-   */
   const updateSettingsDraft = (
     changes: Partial<SpinWheelItem>,
   ) => {
@@ -873,10 +801,6 @@ export default function Sidebar({
     )
   }
 
-  /*
-   * Select another entry from the
-   * settings modal.
-   */
   const selectSettingsEntry = (
     index: number,
   ) => {
@@ -910,10 +834,6 @@ export default function Sidebar({
     )
   }
 
-  /*
-   * Add/change image for the currently
-   * selected advanced entry.
-   */
   const handleSettingsImage = (
     event: ChangeEvent<HTMLInputElement>,
   ) => {
@@ -945,9 +865,6 @@ export default function Sidebar({
     event.target.value = ""
   }
 
-  /*
-   * Export results.
-   */
   const exportResults =
     async () => {
       if (results.length === 0) {
@@ -1176,7 +1093,6 @@ export default function Sidebar({
                     Sort
                   </Button>
 
-                  {/* Add image */}
                   <div
                     ref={imageMenuRef}
                     className="relative"
@@ -1191,9 +1107,7 @@ export default function Sidebar({
                       className="h-9 gap-1.5 rounded-md border border-border/70 bg-muted/60 px-3 text-xs font-semibold shadow-sm hover:bg-muted"
                     >
                       <ImageIcon className="h-3.5 w-3.5" />
-
                       Add image
-
                       <ChevronDown
                         className={`h-3.5 w-3.5 transition-transform ${
                           imageMenuOpen
@@ -1213,9 +1127,7 @@ export default function Sidebar({
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
                         >
                           <Upload className="h-4 w-4 text-muted-foreground" />
-
-                          Add background
-                          image
+                          Add background image
                         </button>
 
                         <button
@@ -1226,7 +1138,6 @@ export default function Sidebar({
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
                         >
                           <Upload className="h-4 w-4 text-muted-foreground" />
-
                           Add center image
                         </button>
 
@@ -1238,7 +1149,6 @@ export default function Sidebar({
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
                         >
                           <Upload className="h-4 w-4 text-muted-foreground" />
-
                           Add image as entry
                         </button>
                       </div>
@@ -1256,7 +1166,6 @@ export default function Sidebar({
                     />
                   </div>
 
-                  {/* Advanced */}
                   <label className="ml-1 flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground">
                     <input
                       type="checkbox"
@@ -1272,16 +1181,12 @@ export default function Sidebar({
                       }}
                       className="h-4 w-4 rounded border-border accent-blue-500"
                     />
-
                     Advanced
                   </label>
                 </div>
               </div>
 
               {advanced ? (
-                /*
-                 * ADVANCED ENTRY EDITOR
-                 */
                 <>
                   <div className="min-h-0 flex-1 overflow-y-auto px-4 py-2">
                     <div className="divide-y divide-border/70">
@@ -1293,10 +1198,7 @@ export default function Sidebar({
                             </p>
 
                             <p className="mt-1 text-xs text-muted-foreground">
-                              Add an entry
-                              below to start
-                              building your
-                              wheel.
+                              Add an entry below to start building your wheel.
                             </p>
                           </div>
                         </div>
@@ -1326,7 +1228,6 @@ export default function Sidebar({
                                 }`}
                               >
                                 <div className="flex min-w-0 items-center gap-2">
-                                  {/* Move controls */}
                                   <div className="flex w-6 shrink-0 flex-col items-center">
                                     <button
                                       type="button"
@@ -1366,9 +1267,7 @@ export default function Sidebar({
                                     </button>
                                   </div>
 
-                                  {/* Entry content */}
                                   <div className="min-w-0 flex-1">
-                                    {/* Name */}
                                     <input
                                       value={
                                         item.label
@@ -1392,9 +1291,7 @@ export default function Sidebar({
                                       className="h-10 w-full rounded-md border border-transparent bg-muted/80 px-3 text-sm font-medium text-foreground outline-none transition placeholder:text-muted-foreground focus:border-blue-500/60 focus:bg-muted"
                                     />
 
-                                    {/* Controls row */}
                                     <div className="mt-2 flex items-center gap-2">
-                                      {/* Color */}
                                       <label
                                         className="relative flex h-9 w-12 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-border/50 shadow-sm"
                                         style={{
@@ -1432,7 +1329,6 @@ export default function Sidebar({
                                         />
                                       </label>
 
-                                      {/* Image */}
                                       <button
                                         type="button"
                                         aria-label={`Add image to ${item.label}`}
@@ -1446,13 +1342,11 @@ export default function Sidebar({
                                         <ImageIcon className="h-4 w-4" />
                                       </button>
 
-                                      {/* Weight */}
                                       <div className="flex h-9 min-w-0 flex-1 items-center rounded-md bg-muted/80">
                                         <Scale className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
 
                                         <span className="ml-2 min-w-[22px] text-sm font-medium text-foreground">
-                                          {item.weight ??
-                                            1}
+                                          {item.weight ?? 1}
                                         </span>
 
                                         <div className="ml-auto flex items-center">
@@ -1494,15 +1388,11 @@ export default function Sidebar({
                                           </button>
 
                                           <span className="mr-2 min-w-[38px] text-right text-sm font-medium text-muted-foreground">
-                                            {
-                                              percentage
-                                            }
-                                            %
+                                            {percentage}%
                                           </span>
                                         </div>
                                       </div>
 
-                                      {/* Settings */}
                                       <button
                                         type="button"
                                         aria-label={`Entry settings for ${item.label}`}
@@ -1511,12 +1401,11 @@ export default function Sidebar({
                                             index,
                                           )
                                         }
-                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-[0_2px_6px_rgba(79,70,229,0.35)] transition hover:bg-indigo-500"
+                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-[0_2px_6px_rgba(59,130,246,0.30)] transition hover:bg-blue-500"
                                       >
                                         <SlidersHorizontal className="h-4 w-4" />
                                       </button>
 
-                                      {/* Delete */}
                                       <button
                                         type="button"
                                         aria-label={`Remove ${item.label}`}
@@ -1530,7 +1419,6 @@ export default function Sidebar({
                                         <X className="h-5 w-5" />
                                       </button>
 
-                                      {/* Visible */}
                                       <label
                                         className="flex h-9 w-6 shrink-0 cursor-pointer items-center justify-center"
                                         title={
@@ -1557,7 +1445,7 @@ export default function Sidebar({
                                               },
                                             )
                                           }
-                                          className="h-4 w-4 cursor-pointer rounded border-border accent-indigo-500"
+                                          className="h-4 w-4 cursor-pointer rounded border-border accent-blue-500"
                                         />
                                       </label>
                                     </div>
@@ -1571,15 +1459,12 @@ export default function Sidebar({
                     </div>
                   </div>
 
-                  {/* Advanced bottom actions */}
                   <div className="shrink-0 border-t border-border/70 bg-card px-4 py-3">
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={
-                          addEntry
-                        }
-                        className="flex h-11 items-center justify-center rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 active:scale-[0.99]"
+                        onClick={addEntry}
+                        className="flex h-11 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 active:scale-[0.99]"
                       >
                         Add entry
                       </button>
@@ -1593,7 +1478,7 @@ export default function Sidebar({
                           hiddenCount ===
                           0
                         }
-                        className="flex h-11 items-center justify-center rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex h-11 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         Reveal hidden
                       </button>
@@ -1601,16 +1486,12 @@ export default function Sidebar({
                   </div>
                 </>
               ) : (
-                /*
-                 * NORMAL ENTRY EDITOR
-                 */
                 <div className="min-h-0 flex-1 p-4">
                   <textarea
                     value={text}
                     onChange={(event) =>
                       handleTextChange(
-                        event.target
-                          .value,
+                        event.target.value,
                       )
                     }
                     onFocus={() => {
@@ -1627,7 +1508,6 @@ export default function Sidebar({
                 </div>
               )}
 
-              {/* Add wheel */}
               <div className="shrink-0 border-t border-border/70 bg-muted/10 px-4 py-3">
                 <div
                   ref={wheelMenuRef}
@@ -1688,7 +1568,6 @@ export default function Sidebar({
             </>
           ) : (
             <>
-              {/* Results toolbar */}
               <div className="shrink-0 border-b border-border/70 px-4 py-4">
                 <div className="flex items-center gap-2">
                   <Button
@@ -1727,11 +1606,9 @@ export default function Sidebar({
                 </div>
               </div>
 
-              {/* Results */}
               <div className="min-h-0 flex-1 p-4">
                 <div className="h-full min-h-[300px] overflow-y-auto rounded-xl border border-border/70 bg-background/70 p-3">
-                  {results.length ===
-                  0 ? (
+                  {results.length === 0 ? (
                     <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
                       No results yet.
                     </div>
@@ -1759,14 +1636,11 @@ export default function Sidebar({
         </div>
       </aside>
 
-      {/* ========================================================= */}
-      {/* ADVANCED ENTRY SETTINGS MODAL                            */}
-      {/* ========================================================= */}
-      {settingsEntryIndex !==
-        null &&
+      {/* Advanced entry settings */}
+      {settingsEntryIndex !== null &&
         settingsDraft && (
           <div
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[3px]"
             onMouseDown={(event) => {
               if (
                 event.target ===
@@ -1780,16 +1654,27 @@ export default function Sidebar({
               role="dialog"
               aria-modal="true"
               aria-labelledby="advanced-entry-settings-title"
-              className="w-full max-w-[640px] overflow-hidden rounded-md border border-border/80 bg-[#1d1d1d] text-white shadow-2xl"
+              className="w-full max-w-[640px] overflow-hidden rounded-2xl border border-border/70 bg-card text-foreground shadow-2xl"
             >
-              {/* Modal header */}
-              <div className="flex h-16 items-center justify-between bg-[#181818] px-4">
-                <div
-                  id="advanced-entry-settings-title"
-                  className="flex items-center gap-2 text-lg font-semibold"
-                >
-                  <SlidersHorizontal className="h-5 w-5" />
-                  Advanced
+              {/* Header */}
+              <div className="flex h-[68px] items-center justify-between border-b border-border/70 bg-card px-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+                    <SlidersHorizontal className="h-[18px] w-[18px]" />
+                  </div>
+
+                  <div>
+                    <h2
+                      id="advanced-entry-settings-title"
+                      className="text-base font-semibold text-foreground"
+                    >
+                      Entry settings
+                    </h2>
+
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Configure this wheel entry
+                    </p>
+                  </div>
                 </div>
 
                 <button
@@ -1798,15 +1683,15 @@ export default function Sidebar({
                   onClick={
                     closeSettings
                   }
-                  className="flex h-9 w-9 items-center justify-center rounded-md text-white transition hover:bg-white/10"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                  <X className="h-6 w-6" />
+                  <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="px-4 pb-4">
+              <div className="max-h-[calc(100vh-120px)] overflow-y-auto">
                 {/* Entry navigation */}
-                <div className="flex h-16 items-center gap-3 border-b border-white/80">
+                <div className="flex h-16 items-center gap-3 border-b border-border/70 px-5">
                   <button
                     type="button"
                     aria-label="Previous entry"
@@ -1816,21 +1701,27 @@ export default function Sidebar({
                     }
                     onClick={() =>
                       selectSettingsEntry(
-                        settingsEntryIndex -
-                          1,
+                        settingsEntryIndex - 1,
                       )
                     }
-                    className="flex h-34 w-9 items-center justify-center rounded-full bg-[#3a3a3a] text-white transition hover:bg-[#4a4a4a] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                   >
-                    <ArrowLeft className="h-5 w-5" />
+                    <ArrowLeft className="h-4 w-4" />
                   </button>
 
-                  <span className="text-sm font-medium text-white">
-                    Entry{" "}
-                    {settingsEntryIndex +
-                      1}{" "}
-                    / {items.length}
-                  </span>
+                  <div className="min-w-[100px]">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Entry
+                    </p>
+
+                    <p className="text-sm font-semibold text-foreground">
+                      {settingsEntryIndex +
+                        1}{" "}
+                      <span className="font-normal text-muted-foreground">
+                        / {items.length}
+                      </span>
+                    </p>
+                  </div>
 
                   <button
                     type="button"
@@ -1841,13 +1732,12 @@ export default function Sidebar({
                     }
                     onClick={() =>
                       selectSettingsEntry(
-                        settingsEntryIndex +
-                          1,
+                        settingsEntryIndex + 1,
                       )
                     }
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3a3a] text-white transition hover:bg-[#4a4a4a] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                   >
-                    <ArrowRight className="h-5 w-5" />
+                    <ArrowRight className="h-4 w-4" />
                   </button>
 
                   <button
@@ -1909,319 +1799,329 @@ export default function Sidebar({
                         undefined,
                       )
                     }}
-                    className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3a3a] text-white transition hover:bg-[#4a4a4a]"
+                    className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-500"
                   >
-                    <Plus className="h-5 w-5" />
+                    <Plus className="h-4 w-4" />
                   </button>
                 </div>
 
-                {/* Visibility + duplicate/delete */}
-                <div className="flex min-h-[72px] items-center justify-between gap-4 border-b border-transparent">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                    <input
-                      type="checkbox"
-                      checked={
-                        !settingsDraft.hidden
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        updateSettingsDraft(
-                          {
-                            hidden:
-                              !event
-                                .target
-                                .checked,
-                          },
-                        )
-                      }
-                      className="h-5 w-5 cursor-pointer rounded border-white/20 accent-indigo-500"
-                    />
-
-                    Visible
-                  </label>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={
-                        duplicateSettingsEntry
-                      }
-                      className="flex h-10 items-center gap-2 rounded-md bg-[#444444] px-4 text-sm font-semibold text-white transition hover:bg-[#505050]"
-                    >
-                      <span className="text-lg leading-none">
-                        ▣
-                      </span>
-                      Duplicate
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={
-                        deleteSettingsEntry
-                      }
-                      className="flex h-10 items-center gap-2 rounded-md bg-[#c34f5c] px-4 text-sm font-semibold text-white transition hover:bg-[#d15b67]"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </button>
-                  </div>
-                </div>
-
-                {/* Text */}
-                <div className="grid grid-cols-[140px_1fr] items-center gap-3 py-2">
-                  <label className="text-sm font-medium">
-                    Text
-                  </label>
-
-                  <input
-                    value={
-                      settingsDraft.label
-                    }
-                    onChange={(event) =>
-                      updateSettingsDraft(
-                        {
-                          label:
-                            event.target
-                              .value,
-                        },
-                      )
-                    }
-                    className="h-10 w-full rounded-md border border-transparent bg-[#303030] px-3 text-sm font-medium text-white outline-none transition focus:border-indigo-500"
-                  />
-                </div>
-
-                {/* Color */}
-                <div className="grid grid-cols-[140px_1fr] items-center gap-3 py-2">
-                  <label className="text-sm font-medium">
-                    Color
-                  </label>
-
-                  <div className="flex items-center justify-between gap-3">
-                    <label
-                      className="relative flex h-10 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-md"
-                      style={{
-                        backgroundColor:
-                          settingsDraft.color ??
-                          "#3b82f6",
-                      }}
-                    >
-                      <Palette className="h-5 w-5 text-black/80" />
-
+                <div className="space-y-0 px-5 py-4">
+                  {/* Visibility + actions */}
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-muted/30 px-4 py-3">
+                    <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-foreground">
                       <input
-                        type="color"
-                        value={
-                          settingsDraft.color ??
-                          "#3b82f6"
+                        type="checkbox"
+                        checked={
+                          !settingsDraft.hidden
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          event,
+                        ) =>
                           updateSettingsDraft(
                             {
-                              color:
-                                event
+                              hidden:
+                                !event
                                   .target
-                                  .value,
+                                  .checked,
                             },
                           )
                         }
-                        className="absolute inset-0 cursor-pointer opacity-0"
+                        className="h-4 w-4 cursor-pointer rounded border-border accent-blue-500"
                       />
+
+                      <span>Visible</span>
                     </label>
 
-                    <label className="flex h-10 items-center gap-2 rounded-md bg-[#303030] px-4 text-sm font-semibold text-white transition hover:bg-[#383838]">
-                      <ImageIcon className="h-4 w-4" />
-                      Add image
-
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={
-                          handleSettingsImage
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={
+                          duplicateSettingsEntry
                         }
-                      />
-                    </label>
+                        className="flex h-9 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
+                      >
+                        <span className="text-sm leading-none">
+                          ▣
+                        </span>
+                        Duplicate
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={
+                          deleteSettingsEntry
+                        }
+                        className="flex h-9 items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 text-xs font-semibold text-red-500 transition-colors hover:bg-red-500/15"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Sound */}
-                <div className="grid grid-cols-[140px_1fr] items-center gap-3 py-2">
-                  <label
-                    htmlFor="entry-sound"
-                    className="text-sm font-medium"
-                  >
-                    Sound
-                  </label>
+                  {/* Text */}
+                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                    <label className="text-sm font-medium text-foreground">
+                      Text
+                    </label>
 
-                  <div className="relative">
-                    <select
-                      id="entry-sound"
+                    <input
                       value={
-                        settingsSound
+                        settingsDraft.label
                       }
                       onChange={(event) =>
-                        setSettingsSound(
+                        updateSettingsDraft(
+                          {
+                            label:
+                              event.target
+                                .value,
+                          },
+                        )
+                      }
+                      className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/60 focus:bg-muted"
+                    />
+                  </div>
+
+                  {/* Color */}
+                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                    <label className="text-sm font-medium text-foreground">
+                      Color
+                    </label>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <label
+                        className="relative flex h-10 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-border/70 shadow-sm"
+                        style={{
+                          backgroundColor:
+                            settingsDraft.color ??
+                            "#3b82f6",
+                        }}
+                        title="Change color"
+                      >
+                        <Palette className="h-4 w-4 text-black/80" />
+
+                        <input
+                          type="color"
+                          value={
+                            settingsDraft.color ??
+                            "#3b82f6"
+                          }
+                          onChange={(event) =>
+                            updateSettingsDraft(
+                              {
+                                color:
+                                  event
+                                    .target
+                                    .value,
+                              },
+                            )
+                          }
+                          className="absolute inset-0 cursor-pointer opacity-0"
+                        />
+                      </label>
+
+                      <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        Add image
+
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={
+                            handleSettingsImage
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Sound */}
+                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                    <label
+                      htmlFor="entry-sound"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Sound
+                    </label>
+
+                    <div className="relative">
+                      <select
+                        id="entry-sound"
+                        value={
+                          settingsSound
+                        }
+                        onChange={(event) =>
+                          setSettingsSound(
+                            event.target
+                              .value,
+                          )
+                        }
+                        className="h-10 w-full appearance-none rounded-lg border border-border/70 bg-muted/60 px-3 pr-10 text-sm text-foreground outline-none transition-colors focus:border-blue-500/60 focus:bg-muted"
+                      >
+                        <option value="inherit">
+                          Inherit from wheel
+                        </option>
+                        <option value="none">
+                          No sound
+                        </option>
+                        <option value="tick">
+                          Tick
+                        </option>
+                        <option value="bell">
+                          Bell
+                        </option>
+                        <option value="pop">
+                          Pop
+                        </option>
+                      </select>
+
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </div>
+
+                  {/* Popup message */}
+                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                    <label className="text-sm font-medium text-foreground">
+                      Popup message
+                    </label>
+
+                    <input
+                      value={
+                        settingsPopupMessage
+                      }
+                      onChange={(event) =>
+                        setSettingsPopupMessage(
                           event.target
                             .value,
                         )
                       }
-                      className="h-10 w-full appearance-none rounded-md border-0 bg-[#303030] px-3 pr-10 text-sm font-medium text-white outline-none focus:ring-1 focus:ring-indigo-500"
-                    >
-                      <option value="inherit">
-                        Inherit from wheel
-                      </option>
-                      <option value="none">
-                        No sound
-                      </option>
-                      <option value="tick">
-                        Tick
-                      </option>
-                      <option value="bell">
-                        Bell
-                      </option>
-                      <option value="pop">
-                        Pop
-                      </option>
-                    </select>
-
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
+                      placeholder="Optional message..."
+                      className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/60 focus:bg-muted"
+                    />
                   </div>
-                </div>
 
-                {/* Popup message */}
-                <div className="grid grid-cols-[140px_1fr] items-center gap-3 py-2">
-                  <label className="text-sm font-medium">
-                    Popup message
-                  </label>
+                  {/* Weight */}
+                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                    <label className="text-sm font-medium text-foreground">
+                      Weight
+                    </label>
 
-                  <input
-                    value={
-                      settingsPopupMessage
-                    }
-                    onChange={(event) =>
-                      setSettingsPopupMessage(
-                        event.target
-                          .value,
-                      )
-                    }
-                    className="h-10 w-full rounded-md border border-transparent bg-[#303030] px-3 text-sm text-white outline-none transition focus:border-indigo-500"
-                  />
-                </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 flex-1 items-center rounded-lg border border-border/70 bg-muted/60">
+                        <Scale className="ml-3 h-4 w-4 text-muted-foreground" />
 
-                {/* Weight */}
-                <div className="grid grid-cols-[140px_1fr] items-center gap-3 py-2">
-                  <label className="text-sm font-medium">
-                    Weight
-                  </label>
+                        <span className="ml-2 text-sm font-medium text-foreground">
+                          {settingsDraft.weight ??
+                            1}
+                        </span>
 
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 flex-1 items-center rounded-md bg-[#303030]">
-                      <span className="px-3 text-sm font-medium text-white">
-                        {settingsDraft.weight ??
-                          1}
-                      </span>
+                        <div className="ml-auto flex items-center">
+                          <button
+                            type="button"
+                            disabled={
+                              (settingsDraft.weight ??
+                                1) <= 0
+                            }
+                            onClick={() =>
+                              updateSettingsDraft(
+                                {
+                                  weight:
+                                    Math.max(
+                                      0,
+                                      Math.round(
+                                        ((settingsDraft.weight ??
+                                          1) -
+                                          1) *
+                                          100,
+                                      ) /
+                                        100,
+                                    ),
+                                },
+                              )
+                            }
+                            className="flex h-10 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
 
-                      <div className="ml-auto flex items-center">
-                        <button
-                          type="button"
-                          disabled={
-                            (settingsDraft.weight ??
-                              1) <= 0
-                          }
-                          onClick={() =>
-                            updateSettingsDraft(
-                              {
-                                weight:
-                                  Math.max(
-                                    0,
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateSettingsDraft(
+                                {
+                                  weight:
                                     Math.round(
                                       ((settingsDraft.weight ??
-                                        1) -
+                                        1) +
                                         1) *
                                         100,
                                     ) /
-                                      100,
-                                  ),
-                              },
-                            )
-                          }
-                          className="flex h-10 w-10 items-center justify-center text-white/70 transition hover:text-white disabled:opacity-30"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
+                                    100,
+                                },
+                              )
+                            }
+                            className="flex h-10 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="min-w-[125px] text-right">
+                        <span className="text-xs text-muted-foreground">
+                          Probability
+                        </span>
+
+                        <p className="text-sm font-semibold text-foreground">
+                          {settingsProbability}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Image */}
+                  {settingsImage && (
+                    <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                      <span className="text-sm font-medium text-foreground">
+                        Image
+                      </span>
+
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 overflow-hidden rounded-lg border border-border/70 bg-muted">
+                          <img
+                            src={
+                              settingsImage
+                            }
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
 
                         <button
                           type="button"
                           onClick={() =>
-                            updateSettingsDraft(
-                              {
-                                weight:
-                                  Math.round(
-                                    ((settingsDraft.weight ??
-                                      1) +
-                                      1) *
-                                      100,
-                                  ) /
-                                  100,
-                              },
+                            setSettingsImage(
+                              undefined,
                             )
                           }
-                          className="flex h-10 w-10 items-center justify-center text-white/70 transition hover:text-white"
+                          className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
                         >
-                          <Plus className="h-4 w-4" />
+                          Remove image
                         </button>
                       </div>
                     </div>
-
-                    <span className="shrink-0 text-sm font-semibold text-white">
-                      Probability:{" "}
-                      {settingsProbability}
-                      %
-                    </span>
-                  </div>
+                  )}
                 </div>
 
-                {/* Selected image preview */}
-                {settingsImage && (
-                  <div className="mt-2 grid grid-cols-[140px_1fr] items-center gap-3">
-                    <span className="text-sm font-medium">
-                      Image
-                    </span>
-
-                    <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 overflow-hidden rounded-md border border-white/10 bg-black/20">
-                        <img
-                          src={
-                            settingsImage
-                          }
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSettingsImage(
-                            undefined,
-                          )
-                        }
-                        className="text-xs font-semibold text-white/60 transition hover:text-white"
-                      >
-                        Remove image
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 {/* Footer */}
-                <div className="mt-4 flex items-center justify-end gap-4 pt-1">
+                <div className="flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-5 py-4">
                   <button
                     type="button"
                     onClick={
                       closeSettings
                     }
-                    className="h-10 px-2 text-sm font-semibold text-white transition hover:text-white/70"
+                    className="h-10 rounded-lg px-4 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     Cancel
                   </button>
@@ -2231,9 +2131,9 @@ export default function Sidebar({
                     onClick={
                       saveSettings
                     }
-                    className="h-10 rounded-md bg-indigo-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500"
+                    className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-500"
                   >
-                    OK
+                    Save changes
                   </button>
                 </div>
               </div>
