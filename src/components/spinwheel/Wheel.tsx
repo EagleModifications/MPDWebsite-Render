@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react"
 import { Wheel as SpinWheel } from "spin-wheel"
 
@@ -12,6 +13,7 @@ export type SpinWheelItem = {
   label: string
   color?: string
   weight?: number
+  hidden?: boolean
 }
 
 type WheelProps = {
@@ -19,16 +21,39 @@ type WheelProps = {
   onResult?: (item: SpinWheelItem) => void
 }
 
+type ConfettiPiece = {
+  id: number
+  x: number
+  y: number
+  rotation: number
+  delay: number
+  duration: number
+  size: number
+  color: string
+  shape: "square" | "rectangle"
+}
+
+const CONFETTI_COLORS = [
+  "#3b82f6",
+  "#60a5fa",
+  "#22c55e",
+  "#86efac",
+  "#facc15",
+  "#fde68a",
+  "#f472b6",
+  "#c084fc",
+  "#fb7185",
+  "#38bdf8",
+]
+
 /*
- * Generates a bright/pastel random colour.
+ * Generate bright pastel colours.
  *
- * HSL gives us a much wider range of colours than a
- * fixed palette while keeping the wheel readable.
+ * Colours are stored by entry ID so editing or reordering
+ * entries does not randomly recolour the entire wheel.
  */
 function createRandomColor() {
-  const hue = Math.floor(
-    Math.random() * 360,
-  )
+  const hue = Math.floor(Math.random() * 360)
 
   const saturation =
     58 + Math.floor(Math.random() * 18)
@@ -39,19 +64,6 @@ function createRandomColor() {
   return `hsl(${hue} ${saturation}% ${lightness}%)`
 }
 
-/*
- * Convert HSL/CSS colours to a hex colour where possible.
- * The pointer can use the CSS colour directly, so this
- * helper isn't required for rendering.
- */
-
-/*
- * Creates stable random colours for entries.
- *
- * The colour is keyed by the entry ID so typing/editing
- * the list doesn't constantly change every existing
- * segment's colour.
- */
 function useRandomItemColors(
   items: SpinWheelItem[],
 ) {
@@ -60,8 +72,7 @@ function useRandomItemColors(
   )
 
   return useMemo(() => {
-    const colors =
-      colorsRef.current
+    const colors = colorsRef.current
 
     const activeIds = new Set(
       items.map((item) => item.id),
@@ -73,17 +84,247 @@ function useRandomItemColors(
       }
     }
 
-    return items.map((item) => {
-      let color = colors.get(item.id)
-
-      if (!color) {
-        color = createRandomColor()
-        colors.set(item.id, color)
+    for (const item of items) {
+      if (!colors.has(item.id)) {
+        colors.set(
+          item.id,
+          createRandomColor(),
+        )
       }
+    }
 
-      return color
-    })
+    return new Map(colors)
   }, [items])
+}
+
+/*
+ * Creates a short mechanical click/tick.
+ *
+ * No external sound file is required.
+ */
+function playTick(
+  audioContext: AudioContext | null,
+) {
+  if (!audioContext) {
+    return
+  }
+
+  if (audioContext.state === "suspended") {
+    void audioContext.resume()
+  }
+
+  const now = audioContext.currentTime
+
+  const oscillator =
+    audioContext.createOscillator()
+
+  const gain =
+    audioContext.createGain()
+
+  oscillator.type = "square"
+
+  oscillator.frequency.setValueAtTime(
+    1450,
+    now,
+  )
+
+  oscillator.frequency.exponentialRampToValueAtTime(
+    720,
+    now + 0.025,
+  )
+
+  gain.gain.setValueAtTime(
+    0.0001,
+    now,
+  )
+
+  gain.gain.exponentialRampToValueAtTime(
+    0.055,
+    now + 0.002,
+  )
+
+  gain.gain.exponentialRampToValueAtTime(
+    0.0001,
+    now + 0.035,
+  )
+
+  oscillator.connect(gain)
+  gain.connect(audioContext.destination)
+
+  oscillator.start(now)
+  oscillator.stop(now + 0.04)
+}
+
+/*
+ * Generates a quiet applause sound using filtered
+ * noise bursts rather than requiring an audio asset.
+ */
+function playApplause(
+  audioContext: AudioContext | null,
+) {
+  if (!audioContext) {
+    return
+  }
+
+  if (audioContext.state === "suspended") {
+    void audioContext.resume()
+  }
+
+  const now = audioContext.currentTime
+
+  const master =
+    audioContext.createGain()
+
+  master.gain.setValueAtTime(
+    0.0001,
+    now,
+  )
+
+  master.gain.exponentialRampToValueAtTime(
+    0.12,
+    now + 0.08,
+  )
+
+  master.gain.exponentialRampToValueAtTime(
+    0.0001,
+    now + 1.05,
+  )
+
+  master.connect(
+    audioContext.destination,
+  )
+
+  /*
+   * Multiple small noise bursts create a
+   * subdued crowd/applause texture.
+   */
+  for (let index = 0; index < 28; index += 1) {
+    const offset =
+      Math.random() * 0.85
+
+    const duration =
+      0.035 +
+      Math.random() * 0.075
+
+    const bufferSize =
+      Math.floor(
+        audioContext.sampleRate *
+          duration,
+      )
+
+    const buffer =
+      audioContext.createBuffer(
+        1,
+        bufferSize,
+        audioContext.sampleRate,
+      )
+
+    const data =
+      buffer.getChannelData(0)
+
+    for (
+      let sample = 0;
+      sample < bufferSize;
+      sample += 1
+    ) {
+      data[sample] =
+        (Math.random() * 2 - 1) *
+        (1 - sample / bufferSize)
+    }
+
+    const source =
+      audioContext.createBufferSource()
+
+    const filter =
+      audioContext.createBiquadFilter()
+
+    const gain =
+      audioContext.createGain()
+
+    source.buffer = buffer
+
+    filter.type = "bandpass"
+
+    filter.frequency.value =
+      1500 +
+      Math.random() * 1800
+
+    filter.Q.value = 0.7
+
+    const start =
+      now + offset
+
+    gain.gain.setValueAtTime(
+      0.0001,
+      start,
+    )
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.018 +
+        Math.random() * 0.025,
+      start + 0.006,
+    )
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      start + duration,
+    )
+
+    source.connect(filter)
+    filter.connect(gain)
+    gain.connect(master)
+
+    source.start(start)
+    source.stop(
+      start + duration + 0.01,
+    )
+  }
+}
+
+function createConfetti(): ConfettiPiece[] {
+  return Array.from(
+    { length: 65 },
+    (_, index) => ({
+      id:
+        Date.now() +
+        index,
+
+      x:
+        25 +
+        Math.random() * 50,
+
+      y:
+        38 +
+        Math.random() * 12,
+
+      rotation:
+        Math.random() * 360,
+
+      delay:
+        Math.random() * 0.18,
+
+      duration:
+        1.3 +
+        Math.random() * 1.2,
+
+      size:
+        5 +
+        Math.random() * 7,
+
+      color:
+        CONFETTI_COLORS[
+          Math.floor(
+            Math.random() *
+              CONFETTI_COLORS.length,
+          )
+        ],
+
+      shape:
+        Math.random() > 0.5
+          ? "square"
+          : "rectangle",
+    }),
+  )
 }
 
 export default function Wheel({
@@ -99,6 +340,20 @@ export default function Wheel({
   const spinningRef =
     useRef(false)
 
+  const currentIndexRef =
+    useRef(0)
+
+  const audioContextRef =
+    useRef<AudioContext | null>(null)
+
+  const lastTickIndexRef =
+    useRef<number | null>(null)
+
+  const confettiTimerRef =
+    useRef<ReturnType<
+      typeof setTimeout
+    > | null>(null)
+
   const [isSpinning, setIsSpinning] =
     useState(false)
 
@@ -108,89 +363,196 @@ export default function Wheel({
   const [pointerColor, setPointerColor] =
     useState("#60a5fa")
 
+  const [confetti, setConfetti] =
+    useState<ConfettiPiece[]>([])
+
   /*
-   * Generate completely random colours for the
-   * current set of entries.
+   * Generate stable random colours.
    */
   const randomColors =
     useRandomItemColors(items)
 
   /*
-   * Keep the winning item accessible to the
-   * onRest callback without recreating the wheel
-   * unnecessarily.
+   * Hidden entries do not participate in the
+   * actual wheel.
    */
-  const itemsRef =
-    useRef(items)
+  const visibleItems = useMemo(
+    () =>
+      items.filter(
+        (item) => !item.hidden,
+      ),
+    [items],
+  )
 
-  useEffect(() => {
-    itemsRef.current = items
-  }, [items])
+  const visibleColors = useMemo(
+    () =>
+      visibleItems.map(
+        (item) =>
+          randomColors.get(item.id) ??
+          createRandomColor(),
+      ),
+    [visibleItems, randomColors],
+  )
 
   /*
-   * Keep the callback current without forcing
-   * the wheel to be recreated.
+   * Keep current items accessible to callbacks.
+   */
+  const itemsRef =
+    useRef(visibleItems)
+
+  useEffect(() => {
+    itemsRef.current =
+      visibleItems
+  }, [visibleItems])
+
+  /*
+   * Keep result callback current without
+   * rebuilding the wheel.
    */
   const onResultRef =
     useRef(onResult)
 
   useEffect(() => {
-    onResultRef.current = onResult
+    onResultRef.current =
+      onResult
   }, [onResult])
 
   /*
-   * Change the pointer colour to match the
-   * segment currently underneath it.
+   * Initialise Web Audio only after the user
+   * interacts with the page.
    */
-  const updatePointerColor = useCallback(
-    (index: number) => {
-      const color =
-        randomColors[index]
-
-      if (color) {
-        setPointerColor(color)
+  const getAudioContext =
+    useCallback(() => {
+      if (
+        typeof window === "undefined"
+      ) {
+        return null
       }
-    },
-    [randomColors],
-  )
+
+      if (
+        !audioContextRef.current
+      ) {
+        const AudioContextClass =
+          window.AudioContext ??
+          (
+            window as Window & {
+              webkitAudioContext?: typeof AudioContext
+            }
+          ).webkitAudioContext
+
+        if (!AudioContextClass) {
+          return null
+        }
+
+        audioContextRef.current =
+          new AudioContextClass()
+      }
+
+      if (
+        audioContextRef.current.state ===
+        "suspended"
+      ) {
+        void audioContextRef.current.resume()
+      }
+
+      return audioContextRef.current
+    }, [])
 
   /*
-   * Spin the wheel to a random item.
+   * Change the arrow colour to the colour
+   * of the segment currently under it.
+   */
+  const updatePointerColor =
+    useCallback(
+      (index: number) => {
+        const color =
+          visibleColors[index]
+
+        if (color) {
+          setPointerColor(color)
+        }
+      },
+      [visibleColors],
+    )
+
+  /*
+   * Launch the confetti celebration.
+   */
+  const launchConfetti =
+    useCallback(() => {
+      if (
+        confettiTimerRef.current
+      ) {
+        clearTimeout(
+          confettiTimerRef.current,
+        )
+      }
+
+      setConfetti(createConfetti())
+
+      confettiTimerRef.current =
+        setTimeout(() => {
+          setConfetti([])
+          confettiTimerRef.current =
+            null
+        }, 2800)
+    }, [])
+
+  /*
+   * Spin to a random visible entry.
    */
   const spin = useCallback(() => {
-    const wheel = wheelRef.current
+    const wheel =
+      wheelRef.current
 
     if (
       !wheel ||
-      itemsRef.current.length === 0 ||
+      visibleItems.length === 0 ||
       spinningRef.current
     ) {
       return
     }
 
-    const currentItems =
-      itemsRef.current
+    const audio =
+      getAudioContext()
+
+    /*
+     * Make sure the first click can unlock
+     * audio playback.
+     */
+    if (audio) {
+      void audio.resume()
+    }
 
     const selectedIndex =
       Math.floor(
         Math.random() *
-          currentItems.length,
+          visibleItems.length,
       )
 
     spinningRef.current = true
+
     setIsSpinning(true)
 
+    setConfetti([])
+
+    /*
+     * Longer spin with a smooth deceleration.
+     */
     wheel.spinToItem(
       selectedIndex,
-      4200,
+      4400,
       true,
       6,
       1,
     )
-  }, [])
+  }, [
+    getAudioContext,
+    visibleItems.length,
+  ])
 
   /*
-   * Ctrl + Enter spins the wheel.
+   * Ctrl + Enter.
    */
   useEffect(() => {
     const handleKeyDown = (
@@ -201,6 +563,9 @@ export default function Wheel({
         event.key === "Enter"
       ) {
         event.preventDefault()
+
+        getAudioContext()
+
         spin()
       }
     }
@@ -216,11 +581,13 @@ export default function Wheel({
         handleKeyDown,
       )
     }
-  }, [spin])
+  }, [
+    getAudioContext,
+    spin,
+  ])
 
   /*
-   * Create/recreate the wheel whenever the
-   * entries change.
+   * Create the actual CrazyTim wheel.
    */
   useEffect(() => {
     const container =
@@ -231,33 +598,48 @@ export default function Wheel({
     }
 
     container.innerHTML = ""
+
     wheelRef.current = null
+
     spinningRef.current = false
+
     setIsSpinning(false)
 
-    if (items.length === 0) {
+    if (visibleItems.length === 0) {
+      currentIndexRef.current = 0
+
       setCurrentIndex(0)
+
       setPointerColor("#60a5fa")
+
       return
     }
 
+    /*
+     * Preserve the current segment where possible.
+     */
     const initialIndex = Math.min(
-      currentIndex,
-      items.length - 1,
+      currentIndexRef.current,
+      visibleItems.length - 1,
     )
+
+    currentIndexRef.current =
+      initialIndex
 
     setCurrentIndex(initialIndex)
 
     const initialColor =
-      randomColors[initialIndex]
+      visibleColors[initialIndex]
 
     if (initialColor) {
-      setPointerColor(initialColor)
+      setPointerColor(
+        initialColor,
+      )
     }
 
     const wheel =
       new SpinWheel(container, {
-        items: items.map(
+        items: visibleItems.map(
           (item, index) => ({
             label:
               item.label ||
@@ -268,83 +650,116 @@ export default function Wheel({
             weight:
               item.weight ?? 1,
 
-            /*
-             * Ignore the colour supplied by the
-             * sidebar and use a random colour.
-             */
             backgroundColor:
-              randomColors[index],
+              visibleColors[index],
 
-            /*
-             * Matches the screenshot:
-             * dark/black labels on pastel segments.
-             */
-            labelColor: "#111111",
+            labelColor:
+              "#111111",
           }),
         ),
 
         /*
-         * Make the wheel fill almost the
-         * entire container.
+         * Fill the available space.
          */
-        radius: 0.96,
+        radius: 0.965,
 
         /*
-         * Pointer is positioned on the right
-         * side of the wheel.
+         * Right-side pointer.
          */
         pointerAngle: 0,
 
         /*
-         * Thin clean outer border.
+         * Strong but clean wheel outline.
          */
-        borderWidth: 2,
+        borderWidth: 2.5,
+
         borderColor:
-          "rgba(255,255,255,0.28)",
+          "rgba(255,255,255,0.72)",
 
         /*
-         * Very subtle segment separators.
+         * Segment separators.
          */
-        lineWidth: 1,
+        lineWidth: 1.5,
+
         lineColor:
-          "rgba(255,255,255,0.28)",
+          "rgba(255,255,255,0.42)",
 
         /*
-         * Radial labels like the screenshot.
+         * Radial labels.
          */
         itemLabelAlign: "right",
-        itemLabelRadius: 0.82,
-        itemLabelRadiusMax: 0.28,
+
+        itemLabelRadius: 0.79,
+
+        itemLabelRadiusMax: 0.27,
 
         itemLabelFont:
           "Inter, ui-sans-serif, system-ui, sans-serif",
 
-        itemLabelFontSizeMax: 42,
-
-        itemLabelStrokeWidth: 0,
+        itemLabelFontSizeMax: 43,
 
         /*
-         * We handle the spin ourselves so clicking
-         * the wheel doesn't trigger the package's
-         * drag interaction.
+         * White outline around black entry text.
+         * This makes the names stand out against
+         * similarly coloured segments.
+         */
+        itemLabelStrokeColor:
+          "rgba(255,255,255,0.78)",
+
+        itemLabelStrokeWidth: 1.7,
+
+        itemLabelBaselineOffset: 0,
+
+        /*
+         * We control clicking/spinning ourselves.
          */
         isInteractive: false,
 
         rotationResistance: -35,
+
         rotationSpeedMax: 1000,
 
         /*
-         * Fired whenever the pointer moves onto
+         * Tick every time the pointer enters
          * another segment.
          */
-        onCurrentIndexChange: (event) => {
+        onCurrentIndexChange: (
+          event,
+        ) => {
           const index =
             event.currentIndex
 
+          currentIndexRef.current =
+            index
+
           setCurrentIndex(index)
+
           updatePointerColor(index)
+
+          /*
+           * Avoid an unnecessary duplicate tick.
+           */
+          if (
+            lastTickIndexRef.current !==
+            index
+          ) {
+            lastTickIndexRef.current =
+              index
+
+            const audio =
+              audioContextRef.current
+
+            if (
+              spinningRef.current
+            ) {
+              playTick(audio)
+            }
+          }
         },
 
+        /*
+         * Winner.
+         */
         onRest: (event) => {
           const selectedIndex =
             event.currentIndex
@@ -354,6 +769,9 @@ export default function Wheel({
               selectedIndex
             ]
 
+          currentIndexRef.current =
+            selectedIndex
+
           setCurrentIndex(
             selectedIndex,
           )
@@ -362,8 +780,22 @@ export default function Wheel({
             selectedIndex,
           )
 
-          spinningRef.current = false
+          spinningRef.current =
+            false
+
           setIsSpinning(false)
+
+          /*
+           * Subdued applause.
+           */
+          playApplause(
+            audioContextRef.current,
+          )
+
+          /*
+           * Celebration.
+           */
+          launchConfetti()
 
           if (selectedItem) {
             onResultRef.current?.(
@@ -375,33 +807,64 @@ export default function Wheel({
 
     wheelRef.current = wheel
 
-    /*
-     * Set the initial pointer colour using
-     * the wheel's actual current index.
-     */
     const actualIndex =
       wheel.getCurrentIndex()
 
-    setCurrentIndex(actualIndex)
-    updatePointerColor(actualIndex)
+    currentIndexRef.current =
+      actualIndex
+
+    setCurrentIndex(
+      actualIndex,
+    )
+
+    updatePointerColor(
+      actualIndex,
+    )
+
+    lastTickIndexRef.current =
+      actualIndex
 
     return () => {
       wheel.remove()
+
       wheelRef.current = null
+
       spinningRef.current = false
     }
   }, [
-    items,
-    randomColors,
+    visibleItems,
+    visibleColors,
     updatePointerColor,
+    launchConfetti,
   ])
 
   /*
-   * Clicking the wheel itself starts a spin.
+   * Cleanup.
+   */
+  useEffect(() => {
+    return () => {
+      if (
+        confettiTimerRef.current
+      ) {
+        clearTimeout(
+          confettiTimerRef.current,
+        )
+      }
+
+      if (
+        audioContextRef.current
+      ) {
+        void audioContextRef.current.close()
+      }
+    }
+  }, [])
+
+  /*
+   * Clicking the wheel starts the spin.
    */
   const handleWheelClick = () => {
     if (
-      items.length === 0 ||
+      visibleItems.length === 0 ||
       spinningRef.current
     ) {
       return
@@ -410,102 +873,299 @@ export default function Wheel({
     spin()
   }
 
+  /*
+   * Keyboard activation for the wheel.
+   */
+  const handleWheelKeyDown = (
+    event: React.KeyboardEvent,
+  ) => {
+    if (
+      event.key === "Enter" ||
+      event.key === " "
+    ) {
+      event.preventDefault()
+
+      handleWheelClick()
+    }
+  }
+
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-background">
-      {/* Background */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.035),transparent_58%)]" />
+      {/* Subtle background */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.045),transparent_60%)]" />
 
-      {items.length > 0 ? (
+      {visibleItems.length > 0 ? (
         <div
-          className="relative aspect-square w-[min(78vw,calc(100vh-130px),1000px)] max-w-[94%]"
-          onClick={handleWheelClick}
+          className="relative aspect-square w-[min(78vw,calc(100vh-130px),1000px)] max-w-[94%] drop-shadow-[0_14px_28px_rgba(0,0,0,0.42)]"
+          onClick={
+            handleWheelClick
+          }
           role="button"
           tabIndex={0}
           aria-label="Spin wheel"
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" ||
-              event.key === " "
-            ) {
-              event.preventDefault()
-              handleWheelClick()
-            }
-          }}
+          onKeyDown={
+            handleWheelKeyDown
+          }
         >
-          {/* Actual wheel */}
+          {/* Wheel */}
           <div
             ref={containerRef}
-            className="absolute inset-0"
+            className="absolute inset-0 overflow-visible"
           />
 
-          {/* Right-side pointer */}
+          {/* 
+            Larger arrow.
+
+            It is intentionally pulled inward so the
+            point sits closer to the wheel's edge.
+          */}
           <div
-            className="pointer-events-none absolute right-[-27px] top-1/2 z-30 -translate-y-1/2"
+            className="pointer-events-none absolute right-[-13px] top-1/2 z-40 -translate-y-1/2"
             aria-hidden="true"
           >
             <div
-              className="relative h-[48px] w-[54px] drop-shadow-[0_3px_8px_rgba(0,0,0,0.45)] transition-colors duration-100"
+              className="relative h-[62px] w-[64px]"
               style={{
                 filter:
-                  "drop-shadow(0 0 3px rgba(255,255,255,0.35))",
+                  "drop-shadow(0 3px 5px rgba(0,0,0,0.75)) drop-shadow(0 0 2px rgba(255,255,255,0.65))",
               }}
             >
-              {/* Outer arrow */}
+              {/* Dark outline */}
               <div
                 className="absolute inset-0"
                 style={{
                   clipPath:
-                    "polygon(100% 0, 0 50%, 100% 100%, 76% 50%)",
-                  backgroundColor:
-                    "rgba(255,255,255,0.55)",
+                    "polygon(100% 0, 0 50%, 100% 100%, 77% 50%)",
+                  background:
+                    "rgba(15,23,42,0.92)",
                 }}
               />
 
-              {/* Coloured arrow */}
+              {/* White highlight/outline */}
               <div
                 className="absolute inset-[2px]"
                 style={{
                   clipPath:
-                    "polygon(100% 0, 0 50%, 100% 100%, 76% 50%)",
+                    "polygon(100% 0, 0 50%, 100% 100%, 77% 50%)",
+                  background:
+                    "rgba(255,255,255,0.78)",
+                }}
+              />
+
+              {/* Actual coloured arrow */}
+              <div
+                className="absolute inset-[4px]"
+                style={{
+                  clipPath:
+                    "polygon(100% 0, 0 50%, 100% 100%, 77% 50%)",
                   backgroundColor:
                     pointerColor,
                   transition:
-                    "background-color 100ms ease",
+                    "background-color 90ms ease",
+                  boxShadow:
+                    "inset 0 1px 2px rgba(255,255,255,0.45)",
                 }}
               />
             </div>
           </div>
 
           {/* White centre */}
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex h-[17%] w-[17%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-[0_1px_8px_rgba(0,0,0,0.18)]" />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 h-[17%] w-[17%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_3px_14px_rgba(0,0,0,0.24)]" />
 
-          {/* Wheel of Names style overlay text */}
+          {/* 
+            Curved Wheel-of-Names-style instructions.
+            
+            SVG textPath gives us real curved text instead
+            of the previous two rotated straight lines.
+          */}
           {!isSpinning && (
-            <div className="pointer-events-none absolute inset-0 z-25">
-              <div className="absolute left-1/2 top-[26%] -translate-x-1/2 -rotate-[8deg] whitespace-nowrap text-[clamp(24px,3vw,42px)] font-extrabold tracking-tight text-white drop-shadow-[0_4px_5px_rgba(0,0,0,0.75)]">
-                Click to spin
-              </div>
+            <svg
+              className="pointer-events-none absolute inset-0 z-35 h-full w-full overflow-visible"
+              viewBox="0 0 1000 1000"
+              aria-hidden="true"
+            >
+              <defs>
+                {/* Upper curve */}
+                <path
+                  id="spin-text-top"
+                  d="M 230 355 A 300 300 0 0 1 770 355"
+                  fill="none"
+                />
 
-              <div className="absolute bottom-[22%] left-1/2 -translate-x-1/2 rotate-[8deg] whitespace-nowrap text-[clamp(18px,2.2vw,30px)] font-extrabold tracking-tight text-white drop-shadow-[0_4px_5px_rgba(0,0,0,0.75)]">
-                or press ctrl+enter
-              </div>
+                {/* Lower curve */}
+                <path
+                  id="spin-text-bottom"
+                  d="M 275 650 A 265 265 0 0 0 725 650"
+                  fill="none"
+                />
+              </defs>
+
+              {/* Top text shadow */}
+              <text
+                fill="rgba(0,0,0,0.58)"
+                fontSize="48"
+                fontWeight="800"
+                fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
+                letterSpacing="-1.5"
+                textAnchor="middle"
+                paintOrder="stroke"
+                stroke="rgba(0,0,0,0.42)"
+                strokeWidth="5"
+                dy="6"
+              >
+                <textPath
+                  href="#spin-text-top"
+                  startOffset="50%"
+                >
+                  Click to spin
+                </textPath>
+              </text>
+
+              {/* Top text */}
+              <text
+                fill="#ffffff"
+                fontSize="48"
+                fontWeight="800"
+                fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
+                letterSpacing="-1.5"
+                textAnchor="middle"
+                paintOrder="stroke"
+                stroke="rgba(255,255,255,0.3)"
+                strokeWidth="1"
+              >
+                <textPath
+                  href="#spin-text-top"
+                  startOffset="50%"
+                >
+                  Click to spin
+                </textPath>
+              </text>
+
+              {/* Bottom text shadow */}
+              <text
+                fill="rgba(0,0,0,0.58)"
+                fontSize="34"
+                fontWeight="800"
+                fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
+                letterSpacing="-0.7"
+                textAnchor="middle"
+                paintOrder="stroke"
+                stroke="rgba(0,0,0,0.42)"
+                strokeWidth="4"
+                dy="6"
+              >
+                <textPath
+                  href="#spin-text-bottom"
+                  startOffset="50%"
+                >
+                  or press ctrl+enter
+                </textPath>
+              </text>
+
+              {/* Bottom text */}
+              <text
+                fill="#ffffff"
+                fontSize="34"
+                fontWeight="800"
+                fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
+                letterSpacing="-0.7"
+                textAnchor="middle"
+              >
+                <textPath
+                  href="#spin-text-bottom"
+                  startOffset="50%"
+                >
+                  or press ctrl+enter
+                </textPath>
+              </text>
+            </svg>
+          )}
+
+          {/* Confetti */}
+          {confetti.length > 0 && (
+            <div
+              className="pointer-events-none absolute inset-0 z-50 overflow-visible"
+              aria-hidden="true"
+            >
+              {confetti.map(
+                (piece) => {
+                  const style: CSSProperties =
+                    {
+                      left: `${piece.x}%`,
+                      top: `${piece.y}%`,
+                      width: `${piece.size}px`,
+                      height:
+                        piece.shape ===
+                        "rectangle"
+                          ? `${piece.size * 1.8}px`
+                          : `${piece.size}px`,
+                      backgroundColor:
+                        piece.color,
+                      transform:
+                        `rotate(${piece.rotation}deg)`,
+                      animationDelay:
+                        `${piece.delay}s`,
+                      animationDuration:
+                        `${piece.duration}s`,
+                    }
+
+                  return (
+                    <span
+                      key={piece.id}
+                      className="absolute rounded-[1px] shadow-sm animate-[confetti-fall_1.8s_ease-out_forwards]"
+                      style={style}
+                    />
+                  )
+                },
+              )}
             </div>
           )}
         </div>
       ) : (
-        <div className="flex aspect-square w-[min(62vw,calc(100vh-180px),760px)] max-w-[78%] items-center justify-center rounded-full border border-border/70 bg-card/30">
+        <div className="flex aspect-square w-[min(62vw,calc(100vh-180px),760px)] max-w-[78%] items-center justify-center rounded-full border border-border/70 bg-card/30 shadow-xl">
           <div className="px-6 text-center">
             <p className="text-lg font-semibold">
               Your wheel is empty
             </p>
 
             <p className="mt-2 text-sm text-muted-foreground">
-              Add entries from the sidebar to
-              get started.
+              Add entries from the sidebar
+              to get started.
             </p>
           </div>
         </div>
       )}
+
+      {/* Confetti animation */}
+      <style>
+        {`
+          @keyframes confetti-fall {
+            0% {
+              opacity: 0;
+              transform:
+                translate3d(0, -10px, 0)
+                rotate(0deg)
+                scale(0.7);
+            }
+
+            8% {
+              opacity: 1;
+            }
+
+            100% {
+              opacity: 0;
+              transform:
+                translate3d(
+                  calc((var(--random-x, 0) * 1px)),
+                  420px,
+                  0
+                )
+                rotate(720deg)
+                scale(1);
+            }
+          }
+        `}
+      </style>
     </div>
   )
 }
