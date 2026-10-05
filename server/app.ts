@@ -21,7 +21,11 @@ import {
   setSessionCookie,
 } from "./auth/session"
 
-import { hasPermission } from "./permissions/permissions"
+import {
+  canAccessPage,
+  hasPermission,
+  isPageProtected,
+} from "./permissions/permissions"
 import { registerPermissionAdminRoutes } from "./permissions/adminRoutes"
 import { logAction, registerActionLogRoutes } from "./actionLogs"
 import { registerRosterListRoutes } from "./rosterLists"
@@ -4518,24 +4522,88 @@ export function createApp() {
   app.get(
     "/api/auth/check",
     async (req, res) => {
+      const permission =
+        typeof req.query.permission === "string"
+          ? req.query.permission
+          : null
+
+      const requestedUrl =
+        typeof req.query.url === "string"
+          ? req.query.url
+          : null
+
+      /*
+       * There are two consumers of this endpoint:
+       *
+       * 1. PageProtection uses ?url=/some/page to determine whether the
+       *    browser route itself requires authentication.
+       * 2. Public pages such as Events and Gallery use ?permission=events
+       *    or ?permission=gallery to determine whether the current visitor
+       *    has management access.
+       *
+       * These are deliberately handled separately. A public page must NOT
+       * become private just because its management controls use this endpoint.
+       */
+      if (requestedUrl !== null) {
+        const protectedPage =
+          await isPageProtected(requestedUrl)
+
+        /*
+         * Public browser route: no session is required. This is the important
+         * branch that prevents /, /events, /gallery, and other unprotected
+         * routes from being redirected to /sign-in.
+         */
+        if (!protectedPage) {
+          return res.json({
+            allowed: true,
+            protected: false,
+          })
+        }
+
+        const user =
+          await getRequestUser(req)
+
+        if (!user) {
+          return res.status(401).json({
+            error: "Unauthorized",
+            protected: true,
+          })
+        }
+
+        const allowed =
+          await canAccessPage(
+            user,
+            requestedUrl,
+          )
+
+        if (!allowed) {
+          return res.status(403).json({
+            error: "Forbidden",
+            protected: true,
+          })
+        }
+
+        return res.json({
+          allowed: true,
+          protected: true,
+          user,
+        })
+      }
+
+      /*
+       * Permission-only check. This is used by public pages to decide whether
+       * to show authenticated management actions. Anonymous visitors simply
+       * receive 401, which the page interprets as "cannot manage" rather than
+       * redirecting the visitor away from the public page.
+       */
       const user =
         await getRequestUser(req)
 
       if (!user) {
-        return res
-          .status(401)
-          .json({
-            error:
-              "Unauthorized",
-          })
+        return res.status(401).json({
+          error: "Unauthorized",
+        })
       }
-
-      const permission =
-        typeof req.query
-          .permission ===
-        "string"
-          ? req.query.permission
-          : null
 
       if (
         permission &&
@@ -4544,12 +4612,9 @@ export function createApp() {
           permission,
         )
       ) {
-        return res
-          .status(403)
-          .json({
-            error:
-              "Forbidden",
-          })
+        return res.status(403).json({
+          error: "Forbidden",
+        })
       }
 
       return res.json({
