@@ -95,7 +95,6 @@ export default function SpinWheel() {
   const wheelAreaRef = useRef<HTMLDivElement | null>(null)
   const winnerAnimationTimeoutRef =
     useRef<ReturnType<typeof setTimeout> | null>(null)
-  const confettiEndRef = useRef(0)
   const confettiFrameRef = useRef<number | null>(null)
   const lastConfettiBurstRef = useRef(0)
   const [customizeRequest, setCustomizeRequest] = useState(0)
@@ -149,13 +148,12 @@ export default function SpinWheel() {
       confettiFrameRef.current = null
     }
 
-    confettiEndRef.current = end
     lastConfettiBurstRef.current = 0
 
     const fire = () => {
       const now = Date.now()
 
-      if (now >= confettiEndRef.current) {
+      if (now >= end) {
         confettiFrameRef.current = null
         return
       }
@@ -465,7 +463,7 @@ export default function SpinWheel() {
           id: typeof wheel.id === "string" ? wheel.id : crypto.randomUUID(),
           name: typeof wheel.name === "string" && wheel.name.trim() ? wheel.name : `Wheel ${index + 1}`,
           items: Array.isArray(wheel.items)
-            ? wheel.items.map((item) => ({
+            ? wheel.items.map((item, itemIndex) => ({
                 id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
                 label: typeof item.label === "string" ? item.label : String(item.label ?? ""),
                 color: item.color,
