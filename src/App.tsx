@@ -51,10 +51,10 @@ import Dashboard from "@/pages/dashboard/Dashboard"
 import AdminPermissions from "@/pages/dashboard/admin/Permissions"
 
 import ActivityRoster from "@/pages/dashboard/activity/ActivityRoster"
-import ActivityLogs from "@/pages/dashboard/activity/ActivityLogs"
 
 import PromotionRoster from "@/pages/dashboard/promotion/PromotionRoster"
-import PromotionLogs from "@/pages/dashboard/promotion/PromotionLogs"
+import PromotionActionLogs from "@/pages/dashboard/promotion/ActionLogs"
+import SpinWheel from "@/pages/SpinWheel"
 
 import ActivityImportDepartment from "@/pages/dashboard/activity/imports/Department"
 import ActivityImportMCD from "@/pages/dashboard/activity/imports/MCD"
@@ -380,6 +380,11 @@ export default function App() {
             element={<Gallery />}
           />
 
+          <Route
+            path="/spin-wheel"
+            element={<SpinWheel />}
+          />
+
           {/* ===================================================
               ROSTERS
           =================================================== */}
@@ -480,11 +485,6 @@ export default function App() {
             element={<ActivityRoster />}
           />
 
-          <Route
-            path="/dashboard/activity/activitylogs"
-            element={<ActivityLogs />}
-          />
-
           {/* ===================================================
               PROMOTION ROSTER
           =================================================== */}
@@ -495,8 +495,8 @@ export default function App() {
           />
 
           <Route
-            path="/dashboard/promotion/promotionlogs"
-            element={<PromotionLogs />}
+            path="/dashboard/promotion/actionlogs"
+            element={<PromotionActionLogs />}
           />
 
           {/* ===================================================
