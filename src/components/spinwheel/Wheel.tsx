@@ -382,19 +382,122 @@ function playAfterSpinSound(sound: string, volume: number) {
 /* Wheel                                                                      */
 /* -------------------------------------------------------------------------- */
 
-/** Fast launch with a smooth, natural ease-out into the final slice. */
-const cubicOut = (t: number) => 1 - Math.pow(1 - t, 3)
+/**
+ * Keep the wheel moving quickly for the first half, then begin a smooth
+ * deceleration exactly at the halfway point. The first derivative is
+ * continuous at 50%, so there is no visible jerk when braking begins.
+ */
+const halfThenSmoothStop = (t: number) => {
+  if (t <= 0.5) return t
 
-/* Constant cruising speed with a short, fully smooth stop. */
-const cruiseThenStop = (t: number) => {
-  // Keep a true, constant angular speed for most of the animation.
-  // Only the final section eases smoothly to zero.
-  const cruiseEnd = 0.84
-  if (t <= cruiseEnd) return t
+  const u = (t - 0.5) * 2
+  // u + u² - u³ has derivative 1 at the join and 0 at the end.
+  const eased = u + u * u - u * u * u
+  return 0.5 + 0.5 * eased
+}
 
-  const u = (t - cruiseEnd) / (1 - cruiseEnd)
-  const eased = u * u * (3 - 2 * u)
-  return cruiseEnd + eased * (1 - cruiseEnd)
+type SpinWheelInternals = {
+  _context: CanvasRenderingContext2D | null
+  _actualRadius: number
+  _size: number
+  _center: { x: number; y: number }
+  _items: Array<{ label: string; labelColor: string | null; path: Path2D }>
+  _itemLabelFont: string
+  _itemLabelFontSizeMax: number
+  _itemLabelRadius: number
+  _itemLabelRadiusMax: number
+  _itemLabelAlign: "left" | "center" | "right"
+  _itemLabelBaselineOffset: number
+  _itemLabelRotation: number
+  _itemLabelStrokeWidth: number
+  _itemLabelStrokeColor: string
+  _itemLabelColors: string[]
+  getScaledNumber: (value: number) => number
+  drawItemLabels: (ctx: CanvasRenderingContext2D, angles?: Array<{ start: number; end: number }>) => void
+}
+
+/**
+ * spin-wheel calculates one shared font size using its longest label. That
+ * makes a single long entry shrink every other entry. Replace only the label
+ * drawing routine so each entry gets its own fitted font size instead. The
+ * wheel/canvas/animation logic remains the library implementation.
+ */
+function enablePerItemLabelSizing(wheel: SpinWheel) {
+  const internal = wheel as unknown as SpinWheelInternals
+
+  internal.drawItemLabels = function drawItemLabels(ctx, angles = []) {
+    const maxWidth =
+      internal._actualRadius *
+      (internal._itemLabelRadius - internal._itemLabelRadiusMax) *
+      (internal._itemLabelAlign === "center" ? 2 : 1)
+
+    const maxFontSize =
+      internal._itemLabelFontSizeMax *
+      (internal._size / 500)
+
+    for (const [index, angleData] of angles.entries()) {
+      const item = internal._items[index]
+      if (!item || item.label.trim() === "") continue
+
+      const labelColor =
+        item.labelColor ||
+        internal._itemLabelColors[index % internal._itemLabelColors.length] ||
+        "transparent"
+
+      if (labelColor === "transparent") continue
+
+      ctx.save()
+      ctx.clip(item.path)
+
+      let low = 8
+      let high = maxFontSize
+      for (let i = 0; i < 12; i += 1) {
+        const candidate = (low + high) / 2
+        ctx.font = `${candidate}px ${internal._itemLabelFont}`
+        if (ctx.measureText(item.label).width <= maxWidth) {
+          low = candidate
+        } else {
+          high = candidate
+        }
+      }
+
+      const fontSize = Math.max(8, Math.min(maxFontSize, low))
+      ctx.font = `${fontSize}px ${internal._itemLabelFont}`
+      ctx.textBaseline = "middle"
+      ctx.textAlign = internal._itemLabelAlign
+
+      const baselineOffset =
+        fontSize * -internal._itemLabelBaselineOffset
+      const angle =
+        angleData.start +
+        (angleData.end - angleData.start) / 2
+
+      ctx.translate(
+        internal._center.x +
+          Math.cos(((angle - 90) * Math.PI) / 180) *
+            (internal._actualRadius * internal._itemLabelRadius),
+        internal._center.y +
+          Math.sin(((angle - 90) * Math.PI) / 180) *
+            (internal._actualRadius * internal._itemLabelRadius),
+      )
+      ctx.rotate(
+        ((angle - 90 + internal._itemLabelRotation) * Math.PI) /
+          180,
+      )
+
+      if (internal._itemLabelStrokeWidth > 0) {
+        ctx.lineWidth =
+          internal.getScaledNumber(internal._itemLabelStrokeWidth * 2)
+        ctx.strokeStyle = internal._itemLabelStrokeColor
+        ctx.lineJoin = "round"
+        ctx.strokeText(item.label, 0, baselineOffset)
+      }
+
+      ctx.fillStyle = labelColor
+      ctx.fillText(item.label, 0, baselineOffset)
+      ctx.restore()
+    }
+  }
 }
 
 export default function Wheel({
@@ -699,7 +802,7 @@ export default function Wheel({
       true,
       6,
       1,
-      slowly ? cruiseThenStop : cubicOut,
+      halfThenSmoothStop,
     )
   }, [
     getAudioContext,
@@ -829,16 +932,18 @@ export default function Wheel({
       }
     }
 
-    const longestLabel = visibleItems.reduce((max, item) => Math.max(max, item.label.trim().length), 0)
+    // Keep a generous maximum. enablePerItemLabelSizing() below makes the
+    // library fit each entry independently, so one long name no longer
+    // shrinks all of the short names on the wheel.
     const count = visibleItems.length
-    const labelFontSize = Math.max(14, Math.min(42,
+    const labelFontSize =
       count >= 80 ? 18 :
       count >= 50 ? 20 :
       count >= 32 ? 23 :
       count >= 20 ? 27 :
       count >= 12 ? 32 :
-      count >= 8 ? 36 : 42,
-    ) - Math.max(0, longestLabel - 18) * 0.55)
+      count >= 8 ? 36 :
+      42
 
     const wheel =
       new SpinWheel(
@@ -896,9 +1001,9 @@ export default function Wheel({
            */
           itemLabelAlign: "right",
 
-          itemLabelRadius: 0.80,
+          itemLabelRadius: 0.86,
 
-          itemLabelRadiusMax: 0.34,
+          itemLabelRadiusMax: 0.20,
 
           itemLabelFont:
             "Arial, Helvetica, sans-serif",
@@ -1020,6 +1125,8 @@ export default function Wheel({
         },
       )
 
+    enablePerItemLabelSizing(wheel)
+
     wheelRef.current =
       wheel
 
@@ -1125,7 +1232,7 @@ export default function Wheel({
         w-full
         items-center
         justify-center
-        overflow-hidden
+        overflow-visible
         bg-transparent
       "
     >
@@ -1155,18 +1262,10 @@ export default function Wheel({
             handleWheelKeyDown
           }
         >
-          {/* Subtle Wheel of Names-style edge — no surrounding card/box. */}
-          {!compact && (
-            <div
-              className="pointer-events-none absolute inset-[-2px] rounded-full border-2 border-black/35 shadow-[0_7px_18px_rgba(0,0,0,0.42),inset_0_1px_2px_rgba(255,255,255,0.16)]"
-            />
-          )}
-
+          {/* The wheel itself is clean — no surrounding card or border. */}
           <div
             ref={containerRef}
-            className={`absolute inset-0 overflow-visible rounded-full ${
-              compact ? "" : "shadow-[0_10px_28px_rgba(0,0,0,0.48)]"
-            }`}
+            className="absolute inset-0 overflow-visible rounded-full"
           />
 
           {/* ---------------------------------------------------------------- */}
@@ -1178,7 +1277,7 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-15px]
+              right-[-24px]
               top-1/2
               z-50
               h-[48px]
