@@ -272,7 +272,7 @@ export default function RosterListDialog({
 
     const now = Math.floor(Date.now() / 1000)
     sections.push(ACTIVITY_NOTES)
-    sections.push(`**Promotion Date:** <t:${now}:F> (<t:${now}:t>)`)
+    sections.push(`**Promotion Date:** <t:${now}:F>`)
     return sections.join("\n")
   }, [strikeMode, title, week, selectedMembers, previewMembers])
 
