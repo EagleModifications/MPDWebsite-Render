@@ -390,29 +390,20 @@ function playAfterSpinSound(sound: string, volume: number) {
 const halfThenSmoothStop = (t: number) => {
   if (t <= 0.5) return t
 
-  // Second half: a seventh-order braking curve with continuous velocity,
-  // acceleration and jerk at the halfway point and a true zero velocity at rest.
+  // First half is constant speed. The second half starts with the exact
+  // same velocity, then eases continuously to a complete stop.
+  // g(u) = u + 10u^3 - 25u^4 + 21u^5 - 6u^6
+  // has matching velocity/acceleration at the halfway point and a very
+  // gentle final glide instead of the visible speed drop in the old curve.
   const u = (t - 0.5) * 2
   const eased =
-    u -
-    15 * u ** 4 +
-    39 * u ** 5 -
-    34 * u ** 6 -
-    10 * u ** 7
+    u +
+    10 * u ** 3 -
+    25 * u ** 4 +
+    21 * u ** 5 -
+    6 * u ** 6
 
   return 0.5 + 0.5 * eased
-}
-
-const fastBuildThenSmoothStop = (t: number) => {
-  if (t <= 0.2) {
-    // Build from rest to normal running speed without a sudden kick.
-    const u = t / 0.2
-    return 0.2 * (u * u * (2 - u))
-  }
-
-  if (t <= 0.5) return t
-
-  return halfThenSmoothStop(t)
 }
 
 type SpinWheelInternals = {
@@ -545,6 +536,15 @@ export default function Wheel({
     useRef<HTMLDivElement | null>(null)
 
   const spinningRef =
+    useRef(false)
+
+  // Only true for a real user-triggered spin. This prevents the library's
+  // initial/rest callbacks from creating a phantom winner on refresh.
+  const activeSpinRef =
+    useRef(false)
+
+  // Idle rotation is separate from a real spin.
+  const idleSpinningRef =
     useRef(false)
 
   const cancelledSpinRef =
@@ -734,7 +734,6 @@ export default function Wheel({
 
   const pointerColorRef =
     useRef("#5fc78b")
-  const idleSpinningRef = useRef(false)
 
   const stopDuringSpinAudio = useCallback(() => {
     const audio = duringSpinAudioRef.current
@@ -790,11 +789,6 @@ export default function Wheel({
       return
     }
 
-    if (idleSpinningRef.current) {
-      wheel.stop()
-      idleSpinningRef.current = false
-    }
-
     const audio =
       getAudioContext()
 
@@ -812,8 +806,15 @@ export default function Wheel({
       )
 
     cancelledSpinRef.current = false
-    spinningRef.current =
-      true
+
+    // Stop the decorative idle rotation before beginning the real spin.
+    if (idleSpinningRef.current) {
+      idleSpinningRef.current = false
+      wheel.stop()
+    }
+
+    activeSpinRef.current = true
+    spinningRef.current = true
 
     setIsSpinning(true)
 
@@ -830,21 +831,19 @@ export default function Wheel({
     const configuredDuration = Math.max(1500, Math.min(60000, spinTimeRef.current * 1000))
     const slowly = spinSlowlyRef.current
 
-    /* Slow: constant speed to 50%, then a long glide.
-       Normal/fast: build speed during the first 20%, hold it to 50%, then
-       use the same long braking glide. */
+    /* Slow mode keeps the configured timing. Normal mode is much quicker,
+       while both use the same halfway-braking curve. */
     const duration = slowly
-      ? Math.max(5000, Math.min(60000, configuredDuration))
-      : Math.max(3200, Math.min(5200, configuredDuration * 0.42))
-    const easing = slowly ? halfThenSmoothStop : fastBuildThenSmoothStop
+      ? configuredDuration
+      : Math.max(4200, Math.min(5600, configuredDuration * 0.50))
 
     wheel.spinToItem(
       selectedIndex,
       duration,
       true,
-      slowly ? 6 : 7,
+      6,
       1,
-      easing,
+      halfThenSmoothStop,
     )
   }, [
     getAudioContext,
@@ -924,6 +923,8 @@ export default function Wheel({
 
     spinningRef.current =
       false
+    activeSpinRef.current = false
+    idleSpinningRef.current = false
 
     setIsSpinning(false)
 
@@ -1058,7 +1059,9 @@ export default function Wheel({
 
           isInteractive: false,
 
-          rotationResistance: -35,
+          // No resistance while idle; the idle rotation is intentionally
+          // continuous. A real spin supplies its own easing curve.
+          rotationResistance: 0,
 
           rotationSpeedMax: 1000,
 
@@ -1108,8 +1111,15 @@ export default function Wheel({
           /* -------------------------------------------------------------- */
 
           onRest: (event) => {
+            // Ignore any rest callback that is not the end of a real user
+            // spin. This is important during construction/remount/refresh.
+            if (!activeSpinRef.current) {
+              return
+            }
+
             if (cancelledSpinRef.current) {
               cancelledSpinRef.current = false
+              activeSpinRef.current = false
               stopDuringSpinAudio()
               spinningRef.current = false
               setIsSpinning(false)
@@ -1148,8 +1158,8 @@ export default function Wheel({
 
             stopDuringSpinAudio()
 
-            spinningRef.current =
-              false
+            activeSpinRef.current = false
+            spinningRef.current = false
 
             setIsSpinning(false)
 
@@ -1182,6 +1192,14 @@ export default function Wheel({
       wheel
 
     /*
+     * Start the decorative idle rotation only after the wheel has been
+     * fully constructed. It is deliberately not a normal spin, so it never
+     * produces a winner.
+     */
+    idleSpinningRef.current = true
+    wheel.spin(14)
+
+    /*
      * Synchronise the pointer with the
      * actual rendered wheel immediately.
      */
@@ -1198,20 +1216,17 @@ export default function Wheel({
     lastTickIndexRef.current =
       actualIndex
 
-    // Keep the wheel gently moving while it is idle. A real spin stops this
-    // continuous rotation first, then starts the selected winner animation.
-    wheel.spin(14)
-    idleSpinningRef.current = true
-
     return () => {
+      // Mark the wheel inactive BEFORE removing/stopping it. The library may
+      // emit onRest during teardown; that must never create a winner.
       idleSpinningRef.current = false
-      wheel.stop()
+      activeSpinRef.current = false
+      spinningRef.current = false
       wheel.remove()
 
-      wheelRef.current = null
-
-      spinningRef.current =
-        false
+      if (wheelRef.current === wheel) {
+        wheelRef.current = null
+      }
     }
   }, [
     visibleItems,
@@ -1229,6 +1244,10 @@ export default function Wheel({
   useEffect(() => {
     return () => {
 
+      idleSpinningRef.current = false
+      activeSpinRef.current = false
+      spinningRef.current = false
+      wheelRef.current?.stop()
       stopDuringSpinAudio()
 
       if (
