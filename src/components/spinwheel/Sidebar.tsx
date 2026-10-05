@@ -65,10 +65,7 @@ function getExtras(id: string): EntryExtras {
   )
 }
 
-function setEntryExtras(
-  id: string,
-  value: Partial<EntryExtras>,
-) {
+function setEntryExtras(id: string, value: Partial<EntryExtras>) {
   const current = getExtras(id)
 
   extras.set(id, {
@@ -86,29 +83,19 @@ function createItemsFromText(
     .map((label) => label.trim())
     .filter(Boolean)
     .map((label, index) => ({
-      id:
-        existingItems[index]?.id ??
-        crypto.randomUUID(),
+      id: existingItems[index]?.id ?? crypto.randomUUID(),
       label,
       color:
         existingItems[index]?.color ??
         COLORS[index % COLORS.length],
-      weight:
-        existingItems[index]?.weight ?? 1,
-      hidden:
-        existingItems[index]?.hidden ?? false,
+      weight: existingItems[index]?.weight ?? 1,
+      hidden: existingItems[index]?.hidden ?? false,
     }))
 }
 
 function clampWeight(value: number) {
-  if (!Number.isFinite(value)) {
-    return 1
-  }
-
-  return Math.max(
-    0.01,
-    Math.min(100, value),
-  )
+  if (!Number.isFinite(value)) return 1
+  return Math.max(0.01, Math.min(100, value))
 }
 
 export default function Sidebar({
@@ -119,40 +106,28 @@ export default function Sidebar({
   onClearResults,
   onNewWheel,
 }: SidebarProps) {
-  const [activeTab, setActiveTab] = useState<
-    "entries" | "results"
-  >("entries")
-
+  const [activeTab, setActiveTab] = useState<"entries" | "results">(
+    "entries",
+  )
   const [advanced, setAdvanced] = useState(false)
-
   const [text, setText] = useState(() =>
-    items
-      .map((item) => item.label)
-      .join("\n"),
+    items.map((item) => item.label).join("\n"),
   )
 
-  const [selectedEntry, setSelectedEntry] =
-    useState<number | null>(null)
+  const [selectedEntry, setSelectedEntry] = useState<number | null>(
+    null,
+  )
 
-  const [advancedOpen, setAdvancedOpen] =
-    useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
 
   const [menuOpen, setMenuOpen] = useState(false)
 
-  /*
-   * Keeps the textarea from being overwritten while
-   * the user is actively typing.
-   *
-   * Without this, pressing Enter creates a blank line,
-   * the items update, and the items effect immediately
-   * rebuilds the text without that blank line.
-   */
+  const [isTextEditing, setIsTextEditing] = useState(false)
+
   const textEditingRef = useRef(false)
 
   useEffect(() => {
-    if (textEditingRef.current) {
-      return
-    }
+    if (textEditingRef.current) return
 
     setText(
       items
@@ -162,26 +137,19 @@ export default function Sidebar({
   }, [items])
 
   const visibleItems = useMemo(
-    () =>
-      items.filter(
-        (item) => !item.hidden,
-      ),
+    () => items.filter((item) => !item.hidden),
     [items],
   )
 
   const hiddenItems = useMemo(
-    () =>
-      items.filter(
-        (item) => item.hidden,
-      ),
+    () => items.filter((item) => item.hidden),
     [items],
   )
 
   const totalWeight = useMemo(
     () =>
       visibleItems.reduce(
-        (total, item) =>
-          total + (item.weight ?? 1),
+        (total, item) => total + (item.weight ?? 1),
         0,
       ),
     [visibleItems],
@@ -193,35 +161,20 @@ export default function Sidebar({
       : null
 
   const selectedProbability = useMemo(() => {
-    if (
-      !selectedItem ||
-      selectedItem.hidden ||
-      totalWeight <= 0
-    ) {
+    if (!selectedItem || selectedItem.hidden || totalWeight <= 0) {
       return 0
     }
 
-    return (
-      ((selectedItem.weight ?? 1) /
-        totalWeight) *
-      100
-    )
-  }, [
-    selectedItem,
-    totalWeight,
-  ])
+    return ((selectedItem.weight ?? 1) / totalWeight) * 100
+  }, [selectedItem, totalWeight])
 
-  const updateItems = (
-    next: SpinWheelItem[],
-  ) => {
+  const updateItems = (next: SpinWheelItem[]) => {
     onChange(next)
   }
 
-  const handleTextChange = (
-    value: string,
-  ) => {
+  const handleTextChange = (value: string) => {
     textEditingRef.current = true
-
+    setIsTextEditing(true)
     setText(value)
 
     updateItems(
@@ -234,6 +187,7 @@ export default function Sidebar({
 
   const finishTextEditing = () => {
     textEditingRef.current = false
+    setIsTextEditing(false)
 
     setText(
       items
@@ -246,8 +200,7 @@ export default function Sidebar({
     const newItem: SpinWheelItem = {
       id: crypto.randomUUID(),
       label: `Entry ${items.length + 1}`,
-      color:
-        COLORS[items.length % COLORS.length],
+      color: COLORS[items.length % COLORS.length],
       weight: 1,
       hidden: false,
     }
@@ -257,10 +210,7 @@ export default function Sidebar({
       popupMessage: "",
     })
 
-    const next = [
-      ...items,
-      newItem,
-    ]
+    const next = [...items, newItem]
 
     updateItems(next)
 
@@ -271,24 +221,17 @@ export default function Sidebar({
     )
 
     setAdvanced(true)
-    setSelectedEntry(
-      next.length - 1,
-    )
+    setSelectedEntry(next.length - 1)
   }
 
-  const removeEntry = (
-    index: number,
-  ) => {
+  const removeEntry = (index: number) => {
     const item = items[index]
 
     if (item) {
       extras.delete(item.id)
     }
 
-    const next = items.filter(
-      (_, itemIndex) =>
-        itemIndex !== index,
-    )
+    const next = items.filter((_, itemIndex) => itemIndex !== index)
 
     updateItems(next)
 
@@ -299,30 +242,17 @@ export default function Sidebar({
     )
 
     setSelectedEntry((current) => {
-      if (current === null) {
-        return null
-      }
-
-      if (next.length === 0) {
-        return null
-      }
-
-      if (current >= next.length) {
-        return next.length - 1
-      }
-
+      if (current === null) return null
+      if (next.length === 0) return null
+      if (current >= next.length) return next.length - 1
       return current
     })
   }
 
-  const duplicateEntry = (
-    index: number,
-  ) => {
+  const duplicateEntry = (index: number) => {
     const source = items[index]
 
-    if (!source) {
-      return
-    }
+    if (!source) return
 
     const duplicate: SpinWheelItem = {
       ...source,
@@ -330,21 +260,14 @@ export default function Sidebar({
       label: `${source.label} copy`,
     }
 
-    const sourceExtras =
-      getExtras(source.id)
+    const sourceExtras = getExtras(source.id)
 
-    setEntryExtras(
-      duplicate.id,
-      {
-        ...sourceExtras,
-      },
-    )
+    setEntryExtras(duplicate.id, {
+      ...sourceExtras,
+    })
 
     const next = [
-      ...items.slice(
-        0,
-        index + 1,
-      ),
+      ...items.slice(0, index + 1),
       duplicate,
       ...items.slice(index + 1),
     ]
@@ -357,23 +280,20 @@ export default function Sidebar({
         .join("\n"),
     )
 
-    setSelectedEntry(
-      index + 1,
-    )
+    setSelectedEntry(index + 1)
   }
 
   const updateEntry = (
     index: number,
     patch: Partial<SpinWheelItem>,
   ) => {
-    const next = items.map(
-      (item, itemIndex) =>
-        itemIndex === index
-          ? {
-              ...item,
-              ...patch,
-            }
-          : item,
+    const next = items.map((item, itemIndex) =>
+      itemIndex === index
+        ? {
+            ...item,
+            ...patch,
+          }
+        : item,
     )
 
     updateItems(next)
@@ -404,12 +324,8 @@ export default function Sidebar({
     const next = [...items]
 
     const current = next[index]
-
-    next[index] =
-      next[targetIndex]
-
-    next[targetIndex] =
-      current
+    next[index] = next[targetIndex]
+    next[targetIndex] = current
 
     updateItems(next)
 
@@ -419,33 +335,20 @@ export default function Sidebar({
         .join("\n"),
     )
 
-    setSelectedEntry(
-      targetIndex,
-    )
+    setSelectedEntry(targetIndex)
   }
 
   const shuffleEntries = () => {
     const next = [...items]
 
-    for (
-      let index = next.length - 1;
-      index > 0;
-      index -= 1
-    ) {
-      const randomIndex =
-        Math.floor(
-          Math.random() *
-            (index + 1),
-        )
+    for (let index = next.length - 1; index > 0; index -= 1) {
+      const randomIndex = Math.floor(
+        Math.random() * (index + 1),
+      )
 
-      const current =
-        next[index]
-
-      next[index] =
-        next[randomIndex]
-
-      next[randomIndex] =
-        current
+      const current = next[index]
+      next[index] = next[randomIndex]
+      next[randomIndex] = current
     }
 
     updateItems(next)
@@ -458,11 +361,8 @@ export default function Sidebar({
   }
 
   const sortEntries = () => {
-    const next = [...items].sort(
-      (a, b) =>
-        a.label.localeCompare(
-          b.label,
-        ),
+    const next = [...items].sort((a, b) =>
+      a.label.localeCompare(b.label),
     )
 
     updateItems(next)
@@ -475,12 +375,10 @@ export default function Sidebar({
   }
 
   const revealHidden = () => {
-    const next = items.map(
-      (item) => ({
-        ...item,
-        hidden: false,
-      }),
-    )
+    const next = items.map((item) => ({
+      ...item,
+      hidden: false,
+    }))
 
     updateItems(next)
 
@@ -492,12 +390,10 @@ export default function Sidebar({
   }
 
   const hideAll = () => {
-    const next = items.map(
-      (item) => ({
-        ...item,
-        hidden: true,
-      }),
-    )
+    const next = items.map((item) => ({
+      ...item,
+      hidden: true,
+    }))
 
     updateItems(next)
 
@@ -512,43 +408,22 @@ export default function Sidebar({
     index: number,
     file: File | undefined,
   ) => {
-    if (!file) {
-      return
-    }
+    if (!file) return
 
-    const reader =
-      new FileReader()
+    const reader = new FileReader()
 
     reader.onload = () => {
-      if (
-        typeof reader.result !==
-        "string"
-      ) {
-        return
-      }
+      if (typeof reader.result !== "string") return
 
-      setEntryExtras(
-        items[index]?.id ?? "",
-        {
-          image: reader.result,
-        },
-      )
-
-      /*
-       * Changing the selected entry causes the
-       * modal to render the latest extras.
-       */
-      setSelectedEntry(
-        (current) => current,
-      )
+      setEntryExtras(items[index]?.id ?? "", {
+        image: reader.result,
+      })
     }
 
     reader.readAsDataURL(file)
   }
 
-  const openEntrySettings = (
-    index: number,
-  ) => {
+  const openEntrySettings = (index: number) => {
     setSelectedEntry(index)
     setAdvancedOpen(true)
   }
@@ -561,42 +436,27 @@ export default function Sidebar({
   const updateSelectedEntry = (
     patch: Partial<SpinWheelItem>,
   ) => {
-    if (
-      selectedEntry === null
-    ) {
-      return
-    }
+    if (selectedEntry === null) return
 
-    updateEntry(
-      selectedEntry,
-      patch,
-    )
+    updateEntry(selectedEntry, patch)
   }
 
   const updateSelectedExtras = (
     patch: Partial<EntryExtras>,
   ) => {
-    if (
-      selectedEntry === null
-    ) {
-      return
-    }
+    if (selectedEntry === null) return
 
-    const item =
-      items[selectedEntry]
+    const item = items[selectedEntry]
 
-    if (!item) {
-      return
-    }
+    if (!item) return
 
-    setEntryExtras(
-      item.id,
-      patch,
-    )
+    setEntryExtras(item.id, patch)
 
-    setSelectedEntry(
-      (current) => current,
-    )
+    /*
+     * Force a re-render so the modal immediately reflects
+     * the changed value.
+     */
+    setSelectedEntry((current) => current)
   }
 
   const selectedExtras =
@@ -620,20 +480,14 @@ export default function Sidebar({
 
             <p className="text-xs text-muted-foreground">
               {items.length}{" "}
-              {items.length === 1
-                ? "entry"
-                : "entries"}
+              {items.length === 1 ? "entry" : "entries"}
             </p>
           </div>
 
-          <div className="relative flex items-center gap-1">
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() =>
-                setMenuOpen(
-                  (value) => !value,
-                )
-              }
+              onClick={() => setMenuOpen((value) => !value)}
               className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
               aria-label="More options"
               title="More options"
@@ -642,14 +496,14 @@ export default function Sidebar({
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-11 z-[80] w-48 rounded-xl border border-border bg-popover p-1.5 shadow-2xl">
+              <div className="absolute right-4 top-14 z-[80] w-48 rounded-xl border border-border bg-popover p-1.5 shadow-2xl">
                 <button
                   type="button"
                   onClick={() => {
                     shuffleEntries()
                     setMenuOpen(false)
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-muted"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
                 >
                   <Shuffle className="h-4 w-4" />
                   Shuffle entries
@@ -661,7 +515,7 @@ export default function Sidebar({
                     sortEntries()
                     setMenuOpen(false)
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-muted"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
                 >
                   <SlidersHorizontal className="h-4 w-4" />
                   Sort entries
@@ -673,7 +527,7 @@ export default function Sidebar({
                     hideAll()
                     setMenuOpen(false)
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-muted"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
                 >
                   <EyeOff className="h-4 w-4" />
                   Hide all
@@ -685,7 +539,7 @@ export default function Sidebar({
                     revealHidden()
                     setMenuOpen(false)
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-muted"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
                 >
                   <Eye className="h-4 w-4" />
                   Reveal all
@@ -699,9 +553,7 @@ export default function Sidebar({
         <div className="flex shrink-0 border-b border-border/70">
           <button
             type="button"
-            onClick={() =>
-              setActiveTab("entries")
-            }
+            onClick={() => setActiveTab("entries")}
             className={`relative flex-1 px-4 py-3 text-sm font-semibold transition ${
               activeTab === "entries"
                 ? "text-foreground"
@@ -721,9 +573,7 @@ export default function Sidebar({
 
           <button
             type="button"
-            onClick={() =>
-              setActiveTab("results")
-            }
+            onClick={() => setActiveTab("results")}
             className={`relative flex-1 px-4 py-3 text-sm font-semibold transition ${
               activeTab === "results"
                 ? "text-foreground"
@@ -756,23 +606,17 @@ export default function Sidebar({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <span>
-                  Advanced
-                </span>
+              <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
+                <span>Advanced</span>
 
                 <button
                   type="button"
                   role="switch"
                   aria-checked={advanced}
                   onClick={() => {
-                    textEditingRef.current =
-                      false
-
-                    setAdvanced(
-                      (value) =>
-                        !value,
-                    )
+                    textEditingRef.current = false
+                    setIsTextEditing(false)
+                    setAdvanced((value) => !value)
                   }}
                   className={`relative h-6 w-11 rounded-full transition ${
                     advanced
@@ -788,7 +632,7 @@ export default function Sidebar({
                     }`}
                   />
                 </button>
-              </div>
+              </label>
             </div>
 
             {!advanced ? (
@@ -802,12 +646,10 @@ export default function Sidebar({
                       )
                     }
                     onFocus={() => {
-                      textEditingRef.current =
-                        true
+                      textEditingRef.current = true
+                      setIsTextEditing(true)
                     }}
-                    onBlur={
-                      finishTextEditing
-                    }
+                    onBlur={finishTextEditing}
                     placeholder="Enter one entry per line..."
                     spellCheck={false}
                     className="h-full min-h-[300px] w-full resize-none rounded-xl border border-border/70 bg-background/70 p-3 text-sm leading-[22px] text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/10"
@@ -827,12 +669,8 @@ export default function Sidebar({
 
                     <button
                       type="button"
-                      onClick={
-                        shuffleEntries
-                      }
-                      disabled={
-                        items.length < 2
-                      }
+                      onClick={shuffleEntries}
+                      disabled={items.length < 2}
                       className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-semibold transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Shuffle className="h-4 w-4" />
@@ -840,23 +678,15 @@ export default function Sidebar({
                     </button>
                   </div>
 
-                  {hiddenItems.length >
-                    0 && (
+                  {hiddenItems.length > 0 && (
                     <button
                       type="button"
-                      onClick={
-                        revealHidden
-                      }
+                      onClick={revealHidden}
                       className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-border bg-background text-xs font-semibold transition hover:bg-muted"
                     >
                       <Eye className="h-4 w-4" />
-                      Reveal{" "}
-                      {
-                        hiddenItems.length
-                      }{" "}
-                      hidden{" "}
-                      {hiddenItems.length ===
-                      1
+                      Reveal {hiddenItems.length} hidden{" "}
+                      {hiddenItems.length === 1
                         ? "entry"
                         : "entries"}
                     </button>
@@ -868,269 +698,208 @@ export default function Sidebar({
                 {/* Advanced list */}
                 <div className="min-h-0 flex-1 overflow-y-auto p-3">
                   <div className="space-y-2">
-                    {items.map(
-                      (
-                        item,
-                        index,
-                      ) => {
-                        const itemExtras =
-                          getExtras(
-                            item.id,
-                          )
+                    {items.map((item, index) => {
+                      const itemExtras =
+                        getExtras(item.id)
 
-                        return (
-                          <div
-                            key={
-                              item.id
-                            }
-                            className={`rounded-xl border transition ${
-                              item.hidden
-                                ? "border-border/50 bg-muted/20 opacity-60"
-                                : "border-border/70 bg-background/60"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 p-2.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateEntry(
-                                    index,
-                                    {
-                                      hidden:
-                                        !item.hidden,
-                                    },
-                                  )
-                                }
-                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
-                                  item.hidden
-                                    ? "bg-muted text-muted-foreground"
-                                    : "bg-blue-500/10 text-blue-500"
-                                }`}
-                                title={
-                                  item.hidden
-                                    ? "Show entry"
-                                    : "Hide entry"
-                                }
-                              >
-                                {item.hidden ? (
-                                  <EyeOff className="h-4 w-4" />
-                                ) : (
-                                  <Eye className="h-4 w-4" />
-                                )}
-                              </button>
+                      return (
+                        <div
+                          key={item.id}
+                          className={`rounded-xl border transition ${
+                            item.hidden
+                              ? "border-border/50 bg-muted/20 opacity-60"
+                              : "border-border/70 bg-background/60"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 p-2.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateEntry(index, {
+                                  hidden: !item.hidden,
+                                })
+                              }
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
+                                item.hidden
+                                  ? "bg-muted text-muted-foreground"
+                                  : "bg-blue-500/10 text-blue-500"
+                              }`}
+                              title={
+                                item.hidden
+                                  ? "Show entry"
+                                  : "Hide entry"
+                              }
+                            >
+                              {item.hidden ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </button>
 
-                              <div
-                                className="h-7 w-7 shrink-0 rounded-md border border-border/70"
-                                style={{
-                                  backgroundColor:
+                            <div
+                              className="h-7 w-7 shrink-0 rounded-md border border-border/70"
+                              style={{
+                                backgroundColor:
+                                  item.color ??
+                                  COLORS[
+                                    index %
+                                      COLORS.length
+                                  ],
+                              }}
+                            />
+
+                            <input
+                              value={item.label}
+                              onChange={(event) =>
+                                updateEntry(index, {
+                                  label: event.target.value,
+                                })
+                              }
+                              className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-border focus:bg-background"
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                moveEntry(index, "up")
+                              }
+                              disabled={index === 0}
+                              className="hidden h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-25 sm:flex"
+                              title="Move up"
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                moveEntry(index, "down")
+                              }
+                              disabled={
+                                index ===
+                                items.length - 1
+                              }
+                              className="hidden h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-25 sm:flex"
+                              title="Move down"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openEntrySettings(index)
+                              }
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                              title="Entry settings"
+                            >
+                              <Settings2 className="h-4 w-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeEntry(index)
+                              }
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-red-500/10 hover:text-red-500"
+                              title="Delete entry"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-between border-t border-border/50 px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-background transition hover:bg-muted">
+                                <Palette className="h-4 w-4" />
+
+                                <input
+                                  type="color"
+                                  value={
                                     item.color ??
                                     COLORS[
                                       index %
                                         COLORS.length
-                                    ],
-                                }}
-                              />
+                                    ]
+                                  }
+                                  onChange={(event) =>
+                                    updateEntry(index, {
+                                      color:
+                                        event.target.value,
+                                    })
+                                  }
+                                  className="sr-only"
+                                />
+                              </label>
 
-                              <input
-                                value={
-                                  item.label
-                                }
-                                onChange={(
-                                  event,
-                                ) =>
-                                  updateEntry(
-                                    index,
-                                    {
-                                      label:
-                                        event
-                                          .target
-                                          .value,
-                                    },
-                                  )
-                                }
-                                className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm outline-none transition focus:border-border focus:bg-background"
-                              />
+                              <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-background transition hover:bg-muted">
+                                <ImagePlus className="h-4 w-4" />
 
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  moveEntry(
-                                    index,
-                                    "up",
-                                  )
-                                }
-                                disabled={
-                                  index ===
-                                  0
-                                }
-                                className="hidden h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-25 sm:flex"
-                                title="Move up"
-                              >
-                                <ChevronUp className="h-4 w-4" />
-                              </button>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="sr-only"
+                                  onChange={(event) => {
+                                    handleImageUpload(
+                                      index,
+                                      event.target.files?.[0],
+                                    )
+                                    event.currentTarget.value =
+                                      ""
+                                  }}
+                                />
+                              </label>
 
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  moveEntry(
-                                    index,
-                                    "down",
-                                  )
-                                }
-                                disabled={
-                                  index ===
-                                  items.length -
-                                    1
-                                }
-                                className="hidden h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-25 sm:flex"
-                                title="Move down"
-                              >
-                                <ChevronDown className="h-4 w-4" />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openEntrySettings(
-                                    index,
-                                  )
-                                }
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                                title="Entry settings"
-                              >
-                                <Settings2 className="h-4 w-4" />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  removeEntry(
-                                    index,
-                                  )
-                                }
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-red-500/10 hover:text-red-500"
-                                title="Delete entry"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              {itemExtras.image && (
+                                <span className="text-[11px] font-medium text-muted-foreground">
+                                  Image added
+                                </span>
+                              )}
                             </div>
 
-                            <div className="flex items-center justify-between border-t border-border/50 px-3 py-2">
-                              <div className="flex items-center gap-2">
-                                <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-background transition hover:bg-muted">
-                                  <Palette className="h-4 w-4" />
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateEntry(index, {
+                                    weight: clampWeight(
+                                      (item.weight ??
+                                        1) - 1,
+                                    ),
+                                  })
+                                }
+                                className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted"
+                              >
+                                −
+                              </button>
 
-                                  <input
-                                    type="color"
-                                    value={
-                                      item.color ??
-                                      COLORS[
-                                        index %
-                                          COLORS.length
-                                      ]
-                                    }
-                                    onChange={(
-                                      event,
-                                    ) =>
-                                      updateEntry(
-                                        index,
-                                        {
-                                          color:
-                                            event
-                                              .target
-                                              .value,
-                                        },
-                                      )
-                                    }
-                                    className="sr-only"
-                                  />
-                                </label>
+                              <span className="min-w-[38px] text-center text-xs font-semibold">
+                                {item.weight ?? 1}
+                              </span>
 
-                                <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-background transition hover:bg-muted">
-                                  <ImagePlus className="h-4 w-4" />
-
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="sr-only"
-                                    onChange={(
-                                      event,
-                                    ) => {
-                                      handleImageUpload(
-                                        index,
-                                        event
-                                          .currentTarget
-                                          .files?.[0],
-                                      )
-
-                                      event.currentTarget.value =
-                                        ""
-                                    }}
-                                  />
-                                </label>
-
-                                {itemExtras.image && (
-                                  <span className="text-[11px] font-medium text-muted-foreground">
-                                    Image added
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateEntry(
-                                      index,
-                                      {
-                                        weight:
-                                          clampWeight(
-                                            (item.weight ??
-                                              1) -
-                                              1,
-                                          ),
-                                      },
-                                    )
-                                  }
-                                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground transition hover:bg-muted"
-                                >
-                                  −
-                                </button>
-
-                                <span className="min-w-[38px] text-center text-xs font-semibold">
-                                  {item.weight ??
-                                    1}
-                                </span>
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateEntry(
-                                      index,
-                                      {
-                                        weight:
-                                          clampWeight(
-                                            (item.weight ??
-                                              1) +
-                                              1,
-                                          ),
-                                      },
-                                    )
-                                  }
-                                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground transition hover:bg-muted"
-                                >
-                                  +
-                                </button>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateEntry(index, {
+                                    weight: clampWeight(
+                                      (item.weight ??
+                                        1) + 1,
+                                    ),
+                                  })
+                                }
+                                className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted"
+                              >
+                                +
+                              </button>
                             </div>
                           </div>
-                        )
-                      },
-                    )}
+                        </div>
+                      )
+                    })}
                   </div>
 
-                  {items.length ===
-                    0 && (
+                  {items.length === 0 && (
                     <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-dashed border-border px-6 text-center">
                       <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                         <Plus className="h-5 w-5 text-muted-foreground" />
@@ -1141,8 +910,7 @@ export default function Sidebar({
                       </p>
 
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Add an entry to
-                        start building
+                        Add an entry to start building
                         your wheel.
                       </p>
                     </div>
@@ -1162,13 +930,8 @@ export default function Sidebar({
 
                     <button
                       type="button"
-                      onClick={
-                        revealHidden
-                      }
-                      disabled={
-                        hiddenItems.length ===
-                        0
-                      }
+                      onClick={revealHidden}
+                      disabled={hiddenItems.length === 0}
                       className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-semibold transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Eye className="h-4 w-4" />
@@ -1189,22 +952,15 @@ export default function Sidebar({
                 </p>
 
                 <p className="text-xs text-muted-foreground">
-                  {results.length}{" "}
-                  result
-                  {results.length ===
-                  1
-                    ? ""
-                    : "s"}
+                  {results.length} result
+                  {results.length === 1 ? "" : "s"}
                 </p>
               </div>
 
-              {results.length >
-                0 && (
+              {results.length > 0 && (
                 <button
                   type="button"
-                  onClick={
-                    onClearResults
-                  }
+                  onClick={onClearResults}
                   className="text-xs font-semibold text-muted-foreground transition hover:text-red-500"
                 >
                   Clear
@@ -1212,8 +968,7 @@ export default function Sidebar({
               )}
             </div>
 
-            {results.length ===
-            0 ? (
+            {results.length === 0 ? (
               <div className="flex h-full min-h-[300px] flex-col items-center justify-center px-6 text-center">
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                   <Check className="h-5 w-5 text-muted-foreground" />
@@ -1224,8 +979,7 @@ export default function Sidebar({
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Spin the wheel to
-                  see results here.
+                  Spin the wheel to see results here.
                 </p>
               </div>
             ) : (
@@ -1233,26 +987,20 @@ export default function Sidebar({
                 <div className="space-y-2">
                   {[...results]
                     .reverse()
-                    .map(
-                      (
-                        result,
-                        index,
-                      ) => (
-                        <div
-                          key={`${result}-${index}`}
-                          className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3"
-                        >
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-xs font-bold text-blue-500">
-                            {results.length -
-                              index}
-                          </span>
+                    .map((result, index) => (
+                      <div
+                        key={`${result}-${index}`}
+                        className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3"
+                      >
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-xs font-bold text-blue-500">
+                          {results.length - index}
+                        </span>
 
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                            {result}
-                          </span>
-                        </div>
-                      ),
-                    )}
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                          {result}
+                        </span>
+                      </div>
+                    ))}
                 </div>
               </div>
             )}
@@ -1287,7 +1035,6 @@ export default function Sidebar({
               <div className="flex h-16 items-center justify-between border-b border-border/70 px-4">
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="h-5 w-5" />
-
                   <h2 className="text-lg font-bold">
                     Advanced
                   </h2>
@@ -1295,9 +1042,7 @@ export default function Sidebar({
 
                 <button
                   type="button"
-                  onClick={
-                    closeEntrySettings
-                  }
+                  onClick={closeEntrySettings}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
                   aria-label="Close"
                 >
@@ -1311,26 +1056,18 @@ export default function Sidebar({
                   <button
                     type="button"
                     onClick={() => {
-                      if (
-                        selectedEntry ===
-                        null
-                      ) {
-                        return
-                      }
+                      if (selectedEntry === null) return
 
                       setSelectedEntry(
                         Math.max(
                           0,
-                          selectedEntry -
-                            1,
+                          selectedEntry - 1,
                         ),
                       )
                     }}
                     disabled={
-                      selectedEntry ===
-                        null ||
-                      selectedEntry ===
-                        0
+                      selectedEntry === null ||
+                      selectedEntry === 0
                     }
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-muted/80 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                     title="Previous entry"
@@ -1340,33 +1077,24 @@ export default function Sidebar({
 
                   <span className="flex-1 text-sm font-medium">
                     Entry{" "}
-                    {(selectedEntry ??
-                      0) + 1}{" "}
-                    / {items.length}
+                    {(selectedEntry ?? 0) + 1} /{" "}
+                    {items.length}
                   </span>
 
                   <button
                     type="button"
                     onClick={() => {
-                      if (
-                        selectedEntry ===
-                        null
-                      ) {
-                        return
-                      }
+                      if (selectedEntry === null) return
 
                       setSelectedEntry(
                         Math.min(
-                          items.length -
-                            1,
-                          selectedEntry +
-                            1,
+                          items.length - 1,
+                          selectedEntry + 1,
                         ),
                       )
                     }}
                     disabled={
-                      selectedEntry ===
-                        null ||
+                      selectedEntry === null ||
                       selectedEntry ===
                         items.length - 1
                     }
@@ -1379,13 +1107,10 @@ export default function Sidebar({
                   <button
                     type="button"
                     onClick={() => {
-                      const previousLength =
-                        items.length
-
                       addEntry()
 
                       setSelectedEntry(
-                        previousLength,
+                        items.length,
                       )
                     }}
                     className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-muted/80 hover:text-foreground"
@@ -1403,12 +1128,10 @@ export default function Sidebar({
                   <button
                     type="button"
                     onClick={() =>
-                      updateSelectedEntry(
-                        {
-                          hidden:
-                            !selectedItem.hidden,
-                        },
-                      )
+                      updateSelectedEntry({
+                        hidden:
+                          !selectedItem.hidden,
+                      })
                     }
                     className="flex items-center gap-2"
                   >
@@ -1434,8 +1157,7 @@ export default function Sidebar({
                       type="button"
                       onClick={() =>
                         duplicateEntry(
-                          selectedEntry ??
-                            0,
+                          selectedEntry ?? 0,
                         )
                       }
                       className="flex h-9 items-center gap-2 rounded-md bg-muted px-3 text-sm font-semibold transition hover:bg-muted/80"
@@ -1448,27 +1170,17 @@ export default function Sidebar({
                       type="button"
                       onClick={() => {
                         const index =
-                          selectedEntry ??
-                          0
+                          selectedEntry ?? 0
 
-                        const wasLast =
-                          items.length <=
-                          1
+                        removeEntry(index)
 
-                        removeEntry(
-                          index,
-                        )
-
-                        if (
-                          wasLast
-                        ) {
+                        if (items.length <= 1) {
                           closeEntrySettings()
                         } else {
                           setSelectedEntry(
                             Math.min(
                               index,
-                              items.length -
-                                2,
+                              items.length - 2,
                             ),
                           )
                         }
@@ -1491,17 +1203,11 @@ export default function Sidebar({
                     </label>
 
                     <input
-                      value={
-                        selectedItem.label
-                      }
+                      value={selectedItem.label}
                       onChange={(event) =>
-                        updateSelectedEntry(
-                          {
-                            label:
-                              event.target
-                                .value,
-                          },
-                        )
+                        updateSelectedEntry({
+                          label: event.target.value,
+                        })
                       }
                       className="h-10 rounded-md border border-border bg-muted/70 px-3 text-sm font-medium outline-none transition focus:border-blue-500"
                     />
@@ -1530,17 +1236,11 @@ export default function Sidebar({
                             selectedItem.color ??
                             "#3b82f6"
                           }
-                          onChange={(
-                            event,
-                          ) =>
-                            updateSelectedEntry(
-                              {
-                                color:
-                                  event
-                                    .target
-                                    .value,
-                              },
-                            )
+                          onChange={(event) =>
+                            updateSelectedEntry({
+                              color:
+                                event.target.value,
+                            })
                           }
                           className="sr-only"
                         />
@@ -1554,17 +1254,11 @@ export default function Sidebar({
                           type="file"
                           accept="image/*"
                           className="sr-only"
-                          onChange={(
-                            event,
-                          ) => {
+                          onChange={(event) => {
                             handleImageUpload(
-                              selectedEntry ??
-                                0,
-                              event
-                                .currentTarget
-                                .files?.[0],
+                              selectedEntry ?? 0,
+                              event.target.files?.[0],
                             )
-
                             event.currentTarget.value =
                               ""
                           }}
@@ -1590,37 +1284,26 @@ export default function Sidebar({
                         value={
                           selectedExtras.sound
                         }
-                        onChange={(
-                          event,
-                        ) =>
-                          updateSelectedExtras(
-                            {
-                              sound:
-                                event
-                                  .target
-                                  .value,
-                            },
-                          )
+                        onChange={(event) =>
+                          updateSelectedExtras({
+                            sound:
+                              event.target.value,
+                          })
                         }
                         className="h-10 w-full appearance-none rounded-md border border-border bg-muted/70 px-3 pr-10 text-sm font-medium outline-none transition focus:border-blue-500"
                       >
                         <option value="inherit">
-                          Inherit from
-                          wheel
+                          Inherit from wheel
                         </option>
-
                         <option value="none">
                           None
                         </option>
-
                         <option value="tick">
                           Tick
                         </option>
-
                         <option value="bell">
                           Bell
                         </option>
-
                         <option value="pop">
                           Pop
                         </option>
@@ -1641,14 +1324,12 @@ export default function Sidebar({
                         selectedExtras.popupMessage
                       }
                       onChange={(event) =>
-                        updateSelectedExtras(
-                          {
-                            popupMessage:
-                              event.target
-                                .value,
-                          },
-                        )
+                        updateSelectedExtras({
+                          popupMessage:
+                            event.target.value,
+                        })
                       }
+                      placeholder=""
                       className="h-10 rounded-md border border-border bg-muted/70 px-3 text-sm outline-none transition focus:border-blue-500"
                     />
                   </div>
@@ -1664,16 +1345,12 @@ export default function Sidebar({
                         <button
                           type="button"
                           onClick={() =>
-                            updateSelectedEntry(
-                              {
-                                weight:
-                                  clampWeight(
-                                    (selectedItem.weight ??
-                                      1) -
-                                      1,
-                                  ),
-                              },
-                            )
+                            updateSelectedEntry({
+                              weight: clampWeight(
+                                (selectedItem.weight ??
+                                  1) - 1,
+                              ),
+                            })
                           }
                           className="flex h-full w-12 items-center justify-center text-xl text-muted-foreground transition hover:bg-muted hover:text-foreground"
                         >
@@ -1689,21 +1366,15 @@ export default function Sidebar({
                             selectedItem.weight ??
                             1
                           }
-                          onChange={(
-                            event,
-                          ) =>
-                            updateSelectedEntry(
-                              {
-                                weight:
-                                  clampWeight(
-                                    Number(
-                                      event
-                                        .target
-                                        .value,
-                                    ),
-                                  ),
-                              },
-                            )
+                          onChange={(event) =>
+                            updateSelectedEntry({
+                              weight: clampWeight(
+                                Number(
+                                  event.target
+                                    .value,
+                                ),
+                              ),
+                            })
                           }
                           className="h-full min-w-0 flex-1 bg-transparent text-center text-sm font-medium outline-none"
                         />
@@ -1711,16 +1382,12 @@ export default function Sidebar({
                         <button
                           type="button"
                           onClick={() =>
-                            updateSelectedEntry(
-                              {
-                                weight:
-                                  clampWeight(
-                                    (selectedItem.weight ??
-                                      1) +
-                                      1,
-                                  ),
-                              },
-                            )
+                            updateSelectedEntry({
+                              weight: clampWeight(
+                                (selectedItem.weight ??
+                                  1) + 1,
+                              ),
+                            })
                           }
                           className="flex h-full w-12 items-center justify-center text-xl text-muted-foreground transition hover:bg-muted hover:text-foreground"
                         >
@@ -1747,9 +1414,7 @@ export default function Sidebar({
               <div className="flex items-center justify-end gap-2 border-t border-border/70 px-4 py-3">
                 <button
                   type="button"
-                  onClick={
-                    closeEntrySettings
-                  }
+                  onClick={closeEntrySettings}
                   className="h-10 rounded-md px-4 text-sm font-semibold transition hover:bg-muted"
                 >
                   Cancel
@@ -1757,9 +1422,7 @@ export default function Sidebar({
 
                 <button
                   type="button"
-                  onClick={
-                    closeEntrySettings
-                  }
+                  onClick={closeEntrySettings}
                   className="h-10 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500"
                 >
                   OK
