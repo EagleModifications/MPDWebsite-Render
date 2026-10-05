@@ -2771,10 +2771,12 @@ export default function Sidebar({
                 <button
                   type="button"
                   onClick={handleRemoveActiveWheel}
-                  className="mt-1 flex h-9 items-center justify-start gap-2 rounded-md px-2 text-xs font-semibold text-foreground transition hover:bg-muted hover:text-foreground"
+                  className="mt-2 flex h-9 w-full min-w-0 items-center justify-center gap-1.5 rounded-md bg-red-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-500"
                 >
-                  <Trash2 className="h-4 w-4 shrink-0" />
-                  Remove wheel {activeWheelNumber}
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    Remove wheel {activeWheelNumber}
+                  </span>
                 </button>
               )}
             </div>
