@@ -44,6 +44,10 @@ export default function SpinWheel() {
    */
   const [animateWinningEntryByWheel, setAnimateWinningEntryByWheel] =
     useState<Record<string, boolean>>({})
+  const [afterSoundByWheel, setAfterSoundByWheel] =
+    useState<Record<string, string>>({})
+  const [afterVolumeByWheel, setAfterVolumeByWheel] =
+    useState<Record<string, number>>({})
 
   /*
    * The large background winner animation is separate from the winner
@@ -172,6 +176,26 @@ export default function SpinWheel() {
     [animatedWinner],
   )
 
+  const handleAfterSoundChange = useCallback(
+    (wheelId: string, sound: string) => {
+      setAfterSoundByWheel((current) => ({
+        ...current,
+        [wheelId]: sound,
+      }))
+    },
+    [],
+  )
+
+  const handleAfterVolumeChange = useCallback(
+    (wheelId: string, volume: number) => {
+      setAfterVolumeByWheel((current) => ({
+        ...current,
+        [wheelId]: volume,
+      }))
+    },
+    [],
+  )
+
   const renameWheel = useCallback((wheelId: string, name: string) => {
     const trimmed = name.trim()
 
@@ -194,7 +218,15 @@ export default function SpinWheel() {
         return current
       }
 
-      return current.filter((wheel) => wheel.id !== wheelId)
+      const remaining = current.filter((wheel) => wheel.id !== wheelId)
+
+      // Keep the automatic wheel names sequential after a deletion.
+      // Custom names are left untouched.
+      return remaining.map((wheel, index) =>
+        /^Wheel \d+$/.test(wheel.name.trim())
+          ? { ...wheel, name: `Wheel ${index + 1}` }
+          : wheel,
+      )
     })
 
     setActiveWheelId((active) => {
@@ -208,6 +240,18 @@ export default function SpinWheel() {
     })
 
     setAnimateWinningEntryByWheel((current) => {
+      const next = { ...current }
+      delete next[wheelId]
+      return next
+    })
+
+    setAfterSoundByWheel((current) => {
+      const next = { ...current }
+      delete next[wheelId]
+      return next
+    })
+
+    setAfterVolumeByWheel((current) => {
       const next = { ...current }
       delete next[wheelId]
       return next
@@ -388,6 +432,8 @@ export default function SpinWheel() {
                   <Wheel
                     items={wheel.items}
                     compact={wheels.length > 1}
+                    afterSound={afterSoundByWheel[wheel.id] ?? "Subdued applause"}
+                    afterVolume={afterVolumeByWheel[wheel.id] ?? 50}
                     onResult={(item) =>
                       handleResult(
                         wheel.id,
@@ -436,6 +482,10 @@ export default function SpinWheel() {
           onAnimateWinningEntryChange={
             handleAnimateWinningEntryChange
           }
+          afterSoundByWheel={afterSoundByWheel}
+          afterVolumeByWheel={afterVolumeByWheel}
+          onAfterSoundChange={handleAfterSoundChange}
+          onAfterVolumeChange={handleAfterVolumeChange}
         />
 
         <button
