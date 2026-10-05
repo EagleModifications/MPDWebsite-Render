@@ -2586,76 +2586,6 @@ export default function Sidebar({
                 </div>
               )}
 
-              <div className="shrink-0 border-t border-border/70 bg-muted/10 px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  {wheels.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={onSpinAllWheels}
-                      className="inline-flex h-10 items-center gap-2 rounded-md border border-border/60 bg-[#34306d] px-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#403a82]"
-                    >
-                      <span className="text-[17px] leading-none">↻</span>
-                      Spin all wheels
-                    </button>
-                  )}
-
-                  <div ref={wheelMenuRef} className="relative inline-flex">
-                    <button
-                      type="button"
-                      onClick={handleNewWheel}
-                      className="inline-flex h-10 items-center gap-2 rounded-l-md border border-[#34306d] bg-[#34306d] px-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#403a82]"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add wheel
-                    </button>
-
-                    <button
-                      type="button"
-                      aria-label="More wheel options"
-                      aria-expanded={wheelMenuOpen}
-                      onClick={toggleWheelMenu}
-                      className="inline-flex h-10 w-9 items-center justify-center rounded-r-md border border-l border-white/10 bg-[#34306d] text-white transition hover:bg-[#403a82]"
-                    >
-                      <ChevronDown className={`h-4 w-4 transition-transform ${wheelMenuOpen ? "rotate-180" : ""}`} />
-                    </button>
-
-                    {wheelMenuOpen && (
-                      <div className="absolute bottom-12 left-0 z-[90] w-[178px] overflow-hidden rounded-md border border-border bg-[#202020] p-1.5 shadow-2xl">
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <button
-                            type="button"
-                            onClick={handleCustomizeActiveWheel}
-                            className="flex h-9 items-center justify-center gap-1 rounded-sm bg-[#34306d] px-1.5 text-[10px] font-bold text-white transition hover:bg-[#403a82]"
-                          >
-                            <Palette className="h-3.5 w-3.5" />
-                            Customize {activeWheel?.name?.toLowerCase() ?? "wheel"}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={handleRenameActiveWheel}
-                            className="flex h-9 items-center justify-center gap-1 rounded-sm bg-[#34306d] px-1.5 text-[10px] font-bold text-white transition hover:bg-[#403a82]"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Rename {activeWheel?.name?.toLowerCase() ?? "wheel"}
-                          </button>
-
-                          {wheels.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={handleRemoveActiveWheel}
-                              className="col-span-2 flex h-9 items-center gap-2 rounded-sm px-3 text-left text-xs font-bold text-white transition hover:bg-white/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Remove {activeWheel?.name?.toLowerCase() ?? "wheel"}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
             </>
           ) : (
             <>
@@ -2724,6 +2654,77 @@ export default function Sidebar({
               </div>
             </>
           )}
+
+          <div className="shrink-0 border-t border-border/70 bg-muted/10 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+                  {wheels.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={onSpinAllWheels}
+                      className="inline-flex h-10 items-center gap-2 rounded-md border border-border/60 bg-blue-600 px-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                    >
+                      <span className="text-[17px] leading-none">↻</span>
+                      Spin all wheels
+                    </button>
+                  )}
+
+                  <div ref={wheelMenuRef} className="relative inline-flex">
+                    <button
+                      type="button"
+                      onClick={handleNewWheel}
+                      className="inline-flex h-10 items-center gap-2 rounded-l-md border border-blue-600 bg-blue-600 px-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add wheel
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label="More wheel options"
+                      aria-expanded={wheelMenuOpen}
+                      onClick={toggleWheelMenu}
+                      className="inline-flex h-10 w-9 items-center justify-center rounded-r-md border border-l border-white/10 bg-blue-600 text-white transition hover:bg-blue-500"
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${wheelMenuOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {wheelMenuOpen && (
+                      <div className="absolute bottom-12 left-0 z-[90] w-[178px] overflow-hidden rounded-md border border-border bg-[#202020] p-1.5 shadow-2xl">
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handleCustomizeActiveWheel}
+                            className="flex h-9 items-center justify-center gap-1 rounded-sm bg-blue-600 px-1.5 text-[10px] font-bold text-white transition hover:bg-blue-500"
+                          >
+                            <Palette className="h-3.5 w-3.5" />
+                            Customize {activeWheel?.name?.toLowerCase() ?? "wheel"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleRenameActiveWheel}
+                            className="flex h-9 items-center justify-center gap-1 rounded-sm bg-blue-600 px-1.5 text-[10px] font-bold text-white transition hover:bg-blue-500"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Rename {activeWheel?.name?.toLowerCase() ?? "wheel"}
+                          </button>
+
+                          {wheels.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveActiveWheel}
+                              className="col-span-2 flex h-9 items-center gap-2 rounded-sm px-3 text-left text-xs font-bold text-white transition hover:bg-white/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Remove {activeWheel?.name?.toLowerCase() ?? "wheel"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+            </div>
+          </div>
         </div>
       </aside>
 
