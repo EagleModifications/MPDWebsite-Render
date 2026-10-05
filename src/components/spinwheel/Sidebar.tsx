@@ -1675,7 +1675,7 @@ function WheelCustomizeDialog({
                   <button
                     type="button"
                     onClick={() => centerImageInputRef.current?.click()}
-                    className="flex h-10 w-20 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm transition hover:bg-blue-500"
+                    className="flex h-10 w-12 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm transition hover:bg-blue-500"
                     aria-label="Choose center image"
                     title="Choose center image"
                   >
@@ -2717,7 +2717,7 @@ export default function Sidebar({
   return (
     <>
       <aside
-        className={`absolute bottom-3 right-3 top-3 z-[150] flex h-auto w-[468px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
+        className={`absolute bottom-4 right-4 top-24 z-[150] flex h-auto w-[468px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
           open
             ? "translate-x-0"
             : "translate-x-full"
