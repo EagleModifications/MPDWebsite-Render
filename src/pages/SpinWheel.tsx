@@ -13,7 +13,14 @@ export default function SpinWheel() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
   const handleResult = useCallback((item: SpinWheelItem) => {
-    setResults((current) => [item.label, ...current])
+    // Keep results in spin order:
+    // first spin at the top, newest spin at the bottom.
+    setResults((current) => [...current, item.label])
+  }, [])
+
+  const handleNewWheel = useCallback(() => {
+    setItems([])
+    setResults([])
   }, [])
 
   return (
@@ -21,10 +28,10 @@ export default function SpinWheel() {
       <Navbar />
 
       <main className="relative h-[calc(100vh-5rem)] min-h-[650px] pt-20">
-        {/* Wheel area */}
+        {/* Main wheel area */}
         <div
           className={`absolute inset-0 transition-[padding] duration-300 ${
-            sidebarOpen ? "pr-0 lg:pr-[468px]" : "pr-0"
+            sidebarOpen ? "lg:pr-[468px]" : ""
           }`}
         >
           <Wheel
@@ -40,20 +47,29 @@ export default function SpinWheel() {
           results={results}
           onChange={setItems}
           onClearResults={() => setResults([])}
+          onNewWheel={handleNewWheel}
         />
 
         {/* Sidebar toggle */}
         <button
           type="button"
-          onClick={() => setSidebarOpen((open) => !open)}
+          onClick={() =>
+            setSidebarOpen((open) => !open)
+          }
           aria-label={
-            sidebarOpen ? "Hide sidebar" : "Show sidebar"
+            sidebarOpen
+              ? "Hide sidebar"
+              : "Show sidebar"
           }
           title={
-            sidebarOpen ? "Hide sidebar" : "Show sidebar"
+            sidebarOpen
+              ? "Hide sidebar"
+              : "Show sidebar"
           }
           className={`absolute top-1/2 z-[70] hidden h-14 w-8 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-border/70 bg-card/95 text-muted-foreground shadow-xl backdrop-blur transition-[right] duration-300 hover:bg-muted hover:text-foreground lg:flex ${
-            sidebarOpen ? "right-[468px]" : "right-0"
+            sidebarOpen
+              ? "right-[468px]"
+              : "right-0"
           }`}
         >
           <span
@@ -65,7 +81,7 @@ export default function SpinWheel() {
           </span>
         </button>
 
-        {/* Small MPD tool badge */}
+        {/* MPD Tools indicator */}
         <div className="pointer-events-none absolute left-5 top-5 z-20">
           <div className="rounded-xl border border-border/70 bg-card/80 px-3 py-2 shadow-sm backdrop-blur">
             <div className="flex items-center gap-2 text-xs font-bold text-blue-500">
