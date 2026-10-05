@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
-import { ChevronDown, FilePlus2, FolderOpen, Palette, Pencil, Save, X } from "lucide-react"
+import { ChevronDown, FilePlus2, FolderOpen, Palette, Pencil, Save, Share2, X } from "lucide-react"
 import confetti from "canvas-confetti"
 
 import Navbar from "@/components/home/Navbar"
@@ -53,6 +53,36 @@ function createWheel(index: number): WheelState {
   }
 }
 
+function encodeSharePayload(value: unknown) {
+  const bytes = new TextEncoder().encode(JSON.stringify(value))
+  let binary = ""
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")
+}
+
+function decodeSharePayload(value: string) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/")
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4)
+  const binary = atob(padded)
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+  return JSON.parse(new TextDecoder().decode(bytes)) as {
+    version?: number
+    title?: string
+    description?: string
+    wheels?: WheelState[]
+    settings?: {
+      animateWinningEntryByWheel?: Record<string, boolean>
+      launchConfettiByWheel?: Record<string, boolean>
+      afterSoundByWheel?: Record<string, string>
+      afterVolumeByWheel?: Record<string, number>
+      spinSlowlyByWheel?: Record<string, boolean>
+      spinTimeByWheel?: Record<string, number>
+      centerImageByWheel?: Record<string, string | undefined>
+      imageSizeByWheel?: Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL">
+    }
+  }
+}
+
 export default function SpinWheel() {
   const [wheels, setWheels] = useState<WheelState[]>(() => [
     createWheel(1),
@@ -99,7 +129,60 @@ export default function SpinWheel() {
   const lastConfettiBurstRef = useRef(0)
   const [customizeRequest, setCustomizeRequest] = useState(0)
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [shareLink, setShareLink] = useState("")
+  const [shareCopied, setShareCopied] = useState(false)
+  const [wheelTitle, setWheelTitle] = useState("Spin Wheel")
+  const [wheelDescription, setWheelDescription] = useState(
+    "Create and spin custom wheels for Metro Police Department activities, selections, and more.",
+  )
   const openFileInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const hash = window.location.hash
+    if (!hash.startsWith("#share=")) return
+
+    try {
+      const payload = decodeSharePayload(hash.slice("#share=".length))
+      if (!Array.isArray(payload.wheels) || payload.wheels.length === 0 || payload.wheels.length > MAX_WHEELS) {
+        throw new Error("Invalid shared wheel")
+      }
+
+      const loaded = payload.wheels.map((wheel, index) => ({
+        id: typeof wheel.id === "string" ? wheel.id : crypto.randomUUID(),
+        name: typeof wheel.name === "string" && wheel.name.trim() ? wheel.name : `Wheel ${index + 1}`,
+        items: Array.isArray(wheel.items)
+          ? wheel.items.map((item) => ({
+              id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
+              label: typeof item.label === "string" ? item.label : String(item.label ?? ""),
+              color: item.color,
+              weight: typeof item.weight === "number" ? item.weight : 1,
+              hidden: Boolean(item.hidden),
+            }))
+          : [],
+      }))
+
+      const settings = payload.settings ?? {}
+      setWheels(loaded)
+      setActiveWheelId(loaded[0].id)
+      setResults([])
+      setWinners([])
+      setAnimateWinningEntryByWheel(settings.animateWinningEntryByWheel ?? {})
+      setLaunchConfettiByWheel(settings.launchConfettiByWheel ?? {})
+      setAfterSoundByWheel(settings.afterSoundByWheel ?? {})
+      setAfterVolumeByWheel(settings.afterVolumeByWheel ?? {})
+      setSpinSlowlyByWheel(settings.spinSlowlyByWheel ?? {})
+      setSpinTimeByWheel(settings.spinTimeByWheel ?? {})
+      setCenterImageByWheel(settings.centerImageByWheel ?? {})
+      setImageSizeByWheel(settings.imageSizeByWheel ?? {})
+      if (typeof payload.title === "string") setWheelTitle(payload.title)
+      if (typeof payload.description === "string") setWheelDescription(payload.description)
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`)
+    } catch {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`)
+    }
+  }, [])
 
   useEffect(() => {
     if (!activeWheelId && wheels[0]) {
@@ -410,6 +493,61 @@ export default function SpinWheel() {
     setImageSizeByWheel((current) => ({ ...current, [wheelId]: size }))
   }, [])
 
+  const createShareLink = useCallback(() => {
+    if (typeof window === "undefined") return ""
+    const payload = {
+      version: 1,
+      title: wheelTitle,
+      description: wheelDescription,
+      wheels,
+      settings: {
+        animateWinningEntryByWheel,
+        launchConfettiByWheel,
+        afterSoundByWheel,
+        afterVolumeByWheel,
+        spinSlowlyByWheel,
+        spinTimeByWheel,
+        centerImageByWheel,
+        imageSizeByWheel,
+      },
+    }
+    return `${window.location.origin}${window.location.pathname}#share=${encodeSharePayload(payload)}`
+  }, [
+    wheelTitle, wheelDescription, wheels, animateWinningEntryByWheel,
+    launchConfettiByWheel, afterSoundByWheel, afterVolumeByWheel,
+    spinSlowlyByWheel, spinTimeByWheel, centerImageByWheel, imageSizeByWheel,
+  ])
+
+  const openEditDialog = useCallback(() => {
+    setShareLink("")
+    setShareCopied(false)
+    setEditDialogOpen(true)
+  }, [])
+
+  const openShareDialog = useCallback(async () => {
+    const link = createShareLink()
+    setShareLink(link)
+    setShareCopied(false)
+    setEditDialogOpen(true)
+    try {
+      await navigator.clipboard.writeText(link)
+      setShareCopied(true)
+    } catch {
+      // The link remains visible for manual copying when clipboard access is unavailable.
+    }
+  }, [createShareLink])
+
+  const copyShareLink = useCallback(async () => {
+    const link = shareLink || createShareLink()
+    setShareLink(link)
+    try {
+      await navigator.clipboard.writeText(link)
+      setShareCopied(true)
+    } catch {
+      window.prompt("Copy this wheel link:", link)
+    }
+  }, [createShareLink, shareLink])
+
   const resetToNewWheel = useCallback(() => {
     const nextWheel = createWheel(1)
 
@@ -674,10 +812,10 @@ export default function SpinWheel() {
       <Navbar />
 
       <main className="relative min-h-screen pt-20">
-        <div className="pointer-events-none absolute left-4 top-4 z-[220] flex items-center gap-2">
+        <div className="pointer-events-none absolute inset-x-4 top-4 z-[220]">
           <button
             type="button"
-            onClick={requestCustomize}
+            onClick={openEditDialog}
             className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:bg-black/75"
             aria-label="Customize wheel"
             title="Customize wheel"
@@ -685,7 +823,7 @@ export default function SpinWheel() {
             <Pencil className="h-4 w-4" />
           </button>
 
-          <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/10 bg-black/45 p-1.5 shadow-lg backdrop-blur-xl">
+          <div className="pointer-events-auto absolute left-[58px] top-[56px] lg:left-auto lg:right-[500px] lg:translate-x-0 flex items-center gap-1 rounded-xl border border-white/10 bg-black/45 p-1.5 shadow-lg backdrop-blur-xl">
             <button type="button" onClick={requestCustomize} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
               <Palette className="h-4 w-4" />
               Customize
@@ -711,6 +849,10 @@ export default function SpinWheel() {
                 </div>
               )}
             </div>
+            <button type="button" onClick={() => void openShareDialog()} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
+              <Share2 className="h-4 w-4" />
+              Share
+            </button>
           </div>
 
           <input ref={openFileInputRef} type="file" accept=".wheel,.json,application/json" className="hidden" onChange={openWheelFile} />
@@ -827,9 +969,9 @@ export default function SpinWheel() {
               ? "Hide sidebar"
               : "Show sidebar"
           }
-          className={`absolute top-1/2 z-[200] hidden h-14 w-8 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-white/10 bg-black/50 text-muted-foreground shadow-xl backdrop-blur transition-[right] duration-300 hover:bg-black/70 hover:text-foreground lg:flex ${
+          className={`absolute top-[108px] z-[200] hidden h-10 w-8 items-center justify-center rounded-l-xl border border-r-0 border-white/10 bg-black/50 text-muted-foreground shadow-xl backdrop-blur transition-[right] duration-300 hover:bg-black/70 hover:text-foreground lg:flex ${
             sidebarOpen
-              ? "right-[480px]"
+              ? "right-[500px]"
               : "right-1"
           }`}
         >
@@ -900,6 +1042,40 @@ export default function SpinWheel() {
               </div>
             </div>
           </>
+        )}
+
+        {editDialogOpen && (
+          <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditDialogOpen(false) }}>
+            <div role="dialog" aria-modal="true" className="w-full max-w-[590px] overflow-hidden rounded-md border border-white/10 bg-[#202020] shadow-[0_22px_80px_rgba(0,0,0,0.7)]">
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <div className="flex items-center gap-2 text-[16px] font-bold text-white">
+                  <Pencil className="h-4 w-4" />
+                  Edit title and description
+                </div>
+                <button type="button" onClick={() => setEditDialogOpen(false)} className="rounded p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label="Close">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="space-y-4 p-4">
+                <input value={wheelTitle} onChange={(event) => setWheelTitle(event.target.value)} placeholder="Wheel title" className="h-10 w-full rounded-md border border-white/10 bg-[#3a3a3a] px-3 text-sm text-white outline-none focus:border-blue-500" />
+                <textarea value={wheelDescription} onChange={(event) => setWheelDescription(event.target.value)} placeholder="Wheel description" rows={4} className="w-full resize-y rounded-md border border-white/10 bg-[#303030] px-3 py-2 text-sm text-white outline-none focus:border-blue-500" />
+                {shareLink && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-white/60">Wheel link</label>
+                    <div className="flex gap-2">
+                      <input readOnly value={shareLink} className="min-w-0 flex-1 rounded-md border border-white/10 bg-[#151515] px-3 text-xs text-white/70" />
+                      <button type="button" onClick={() => void copyShareLink()} className="rounded-md bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-500">{shareCopied ? "Copied" : "Copy"}</button>
+                    </div>
+                    <p className="text-[11px] text-white/45">Anyone opening this link gets the same wheels, entries, colours and wheel settings.</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 border-t border-white/10 px-4 py-3">
+                <button type="button" onClick={() => setEditDialogOpen(false)} className="rounded-md px-3 py-2 text-xs font-bold text-white/75 hover:bg-white/10">Cancel</button>
+                <button type="button" onClick={() => { setEditDialogOpen(false) }} className="rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500">OK</button>
+              </div>
+            </div>
+          </div>
         )}
 
         {orderedWinners.length > 0 && (
