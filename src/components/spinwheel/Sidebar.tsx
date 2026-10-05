@@ -5,6 +5,7 @@ import {
   useState,
   type ChangeEvent,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react"
 import {
   ArrowDown,
@@ -12,13 +13,13 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  Check,
   ChevronDown,
   Download,
   FolderOpen,
   Image as ImageIcon,
   Minus,
   Palette,
-  Pipette,
   Plus,
   Scale,
   Shuffle,
@@ -26,6 +27,7 @@ import {
   Trash2,
   Upload,
   X,
+  Pipette,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -42,84 +44,14 @@ type SidebarProps = {
 }
 
 type Tab = "entries" | "results"
-type ColorTab = "hex" | "rgb" | "wheel"
 
-const COLORS = [
-  "#3b82f6",
-  "#64748b",
-  "#0ea5e9",
-  "#334155",
-  "#60a5fa",
-  "#94a3b8",
-]
+type ColorPickerTab = "hex" | "rgb" | "wheel"
 
-const COLOR_GALLERY = [
-  "#ef4444",
-  "#f97316",
-  "#f59e0b",
-  "#eab308",
-  "#84cc16",
-  "#22c55e",
-  "#10b981",
-  "#14b8a6",
-  "#06b6d4",
-  "#0ea5e9",
-  "#3b82f6",
-  "#6366f1",
-  "#8b5cf6",
-  "#a855f7",
-  "#d946ef",
-  "#ec4899",
-  "#f43f5e",
-
-  "#fecaca",
-  "#fed7aa",
-  "#fde68a",
-  "#fef08a",
-  "#d9f99d",
-  "#bbf7d0",
-  "#a7f3d0",
-  "#99f6e4",
-  "#a5f3fc",
-  "#bae6fd",
-  "#bfdbfe",
-  "#c7d2fe",
-  "#ddd6fe",
-  "#e9d5ff",
-  "#f5d0fe",
-  "#fbcfe8",
-  "#fecdd3",
-
-  "#991b1b",
-  "#9a3412",
-  "#92400e",
-  "#854d0e",
-  "#3f6212",
-  "#166534",
-  "#065f46",
-  "#115e59",
-  "#155e75",
-  "#075985",
-  "#1e40af",
-  "#3730a3",
-  "#5b21b6",
-  "#6b21a8",
-  "#86198f",
-  "#9d174d",
-  "#9f1239",
-
-  "#000000",
-  "#171717",
-  "#262626",
-  "#404040",
-  "#525252",
-  "#737373",
-  "#a3a3a3",
-  "#d4d4d4",
-  "#e5e5e5",
-  "#f5f5f5",
-  "#ffffff",
-]
+type EntryExtras = {
+  sound?: string
+  popupMessage?: string
+  image?: string
+}
 
 type SaveFilePickerOptions = {
   suggestedName?: string
@@ -140,30 +72,136 @@ type SaveFilePickerWindow = Window & {
   showSaveFilePicker?: (
     options?: SaveFilePickerOptions,
   ) => Promise<SaveFilePickerHandle>
-  EyeDropper?: new () => {
-    open: () => Promise<{
-      sRGBHex: string
-    }>
-  }
 }
 
-type EntryExtras = {
-  sound?: string
-  popupMessage?: string
-  image?: string
+type EyeDropperResult = {
+  sRGBHex: string
 }
 
-type RGB = {
-  r: number
-  g: number
-  b: number
+type EyeDropperInstance = {
+  open: () => Promise<EyeDropperResult>
 }
 
-type HSV = {
-  h: number
-  s: number
-  v: number
+type EyeDropperWindow = Window & {
+  EyeDropper?: new () => EyeDropperInstance
 }
+
+const COLORS = [
+  "#3b82f6",
+  "#64748b",
+  "#0ea5e9",
+  "#334155",
+  "#60a5fa",
+  "#94a3b8",
+]
+
+const COLOR_GALLERY = [
+  "#ffffff",
+  "#f8fafc",
+  "#e2e8f0",
+  "#94a3b8",
+  "#64748b",
+  "#334155",
+  "#0f172a",
+  "#000000",
+
+  "#fecaca",
+  "#fca5a5",
+  "#ef4444",
+  "#dc2626",
+  "#991b1b",
+  "#7f1d1d",
+
+  "#fed7aa",
+  "#fb923c",
+  "#f97316",
+  "#ea580c",
+  "#c2410c",
+
+  "#fef08a",
+  "#fde047",
+  "#eab308",
+  "#ca8a04",
+  "#a16207",
+
+  "#bbf7d0",
+  "#86efac",
+  "#22c55e",
+  "#16a34a",
+  "#15803d",
+
+  "#a5f3fc",
+  "#67e8f9",
+  "#06b6d4",
+  "#0891b2",
+  "#0e7490",
+
+  "#bfdbfe",
+  "#93c5fd",
+  "#3b82f6",
+  "#2563eb",
+  "#1d4ed8",
+  "#1e40af",
+
+  "#ddd6fe",
+  "#c4b5fd",
+  "#8b5cf6",
+  "#7c3aed",
+  "#6d28d9",
+
+  "#f5d0fe",
+  "#f0abfc",
+  "#d946ef",
+  "#c026d3",
+  "#a21caf",
+]
+
+const SOUND_OPTIONS = [
+  "Inherit from wheel",
+  "No sound",
+  "Random sound",
+  "Subdued applause",
+  "Joke punchline",
+  "Announcement bell",
+  "Twinkling star",
+  "Correct answer ding",
+  "Synth bell",
+  "Notification bell",
+  "Loud applause",
+  "Fanfare",
+  "Bell ringing",
+  "Cymbals",
+  "Thunder",
+  "Cash register",
+  "Evil laugh",
+  "Microwave ding",
+  "Old phone ringing",
+  "Alarm clock",
+  "Fireworks",
+  "Game win ding",
+  "Wrong answer",
+  "Punch",
+  "Cat meow",
+  "Wolf howl",
+  "Horse",
+  "Lion roar",
+  "Sad trombone",
+  "Cinematic drum impact",
+  "Water splash",
+  "Gong",
+  "Doorbell",
+  "Church bell",
+  "Referee whistle",
+  "Boing",
+  "Angel choir",
+  "Harp strum",
+  "Breaker switch",
+  "Camera shutter & flash",
+  "Lost game",
+  "Horror scream",
+  "Speak result aloud (Voice 1)",
+  "Speak result aloud (Voice 2)",
+]
 
 const extras = new Map<string, EntryExtras>()
 
@@ -242,12 +280,15 @@ function normalizeHex(value: string) {
   }
 
   if (/^#[0-9a-fA-F]{3}$/.test(hex)) {
-    return `#${hex
-      .slice(1)
-      .split("")
-      .map((character) => `${character}${character}`)
-      .join("")
-      .toLowerCase()}`
+    return (
+      "#" +
+      hex
+        .slice(1)
+        .split("")
+        .map((character) => character + character)
+        .join("")
+        .toLowerCase()
+    )
   }
 
   if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
@@ -257,27 +298,38 @@ function normalizeHex(value: string) {
   return "#3b82f6"
 }
 
-function hexToRgb(hex: string): RGB {
+function hexToRgb(hex: string) {
   const normalized = normalizeHex(hex)
-  const value = normalized.slice(1)
 
   return {
-    r: parseInt(value.slice(0, 2), 16),
-    g: parseInt(value.slice(2, 4), 16),
-    b: parseInt(value.slice(4, 6), 16),
+    r: Number.parseInt(
+      normalized.slice(1, 3),
+      16,
+    ),
+    g: Number.parseInt(
+      normalized.slice(3, 5),
+      16,
+    ),
+    b: Number.parseInt(
+      normalized.slice(5, 7),
+      16,
+    ),
   }
 }
 
-function rgbToHex({
-  r,
-  g,
-  b,
-}: RGB) {
+function rgbToHex(
+  r: number,
+  g: number,
+  b: number,
+) {
   return `#${[r, g, b]
     .map((value) =>
       Math.max(
         0,
-        Math.min(255, Math.round(value)),
+        Math.min(
+          255,
+          Math.round(value),
+        ),
       )
         .toString(16)
         .padStart(2, "0"),
@@ -285,11 +337,11 @@ function rgbToHex({
     .join("")}`
 }
 
-function rgbToHsv({
-  r,
-  g,
-  b,
-}: RGB): HSV {
+function rgbToHsv(
+  r: number,
+  g: number,
+  b: number,
+) {
   const red = r / 255
   const green = g / 255
   const blue = b / 255
@@ -299,54 +351,57 @@ function rgbToHsv({
     green,
     blue,
   )
-
   const min = Math.min(
     red,
     green,
     blue,
   )
+  const difference = max - min
 
-  const delta = max - min
+  let hue = 0
 
-  let h = 0
-
-  if (delta !== 0) {
+  if (difference !== 0) {
     if (max === red) {
-      h =
-        60 *
-        (((green - blue) / delta) % 6)
+      hue =
+        ((green - blue) /
+          difference) %
+        6
     } else if (max === green) {
-      h =
-        60 *
-        ((blue - red) / delta + 2)
+      hue =
+        (blue - red) /
+          difference +
+        2
     } else {
-      h =
-        60 *
-        ((red - green) / delta + 4)
+      hue =
+        (red - green) /
+          difference +
+        4
+    }
+
+    hue *= 60
+
+    if (hue < 0) {
+      hue += 360
     }
   }
 
-  if (h < 0) {
-    h += 360
-  }
-
-  const s =
+  const saturation =
     max === 0
       ? 0
-      : delta / max
+      : difference / max
 
   return {
-    h,
-    s,
+    h: hue,
+    s: saturation,
     v: max,
   }
 }
 
-function hsvToRgb({
-  h,
-  s,
-  v,
-}: HSV): RGB {
+function hsvToHex(
+  h: number,
+  s: number,
+  v: number,
+) {
   const c = v * s
   const x =
     c *
@@ -356,103 +411,577 @@ function hsvToRgb({
       ))
   const m = v - c
 
-  let r = 0
-  let g = 0
-  let b = 0
+  let red = 0
+  let green = 0
+  let blue = 0
 
   if (h < 60) {
-    r = c
-    g = x
+    red = c
+    green = x
   } else if (h < 120) {
-    r = x
-    g = c
+    red = x
+    green = c
   } else if (h < 180) {
-    g = c
-    b = x
+    green = c
+    blue = x
   } else if (h < 240) {
-    g = x
-    b = c
+    green = x
+    blue = c
   } else if (h < 300) {
-    r = x
-    b = c
+    red = x
+    blue = c
   } else {
-    r = c
-    b = x
+    red = c
+    blue = x
   }
 
-  return {
-    r: (r + m) * 255,
-    g: (g + m) * 255,
-    b: (b + m) * 255,
-  }
-}
-
-function hsvToHex(hsv: HSV) {
   return rgbToHex(
-    hsvToRgb(hsv),
+    (red + m) * 255,
+    (green + m) * 255,
+    (blue + m) * 255,
   )
 }
 
-function clampColorValue(value: number) {
-  return Math.max(
-    0,
-    Math.min(255, Math.round(value)),
-  )
-}
-
-function ColorPicker({
-  color,
+function ColorPickerPopover({
+  value,
   onChange,
   onClose,
 }: {
-  color: string
-  onChange: (color: string) => void
+  value: string
+  onChange: (value: string) => void
   onClose: () => void
 }) {
-  const [tab, setTab] =
-    useState<ColorTab>("hex")
-
-  const [hexInput, setHexInput] =
-    useState(normalizeHex(color))
-
-  const [hsv, setHsv] =
-    useState<HSV>(() =>
-      rgbToHsv(
-        hexToRgb(color),
-      ),
-    )
-
   const pickerRef =
     useRef<HTMLDivElement | null>(null)
 
+  const currentColor =
+    normalizeHex(value)
+
+  const currentRgb =
+    hexToRgb(currentColor)
+
+  const currentHsv =
+    rgbToHsv(
+      currentRgb.r,
+      currentRgb.g,
+      currentRgb.b,
+    )
+
+  const [
+    activeTab,
+    setActiveTab,
+  ] = useState<ColorPickerTab>("hex")
+
+  const [
+    hexValue,
+    setHexValue,
+  ] = useState(currentColor)
+
+  const [
+    hue,
+    setHue,
+  ] = useState(currentHsv.h)
+
   useEffect(() => {
     const normalized =
-      normalizeHex(color)
+      normalizeHex(value)
 
-    setHexInput(normalized)
-    setHsv(
-      rgbToHsv(
-        hexToRgb(normalized),
-      ),
-    )
-  }, [color])
+    setHexValue(normalized)
+
+    const rgb = hexToRgb(normalized)
+    setHue(rgbToHsv(
+      rgb.r,
+      rgb.g,
+      rgb.b,
+    ).h)
+  }, [value])
 
   useEffect(() => {
-    const handleClick = (
+    const handlePointerDown = (
       event: MouseEvent,
     ) => {
       const target = event.target
 
-      if (!(target instanceof Node)) {
-        return
-      }
-
       if (
+        target instanceof Node &&
         !pickerRef.current?.contains(
           target,
         )
       ) {
         onClose()
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handlePointerDown,
+    )
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handlePointerDown,
+      )
+    }
+  }, [onClose])
+
+  const applyHex = (next: string) => {
+    const normalized =
+      normalizeHex(next)
+
+    setHexValue(normalized)
+    onChange(normalized)
+
+    const rgb = hexToRgb(normalized)
+    setHue(
+      rgbToHsv(
+        rgb.r,
+        rgb.g,
+        rgb.b,
+      ).h,
+    )
+  }
+
+  const updateRgb = (
+    channel: "r" | "g" | "b",
+    amount: number,
+  ) => {
+    const rgb = hexToRgb(currentColor)
+
+    rgb[channel] = Math.max(
+      0,
+      Math.min(
+        255,
+        Math.round(amount),
+      ),
+    )
+
+    applyHex(
+      rgbToHex(
+        rgb.r,
+        rgb.g,
+        rgb.b,
+      ),
+    )
+  }
+
+  const handleHuePointer = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    const rect =
+      event.currentTarget.getBoundingClientRect()
+
+    const x =
+      event.clientX -
+      (rect.left + rect.width / 2)
+
+    const y =
+      event.clientY -
+      (rect.top + rect.height / 2)
+
+    let nextHue =
+      (Math.atan2(y, x) * 180) /
+      Math.PI +
+      90
+
+    if (nextHue < 0) {
+      nextHue += 360
+    }
+
+    setHue(nextHue)
+
+    const nextColor = hsvToHex(
+      nextHue,
+      currentHsv.s,
+      currentHsv.v,
+    )
+
+    applyHex(nextColor)
+  }
+
+  const handleSvPointer = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    const rect =
+      event.currentTarget.getBoundingClientRect()
+
+    const saturation = Math.max(
+      0,
+      Math.min(
+        1,
+        (event.clientX -
+          rect.left) /
+          rect.width,
+      ),
+    )
+
+    const brightness =
+      1 -
+      Math.max(
+        0,
+        Math.min(
+          1,
+          (event.clientY -
+            rect.top) /
+            rect.height,
+        ),
+      )
+
+    applyHex(
+      hsvToHex(
+        hue,
+        saturation,
+        brightness,
+      ),
+    )
+  }
+
+  const useEyeDropper = async () => {
+    const eyeDropperWindow =
+      window as EyeDropperWindow
+
+    if (
+      !eyeDropperWindow.EyeDropper
+    ) {
+      return
+    }
+
+    try {
+      const eyeDropper =
+        new eyeDropperWindow.EyeDropper()
+
+      const result =
+        await eyeDropper.open()
+
+      applyHex(result.sRGBHex)
+    } catch {
+      // User cancelled the eyedropper.
+    }
+  }
+
+  const slider = (
+    label: string,
+    channel: "r" | "g" | "b",
+    value: number,
+  ) => (
+    <div
+      key={channel}
+      className="grid grid-cols-[24px_1fr_52px] items-center gap-2"
+    >
+      <span className="text-xs font-medium text-muted-foreground">
+        {label}
+      </span>
+
+      <input
+        type="range"
+        min={0}
+        max={255}
+        value={value}
+        onChange={(event) =>
+          updateRgb(
+            channel,
+            Number(event.target.value),
+          )
+        }
+        className="h-1.5 w-full cursor-pointer accent-blue-500"
+      />
+
+      <input
+        type="number"
+        min={0}
+        max={255}
+        value={value}
+        onChange={(event) =>
+          updateRgb(
+            channel,
+            Number(event.target.value),
+          )
+        }
+        className="h-7 w-[52px] rounded-md border border-border/70 bg-background px-2 text-center text-xs text-foreground outline-none focus:border-blue-500/60"
+      />
+    </div>
+  )
+
+  return (
+    <div
+      ref={pickerRef}
+      className="absolute left-0 top-[calc(100%+8px)] z-[300] w-[340px] overflow-hidden rounded-xl border border-border/70 bg-card shadow-2xl"
+      onMouseDown={(event) =>
+        event.stopPropagation()
+      }
+    >
+      <div className="flex items-center border-b border-border/70 bg-muted/30">
+        {(
+          [
+            ["hex", "HEX"],
+            ["rgb", "RGB"],
+            ["wheel", "Wheel"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() =>
+              setActiveTab(id)
+            }
+            className={`flex h-10 flex-1 items-center justify-center border-b-2 text-xs font-semibold transition-colors ${
+              activeTab === id
+                ? "border-blue-500 text-blue-500"
+                : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+
+        <button
+          type="button"
+          aria-label="Pick color from screen"
+          title="Pick color from screen"
+          onClick={
+            useEyeDropper
+          }
+          className="mr-1.5 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Pipette className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="space-y-3 p-3">
+        <div
+          className="h-9 rounded-lg border border-border/70 shadow-inner"
+          style={{
+            backgroundColor:
+              currentColor,
+          }}
+        />
+
+        {activeTab === "hex" && (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                #
+              </span>
+
+              <input
+                value={hexValue.replace(
+                  "#",
+                  "",
+                )}
+                onChange={(event) => {
+                  const raw =
+                    event.target.value.replace(
+                      /[^0-9a-fA-F]/g,
+                      "",
+                    )
+
+                  setHexValue(
+                    `#${raw}`,
+                  )
+
+                  if (
+                    raw.length === 6
+                  ) {
+                    applyHex(
+                      `#${raw}`,
+                    )
+                  }
+                }}
+                onBlur={() =>
+                  applyHex(
+                    hexValue,
+                  )
+                }
+                className="h-9 flex-1 rounded-lg border border-border/70 bg-muted/60 px-3 text-sm text-foreground outline-none focus:border-blue-500/60"
+              />
+            </div>
+
+            <div className="grid grid-cols-8 gap-1.5">
+              {COLOR_GALLERY.map(
+                (color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={`Use ${color}`}
+                    onClick={() =>
+                      applyHex(color)
+                    }
+                    className={`h-7 rounded-md border transition-transform hover:scale-105 ${
+                      currentColor ===
+                      color
+                        ? "border-foreground ring-2 ring-blue-500/40"
+                        : "border-black/10 dark:border-white/10"
+                    }`}
+                    style={{
+                      backgroundColor:
+                        color,
+                    }}
+                  />
+                ),
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "rgb" && (
+          <>
+            <div className="grid grid-cols-8 gap-1.5">
+              {COLOR_GALLERY.map(
+                (color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={`Use ${color}`}
+                    onClick={() =>
+                      applyHex(color)
+                    }
+                    className={`h-7 rounded-md border transition-transform hover:scale-105 ${
+                      currentColor ===
+                      color
+                        ? "border-foreground ring-2 ring-blue-500/40"
+                        : "border-black/10 dark:border-white/10"
+                    }`}
+                    style={{
+                      backgroundColor:
+                        color,
+                    }}
+                  />
+                ),
+              )}
+            </div>
+
+            <div className="space-y-2.5 border-t border-border/60 pt-3">
+              {slider(
+                "R",
+                "r",
+                currentRgb.r,
+              )}
+
+              {slider(
+                "G",
+                "g",
+                currentRgb.g,
+              )}
+
+              {slider(
+                "B",
+                "b",
+                currentRgb.b,
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "wheel" && (
+          <div className="grid grid-cols-[150px_1fr] gap-3">
+            <div
+              className="relative h-[150px] w-[150px] cursor-crosshair rounded-full"
+              style={{
+                background:
+                  "conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+              }}
+              onPointerDown={
+                handleHuePointer
+              }
+            >
+              <div className="absolute inset-[17px] rounded-full bg-card" />
+
+              <div
+                className="absolute inset-[23px] rounded-full"
+                style={{
+                  backgroundColor:
+                    `hsl(${hue} 100% 50%)`,
+                }}
+              />
+
+              <div className="absolute inset-[35px] rounded-full bg-card/95" />
+
+              <div
+                className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-lg"
+                style={{
+                  backgroundColor:
+                    currentColor,
+                }}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div
+                className="relative h-[110px] cursor-crosshair overflow-hidden rounded-lg border border-border/70"
+                style={{
+                  backgroundColor:
+                    `hsl(${hue} 100% 50%)`,
+                  backgroundImage:
+                    "linear-gradient(to right, #fff, transparent), linear-gradient(to top, #000, transparent)",
+                }}
+                onPointerDown={
+                  handleSvPointer
+                }
+              >
+                <div
+                  className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-md"
+                  style={{
+                    left: `${currentHsv.s * 100}%`,
+                    top: `${(1 - currentHsv.v) * 100}%`,
+                  }}
+                />
+              </div>
+
+              <div className="space-y-2.5">
+                {slider(
+                  "R",
+                  "r",
+                  currentRgb.r,
+                )}
+
+                {slider(
+                  "G",
+                  "g",
+                  currentRgb.g,
+                )}
+
+                {slider(
+                  "B",
+                  "b",
+                  currentRgb.b,
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SoundDropdown({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const [open, setOpen] =
+    useState(false)
+
+  const ref =
+    useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    const handleClick = (
+      event: MouseEvent,
+    ) => {
+      const target = event.target
+
+      if (
+        target instanceof Node &&
+        !ref.current?.contains(target)
+      ) {
+        setOpen(false)
       }
     }
 
@@ -467,502 +996,73 @@ function ColorPicker({
         handleClick,
       )
     }
-  }, [onClose])
-
-  const rgb = useMemo(
-    () => hexToRgb(color),
-    [color],
-  )
-
-  const setColor = (
-    nextColor: string,
-  ) => {
-    const normalized =
-      normalizeHex(nextColor)
-
-    setHexInput(normalized)
-
-    const nextHsv =
-      rgbToHsv(
-        hexToRgb(normalized),
-      )
-
-    setHsv(nextHsv)
-    onChange(normalized)
-  }
-
-  const updateRgb = (
-    channel: keyof RGB,
-    value: number,
-  ) => {
-    const nextRgb = {
-      ...rgb,
-      [channel]:
-        clampColorValue(value),
-    }
-
-    setColor(
-      rgbToHex(nextRgb),
-    )
-  }
-
-  const updateHsv = (
-    changes: Partial<HSV>,
-  ) => {
-    const nextHsv = {
-      ...hsv,
-      ...changes,
-    }
-
-    setHsv(nextHsv)
-    setColor(
-      hsvToHex(nextHsv),
-    )
-  }
-
-  const handleHexChange = (
-    value: string,
-  ) => {
-    setHexInput(value)
-
-    if (
-      /^#?[0-9a-fA-F]{6}$/.test(
-        value,
-      ) ||
-      /^#?[0-9a-fA-F]{3}$/.test(
-        value,
-      )
-    ) {
-      setColor(value)
-    }
-  }
-
-  const useEyeDropper =
-    async () => {
-      const pickerWindow =
-        window as SaveFilePickerWindow
-
-      if (!pickerWindow.EyeDropper) {
-        return
-      }
-
-      try {
-        const eyeDropper =
-          new pickerWindow.EyeDropper()
-
-        const result =
-          await eyeDropper.open()
-
-        setColor(result.sRGBHex)
-      } catch {
-        // User cancelled the browser eyedropper.
-      }
-    }
-
-  const handleSaturationValueClick = (
-    event: ReactMouseEvent<HTMLDivElement>,
-  ) => {
-    const rect =
-      event.currentTarget.getBoundingClientRect()
-
-    const saturation = Math.max(
-      0,
-      Math.min(
-        1,
-        (event.clientX - rect.left) /
-          rect.width,
-      ),
-    )
-
-    const value = Math.max(
-      0,
-      Math.min(
-        1,
-        1 -
-          (event.clientY -
-            rect.top) /
-            rect.height,
-      ),
-    )
-
-    updateHsv({
-      s: saturation,
-      v: value,
-    })
-  }
-
-  const handleHueClick = (
-    event: ReactMouseEvent<HTMLDivElement>,
-  ) => {
-    const rect =
-      event.currentTarget.getBoundingClientRect()
-
-    const centerX =
-      rect.left + rect.width / 2
-
-    const centerY =
-      rect.top + rect.height / 2
-
-    const angle =
-      Math.atan2(
-        event.clientY - centerY,
-        event.clientX - centerX,
-      ) *
-      (180 / Math.PI)
-
-    const hue =
-      (angle + 90 + 360) % 360
-
-    updateHsv({
-      h: hue,
-    })
-  }
-
-  const tabClass = (
-    current: ColorTab,
-  ) =>
-    `flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
-      tab === current
-        ? "bg-background text-foreground shadow-sm"
-        : "text-muted-foreground hover:text-foreground"
-    }`
-
-  const pickerSupported =
-    Boolean(
-      (window as SaveFilePickerWindow)
-        .EyeDropper,
-    )
+  }, [open])
 
   return (
     <div
-      ref={pickerRef}
-      className="absolute left-0 top-12 z-[150] w-[330px] overflow-hidden rounded-xl border border-border/70 bg-card shadow-2xl"
-      onMouseDown={(event) =>
-        event.stopPropagation()
-      }
+      ref={ref}
+      className="relative w-full"
     >
-      {/* Tabs */}
-      <div className="border-b border-border/70 p-2">
-        <div className="flex rounded-lg bg-muted/60 p-1">
-          <button
-            type="button"
-            onClick={() =>
-              setTab("hex")
-            }
-            className={tabClass("hex")}
-          >
-            HEX
-          </button>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() =>
+          setOpen((current) => !current)
+        }
+        className="flex h-10 w-full items-center justify-between rounded-lg border border-border/70 bg-muted/60 px-3 text-left text-sm text-foreground outline-none transition-colors hover:bg-muted focus:border-blue-500/60"
+      >
+        <span className="truncate">
+          {value}
+        </span>
 
-          <button
-            type="button"
-            onClick={() =>
-              setTab("rgb")
-            }
-            className={tabClass("rgb")}
-          >
-            RGB
-          </button>
+        <ChevronDown
+          className={`ml-2 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
 
-          <button
-            type="button"
-            onClick={() =>
-              setTab("wheel")
-            }
-            className={tabClass("wheel")}
-          >
-            Wheel
-          </button>
-        </div>
-      </div>
+      {open && (
+        <div className="absolute left-0 top-[calc(100%+6px)] z-[320] w-full overflow-hidden rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl">
+          <div className="max-h-[300px] overflow-y-auto pr-1">
+            {SOUND_OPTIONS.map(
+              (sound) => {
+                const active =
+                  sound === value
 
-      {/* Current color / editor */}
-      <div className="p-3">
-        {tab === "hex" && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div
-                className="h-10 w-10 shrink-0 rounded-lg border border-border/70 shadow-inner"
-                style={{
-                  backgroundColor: color,
-                }}
-              />
-
-              <div className="relative flex-1">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
-                  #
-                </span>
-
-                <input
-                  value={hexInput.replace(
-                    /^#/,
-                    "",
-                  )}
-                  onChange={(event) =>
-                    handleHexChange(
-                      `#${event.target.value}`,
-                    )
-                  }
-                  onBlur={() =>
-                    setHexInput(
-                      normalizeHex(
-                        hexInput,
-                      ),
-                    )
-                  }
-                  className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 pl-7 pr-3 font-mono text-sm text-foreground outline-none focus:border-blue-500/60"
-                  maxLength={6}
-                  spellCheck={false}
-                />
-              </div>
-
-              <button
-                type="button"
-                aria-label="Pick color from screen"
-                title={
-                  pickerSupported
-                    ? "Pick color from screen"
-                    : "Eyedropper is not supported in this browser"
-                }
-                disabled={
-                  !pickerSupported
-                }
-                onClick={
-                  useEyeDropper
-                }
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Pipette className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {tab === "rgb" && (
-          <div className="space-y-3">
-            {(
-              [
-                ["R", "r"],
-                ["G", "g"],
-                ["B", "b"],
-              ] as const
-            ).map(
-              ([
-                label,
-                channel,
-              ]) => (
-                <div
-                  key={channel}
-                  className="flex items-center gap-3"
-                >
-                  <span className="w-4 text-xs font-semibold text-foreground">
-                    {label}
-                  </span>
-
-                  <input
-                    type="range"
-                    min="0"
-                    max="255"
-                    value={
-                      rgb[channel]
+                return (
+                  <button
+                    key={sound}
+                    type="button"
+                    role="option"
+                    aria-selected={
+                      active
                     }
-                    onChange={(event) =>
-                      updateRgb(
-                        channel,
-                        Number(
-                          event.target
-                            .value,
-                        ),
-                      )
-                    }
-                    className="min-w-0 flex-1 accent-blue-500"
-                  />
-
-                  <input
-                    type="number"
-                    min="0"
-                    max="255"
-                    value={
-                      rgb[channel]
-                    }
-                    onChange={(event) =>
-                      updateRgb(
-                        channel,
-                        Number(
-                          event.target
-                            .value,
-                        ),
-                      )
-                    }
-                    className="h-8 w-14 rounded-md border border-border/70 bg-muted/60 px-2 text-center text-xs text-foreground outline-none focus:border-blue-500/60"
-                  />
-                </div>
-              ),
-            )}
-          </div>
-        )}
-
-        {tab === "wheel" && (
-          <div className="flex items-center justify-center py-1">
-            <div
-              className="relative flex h-[190px] w-[190px] cursor-crosshair items-center justify-center rounded-full"
-              style={{
-                background:
-                  "conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-              }}
-              onClick={
-                handleHueClick
-              }
-            >
-              <div className="absolute inset-[25px] rounded-full border-2 border-white/70 bg-card shadow-lg" />
-
-              <div
-                className="absolute left-1/2 top-1/2 h-[150px] w-[150px] -translate-x-1/2 -translate-y-1/2 cursor-crosshair rounded-full"
-                style={{
-                  background: `linear-gradient(to bottom, transparent, #000), linear-gradient(to right, #fff, hsl(${hsv.h} 100% 50%))`,
-                }}
-                onClick={
-                  handleSaturationValueClick
-                }
-              >
-                <div
-                  className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-md"
-                  style={{
-                    left: `${hsv.s * 100}%`,
-                    top: `${
-                      (1 - hsv.v) * 100
-                    }%`,
-                  }}
-                />
-              </div>
-
-              <div
-                className="pointer-events-none absolute h-7 w-7 rounded-full border-2 border-white shadow-lg"
-                style={{
-                  backgroundColor:
-                    color,
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Gallery */}
-        <div className="mt-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-semibold text-foreground">
-              Gallery
-            </span>
-
-            <button
-              type="button"
-              aria-label="Pick color from screen"
-              title={
-                pickerSupported
-                  ? "Pick color from screen"
-                  : "Eyedropper is not supported in this browser"
-              }
-              disabled={
-                !pickerSupported
-              }
-              onClick={
-                useEyeDropper
-              }
-              className="flex h-7 w-7 items-center justify-center rounded-md border border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Pipette className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-17 overflow-hidden rounded-lg border border-border/70">
-            {COLOR_GALLERY.map(
-              (galleryColor) => (
-                <button
-                  key={galleryColor}
-                  type="button"
-                  aria-label={`Use ${galleryColor}`}
-                  title={galleryColor}
-                  onClick={() =>
-                    setColor(
-                      galleryColor,
-                    )
-                  }
-                  className="aspect-square min-w-0 border-r border-b border-black/10 transition-transform hover:z-10 hover:scale-110"
-                  style={{
-                    backgroundColor:
-                      galleryColor,
-                  }}
-                />
-              ),
-            )}
-          </div>
-        </div>
-
-        {/* RGB sliders always visible */}
-        <div className="mt-4 border-t border-border/70 pt-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-semibold text-foreground">
-              RGB
-            </span>
-
-            <span className="font-mono text-[11px] text-muted-foreground">
-              {rgb.r}, {rgb.g}, {rgb.b}
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            {(
-              [
-                ["R", "r", "#ef4444"],
-                ["G", "g", "#22c55e"],
-                ["B", "b", "#3b82f6"],
-              ] as const
-            ).map(
-              ([
-                label,
-                channel,
-                accent,
-              ]) => (
-                <div
-                  key={channel}
-                  className="flex items-center gap-2"
-                >
-                  <span className="w-4 text-[11px] font-semibold text-muted-foreground">
-                    {label}
-                  </span>
-
-                  <input
-                    type="range"
-                    min="0"
-                    max="255"
-                    value={
-                      rgb[channel]
-                    }
-                    onChange={(event) =>
-                      updateRgb(
-                        channel,
-                        Number(
-                          event.target
-                            .value,
-                        ),
-                      )
-                    }
-                    className="min-w-0 flex-1"
-                    style={{
-                      accentColor:
-                        accent,
+                    onClick={() => {
+                      onChange(sound)
+                      setOpen(false)
                     }}
-                  />
+                    className={`flex min-h-9 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-blue-500/10 text-blue-500"
+                        : "text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <span className="truncate">
+                      {sound}
+                    </span>
 
-                  <span className="w-8 text-right font-mono text-[11px] text-muted-foreground">
-                    {rgb[channel]}
-                  </span>
-                </div>
-              ),
+                    {active && (
+                      <Check className="h-4 w-4 shrink-0 text-blue-500" />
+                    )}
+                  </button>
+                )
+              },
             )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -993,11 +1093,6 @@ export default function Sidebar({
   const [wheelMenuOpen, setWheelMenuOpen] =
     useState(false)
 
-  const [
-    colorPickerOpen,
-    setColorPickerOpen,
-  ] = useState(false)
-
   const textEditingRef =
     useRef(false)
 
@@ -1007,7 +1102,7 @@ export default function Sidebar({
   const entryImageInputRef =
     useRef<HTMLInputElement | null>(null)
 
-  const entryImageTargetRef =
+  const pendingImageEntryId =
     useRef<string | null>(null)
 
   const imageMenuRef =
@@ -1015,6 +1110,11 @@ export default function Sidebar({
 
   const wheelMenuRef =
     useRef<HTMLDivElement | null>(null)
+
+  const [
+    colorPickerEntryId,
+    setColorPickerEntryId,
+  ] = useState<string | null>(null)
 
   const [
     settingsEntryIndex,
@@ -1029,7 +1129,7 @@ export default function Sidebar({
   const [
     settingsSound,
     setSettingsSound,
-  ] = useState("")
+  ] = useState("Inherit from wheel")
 
   const [
     settingsPopupMessage,
@@ -1042,6 +1142,11 @@ export default function Sidebar({
   ] = useState<string | undefined>(
     undefined,
   )
+
+  const [
+    settingsColorOpen,
+    setSettingsColorOpen,
+  ] = useState(false)
 
   useEffect(() => {
     if (textEditingRef.current) {
@@ -1273,16 +1378,16 @@ export default function Sidebar({
     setImageMenuOpen(false)
   }
 
-  const handleEntryImageFile = (
+  const handleEntryImageFiles = (
     event: ChangeEvent<HTMLInputElement>,
   ) => {
     const file =
       event.target.files?.[0]
 
-    const targetId =
-      entryImageTargetRef.current
+    const entryId =
+      pendingImageEntryId.current
 
-    if (!file || !targetId) {
+    if (!file || !entryId) {
       event.target.value = ""
       return
     }
@@ -1298,17 +1403,13 @@ export default function Sidebar({
         return
       }
 
-      setEntryExtras(
-        targetId,
-        {
-          image:
-            reader.result,
-        },
-      )
+      setEntryExtras(entryId, {
+        image: reader.result,
+      })
 
       if (
         settingsDraft?.id ===
-        targetId
+        entryId
       ) {
         setSettingsImage(
           reader.result,
@@ -1318,14 +1419,14 @@ export default function Sidebar({
 
     reader.readAsDataURL(file)
 
+    pendingImageEntryId.current = null
     event.target.value = ""
-    entryImageTargetRef.current = null
   }
 
   const openEntryImagePicker = (
     id: string,
   ) => {
-    entryImageTargetRef.current = id
+    pendingImageEntryId.current = id
     entryImageInputRef.current?.click()
   }
 
@@ -1530,14 +1631,13 @@ export default function Sidebar({
       getExtras(item.id)
 
     setSettingsEntryIndex(index)
-
     setSettingsDraft({
       ...item,
     })
 
     setSettingsSound(
       entryExtras.sound ??
-        "inherit",
+        "Inherit from wheel",
     )
 
     setSettingsPopupMessage(
@@ -1549,16 +1649,18 @@ export default function Sidebar({
       entryExtras.image,
     )
 
-    setColorPickerOpen(false)
+    setSettingsColorOpen(false)
   }
 
   const closeSettings = () => {
     setSettingsEntryIndex(null)
     setSettingsDraft(null)
-    setSettingsSound("")
+    setSettingsSound(
+      "Inherit from wheel",
+    )
     setSettingsPopupMessage("")
     setSettingsImage(undefined)
-    setColorPickerOpen(false)
+    setSettingsColorOpen(false)
   }
 
   const saveSettings = () => {
@@ -1662,8 +1764,6 @@ export default function Sidebar({
     setSettingsDraft({
       ...duplicated,
     })
-
-    setColorPickerOpen(false)
   }
 
   const deleteSettingsEntry = () => {
@@ -1705,14 +1805,13 @@ export default function Sidebar({
       getExtras(item.id)
 
     setSettingsEntryIndex(index)
-
     setSettingsDraft({
       ...item,
     })
 
     setSettingsSound(
       entryExtras.sound ??
-        "inherit",
+        "Inherit from wheel",
     )
 
     setSettingsPopupMessage(
@@ -1724,7 +1823,7 @@ export default function Sidebar({
       entryExtras.image,
     )
 
-    setColorPickerOpen(false)
+    setSettingsColorOpen(false)
   }
 
   const handleSettingsImage = (
@@ -1754,7 +1853,6 @@ export default function Sidebar({
     }
 
     reader.readAsDataURL(file)
-
     event.target.value = ""
   }
 
@@ -1922,7 +2020,7 @@ export default function Sidebar({
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              <span>Entries</span>
+              Entries
 
               <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-muted-foreground/20 px-1.5 text-[11px] font-bold leading-none text-muted-foreground">
                 {items.length}
@@ -1940,7 +2038,7 @@ export default function Sidebar({
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              <span>Results</span>
+              Results
 
               <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-muted-foreground/20 px-1.5 text-[11px] font-bold leading-none text-muted-foreground">
                 {results.length}
@@ -2109,17 +2207,22 @@ export default function Sidebar({
                               item.hidden ===
                               true
 
+                            const itemExtras =
+                              getExtras(
+                                item.id,
+                              )
+
                             return (
                               <div
                                 key={item.id}
-                                className={`relative py-2 transition-opacity ${
+                                className={`relative py-2.5 transition-opacity ${
                                   hidden
                                     ? "opacity-35"
                                     : ""
                                 }`}
                               >
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <div className="flex w-6 shrink-0 flex-col items-center">
+                                <div className="flex min-w-0 items-center gap-2.5">
+                                  <div className="flex w-7 shrink-0 flex-col items-center gap-1">
                                     <button
                                       type="button"
                                       aria-label={`Move ${item.label} up`}
@@ -2133,7 +2236,7 @@ export default function Sidebar({
                                           -1,
                                         )
                                       }
-                                      className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-30"
+                                      className="flex h-6 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-30"
                                     >
                                       <ArrowUp className="h-4 w-4" />
                                     </button>
@@ -2152,7 +2255,7 @@ export default function Sidebar({
                                           1,
                                         )
                                       }
-                                      className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-30"
+                                      className="flex h-6 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-30"
                                     >
                                       <ArrowDown className="h-4 w-4" />
                                     </button>
@@ -2183,65 +2286,82 @@ export default function Sidebar({
                                     />
 
                                     <div className="mt-2 flex items-center gap-2">
-                                      <label
-                                        className="relative flex h-9 w-12 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-border/50 shadow-sm"
-                                        style={{
-                                          backgroundColor:
-                                            item.color ??
-                                            COLORS[
-                                              index %
-                                                COLORS.length
-                                            ],
-                                        }}
-                                        title="Change color"
-                                      >
-                                        <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.4)]" />
-
-                                        <input
-                                          type="color"
-                                          value={
-                                            item.color ??
-                                            "#3b82f6"
-                                          }
-                                          onChange={(
-                                            event,
-                                          ) =>
-                                            updateEntry(
-                                              item.id,
-                                              {
-                                                color:
-                                                  event
-                                                    .target
-                                                    .value,
-                                              },
+                                      <div className="relative shrink-0">
+                                        <button
+                                          type="button"
+                                          aria-label={`Change color for ${item.label}`}
+                                          onClick={() =>
+                                            setColorPickerEntryId(
+                                              (
+                                                current,
+                                              ) =>
+                                                current ===
+                                                item.id
+                                                  ? null
+                                                  : item.id,
                                             )
                                           }
-                                          className="absolute inset-0 cursor-pointer opacity-0"
-                                        />
-                                      </label>
+                                          className="flex h-9 w-11 items-center justify-center overflow-hidden rounded-md border border-border/70 shadow-sm transition hover:brightness-105"
+                                          style={{
+                                            backgroundColor:
+                                              item.color ??
+                                              COLORS[
+                                                index %
+                                                  COLORS.length
+                                              ],
+                                          }}
+                                        >
+                                          <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.45)]" />
+                                        </button>
 
-                                      {/* Direct entry image picker */}
+                                        {colorPickerEntryId ===
+                                          item.id && (
+                                          <ColorPickerPopover
+                                            value={
+                                              item.color ??
+                                              "#3b82f6"
+                                            }
+                                            onChange={(
+                                              color,
+                                            ) =>
+                                              updateEntry(
+                                                item.id,
+                                                {
+                                                  color,
+                                                },
+                                              )
+                                            }
+                                            onClose={() =>
+                                              setColorPickerEntryId(
+                                                null,
+                                              )
+                                            }
+                                          />
+                                        )}
+                                      </div>
+
                                       <button
                                         type="button"
                                         aria-label={`Add image to ${item.label}`}
-                                        title="Set entry image"
                                         onClick={() =>
                                           openEntryImagePicker(
                                             item.id,
                                           )
                                         }
-                                        className={`flex h-9 w-10 shrink-0 items-center justify-center rounded-md text-foreground transition ${
-                                          getExtras(
-                                            item.id,
-                                          ).image
-                                            ? "bg-blue-500/10 text-blue-500"
-                                            : "hover:bg-muted"
+                                        className={`relative flex h-9 w-10 shrink-0 items-center justify-center rounded-md border border-border/70 bg-muted/80 text-foreground transition hover:bg-muted ${
+                                          itemExtras.image
+                                            ? "text-blue-500"
+                                            : ""
                                         }`}
                                       >
                                         <ImageIcon className="h-4 w-4" />
+
+                                        {itemExtras.image && (
+                                          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                        )}
                                       </button>
 
-                                      <div className="flex h-9 min-w-0 flex-1 items-center rounded-md bg-muted/80">
+                                      <div className="flex h-9 min-w-0 flex-1 items-center rounded-md border border-border/50 bg-muted/80">
                                         <Scale className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
 
                                         <span className="ml-2 min-w-[22px] text-sm font-medium text-foreground">
@@ -2264,7 +2384,7 @@ export default function Sidebar({
                                                 -1,
                                               )
                                             }
-                                            className="flex h-9 w-7 items-center justify-center text-muted-foreground transition hover:text-foreground disabled:opacity-40"
+                                            className="flex h-9 w-8 items-center justify-center text-muted-foreground transition hover:text-foreground disabled:opacity-40"
                                           >
                                             <Minus className="h-4 w-4" />
                                           </button>
@@ -2281,7 +2401,7 @@ export default function Sidebar({
                                                 1,
                                               )
                                             }
-                                            className="flex h-9 w-7 items-center justify-center text-muted-foreground transition hover:text-foreground disabled:opacity-40"
+                                            className="flex h-9 w-8 items-center justify-center text-muted-foreground transition hover:text-foreground disabled:opacity-40"
                                           >
                                             <Plus className="h-4 w-4" />
                                           </button>
@@ -2533,18 +2653,16 @@ export default function Sidebar({
         </div>
       </aside>
 
-      {/* Shared entry image picker */}
       <input
         ref={entryImageInputRef}
         type="file"
         accept="image/*"
         className="hidden"
         onChange={
-          handleEntryImageFile
+          handleEntryImageFiles
         }
       />
 
-      {/* Advanced entry settings */}
       {settingsEntryIndex !== null &&
         settingsDraft && (
           <div
@@ -2564,7 +2682,6 @@ export default function Sidebar({
               aria-labelledby="advanced-entry-settings-title"
               className="w-full max-w-[680px] overflow-hidden rounded-2xl border border-border/70 bg-card text-foreground shadow-2xl"
             >
-              {/* Header */}
               <div className="flex h-[68px] items-center justify-between border-b border-border/70 bg-card px-5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
@@ -2574,7 +2691,7 @@ export default function Sidebar({
                   <div>
                     <h2
                       id="advanced-entry-settings-title"
-                      className="text-base font-semibold text-foreground"
+                      className="text-base font-semibold"
                     >
                       Entry settings
                     </h2>
@@ -2598,129 +2715,127 @@ export default function Sidebar({
               </div>
 
               <div className="max-h-[calc(100vh-120px)] overflow-y-auto">
-                {/* Entry navigation */}
-                <div className="flex min-h-[76px] items-center gap-5 border-b border-border/70 px-5">
-                  <button
-                    type="button"
-                    aria-label="Previous entry"
-                    disabled={
-                      settingsEntryIndex <=
-                      0
-                    }
-                    onClick={() =>
-                      selectSettingsEntry(
-                        settingsEntryIndex - 1,
-                      )
-                    }
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-muted/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </button>
+                <div className="border-b border-border/70 px-5 py-4">
+                  <div className="flex items-center justify-center gap-5">
+                    <button
+                      type="button"
+                      aria-label="Previous entry"
+                      disabled={
+                        settingsEntryIndex <=
+                        0
+                      }
+                      onClick={() =>
+                        selectSettingsEntry(
+                          settingsEntryIndex - 1,
+                        )
+                      }
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </button>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      Entry
-                    </p>
+                    <div className="min-w-[120px] text-center">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Entry
+                      </p>
 
-                    <p className="text-sm font-semibold text-foreground">
-                      {settingsEntryIndex +
-                        1}{" "}
-                      <span className="font-normal text-muted-foreground">
-                        / {items.length}
-                      </span>
-                    </p>
+                      <p className="mt-0.5 text-sm font-semibold">
+                        {settingsEntryIndex +
+                          1}{" "}
+                        <span className="font-normal text-muted-foreground">
+                          / {items.length}
+                        </span>
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      aria-label="Next entry"
+                      disabled={
+                        settingsEntryIndex >=
+                        items.length - 1
+                      }
+                      onClick={() =>
+                        selectSettingsEntry(
+                          settingsEntryIndex + 1,
+                        )
+                      }
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label="Add entry"
+                      onClick={() => {
+                        const newItem: SpinWheelItem =
+                          {
+                            id: crypto.randomUUID(),
+                            label: `Entry ${items.length + 1}`,
+                            color:
+                              COLORS[
+                                items.length %
+                                  COLORS.length
+                              ],
+                            weight: 1,
+                            hidden: false,
+                          }
+
+                        const nextItems = [
+                          ...items,
+                          newItem,
+                        ]
+
+                        textEditingRef.current =
+                          false
+
+                        setText(
+                          nextItems
+                            .map(
+                              (
+                                item,
+                              ) =>
+                                item.label,
+                            )
+                            .join("\n"),
+                        )
+
+                        onChange(
+                          nextItems,
+                        )
+
+                        setSettingsEntryIndex(
+                          nextItems.length -
+                            1,
+                        )
+
+                        setSettingsDraft({
+                          ...newItem,
+                        })
+
+                        setSettingsSound(
+                          "Inherit from wheel",
+                        )
+
+                        setSettingsPopupMessage(
+                          "",
+                        )
+
+                        setSettingsImage(
+                          undefined,
+                        )
+                      }}
+                      className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-500"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    aria-label="Next entry"
-                    disabled={
-                      settingsEntryIndex >=
-                      items.length - 1
-                    }
-                    onClick={() =>
-                      selectSettingsEntry(
-                        settingsEntryIndex + 1,
-                      )
-                    }
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-muted/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-
-                  <button
-                    type="button"
-                    aria-label="Add entry"
-                    onClick={() => {
-                      const newItem: SpinWheelItem =
-                        {
-                          id: crypto.randomUUID(),
-                          label: `Entry ${items.length + 1}`,
-                          color:
-                            COLORS[
-                              items.length %
-                                COLORS.length
-                            ],
-                          weight: 1,
-                          hidden: false,
-                        }
-
-                      const nextItems = [
-                        ...items,
-                        newItem,
-                      ]
-
-                      textEditingRef.current =
-                        false
-
-                      setText(
-                        nextItems
-                          .map(
-                            (item) =>
-                              item.label,
-                          )
-                          .join("\n"),
-                      )
-
-                      onChange(
-                        nextItems,
-                      )
-
-                      setSettingsEntryIndex(
-                        nextItems.length -
-                          1,
-                      )
-
-                      setSettingsDraft({
-                        ...newItem,
-                      })
-
-                      setSettingsSound(
-                        "inherit",
-                      )
-
-                      setSettingsPopupMessage(
-                        "",
-                      )
-
-                      setSettingsImage(
-                        undefined,
-                      )
-
-                      setColorPickerOpen(
-                        false,
-                      )
-                    }}
-                    className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-[0_2px_8px_rgba(59,130,246,0.25)] transition-colors hover:bg-blue-500"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
                 </div>
 
-                <div className="space-y-0 px-5 py-4">
-                  {/* Visibility + actions */}
+                <div className="px-5 py-4">
                   <div className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-muted/30 px-4 py-3">
-                    <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-foreground">
+                    <label className="flex cursor-pointer items-center gap-3 text-sm font-medium">
                       <input
                         type="checkbox"
                         checked={
@@ -2741,7 +2856,7 @@ export default function Sidebar({
                         className="h-4 w-4 cursor-pointer rounded border-border accent-blue-500"
                       />
 
-                      <span>Visible</span>
+                      Visible
                     </label>
 
                     <div className="flex items-center gap-2">
@@ -2750,9 +2865,9 @@ export default function Sidebar({
                         onClick={
                           duplicateSettingsEntry
                         }
-                        className="flex h-9 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
+                        className="flex h-9 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 text-xs font-semibold transition-colors hover:bg-muted"
                       >
-                        <span className="text-sm leading-none">
+                        <span className="text-sm">
                           ▣
                         </span>
                         Duplicate
@@ -2771,9 +2886,8 @@ export default function Sidebar({
                     </div>
                   </div>
 
-                  {/* Text */}
                   <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                    <label className="text-sm font-medium text-foreground">
+                    <label className="text-sm font-medium">
                       Text
                     </label>
 
@@ -2790,69 +2904,59 @@ export default function Sidebar({
                           },
                         )
                       }
-                      className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/60 focus:bg-muted"
+                      className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 px-3 text-sm outline-none transition-colors focus:border-blue-500/60 focus:bg-muted"
                     />
                   </div>
 
-                  {/* Color */}
-                  <div className="relative grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                    <label className="text-sm font-medium text-foreground">
+                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                    <label className="text-sm font-medium">
                       Color
                     </label>
 
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="relative">
-                        <button
-                          type="button"
-                          aria-label="Open color picker"
-                          aria-expanded={
-                            colorPickerOpen
+                    <div className="relative flex items-center gap-3">
+                      <button
+                        type="button"
+                        aria-label="Change color"
+                        onClick={() =>
+                          setSettingsColorOpen(
+                            (current) =>
+                              !current,
+                          )
+                        }
+                        className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-lg border border-border/70 shadow-sm transition hover:brightness-105"
+                        style={{
+                          backgroundColor:
+                            settingsDraft.color ??
+                            "#3b82f6",
+                        }}
+                      >
+                        <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.45)]" />
+                      </button>
+
+                      {settingsColorOpen && (
+                        <ColorPickerPopover
+                          value={
+                            settingsDraft.color ??
+                            "#3b82f6"
                           }
-                          onClick={() =>
-                            setColorPickerOpen(
-                              (current) =>
-                                !current,
+                          onChange={(
+                            color,
+                          ) =>
+                            updateSettingsDraft(
+                              {
+                                color,
+                              },
                             )
                           }
-                          className="relative flex h-10 w-12 items-center justify-center overflow-hidden rounded-lg border border-border/70 bg-background shadow-sm transition hover:border-blue-500/50"
-                        >
-                          <span
-                            className="absolute inset-1 rounded-md"
-                            style={{
-                              backgroundColor:
-                                settingsDraft.color ??
-                                "#3b82f6",
-                            }}
-                          />
+                          onClose={() =>
+                            setSettingsColorOpen(
+                              false,
+                            )
+                          }
+                        />
+                      )}
 
-                          <Palette className="relative z-10 h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.55)]" />
-                        </button>
-
-                        {colorPickerOpen && (
-                          <ColorPicker
-                            color={
-                              settingsDraft.color ??
-                              "#3b82f6"
-                            }
-                            onChange={(
-                              color,
-                            ) =>
-                              updateSettingsDraft(
-                                {
-                                  color,
-                                },
-                              )
-                            }
-                            onClose={() =>
-                              setColorPickerOpen(
-                                false,
-                              )
-                            }
-                          />
-                        )}
-                      </div>
-
-                      <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted">
+                      <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold transition-colors hover:bg-muted">
                         <ImageIcon className="h-4 w-4 text-muted-foreground" />
                         Add image
 
@@ -2868,53 +2972,23 @@ export default function Sidebar({
                     </div>
                   </div>
 
-                  {/* Sound */}
                   <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                    <label
-                      htmlFor="entry-sound"
-                      className="text-sm font-medium text-foreground"
-                    >
+                    <label className="text-sm font-medium">
                       Sound
                     </label>
 
-                    <div className="relative">
-                      <select
-                        id="entry-sound"
-                        value={
-                          settingsSound
-                        }
-                        onChange={(event) =>
-                          setSettingsSound(
-                            event.target
-                              .value,
-                          )
-                        }
-                        className="h-10 w-full appearance-none rounded-lg border border-border/70 bg-muted/60 px-3 pr-10 text-sm text-foreground outline-none transition-colors focus:border-blue-500/60 focus:bg-muted"
-                      >
-                        <option value="inherit">
-                          Inherit from wheel
-                        </option>
-                        <option value="none">
-                          No sound
-                        </option>
-                        <option value="tick">
-                          Tick
-                        </option>
-                        <option value="bell">
-                          Bell
-                        </option>
-                        <option value="pop">
-                          Pop
-                        </option>
-                      </select>
-
-                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    </div>
+                    <SoundDropdown
+                      value={
+                        settingsSound
+                      }
+                      onChange={
+                        setSettingsSound
+                      }
+                    />
                   </div>
 
-                  {/* Popup message */}
                   <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                    <label className="text-sm font-medium text-foreground">
+                    <label className="text-sm font-medium">
                       Popup message
                     </label>
 
@@ -2929,13 +3003,12 @@ export default function Sidebar({
                         )
                       }
                       placeholder="Optional message..."
-                      className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/60 focus:bg-muted"
+                      className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/60 focus:bg-muted"
                     />
                   </div>
 
-                  {/* Weight */}
                   <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                    <label className="text-sm font-medium text-foreground">
+                    <label className="text-sm font-medium">
                       Weight
                     </label>
 
@@ -2943,7 +3016,7 @@ export default function Sidebar({
                       <div className="flex h-10 flex-1 items-center rounded-lg border border-border/70 bg-muted/60">
                         <Scale className="ml-3 h-4 w-4 text-muted-foreground" />
 
-                        <span className="ml-2 text-sm font-medium text-foreground">
+                        <span className="ml-2 text-sm font-medium">
                           {settingsDraft.weight ??
                             1}
                         </span>
@@ -3000,22 +3073,21 @@ export default function Sidebar({
                         </div>
                       </div>
 
-                      <div className="min-w-[125px] text-right">
+                      <div className="min-w-[100px] text-right">
                         <span className="text-xs text-muted-foreground">
                           Probability
                         </span>
 
-                        <p className="text-sm font-semibold text-foreground">
+                        <p className="text-sm font-semibold">
                           {settingsProbability}%
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Image */}
                   {settingsImage && (
                     <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
-                      <span className="text-sm font-medium text-foreground">
+                      <span className="text-sm font-medium">
                         Image
                       </span>
 
@@ -3046,7 +3118,6 @@ export default function Sidebar({
                   )}
                 </div>
 
-                {/* Footer */}
                 <div className="flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-5 py-4">
                   <button
                     type="button"
