@@ -21,6 +21,8 @@ import {
   Minus,
   Palette,
   Pencil,
+  Play,
+  Square,
   Plus,
   Scale,
   Shuffle,
@@ -57,6 +59,10 @@ type SidebarProps = {
   onOpenWheel: () => void
   animateWinningEntryByWheel: Record<string, boolean>
   onAnimateWinningEntryChange: (wheelId: string, enabled: boolean) => void
+  afterSoundByWheel: Record<string, string>
+  afterVolumeByWheel: Record<string, number>
+  onAfterSoundChange: (wheelId: string, sound: string) => void
+  onAfterVolumeChange: (wheelId: string, volume: number) => void
 }
 
 type Tab = "entries" | "results"
@@ -110,6 +116,77 @@ const COLORS = [
   "#60a5fa",
   "#94a3b8",
 ]
+
+const WHEEL_THEMES = [
+  ["Default", ["#3b82f6", "#64748b", "#0ea5e9", "#334155", "#60a5fa", "#94a3b8"]],
+  ["Classic", ["#2563eb", "#ef4444", "#facc15", "#22c55e", "#8b5cf6", "#f97316"]],
+  ["Rainbow", ["#7c3aed", "#2563eb", "#06b6d4", "#22c55e", "#facc15", "#ef4444"]],
+  ["Unicorn", ["#c026d3", "#ec4899", "#f9a8d4", "#fde68a", "#c4b5fd", "#e2e8f0"]],
+  ["Circus", ["#06b6d4", "#facc15", "#fb7185", "#f97316", "#ec4899", "#22c55e"]],
+  ["Fruit Salad", ["#f97316", "#fb923c", "#facc15", "#84cc16", "#4ade80", "#22c55e"]],
+  ["Building Blocks", ["#06b6d4", "#38bdf8", "#fde68a", "#fb7185", "#f97316", "#ef4444"]],
+  ["Splash", ["#38bdf8", "#67e8f9", "#a5f3fc", "#2563eb", "#c084fc", "#94a3b8"]],
+  ["Retro Pop", ["#fb7185", "#fef3c7", "#67e8f9", "#22d3ee", "#bef264", "#84cc16"]],
+  ["Playground", ["#3b82f6", "#facc15", "#fb923c", "#f43f5e", "#c084fc", "#22c55e"]],
+  ["Picnic", ["#f59e0b", "#facc15", "#a3e635", "#4ade80", "#22c55e", "#84cc16"]],
+  ["Sugar Rush", ["#ec4899", "#f472b6", "#fde047", "#facc15", "#fb7185", "#86efac"]],
+  ["Popsicle", ["#60a5fa", "#34d399", "#fde047", "#f97316", "#fb7185", "#c084fc"]],
+  ["Cotton Candy", ["#bae6fd", "#ddd6fe", "#bbf7d0", "#fbcfe8", "#f9a8d4", "#e0f2fe"]],
+  ["Marshmallow", ["#86efac", "#c4b5fd", "#f9a8d4", "#fde2e4", "#bfdbfe", "#d9f99d"]],
+  ["Lilac Dreams", ["#d8b4fe", "#c4b5fd", "#a78bfa", "#f5d0fe", "#fbcfe8", "#ede9fe"]],
+  ["Blush & Peach", ["#d8b4fe", "#fed7aa", "#fdba74", "#fb923c", "#fb7185", "#f43f5e"]],
+  ["Seaside", ["#a7f3d0", "#fed7aa", "#bae6fd", "#67e8f9", "#22d3ee", "#38bdf8"]],
+  ["Soft Sage", ["#d1fae5", "#dcfce7", "#bbf7d0", "#a7f3d0", "#d9f99d", "#f0fdf4"]],
+  ["Office Hours", ["#fca5a5", "#fde68a", "#cbd5e1", "#94a3b8", "#6366f1", "#475569"]],
+  ["Information Blues", ["#94a3b8", "#cbd5e1", "#e2e8f0", "#64748b", "#3b82f6", "#1d4ed8"]],
+  ["Ice & Slate", ["#0284c7", "#38bdf8", "#7dd3fc", "#cbd5e1", "#e5e7eb", "#f3f4f6"]],
+  ["Moon", ["#27272a", "#52525b", "#a1a1aa", "#d4d4d8", "#e4e4e7", "#f4f4f5"]],
+  ["Modern Muted", ["#a7c4bc", "#d1d5db", "#e7e5e4", "#f5f5f4", "#fecdd3", "#94a3b8"]],
+  ["Deep Dive", ["#020617", "#0f172a", "#0e7490", "#0369a1", "#155e75", "#164e63"]],
+  ["Jungle", ["#166534", "#15803d", "#4d7c0f", "#84cc16", "#a3a3a3", "#c08457"]],
+  ["Autumn Foliage", ["#c2410c", "#ea580c", "#f59e0b", "#d97706", "#84cc16", "#a16207"]],
+  ["Woodland", ["#9a6654", "#7c5c4b", "#78534a", "#d6a77a", "#c49a6c", "#e2c19a"]],
+  ["Savanna", ["#fef3c7", "#fde68a", "#b45309", "#d97706", "#92400e", "#78716c"]],
+  ["Canyon", ["#a8a29e", "#d97757", "#fb923c", "#ea580c", "#7c2d12", "#57534e"]],
+  ["Succulent Garden", ["#9ca3af", "#86a58a", "#d9f99d", "#fed7aa", "#fef3c7", "#a7f3d0"]],
+  ["Pond Life", ["#4d7c0f", "#65a30d", "#facc15", "#fb7185", "#f9a8d4", "#86efac"]],
+  ["Koi Fish", ["#f97316", "#f8fafc", "#facc15", "#ef4444", "#fb923c", "#334155"]],
+  ["Rainforest", ["#06b6d4", "#14b8a6", "#0f766e", "#e2e8f0", "#67e8f9", "#22c55e"]],
+  ["Oasis", ["#fde68a", "#fbbf24", "#365f55", "#4d7c6f", "#86a98b", "#94a3b8"]],
+  ["Deep Sea", ["#4338ca", "#67e8f9", "#cffafe", "#e0f2fe", "#5eead4", "#0f766e"]],
+  ["Moss & Fern", ["#3f6212", "#4d7c0f", "#65a30d", "#84cc16", "#a3e635", "#bef264"]],
+  ["Midnight", ["#082f49", "#1e3a5f", "#64748b", "#9f1239", "#fb7185", "#fed7aa"]],
+  ["Neon Nights", ["#f0abfc", "#d946ef", "#8b5cf6", "#7c3aed", "#4338ca", "#1d4ed8"]],
+  ["Deep Forest", ["#475569", "#6366f1", "#cbd5e1", "#3f6212", "#166534", "#365314"]],
+  ["Galactic", ["#a5b4fc", "#7c3aed", "#4c1d95", "#312e81", "#581c87", "#475569"]],
+  ["Urban Ops", ["#737373", "#171717", "#0f172a", "#7dd3fc", "#e5e7eb", "#f5f5f5"]],
+  ["Abyss", ["#38bdf8", "#0891b2", "#164e63", "#0f3d56", "#c084fc", "#e9d5ff"]],
+  ["Fire & Ice", ["#60a5fa", "#3b82f6", "#fed7aa", "#fb923c", "#f97316", "#ea580c"]],
+  ["Sunshine", ["#f8fafc", "#fde68a", "#facc15", "#f59e0b", "#ea580c", "#dc2626"]],
+  ["Heatwave", ["#dc2626", "#f97316", "#fb923c", "#fde68a", "#facc15", "#bef264"]],
+  ["Solstice", ["#991b1b", "#dc2626", "#f97316", "#fde68a", "#facc15", "#fb923c"]],
+  ["Golden Hour", ["#d97706", "#f59e0b", "#facc15", "#eab308", "#fde047", "#fef08a"]],
+  ["Sorbet", ["#4f46e5", "#6366f1", "#ec4899", "#fda4af", "#fdba74", "#fde68a"]],
+  ["Valentine's Day", ["#ef4444", "#ec4899", "#f9a8d4", "#fecdd3", "#fff1f2", "#be123c"]],
+  ["Saint Patrick's Day", ["#16a34a", "#f8fafc", "#f59e0b", "#facc15", "#166534", "#4ade80"]],
+  ["Easter", ["#f9a8d4", "#fef3c7", "#bbf7d0", "#bfdbfe", "#ddd6fe", "#fbcfe8"]],
+  ["Halloween", ["#f97316", "#111827", "#a21caf", "#84cc16", "#facc15", "#7c2d12"]],
+  ["Christmas", ["#15803d", "#dc2626", "#facc15", "#f8fafc", "#166534", "#b91c1c"]],
+  ["New Year", ["#111827", "#facc15", "#f8fafc", "#64748b", "#1e3a8a", "#e5e7eb"]],
+  ["Classic Rainbow", ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#8b5cf6"]],
+  ["Asexual", ["#111827", "#a3a3a3", "#f8fafc", "#7c2d8a", "#52525b", "#d4d4d8"]],
+  ["Bisexual", ["#ec4899", "#a855f7", "#2563eb", "#c026d3", "#7c3aed", "#1d4ed8"]],
+  ["Demisexual", ["#111827", "#f8fafc", "#7e22ce", "#a3a3a3", "#e5e7eb", "#4c1d95"]],
+  ["Gay", ["#059669", "#86efac", "#f8fafc", "#60a5fa", "#4c1d95", "#22c55e"]],
+  ["Lesbian", ["#f97316", "#fb923c", "#f8fafc", "#f472b6", "#db2777", "#be185d"]],
+  ["Pansexual", ["#ec4899", "#facc15", "#0ea5e9", "#db2777", "#fde047", "#0284c7"]],
+  ["Agender", ["#111827", "#d4d4d8", "#f8fafc", "#bef264", "#52525b", "#a3a3a3"]],
+  ["Genderfluid", ["#f472b6", "#f8fafc", "#c026d3", "#111827", "#4338ca", "#a78bfa"]],
+  ["Genderqueer", ["#a78bfa", "#f8fafc", "#65a30d", "#7e22ce", "#bef264", "#e9d5ff"]],
+  ["Intersex", ["#a21caf", "#facc15", "#7e22ce", "#fde047", "#581c87", "#fef08a"]],
+  ["Non-binary", ["#facc15", "#f8fafc", "#a855f7", "#111827", "#fde047", "#c084fc"]],
+  ["Transgender", ["#5eead4", "#f9a8d4", "#f8fafc", "#fbcfe8", "#67e8f9", "#38bdf8"]],
+] as const
 
 const COLOR_GALLERY = [
   "#ffffff",
@@ -1100,24 +1177,32 @@ function WheelCustomizeDialog({
   onClose,
   animateWinner,
   onAnimateWinnerChange,
+  onColorsChange,
+  afterSound,
+  afterVolume,
+  onAfterSoundChange,
+  onAfterVolumeChange,
 }: {
   open: boolean
   wheelNumber: number
   onClose: () => void
   animateWinner: boolean
   onAnimateWinnerChange: (enabled: boolean) => void
+  onColorsChange: (colors: string[]) => void
+  afterSound: string
+  afterVolume: number
+  onAfterSoundChange: (sound: string) => void
+  onAfterVolumeChange: (volume: number) => void
 }) {
   const [tab, setTab] = useState<"during" | "after" | "appearance">("during")
   const [duringSound, setDuringSound] = useState("Ticking sound")
   const [duringVolume, setDuringVolume] = useState(50)
   const [displayDuplicates, setDisplayDuplicates] = useState(true)
-  const [spinSlowly, setSpinSlowly] = useState(true)
+  const [spinSlowly, setSpinSlowly] = useState(false)
   const [showTitle, setShowTitle] = useState(true)
   const [spinTime, setSpinTime] = useState(10)
   const [maxVisible, setMaxVisible] = useState(1000)
 
-  const [afterSound, setAfterSound] = useState("Subdued applause")
-  const [afterVolume, setAfterVolume] = useState(50)
   const [launchConfetti, setLaunchConfetti] = useState(true)
   const [autoRemove, setAutoRemove] = useState(false)
   const [displayPopup, setDisplayPopup] = useState(true)
@@ -1127,15 +1212,11 @@ function WheelCustomizeDialog({
 
   const [oneColorPerSection, setOneColorPerSection] = useState(true)
   const [useBackgroundImage, setUseBackgroundImage] = useState(true)
-  const [selectedColors, setSelectedColors] = useState([
-    "#38aee0",
-    "#7be0ae",
-    "#f7dc68",
-    "#ae75c8",
-  ])
+  const [availableColors, setAvailableColors] = useState<string[]>(COLORS)
+  const [selectedColors, setSelectedColors] = useState<string[]>(COLORS)
+  const [themeOpen, setThemeOpen] = useState(false)
   const [centerImage, setCenterImage] = useState<string | undefined>()
   const [imageSize, setImageSize] = useState("S")
-  const [pageBackgroundColor, setPageBackgroundColor] = useState("#ffffff")
   const [gradient, setGradient] = useState(true)
   const [contours, setContours] = useState(false)
   const [wheelShadow, setWheelShadow] = useState(true)
@@ -1143,6 +1224,7 @@ function WheelCustomizeDialog({
   const [alwaysShowText, setAlwaysShowText] = useState("Always show text on the wheel")
 
   const centerImageInputRef = useRef<HTMLInputElement | null>(null)
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -1158,11 +1240,14 @@ function WheelCustomizeDialog({
   if (!open) return null
 
   const toggleColor = (color: string) => {
-    setSelectedColors((current) =>
-      current.includes(color)
+    setSelectedColors((current) => {
+      const next = current.includes(color)
         ? current.filter((entry) => entry !== color)
-        : [...current, color],
-    )
+        : [...current, color]
+      const safe = next.length > 0 ? next : [color]
+      onColorsChange(safe)
+      return safe
+    })
   }
 
   const handleCenterImage = (event: ChangeEvent<HTMLInputElement>) => {
@@ -1214,6 +1299,73 @@ function WheelCustomizeDialog({
     </div>
   )
 
+  const previewAfterSound = () => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause()
+      previewAudioRef.current.currentTime = 0
+    }
+    if (afterSound === "No sound" || afterSound === "Inherit from wheel" || afterSound.startsWith("Speak result")) return
+    const files: Record<string, string> = {
+      "Subdued applause": "subdued-applause.mp3",
+      "Joke punchline": "joke-punchline.mp3",
+      "Announcement bell": "announcement-bell.mp3",
+      "Twinkling star": "twinkling-star.mp3",
+      "Correct answer ding": "correct-answer-ding.mp3",
+      "Synth bell": "synth-bell.mp3",
+      "Notification bell": "notification-bell.mp3",
+      "Loud applause": "loud-applause.mp3",
+      "Fanfare": "fanfare.mp3",
+      "Bell ringing": "bell-ringing.mp3",
+      "Cymbals": "cymbals.mp3",
+      "Thunder": "thunder.mp3",
+      "Cash register": "cash-register.mp3",
+      "Evil laugh": "evil-laugh.mp3",
+      "Microwave ding": "microwave-ding.mp3",
+      "Old phone ringing": "old-phone-ringing.mp3",
+      "Alarm clock": "alarm-clock.mp3",
+      "Fireworks": "fireworks.mp3",
+      "Game win ding": "game-win-ding.mp3",
+      "Wrong answer": "wrong-answer.mp3",
+      "Punch": "punch.mp3",
+      "Cat meow": "cat-meow.mp3",
+      "Wolf howl": "wolf-howl.mp3",
+      "Horse": "horse.mp3",
+      "Lion roar": "lion-roar.mp3",
+      "Sad trombone": "sad-trombone.mp3",
+      "Cinematic drum impact": "cinematic-drum-impact.mp3",
+      "Water splash": "water-splash.mp3",
+      "Gong": "gong.mp3",
+      "Doorbell": "doorbell.mp3",
+      "Church bell": "church-bell.mp3",
+      "Referee whistle": "referee-whistle.mp3",
+      "Boing": "boing.mp3",
+      "Angel choir": "angel-choir.mp3",
+      "Harp strum": "harp-strum.mp3",
+      "Breaker switch": "breaker-switch.mp3",
+      "Camera shutter & flash": "camera-shutter-flash.mp3",
+      "Lost game": "lost-game.mp3",
+      "Horror scream": "horror-scream.mp3",
+    }
+    const file = files[afterSound]
+    if (!file) return
+    const audio = new Audio(`/sounds/afterspin/${file}`)
+    audio.volume = afterVolume / 100
+    audio.onerror = () => {
+      const fallback = new Audio(`/sounds/after-spin/${file}`)
+      fallback.volume = afterVolume / 100
+      previewAudioRef.current = fallback
+      void fallback.play().catch(() => undefined)
+    }
+    previewAudioRef.current = audio
+    void audio.play().catch(() => undefined)
+  }
+
+  const stopPreviewSound = () => {
+    if (!previewAudioRef.current) return
+    previewAudioRef.current.pause()
+    previewAudioRef.current.currentTime = 0
+  }
+
   return (
     <div
       className="fixed inset-0 z-[400] flex items-center justify-center bg-background/65 p-4 backdrop-blur-sm"
@@ -1264,10 +1416,10 @@ function WheelCustomizeDialog({
                     <SoundDropdown value={duringSound} onChange={setDuringSound} />
                   </div>
                   <button type="button" aria-label="Preview sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
-                    <span className="ml-0.5 text-xl leading-none">▶</span>
+                    <Play className="h-5 w-5 fill-current" />
                   </button>
                   <button type="button" aria-label="Stop sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
-                    <span className="text-lg leading-none">■</span>
+                    <Square className="h-4 w-4 fill-current" />
                   </button>
                 </div>
 
@@ -1279,7 +1431,7 @@ function WheelCustomizeDialog({
 
               <div className="border-t border-border/70 py-5">
                 <div className="flex flex-wrap gap-x-7 gap-y-4">
-                  {check(displayDuplicates, setDisplayDuplicates, "Display duplicates", <span className="flex h-4 w-4 items-center justify-center rounded-full bg-muted-foreground/40 text-[10px] text-background">?</span>)}
+                  {check(displayDuplicates, setDisplayDuplicates, "Display duplicates")}
                   {check(spinSlowly, setSpinSlowly, "Spin slowly")}
                   {check(showTitle, setShowTitle, "Show title")}
                 </div>
@@ -1308,19 +1460,19 @@ function WheelCustomizeDialog({
                 <label className="text-sm font-semibold">Sound</label>
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <SoundDropdown value={afterSound} onChange={setAfterSound} />
+                    <SoundDropdown value={afterSound} onChange={onAfterSoundChange} />
                   </div>
-                  <button type="button" aria-label="Preview sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
-                    <span className="ml-0.5 text-xl leading-none">▶</span>
+                  <button type="button" aria-label="Preview sound" onClick={previewAfterSound} className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                    <Play className="h-5 w-5 fill-current" />
                   </button>
-                  <button type="button" aria-label="Stop sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
-                    <span className="text-lg leading-none">■</span>
+                  <button type="button" aria-label="Stop sound" onClick={stopPreviewSound} className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                    <Square className="h-4 w-4 fill-current" />
                   </button>
                 </div>
 
                 <label className="text-sm font-semibold">Volume</label>
                 <div>
-                  {slider(afterVolume, 0, 100, 1, setAfterVolume, ["0%", "25%", "50%", "75%", "100%"])}
+                  {slider(afterVolume, 0, 100, 1, (value) => onAfterVolumeChange(value), ["0%", "25%", "50%", "75%", "100%"])}
                 </div>
               </div>
 
@@ -1378,31 +1530,70 @@ function WheelCustomizeDialog({
                 </button>
               </div>
 
-              <div className="border-b border-border/70 py-5">
-                <button type="button" className="flex h-9 items-center gap-3 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500">
+              <div className="relative border-b border-border/70 py-5">
+                <button
+                  type="button"
+                  onClick={() => setThemeOpen((value) => !value)}
+                  className="flex h-9 min-w-[200px] items-center justify-center gap-3 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                >
                   Apply a theme
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className={`h-4 w-4 transition-transform ${themeOpen ? "rotate-180" : ""}`} />
                 </button>
+
+                {themeOpen && (
+                  <div className="absolute left-0 top-[calc(100%+4px)] z-[50] w-[285px] overflow-hidden rounded-md border border-white/10 bg-[#1c1c1c] shadow-2xl">
+                    <div className="max-h-[520px] overflow-y-auto">
+                      {WHEEL_THEMES.map(([name, colors]) => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => {
+                            const next = [...colors]
+                            setAvailableColors(next)
+                            setSelectedColors(next)
+                            onColorsChange(next)
+                            setThemeOpen(false)
+                          }}
+                          className="flex min-h-11 w-full items-center justify-between gap-4 px-5 py-2.5 text-left text-sm font-semibold text-white transition hover:bg-white/10"
+                        >
+                          <span>{name}</span>
+                          <span className="flex shrink-0 gap-1">
+                            {colors.map((color) => (
+                              <span key={color} className="h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
+                            ))}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="border-b border-border/70 py-5">
                 <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
                   Customize colors
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-muted-foreground/40 text-[10px] text-background">?</span>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
-                  {selectedColors.map((color, index) => (
-                    <button
-                      key={`${color}-${index}`}
-                      type="button"
-                      onClick={() => toggleColor(color)}
-                      className="flex h-10 w-20 items-center justify-center rounded-md border border-border/70 shadow-sm transition hover:brightness-105"
-                      style={{ backgroundColor: color }}
-                    >
-                      <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.45)]" />
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-4">
+                  {availableColors.map((color) => {
+                    const checked = selectedColors.includes(color)
+                    return (
+                      <label key={color} className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleColor(color)}
+                          className="h-5 w-5 cursor-pointer rounded border-border accent-blue-500"
+                        />
+                        <span
+                          className="flex h-9 w-12 items-center justify-center rounded-md border border-border/70 shadow-sm"
+                          style={{ backgroundColor: color }}
+                        >
+                          <Palette className="h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.45)]" />
+                        </span>
+                      </label>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -1410,7 +1601,6 @@ function WheelCustomizeDialog({
                 <div className="flex items-center gap-3 text-sm font-semibold">Image at the center of the wheel
                   <button type="button" onClick={() => centerImageInputRef.current?.click()} className="flex h-10 w-24 items-center justify-center gap-2 rounded-md bg-blue-600 text-white transition hover:bg-blue-500">
                     <ImageIcon className="h-4 w-4" />
-                    <ChevronDown className="h-4 w-4" />
                   </button>
                   <input ref={centerImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleCenterImage} />
                 </div>
@@ -1423,16 +1613,6 @@ function WheelCustomizeDialog({
               </div>
 
               <div className="grid grid-cols-2 gap-x-8 gap-y-4 bg-muted/20 p-4">
-                <button
-                  type="button"
-                  onClick={() => setPageBackgroundColor((current) => current === "#ffffff" ? "#111111" : "#ffffff")}
-                  className="flex items-center gap-3 text-left text-sm font-medium"
-                >
-                  <span className="flex h-10 w-12 items-center justify-center rounded-md border border-border/70 bg-background" style={{ backgroundColor: pageBackgroundColor }}>
-                    <Palette className="h-4 w-4" />
-                  </span>
-                  Page background color
-                </button>
                 {check(contours, setContours, "Contours")}
                 {check(gradient, setGradient, "Display a color gradient on the page")}
                 {check(wheelShadow, setWheelShadow, "Wheel shadow")}
@@ -1468,6 +1648,10 @@ export default function Sidebar({
   onOpenWheel,
   animateWinningEntryByWheel,
   onAnimateWinningEntryChange,
+  afterSoundByWheel,
+  afterVolumeByWheel,
+  onAfterSoundChange,
+  onAfterVolumeChange,
 }: SidebarProps) {
   const [tab, setTab] =
     useState<Tab>("entries")
@@ -1485,6 +1669,9 @@ export default function Sidebar({
     useState(false)
 
   const [wheelMenuOpen, setWheelMenuOpen] =
+    useState(false)
+
+  const [removeWheelConfirmOpen, setRemoveWheelConfirmOpen] =
     useState(false)
 
   const [customizeWheelOpen, setCustomizeWheelOpen] =
@@ -2356,8 +2543,13 @@ export default function Sidebar({
       return
     }
 
-    onRemoveWheel(activeWheelId)
     setWheelMenuOpen(false)
+    setRemoveWheelConfirmOpen(true)
+  }
+
+  const confirmRemoveActiveWheel = () => {
+    onRemoveWheel(activeWheelId)
+    setRemoveWheelConfirmOpen(false)
   }
 
   const handleCustomizeActiveWheel = () => {
@@ -3149,6 +3341,24 @@ export default function Sidebar({
         </div>
       </aside>
 
+      {removeWheelConfirmOpen && (
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setRemoveWheelConfirmOpen(false)
+          }}
+        >
+          <div className="w-full max-w-[420px] rounded-xl border border-border/70 bg-card p-5 text-foreground shadow-2xl">
+            <h2 className="text-base font-semibold">Remove wheel?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Are you sure you want to remove Wheel {activeWheelNumber}? This cannot be undone.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setRemoveWheelConfirmOpen(false)} className="h-10 rounded-md px-4 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
+              <button type="button" onClick={confirmRemoveActiveWheel} className="h-10 rounded-md bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-500">Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <WheelCustomizeDialog
         open={customizeWheelOpen}
         wheelNumber={activeWheelNumber}
@@ -3157,6 +3367,17 @@ export default function Sidebar({
         onAnimateWinnerChange={(enabled) =>
           onAnimateWinningEntryChange(activeWheelId, enabled)
         }
+        afterSound={afterSoundByWheel[activeWheelId] ?? "Subdued applause"}
+        afterVolume={afterVolumeByWheel[activeWheelId] ?? 50}
+        onAfterSoundChange={(sound) => onAfterSoundChange(activeWheelId, sound)}
+        onAfterVolumeChange={(volume) => onAfterVolumeChange(activeWheelId, volume)}
+        onColorsChange={(colors) => {
+          const next = items.map((item, index) => ({
+            ...item,
+            color: colors[index % colors.length],
+          }))
+          onChange(next)
+        }}
       />
 
       <input
