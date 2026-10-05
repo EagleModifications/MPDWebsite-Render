@@ -1240,7 +1240,7 @@ export default function ActivityRoster() {
                 variant="ghost"
                 size="sm"
                 onClick={clearSearch}
-                className="shrink-0 gap-2 bg-transparent text-foreground transition-colors hover:bg-transparent hover:text-blue-400"
+                className="shrink-0 gap-2 bg-transparent text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
               >
                 <X className="h-4 w-4" />
 
@@ -1783,36 +1783,6 @@ export default function ActivityRoster() {
               </DropdownMenu>
             )}
 
-            {/* Clear / Reset Filters */}
-
-            {hasFilterSelection && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="shrink-0 gap-2 bg-transparent text-foreground transition-colors hover:bg-transparent hover:text-blue-400"
-              >
-                <X className="h-4 w-4" />
-
-                Clear Filters
-              </Button>
-            )}
-
-            {hasFilterChanges && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={resetFilters}
-                className="shrink-0 gap-2 bg-transparent text-foreground transition-colors hover:bg-transparent hover:text-blue-400"
-              >
-                <RotateCcw className="h-4 w-4" />
-
-                Reset Filters
-              </Button>
-            )}
-
             {/* Google Sheets Refresh */}
 
             <GoogleRosterRefresh
@@ -1840,34 +1810,34 @@ export default function ActivityRoster() {
             ) : (
               <>
                 {statusFilters.map(
-                (status) => {
-                  const Icon =
-                    getStatusIcon(status)
+                  (status) => {
+                    const Icon =
+                      getStatusIcon(status)
 
-                  return (
-                    <button
-                      key={`status-${status}`}
-                      type="button"
-                      onClick={() =>
-                        toggleStatusFilter(
+                    return (
+                      <button
+                        key={`status-${status}`}
+                        type="button"
+                        onClick={() =>
+                          toggleStatusFilter(
+                            status,
+                          )
+                        }
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80 ${getStatusClasses(
                           status,
-                        )
-                      }
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80 ${getStatusClasses(
-                        status,
-                      )}`}
-                    >
-                      <Icon className="h-3 w-3" />
+                        )}`}
+                      >
+                        <Icon className="h-3 w-3" />
 
-                      {getStatusLabel(
-                        status,
-                      )}
+                        {getStatusLabel(
+                          status,
+                        )}
 
-                      <X className="h-3 w-3" />
-                    </button>
-                  )
-                },
-              )}
+                        <X className="h-3 w-3" />
+                      </button>
+                    )
+                  },
+                )}
 
                 {rankFilters.map(
                   (rank) => (
@@ -1890,6 +1860,36 @@ export default function ActivityRoster() {
                   ),
                 )}
               </>
+            )}
+
+            {(hasFilterSelection || hasFilterChanges) && (
+              <div className="flex items-center gap-2">
+                {hasFilterSelection && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-7 gap-1.5 bg-transparent px-2 text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Clear Filters
+                  </Button>
+                )}
+
+                {hasFilterChanges && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={resetFilters}
+                    className="h-7 gap-1.5 bg-transparent px-2 text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset Filters
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </div>
