@@ -315,6 +315,7 @@ export default function Navbar() {
               </NavLink>
             ))}
 
+          {/* Documents */}
           {hasDocuments && (
             <div
               ref={documentsRef}
@@ -352,8 +353,8 @@ export default function Navbar() {
                         className={[
                           "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                           rostersActive || rostersOpen
-                            ? "text-foreground"
-                            : "text-muted-foreground hover:text-foreground",
+                            ? "bg-foreground/10 text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                         ].join(" ")}
                       >
                         <span>Rosters</span>
@@ -399,8 +400,8 @@ export default function Navbar() {
                         className={[
                           "mt-1 flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                           sopsActive || sopsOpen
-                            ? "text-foreground"
-                            : "text-muted-foreground hover:text-foreground",
+                            ? "bg-foreground/10 text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                         ].join(" ")}
                       >
                         <span>SOPs</span>
@@ -445,8 +446,8 @@ export default function Navbar() {
                       className={[
                         "mt-1 block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                         supervisorActive
-                          ? "text-foreground"
-                          : "text-muted-foreground hover:text-foreground",
+                          ? "bg-foreground/10 text-foreground"
+                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                       ].join(" ")}
                     >
                       Supervisor
@@ -461,8 +462,8 @@ export default function Navbar() {
                       className={[
                         "mt-1 block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                         commandActive
-                          ? "text-foreground"
-                          : "text-muted-foreground hover:text-foreground",
+                          ? "bg-foreground/10 text-foreground"
+                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                       ].join(" ")}
                     >
                       Command
@@ -501,8 +502,8 @@ export default function Navbar() {
           {user ? (
             <Button
               asChild
-              size="sm"
               variant="outline"
+              size="sm"
               className="h-8 rounded-lg border-foreground/70 bg-transparent px-3 text-xs font-medium text-foreground shadow-none hover:bg-foreground/5 hover:text-foreground"
             >
               <a href="/api/auth/logout">
@@ -552,6 +553,7 @@ export default function Navbar() {
         <div className="border-t border-border/50 bg-background/95 px-6 py-4 shadow-xl backdrop-blur-xl md:hidden">
           <nav className="mx-auto flex max-w-[1600px] flex-col gap-1">
 
+            {/* Main Mobile Navigation */}
             {visibleItems.map((item) => (
               <NavLink
                 key={item.href}
@@ -570,6 +572,7 @@ export default function Navbar() {
               </NavLink>
             ))}
 
+            {/* Mobile Documents */}
             {hasDocuments && (
               <div className="mt-1">
                 <button
@@ -604,8 +607,8 @@ export default function Navbar() {
                           className={[
                             "flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
                             rostersActive || rostersOpen
-                              ? "text-foreground"
-                              : "text-muted-foreground hover:text-foreground",
+                              ? "bg-foreground/10 text-foreground"
+                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                           ].join(" ")}
                         >
                           <span>Rosters</span>
@@ -651,8 +654,8 @@ export default function Navbar() {
                           className={[
                             "flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
                             sopsActive || sopsOpen
-                              ? "text-foreground"
-                              : "text-muted-foreground hover:text-foreground",
+                              ? "bg-foreground/10 text-foreground"
+                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                           ].join(" ")}
                         >
                           <span>SOPs</span>
@@ -697,8 +700,8 @@ export default function Navbar() {
                         className={[
                           "block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
                           supervisorActive
-                            ? "text-foreground"
-                            : "text-muted-foreground hover:text-foreground",
+                            ? "bg-foreground/10 text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                         ].join(" ")}
                       >
                         Supervisor
@@ -713,8 +716,8 @@ export default function Navbar() {
                         className={[
                           "block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
                           commandActive
-                            ? "text-foreground"
-                            : "text-muted-foreground hover:text-foreground",
+                            ? "bg-foreground/10 text-foreground"
+                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                         ].join(" ")}
                       >
                         Command
@@ -725,13 +728,13 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Mobile Auth */}
+            {/* Mobile Authentication */}
             <div className="mt-2 flex items-center border-t border-border/50 pt-3">
               {user ? (
                 <Button
                   asChild
-                  size="sm"
                   variant="outline"
+                  size="sm"
                   className="h-8 rounded-lg border-foreground/70 bg-transparent px-3 text-xs font-medium text-foreground shadow-none hover:bg-foreground/5 hover:text-foreground"
                 >
                   <a href="/api/auth/logout">
