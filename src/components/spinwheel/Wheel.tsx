@@ -1361,16 +1361,13 @@ export default function Wheel({
           className="
             relative
             aspect-square
-            w-full
+            h-full
+            w-auto
+            max-h-full
             max-w-full
+            shrink-0
             overflow-visible
           "
-          style={{
-            width: compact
-              ? "min(100%, calc(100vh - 150px))"
-              : "min(72vw, calc(100vh - 130px), 820px)",
-            maxWidth: "100%",
-          }}
           onClick={
             handleWheelClick
           }
@@ -1592,9 +1589,12 @@ export default function Wheel({
         <div
           className="
             flex
+            h-full
+            max-h-full
+            w-auto
+            max-w-full
+            shrink-0
             aspect-square
-            w-[min(52vw,calc(100vh-180px),620px)]
-            max-w-[70%]
             items-center
             justify-center
             rounded-full
