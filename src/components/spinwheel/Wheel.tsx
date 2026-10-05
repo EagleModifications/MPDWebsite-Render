@@ -454,9 +454,21 @@ function enablePerItemLabelSizing(wheel: SpinWheel) {
   const internal = wheel as unknown as SpinWheelInternals
 
   internal.drawItemLabels = function drawItemLabels(ctx, angles = []) {
+    /*
+     * Keep every entry outside the centre button.  The label is right-aligned
+     * at itemLabelRadius, so its measured width is also its maximum inward
+     * reach.  Reserve a little more than the centre circle radius here so
+     * long labels are reduced before they can approach the white button.
+     */
+    const protectedCenterRadius = 0.23
+    const usableLabelRadius = Math.max(
+      0.20,
+      internal._itemLabelRadius - protectedCenterRadius,
+    )
+
     const maxWidth =
       internal._actualRadius *
-      (internal._itemLabelRadius - internal._itemLabelRadiusMax) *
+      usableLabelRadius *
       (internal._itemLabelAlign === "center" ? 2 : 1)
 
     const maxFontSize =
@@ -685,6 +697,20 @@ export default function Wheel({
   /* ---------------------------------------------------------------------- */
 
   /*
+   * spin-wheel reports the index using its pointer-angle convention.
+   * The visual pointer in this UI is the 3-o'clock pointer, so the visible
+   * slice is one segment clockwise from the reported boundary index. Keep
+   * this conversion in one place so the arrow colour and displayed winner
+   * stay aligned with the slice that is actually under the arrow.
+   */
+  const getVisualPointerIndex = useCallback((index: number) => {
+    const count = colorsRef.current.length
+    if (count === 0) return 0
+
+    return (index + 1) % count
+  }, [])
+
+  /*
    * This updates the DOM immediately.
    *
    * Previously this was only React state, which could
@@ -708,8 +734,11 @@ export default function Wheel({
             colors.length) %
           colors.length
 
+        const visualIndex =
+          getVisualPointerIndex(safeIndex)
+
         const color =
-          colors[safeIndex]
+          colors[visualIndex]
 
         if (!color) {
           return
@@ -738,7 +767,7 @@ export default function Wheel({
           setPointerColor(color)
         }
       },
-      [],
+      [getVisualPointerIndex],
     )
 
   const pointerColorRef =
@@ -1052,9 +1081,11 @@ export default function Wheel({
            */
           itemLabelAlign: "right",
 
-          itemLabelRadius: 0.90,
+          /* Keep labels close to the rim while the custom renderer below
+           * guarantees they stop before the centre button. */
+          itemLabelRadius: 0.94,
 
-          itemLabelRadiusMax: 0.14,
+          itemLabelRadiusMax: 0.30,
 
           itemLabelFont:
             "Arial, Helvetica, sans-serif",
@@ -1136,12 +1167,15 @@ export default function Wheel({
             const eventIndex =
               event.currentIndex
 
-            const selectedIndex =
+            const wheelIndex =
               Number.isInteger(
                 finalIndex,
               )
                 ? finalIndex
                 : eventIndex
+
+            const selectedIndex =
+              getVisualPointerIndex(wheelIndex)
 
             const selectedItem =
               itemsRef.current[
@@ -1226,6 +1260,7 @@ export default function Wheel({
     visibleItems,
     visibleColors,
     setPointerForIndex,
+    getVisualPointerIndex,
     stopDuringSpinAudio,
     afterSound,
     afterVolume,
@@ -1360,32 +1395,32 @@ export default function Wheel({
               top-1/2
               z-50
               h-[46px]
-              w-[36px]
+              w-[42px]
               -translate-y-1/2
             "
             style={
               {
                 "--pointer-color": pointerColor,
-                left: "calc(100% - 7px)",
+                left: "calc(100% - 12px)",
               } as CSSProperties
             }
             aria-hidden="true"
           >
-            {/* Clean colour-matched triangle. Its point touches the wheel edge. */}
+            {/* Clean colour-matched triangle. The wide base sits on the wheel edge and the tip points outward, like the reference. */}
             <div
               className="absolute inset-0"
               style={{
-                filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.28)) drop-shadow(0 0 1px rgba(255,255,255,0.42))",
-                clipPath: "polygon(0 50%, 100% 0, 100% 100%)",
+                filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.20)) drop-shadow(0 0 1px rgba(255,255,255,0.55))",
+                clipPath: "polygon(100% 50%, 0 0, 0 100%)",
                 background: "var(--pointer-color)",
               }}
             />
 
-            {/* Very subtle highlight — no outline and no dark backing. */}
+            {/* Very subtle edge highlight — no heavy outline or backing plate. */}
             <div
               className="absolute inset-0 opacity-20"
               style={{
-                clipPath: "polygon(0 50%, 100% 0, 100% 50%)",
+                clipPath: "polygon(100% 50%, 0 0, 0 50%)",
                 background: "rgba(255,255,255,0.9)",
               }}
             />
