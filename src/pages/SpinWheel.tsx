@@ -69,6 +69,8 @@ export default function SpinWheel() {
    */
   const [animateWinningEntryByWheel, setAnimateWinningEntryByWheel] =
     useState<Record<string, boolean>>({})
+  const [launchConfettiByWheel, setLaunchConfettiByWheel] =
+    useState<Record<string, boolean>>({})
   const [afterSoundByWheel, setAfterSoundByWheel] =
     useState<Record<string, string>>({})
   const [afterVolumeByWheel, setAfterVolumeByWheel] =
@@ -95,6 +97,7 @@ export default function SpinWheel() {
     useRef<ReturnType<typeof setTimeout> | null>(null)
   const confettiEndRef = useRef(0)
   const confettiFrameRef = useRef<number | null>(null)
+  const lastConfettiBurstRef = useRef(0)
 
   useEffect(() => {
     if (!activeWheelId && wheels[0]) {
@@ -139,6 +142,7 @@ export default function SpinWheel() {
     // positions for five seconds. Each burst then naturally falls away.
     const end = Date.now() + 5000
     confettiEndRef.current = end
+    lastConfettiBurstRef.current = 0
 
     if (confettiFrameRef.current !== null) {
       cancelAnimationFrame(confettiFrameRef.current)
@@ -152,28 +156,38 @@ export default function SpinWheel() {
         return
       }
 
-      const bursts = 2 + Math.floor(Math.random() * 2)
-      for (let i = 0; i < bursts; i += 1) {
-        const x = 0.08 + Math.random() * 0.84
-        const y = 0.12 + Math.random() * 0.58
-        const leftOrRight = Math.random() > 0.5
-        confetti({
-          particleCount: 24 + Math.floor(Math.random() * 18),
-          angle: leftOrRight ? 60 + Math.random() * 35 : 95 + Math.random() * 35,
-          spread: 48 + Math.random() * 55,
-          startVelocity: 38 + Math.random() * 28,
-          decay: 0.91 + Math.random() * 0.025,
-          gravity: 0.78 + Math.random() * 0.28,
-          drift: (Math.random() - 0.5) * 0.7,
-          scalar: 0.75 + Math.random() * 0.45,
-          ticks: 180 + Math.floor(Math.random() * 100),
-          origin: { x, y },
-          colors: [
-            "#3b82f6", "#60a5fa", "#0ea5e9", "#22c55e",
-            "#facc15", "#f97316", "#ef4444", "#a855f7",
-          ],
-          zIndex: 1000,
-        })
+      // Fire a few bursts at a time rather than on every animation frame.
+      // This gives the fireworks their separate "pop" moments without
+      // flooding the canvas with thousands of particles.
+      if (now - lastConfettiBurstRef.current >= 110) {
+        lastConfettiBurstRef.current = now
+
+        const bursts = 2 + Math.floor(Math.random() * 2)
+        for (let i = 0; i < bursts; i += 1) {
+          const x = 0.06 + Math.random() * 0.88
+          const y = 0.08 + Math.random() * 0.62
+          const direction = Math.random() > 0.5 ? 1 : -1
+
+          confetti({
+            particleCount: 30 + Math.floor(Math.random() * 20),
+            angle: direction > 0
+              ? 55 + Math.random() * 35
+              : 95 + Math.random() * 35,
+            spread: 42 + Math.random() * 60,
+            startVelocity: 42 + Math.random() * 30,
+            decay: 0.91 + Math.random() * 0.025,
+            gravity: 0.78 + Math.random() * 0.28,
+            drift: (Math.random() - 0.5) * 0.8,
+            scalar: 0.75 + Math.random() * 0.45,
+            ticks: 180 + Math.floor(Math.random() * 100),
+            origin: { x, y },
+            colors: [
+              "#3b82f6", "#60a5fa", "#0ea5e9", "#22c55e",
+              "#facc15", "#f97316", "#ef4444", "#a855f7",
+            ],
+            zIndex: 1000,
+          })
+        }
       }
 
       confettiFrameRef.current = requestAnimationFrame(frame)
@@ -211,7 +225,9 @@ export default function SpinWheel() {
         result,
       ])
 
-      launchWinnerCelebration()
+      if (launchConfettiByWheel[wheelId]) {
+        launchWinnerCelebration()
+      }
 
       /*
        * "Animate winning entry" is the switch that controls this exact
@@ -238,7 +254,7 @@ export default function SpinWheel() {
         }
       }
     },
-    [animateWinningEntryByWheel, launchWinnerCelebration, wheels],
+    [animateWinningEntryByWheel, launchConfettiByWheel, launchWinnerCelebration, wheels],
   )
 
   const handleAnimateWinningEntryChange = useCallback(
@@ -262,6 +278,16 @@ export default function SpinWheel() {
       }
     },
     [animatedWinner],
+  )
+
+  const handleLaunchConfettiChange = useCallback(
+    (wheelId: string, enabled: boolean) => {
+      setLaunchConfettiByWheel((current) => ({
+        ...current,
+        [wheelId]: enabled,
+      }))
+    },
+    [],
   )
 
   const handleAfterSoundChange = useCallback(
@@ -328,6 +354,12 @@ export default function SpinWheel() {
     })
 
     setAnimateWinningEntryByWheel((current) => {
+      const next = { ...current }
+      delete next[wheelId]
+      return next
+    })
+
+    setLaunchConfettiByWheel((current) => {
       const next = { ...current }
       delete next[wheelId]
       return next
@@ -529,22 +561,22 @@ export default function SpinWheel() {
         <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_35%_35%,rgba(33,70,82,0.42),transparent_45%),radial-gradient(circle_at_78%_25%,rgba(81,42,91,0.28),transparent_42%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]">
           <div
             className={`absolute inset-0 min-h-0 overflow-hidden transition-[padding] duration-300 ${
-              sidebarOpen ? "lg:pr-[520px]" : ""
+              sidebarOpen ? "lg:pr-[560px]" : ""
             }`}
           >
             <div
               ref={wheelAreaRef}
-              className={`grid h-full min-h-0 w-full ${
+              className={`grid h-full min-h-0 w-full overflow-visible ${
                 wheels.length === 1
                   ? "grid-cols-1 grid-rows-1 p-2"
-                  : "grid-cols-2 auto-rows-fr gap-x-8 gap-y-5 p-6 lg:gap-x-10 lg:gap-y-6 lg:p-10"
+                  : "grid-cols-2 auto-rows-fr gap-x-6 gap-y-4 p-5 lg:gap-x-8 lg:gap-y-5 lg:p-7"
               }`}
             >
               {wheels.map((wheel) => (
                 <div
                   key={wheel.id}
-                  className={`relative flex min-h-0 min-w-0 items-center justify-center bg-transparent ${
-                    wheels.length > 1 ? "p-4 lg:p-6" : ""
+                  className={`relative flex min-h-0 min-w-0 items-center justify-center overflow-visible bg-transparent ${
+                    wheels.length > 1 ? "p-2 lg:p-3" : ""
                   }`}
                 >
                   <Wheel
@@ -552,7 +584,7 @@ export default function SpinWheel() {
                     compact={wheels.length > 1}
                     afterSound={afterSoundByWheel[wheel.id] ?? "Subdued applause"}
                     afterVolume={afterVolumeByWheel[wheel.id] ?? 50}
-                    spinSlowly={spinSlowlyByWheel[wheel.id] ?? true}
+                    spinSlowly={spinSlowlyByWheel[wheel.id] ?? false}
                     spinTime={spinTimeByWheel[wheel.id] ?? 10}
                     centerImage={centerImageByWheel[wheel.id]}
                     imageSize={imageSizeByWheel[wheel.id] ?? "S"}
@@ -604,6 +636,12 @@ export default function SpinWheel() {
           }
           onAnimateWinningEntryChange={
             handleAnimateWinningEntryChange
+          }
+          launchConfettiByWheel={
+            launchConfettiByWheel
+          }
+          onLaunchConfettiChange={
+            handleLaunchConfettiChange
           }
           afterSoundByWheel={afterSoundByWheel}
           afterVolumeByWheel={afterVolumeByWheel}
