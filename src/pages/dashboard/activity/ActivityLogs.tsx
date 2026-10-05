@@ -4,22 +4,29 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react"
 
 import {
-    ChevronDown,
-  ChevronUp,
   Check,
-  Clipboard,
-  History,
-  RefreshCw,
+  CheckCircle2,
+  ChevronDown,
+  ClipboardList,
+  Clock3,
+  Copy,
+  Filter,
   Search,
+  Shield,
+  Users,
   X,
+  XCircle,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
+import GoogleRosterRefresh from "@/components/dashboard/GoogleRosterRefresh"
+import { logAction } from "@/lib/actionLog"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,1245 +34,2190 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-type Module = "" | "promotion" | "activity"
-type Category =
-  | ""
-  | "roster"
-  | "import"
-  | "requirements"
-  | "navigation"
-  | "management"
-
 type Division =
-  | ""
   | "department"
   | "swat"
   | "mtf7"
   | "mcd"
   | "tru"
-  | "teu"
-  | "sar"
 
-type ActionLog = {
-  id: string
-  entryNumber: number
-  createdAt: string
+type Status =
+  | "compliant"
+  | "non-compliant"
 
-  userId: string
-  userName: string
-  username: string
-  rank: string
+type ActivityRosterMember = {
   callsign: string
   badgeNumber: string
-  avatar?: string | null
-
-  action: string
-  module: Exclude<Module, "">
-  category: Exclude<Category, "">
-  division?: Exclude<Division, ""> | null
-
-  targetUserId?: string
-  targetName?: string
-  targetRank?: string
-
-  summary: string
-  details?: Record<string, unknown>
-  path?: string
+  name: string
+  rank: string
+  discordId: string
+  timeInDept: string
+  timeInRank: string
+  requiredHours: number
+  activityHours: number
+  status: Status
 }
 
-type DiscordProfile = {
-  id: string
-  username?: string
-  displayName?: string
-  avatar?: string | null
-}
+type CopyType =
+  | "discord"
+  | "discord-mention"
+  | "name"
+  | "callsign"
+  | "badge"
+  | "rank"
+  | "name-discord"
+  | "callsign-discord"
+  | "callsign-name"
+  | "callsign-badge"
+  | "badge-name"
+  | "badge-discord"
+  | "callsign-name-discord"
+  | "callsign-badge-discord"
+  | "name-badge-discord"
+  | "callsign-badge-name"
+  | "callsign-badge-name-discord"
+  | "name-rank-discord"
+  | "full"
 
-type ApiResponse = {
-  success?: boolean
-  error?: string
-  logs?: ActionLog[]
-  pagination?: {
-    page: number
-    limit: number
-    total: number
-    pages: number
-  }
-}
-
-type Option = {
-  value: string
+const divisions: {
+  id: Division
   label: string
-}
-
-const moduleOptions: Option[] = [
-  { value: "", label: "All modules" },
-  { value: "promotion", label: "Promotion" },
-  { value: "activity", label: "Activity" },
+}[] = [
+  {
+    id: "department",
+    label: "Department",
+  },
+  {
+    id: "swat",
+    label: "SWAT",
+  },
+  {
+    id: "mtf7",
+    label: "MTF-7",
+  },
+  {
+    id: "mcd",
+    label: "MCD",
+  },
+  {
+    id: "tru",
+    label: "TRU",
+  },
 ]
 
-const categoryOptions: Option[] = [
-  { value: "", label: "All categories" },
-  { value: "requirements", label: "Requirements" },
-  { value: "import", label: "Imports" },
-  { value: "roster", label: "Roster" },
-  { value: "navigation", label: "Navigation" },
-  { value: "management", label: "Management" },
+const statusOptions: {
+  id: Status
+  label: string
+  icon: typeof CheckCircle2
+}[] = [
+  {
+    id: "compliant",
+    label: "Compliant",
+    icon: CheckCircle2,
+  },
+  {
+    id: "non-compliant",
+    label: "Non-Compliant",
+    icon: XCircle,
+  },
 ]
 
-const divisionLabels: Record<string, string> = {
-  department: "Department",
-  swat: "SWAT",
-  mtf7: "MTF-7",
-  mcd: "MCD",
-  tru: "TRU",
-  teu: "TEU",
-  sar: "SAR",
+const cleanValue = (
+  value: unknown,
+): string => {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return ""
+  }
+
+  const cleaned = String(value).trim()
+
+  if (
+    !cleaned ||
+    cleaned === "-" ||
+    cleaned === "—" ||
+    cleaned === "#N/A" ||
+    cleaned.toLowerCase() === "n/a" ||
+    cleaned.toLowerCase() === "null" ||
+    cleaned.toLowerCase() === "undefined"
+  ) {
+    return ""
+  }
+
+  return cleaned
 }
 
-const divisionOptions: Option[] = [
-  { value: "", label: "All divisions" },
-  ...Object.entries(divisionLabels).map(([value, label]) => ({
-    value,
-    label,
-  })),
-]
+const normalizeStatus = (
+  value: unknown,
+): Status => {
+  const status =
+    cleanValue(value).toLowerCase()
 
-const moduleLabel = (value: string) => {
-  if (value === "promotion") return "Promotion"
-  if (value === "activity") return "Activity"
-  return value || "All modules"
+  if (status === "compliant") {
+    return "compliant"
+  }
+
+  return "non-compliant"
 }
 
-const actionLabel = (value: string) =>
-  value
-    .replace(/[-_]+/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+const normalizeRank = (
+  value: unknown,
+): string =>
+  cleanValue(value)
+    .replace(/\s+/g, " ")
+    .toLowerCase()
 
-const divisionLabel = (value?: string | null) =>
-  value ? divisionLabels[value] ?? actionLabel(value) : "Department"
+const getStatusLabel = (
+  status: Status,
+) => {
+  switch (status) {
+    case "compliant":
+      return "Compliant"
 
-const getInitials = (value: string) =>
-  value
-    .trim()
-    .split(/\s+/)
-    .map((part) => part.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "U"
-
-const getAvatarUrl = (discordId: string, avatar?: string | null) => {
-  if (!discordId) return undefined
-
-  if (avatar?.startsWith("http://") || avatar?.startsWith("https://")) {
-    return avatar
-  }
-
-  if (avatar) {
-    const extension = avatar.startsWith("a_") ? "gif" : "png"
-    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.${extension}?size=128`
-  }
-
-  try {
-    const index = Number(BigInt(discordId) % 6n)
-    return `https://cdn.discordapp.com/embed/avatars/${index}.png?size=128`
-  } catch {
-    return undefined
+    case "non-compliant":
+      return "Non-Compliant"
   }
 }
 
-
-const relativeTime = (value: string) => {
-  const timestamp = new Date(value).getTime()
-
-  if (!Number.isFinite(timestamp)) {
-    return "Unknown time"
-  }
-
-  const seconds = Math.max(
-    0,
-    Math.floor((Date.now() - timestamp) / 1000),
-  )
-
-  if (seconds < 10) return "just now"
-  if (seconds < 60) return `${seconds}s ago`
-
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days}d ago`
-
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(timestamp)
-}
-
-const formatDateTime = (value: string) => {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown"
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date)
-}
-
-const dateHeading = (value: string) => {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "UNKNOWN DATE"
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  })
-    .format(date)
-    .toUpperCase()
-}
-
-function tagClass(type: "module" | "division" | "category", value?: string | null) {
-  const key = (value ?? "").toLowerCase()
-
-  if (type === "module") {
-    if (key === "promotion") {
-      return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-    }
-
-    if (key === "activity") {
-      return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-    }
-
-    return "border-border bg-muted/30 text-muted-foreground"
-  }
-
-  if (type === "division") {
-    if (key === "department") {
-      return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-    }
-
-    if (key === "swat") {
-      return "border-blue-500/20 bg-blue-500/5 text-blue-300"
-    }
-
-    if (key === "mtf7") {
-      return "border-border bg-muted/30 text-muted-foreground"
-    }
-
-    if (key === "mcd") {
+const getStatusClasses = (
+  status: Status,
+) => {
+  switch (status) {
+    case "compliant":
       return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-    }
 
-    if (key === "tru") {
+    case "non-compliant":
       return "border-red-500/20 bg-red-500/10 text-red-400"
-    }
-
-    if (key === "teu") {
-      return "border-border bg-muted/30 text-muted-foreground"
-    }
-
-    if (key === "sar") {
-      return "border-blue-500/20 bg-blue-500/5 text-blue-400"
-    }
-
-    return "border-border bg-muted/30 text-muted-foreground"
   }
-
-  if (key === "requirements") {
-    return "border-border bg-muted/30 text-muted-foreground"
-  }
-
-  if (key === "import") {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-  }
-
-  if (key === "roster") {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-  }
-
-  if (key === "management") {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-  }
-
-  if (key === "navigation") {
-    return "border-border bg-muted/30 text-muted-foreground"
-  }
-
-  return "border-border bg-muted/30 text-muted-foreground"
 }
 
-function statusLabel(log: ActionLog) {
-  const value = log.action.toLowerCase()
+const getStatusIcon = (
+  status: Status,
+) => {
+  switch (status) {
+    case "compliant":
+      return CheckCircle2
 
-  if (value.includes("copy")) return "Copied"
-  if (value.includes("select")) return "Selected"
-  if (value.includes("import")) return "Imported"
-  if (value.includes("delete") || value.includes("remove")) return "Removed"
-  if (value.includes("create") || value.includes("add")) return "Created"
-  return "Updated"
+    case "non-compliant":
+      return XCircle
+  }
 }
 
-function statusClass(log: ActionLog) {
-  const value = statusLabel(log).toLowerCase()
+/* ─────────────────────────────────────────────
+   Callsign Sorting
+───────────────────────────────────────────── */
 
-  if (value === "created") {
-    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-  }
-
-  if (value === "removed" || value === "deleted") {
-    return "border-red-500/20 bg-red-500/10 text-red-400"
-  }
-
-  if (value === "copied") {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-  }
-
-  if (value === "selected") {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-  }
-
-  return "border-blue-500/20 bg-blue-500/10 text-blue-400"
-}
-
-function Tag({
-  children,
-  className,
-}: {
-  children: ReactNode
-  className: string
-}) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-medium leading-none ${className}`}
-    >
-      {children}
-    </span>
+const compareCallsigns = (
+  a: ActivityRosterMember,
+  b: ActivityRosterMember,
+) =>
+  cleanValue(
+    a.callsign,
+  ).localeCompare(
+    cleanValue(
+      b.callsign,
+    ),
+    undefined,
+    {
+      numeric: true,
+      sensitivity: "base",
+    },
   )
-}
 
-function Avatar({
-  name,
-  id,
-  avatar,
-  className = "h-6 w-6",
-}: {
-  name: string
-  id: string
-  avatar?: string | null
-  className?: string
-}) {
-  const [failed, setFailed] = useState(false)
-  const url = failed ? getAvatarUrl(id) : getAvatarUrl(id, avatar)
+export default function ActivityRoster() {
+  const [division, setDivision] =
+    useState<Division>("department")
 
-  return (
-    <span className={`${className} shrink-0 overflow-hidden rounded-full border border-border bg-muted`}>
-      {url ? (
-        <img
-          src={url}
-          alt=""
-          className="h-full w-full object-cover"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <span className="flex h-full w-full items-center justify-center text-[8px] font-semibold text-muted-foreground">
-          {getInitials(name)}
-        </span>
-      )}
-    </span>
+  const [members, setMembers] =
+    useState<ActivityRosterMember[]>([])
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [error, setError] =
+    useState<string | null>(null)
+
+  const [search, setSearch] =
+    useState("")
+
+  const [statusFilters, setStatusFilters] =
+    useState<Status[]>([])
+
+  const [rankFilters, setRankFilters] =
+    useState<string[]>([])
+
+  const [selectedIds, setSelectedIds] =
+    useState<string[]>([])
+
+  const [selectedCopied, setSelectedCopied] =
+    useState(false)
+
+  /*
+   * Ref is used instead of state so Shift is
+   * captured synchronously before Radix fires
+   * onCheckedChange.
+   */
+  const shiftSelectingRef =
+    useRef(false)
+
+  /* ─────────────────────────────────────────────
+     Load Roster
+  ───────────────────────────────────────────── */
+
+  const loadRoster = useCallback(
+    async (
+      showLoadingState = false,
+      resetFilters = false,
+    ) => {
+      try {
+        if (showLoadingState) {
+          setLoading(true)
+        }
+
+        setError(null)
+
+        const response = await fetch(
+          `/api/activity/roster/${division}`,
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              Accept: "application/json",
+            },
+          },
+        )
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to load roster (${response.status})`,
+          )
+        }
+
+        const data =
+          await response.json()
+
+        if (!data?.success) {
+          throw new Error(
+            data?.error ||
+              "Failed to load roster.",
+          )
+        }
+
+        const roster: ActivityRosterMember[] =
+          Array.isArray(data.members)
+            ? data.members
+                .map(
+                  (
+                    member: Record<
+                      string,
+                      unknown
+                    >,
+                  ) => ({
+                    callsign: cleanValue(
+                      member.callsign,
+                    ),
+                    badgeNumber: cleanValue(
+                      member.badgeNumber,
+                    ),
+                    name: cleanValue(
+                      member.name,
+                    ),
+                    rank: cleanValue(
+                      member.rank,
+                    ),
+                    discordId: cleanValue(
+                      member.discordId,
+                    ),
+                    timeInDept: cleanValue(
+                      member.timeInDept,
+                    ),
+                    timeInRank: cleanValue(
+                      member.timeInRank,
+                    ),
+                    requiredHours:
+                      Number(
+                        member.requiredHours,
+                      ) || 0,
+                    activityHours:
+                      Number(
+                        member.activityHours,
+                      ) || 0,
+                    status:
+                      normalizeStatus(
+                        member.status,
+                      ),
+                  }),
+                )
+                .filter(
+                  (member) =>
+                    member.name &&
+                    member.callsign &&
+                    member.badgeNumber &&
+                    member.rank &&
+                    member.discordId,
+                )
+            : []
+
+        setMembers(roster)
+
+        if (resetFilters) {
+          const defaultRanks = Array.from(
+            new Map(
+              roster.map((member) => [
+                normalizeRank(member.rank),
+                cleanValue(member.rank),
+              ] as const),
+            ).values(),
+          ).filter(Boolean)
+
+          setStatusFilters(
+            statusOptions.map(
+              (status) => status.id,
+            ),
+          )
+          setRankFilters(defaultRanks)
+          setSearch("")
+        }
+
+        setSelectedIds([])
+        setSelectedCopied(false)
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Failed to load activity roster."
+
+        setMembers([])
+        setError(message)
+
+        toast.error(
+          "Failed to load roster",
+          {
+            description: message,
+          },
+        )
+      } finally {
+        setLoading(false)
+      }
+    },
+    [division],
   )
-}
 
+  useEffect(() => {
+    void loadRoster(false, true)
+  }, [loadRoster])
 
-function CopyMenu({
-  name,
-  id,
-  callsign,
-  badgeNumber,
-  rank,
-  avatar,
-  large = false,
-}: {
-  name: string
-  id?: string
-  callsign?: string
-  badgeNumber?: string
-  rank?: string
-  avatar?: string | null
-  large?: boolean
-}) {
-  const display = name?.trim() || "Unknown User"
-  const safeId = id?.trim() || ""
-  const safeCallsign = callsign?.trim() || ""
-  const safeBadge = badgeNumber?.trim() || ""
-  const safeRank = rank?.trim() || ""
+  /* ─────────────────────────────────────────────
+     Sorted Members
+  ───────────────────────────────────────────── */
 
-  const items = [
-    ["discord", "Copy Discord ID", safeId],
-    ["discord-mention", "Copy Discord Mention", safeId ? `<@${safeId}>` : ""],
-    ["name", "Copy Name", display],
-    ["callsign", "Copy Callsign", safeCallsign],
-    ["badge", "Copy Badge Number", safeBadge],
-    ["rank", "Copy Rank", safeRank],
-  ] as const
+  const sortedMembers = useMemo(
+    () =>
+      [...members].sort(
+        compareCallsigns,
+      ),
+    [members],
+  )
 
-  const combined = [
-    ["name-discord", "Name + Discord ID", safeId ? `${display} — ${safeId}` : ""],
-    ["callsign-discord", "Callsign + Discord ID", safeCallsign && safeId ? `${safeCallsign} — ${safeId}` : ""],
-    ["callsign-name", "Callsign + Name", safeCallsign ? `${safeCallsign} — ${display}` : ""],
-    ["callsign-badge", "Callsign + Badge Number", safeCallsign && safeBadge ? `${safeCallsign} — ${safeBadge}` : ""],
-    ["badge-name", "Badge Number + Name", safeBadge ? `${safeBadge} — ${display}` : ""],
-    ["badge-discord", "Badge Number + Discord ID", safeBadge && safeId ? `${safeBadge} — ${safeId}` : ""],
-  ] as const
+  /* ─────────────────────────────────────────────
+     Rank Options
+  ───────────────────────────────────────────── */
 
-  const copy = async (value: string, label: string) => {
+  const rankOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const ranks: string[] = []
+
+    for (const member of sortedMembers) {
+      const rank = cleanValue(
+        member.rank,
+      )
+
+      const rankKey =
+        normalizeRank(rank)
+
+      if (!rank || !rankKey) {
+        continue
+      }
+
+      if (seen.has(rankKey)) {
+        continue
+      }
+
+      seen.add(rankKey)
+      ranks.push(rank)
+    }
+
+    return ranks
+  }, [sortedMembers])
+
+  /* ─────────────────────────────────────────────
+     Filtered Members
+  ───────────────────────────────────────────── */
+
+  const filteredMembers = useMemo(() => {
+    const query =
+      search.trim().toLowerCase()
+
+    return sortedMembers.filter(
+      (member) => {
+        const matchesSearch =
+          !query ||
+          [
+            member.callsign,
+            member.badgeNumber,
+            member.name,
+            member.rank,
+            member.discordId,
+          ].some((value) =>
+            cleanValue(value)
+              .toLowerCase()
+              .includes(query),
+          )
+
+        const matchesStatus =
+          statusFilters.length === 0 ||
+          statusFilters.includes(
+            member.status,
+          )
+
+        const matchesRank =
+          rankFilters.length === 0 ||
+          rankFilters.some(
+            (rank) =>
+              normalizeRank(rank) ===
+              normalizeRank(member.rank),
+          )
+
+        return (
+          matchesSearch &&
+          matchesStatus &&
+          matchesRank
+        )
+      },
+    )
+  }, [
+    sortedMembers,
+    search,
+    statusFilters,
+    rankFilters,
+  ])
+
+  /* ─────────────────────────────────────────────
+     Statistics
+  ───────────────────────────────────────────── */
+
+  const stats = useMemo(() => {
+    const compliant = members.filter(
+      (member) =>
+        member.status === "compliant",
+    ).length
+
+    const nonCompliant = members.filter(
+      (member) =>
+        member.status === "non-compliant",
+    ).length
+
+    const totalHours = members.reduce(
+      (total, member) =>
+        total + member.activityHours,
+      0,
+    )
+
+    return {
+      total: members.length,
+      compliant,
+      nonCompliant,
+      totalHours,
+    }
+  }, [members])
+
+  /* ─────────────────────────────────────────────
+     Selection
+  ───────────────────────────────────────────── */
+
+  const toggleMember = (
+    discordId: string,
+  ) => {
+    if (!discordId) {
+      return
+    }
+
+    setSelectedIds((current) =>
+      current.includes(discordId)
+        ? current.filter(
+            (id) => id !== discordId,
+          )
+        : [...current, discordId],
+    )
+
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: selectedIds.includes(discordId) ? "deselect-member" : "select-member", category: "roster", division, targetUserId: discordId, summary: `${selectedIds.includes(discordId) ? "Deselected" : "Selected"} a member on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
+  }
+
+  const selectRankMembers = (
+    member: ActivityRosterMember,
+  ) => {
+    const memberRank =
+      normalizeRank(member.rank)
+
+    if (
+      !memberRank ||
+      !member.discordId
+    ) {
+      return
+    }
+
+    const rankIds = filteredMembers
+      .filter(
+        (item) =>
+          normalizeRank(item.rank) ===
+            memberRank &&
+          item.discordId,
+      )
+      .map(
+        (item) => item.discordId,
+      )
+
+    if (!rankIds.length) {
+      return
+    }
+
+    setSelectedIds((current) =>
+      Array.from(
+        new Set([
+          ...current,
+          ...rankIds,
+        ]),
+      ),
+    )
+
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: "select-rank", category: "roster", division, targetRank: member.rank, summary: `Selected all visible ${member.rank} members on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`, details: { count: rankIds.length } })
+  }
+
+  const handleMemberSelection = (
+    member: ActivityRosterMember,
+    shiftKey: boolean,
+  ) => {
+    if (!member.discordId) {
+      return
+    }
+
+    if (shiftKey) {
+      selectRankMembers(member)
+      return
+    }
+
+    toggleMember(member.discordId)
+  }
+
+  const toggleAllVisible = () => {
+    const visibleIds =
+      filteredMembers
+        .map(
+          (member) => member.discordId,
+        )
+        .filter(Boolean)
+
+    if (!visibleIds.length) {
+      return
+    }
+
+    const allSelected =
+      visibleIds.every((id) =>
+        selectedIds.includes(id),
+      )
+
+    if (allSelected) {
+      setSelectedIds((current) =>
+        current.filter(
+          (id) =>
+            !visibleIds.includes(id),
+        ),
+      )
+    } else {
+      setSelectedIds((current) =>
+        Array.from(
+          new Set([
+            ...current,
+            ...visibleIds,
+          ]),
+        ),
+      )
+    }
+
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: allSelected ? "deselect-all-visible" : "select-all-visible", category: "roster", division, summary: `${allSelected ? "Deselected" : "Selected"} all visible members on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`, details: { count: visibleIds.length } })
+  }
+
+  /* ─────────────────────────────────────────────
+     Copy
+  ───────────────────────────────────────────── */
+
+  const copySelected = async (
+    type: CopyType,
+  ) => {
+    if (!selectedIds.length) {
+      return
+    }
+
+    const selectedMembers =
+      sortedMembers.filter((member) =>
+        selectedIds.includes(
+          member.discordId,
+        ),
+      )
+
+    let values: string[] = []
+
+    switch (type) {
+      case "discord":
+        values = selectedMembers.map(
+          (member) => member.discordId,
+        )
+        break
+
+      case "discord-mention":
+        values = selectedMembers.map(
+          (member) =>
+            `<@${member.discordId}>`,
+        )
+        break
+
+      case "name":
+        values = selectedMembers.map(
+          (member) => member.name,
+        )
+        break
+
+      case "callsign":
+        values = selectedMembers.map(
+          (member) => member.callsign,
+        )
+        break
+
+      case "badge":
+        values = selectedMembers.map(
+          (member) => member.badgeNumber,
+        )
+        break
+
+      case "rank":
+        values = selectedMembers.map(
+          (member) => member.rank,
+        )
+        break
+
+      case "name-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.name} — ${member.discordId}`,
+        )
+        break
+
+      case "callsign-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.discordId}`,
+        )
+        break
+
+      case "callsign-name":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.name}`,
+        )
+        break
+
+      case "callsign-badge":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.badgeNumber}`,
+        )
+        break
+
+      case "badge-name":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.badgeNumber} — ${member.name}`,
+        )
+        break
+
+      case "badge-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.badgeNumber} — ${member.discordId}`,
+        )
+        break
+
+      case "callsign-name-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.name} — ${member.discordId}`,
+        )
+        break
+
+      case "callsign-badge-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.badgeNumber} — ${member.discordId}`,
+        )
+        break
+
+      case "name-badge-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.name} — ${member.badgeNumber} — ${member.discordId}`,
+        )
+        break
+
+      case "callsign-badge-name":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.badgeNumber} — ${member.name}`,
+        )
+        break
+
+      case "callsign-badge-name-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.callsign} — ${member.badgeNumber} — ${member.name} — ${member.discordId}`,
+        )
+        break
+
+      case "name-rank-discord":
+        values = selectedMembers.map(
+          (member) =>
+            `${member.name} — ${member.rank} — ${member.discordId}`,
+        )
+        break
+
+      case "full":
+        values = selectedMembers.map(
+          (member) =>
+            [
+              member.callsign,
+              member.badgeNumber,
+              member.name,
+              member.rank,
+              member.discordId,
+              member.timeInDept,
+              member.timeInRank,
+              `${member.requiredHours.toFixed(1)}h`,
+              `${member.activityHours.toFixed(1)}h`,
+              getStatusLabel(
+                member.status,
+              ),
+            ].join(" — "),
+        )
+        break
+    }
+
+    if (!values.length) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(
+        values.join("\n"),
+      )
+
+      setSelectedCopied(true)
+
+      toast.success(
+        "Copied successfully",
+        {
+          description: `${selectedMembers.length} ${
+            selectedMembers.length === 1
+              ? "member"
+              : "members"
+          } copied to your clipboard.`,
+        },
+      )
+
+      void logAction({
+        module: "activity",
+        action: "copy-roster",
+        category: "roster",
+        division,
+        summary: `Copied ${selectedMembers.length} selected members from the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`,
+        details: {
+          copyType: type,
+          count: selectedMembers.length,
+          memberIds: selectedMembers.map((member) => member.discordId),
+        },
+      })
+
+      window.setTimeout(() => {
+        setSelectedCopied(false)
+      }, 1800)
+    } catch {
+      setSelectedCopied(false)
+
+      toast.error(
+        "Copy failed",
+        {
+          description:
+            "Your browser could not access the clipboard.",
+        },
+      )
+    }
+  }
+
+  const copyMember = async (type: CopyType, member: ActivityRosterMember) => {
+    let value = ""
+    let label = ""
+
+    switch (type) {
+      case "discord": value = member.discordId; label = "Discord ID"; break
+      case "discord-mention": value = `<@${member.discordId}>`; label = "Discord Mention"; break
+      case "name": value = member.name; label = "Name"; break
+      case "callsign": value = member.callsign; label = "Callsign"; break
+      case "badge": value = member.badgeNumber; label = "Badge Number"; break
+      case "rank": value = member.rank; label = "Rank"; break
+      case "name-discord": value = `${member.name} — ${member.discordId}`; label = "Name + Discord ID"; break
+      case "callsign-discord": value = `${member.callsign} — ${member.discordId}`; label = "Callsign + Discord ID"; break
+      case "callsign-name": value = `${member.callsign} — ${member.name}`; label = "Callsign + Name"; break
+      case "callsign-badge": value = `${member.callsign} — ${member.badgeNumber}`; label = "Callsign + Badge Number"; break
+      case "badge-name": value = `${member.badgeNumber} — ${member.name}`; label = "Badge Number + Name"; break
+      case "badge-discord": value = `${member.badgeNumber} — ${member.discordId}`; label = "Badge Number + Discord ID"; break
+      case "callsign-name-discord": value = `${member.callsign} — ${member.name} — ${member.discordId}`; label = "Callsign + Name + Discord"; break
+      case "callsign-badge-discord": value = `${member.callsign} — ${member.badgeNumber} — ${member.discordId}`; label = "Callsign + Badge + Discord"; break
+      case "name-badge-discord": value = `${member.name} — ${member.badgeNumber} — ${member.discordId}`; label = "Name + Badge + Discord"; break
+      case "callsign-badge-name": value = `${member.callsign} — ${member.badgeNumber} — ${member.name}`; label = "Callsign + Badge + Name"; break
+      case "callsign-badge-name-discord": value = `${member.callsign} — ${member.badgeNumber} — ${member.name} — ${member.discordId}`; label = "Callsign + Badge + Name + Discord"; break
+      case "name-rank-discord": value = `${member.name} — ${member.rank} — ${member.discordId}`; label = "Name + Rank + Discord"; break
+      case "full":
+        value = [member.callsign, member.badgeNumber, member.name, member.rank, member.discordId, member.timeInDept, member.timeInRank, `${member.requiredHours.toFixed(1)}h`, `${member.activityHours.toFixed(1)}h`, getStatusLabel(member.status)].join(" — ")
+        label = "Full Details"
+        break
+    }
+
     if (!value) return
     try {
       await navigator.clipboard.writeText(value)
-      toast.success(`${label} copied`, { description: value })
+      toast.success(`${label} copied`, { description: `${member.name}'s ${label.toLowerCase()} has been copied to your clipboard.` })
+      void logAction({
+        module: "activity",
+        action: "copy-member",
+        category: "roster",
+        division,
+        targetUserId: member.discordId,
+        targetName: member.name,
+        targetRank: member.rank,
+        summary: `Copied ${label} for ${member.name} from the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`,
+        details: { copyType: type },
+      })
     } catch {
-      toast.error("Copy failed")
+      toast.error("Copy failed", { description: "Your browser could not access the clipboard." })
     }
   }
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          title="Copy options"
-          className="inline-flex max-w-full items-center gap-2 rounded-md bg-transparent py-0.5 text-left outline-none transition-colors hover:bg-transparent hover:text-blue-300 hover:underline hover:decoration-blue-400/60 hover:underline-offset-2 focus:bg-transparent focus:outline-none data-[state=open]:bg-transparent"
-        >
-          <Avatar
-            name={display}
-            id={safeId}
-            avatar={avatar}
-            className={large ? "h-10 w-10" : "h-6 w-6"}
-          />
-          <span className={`truncate font-medium text-blue-400 ${large ? "text-sm" : "text-xs"}`}>
-            {display}
-          </span>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        side="bottom"
-        align="start"
-        sideOffset={4}
-        avoidCollisions={false}
-        className="w-[285px] max-h-80 overflow-y-auto p-1"
-      >
-        {items.map(([type, label, value]) => (
-          <DropdownMenuItem
-            key={type}
-            disabled={!value}
-            onClick={() => void copy(value, label)}
-            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
-          >
-            <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-            <span>{label}</span>
-          </DropdownMenuItem>
-        ))}
-        <div className="my-0.5 h-px bg-border" />
-        {combined.map(([type, label, value]) => (
-          <DropdownMenuItem
-            key={type}
-            disabled={!value}
-            onClick={() => void copy(value, label)}
-            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
-          >
-            <Clipboard className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-            <span>{label}</span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
+  /* ─────────────────────────────────────────────
+     Status Filters
+  ───────────────────────────────────────────── */
 
-function FilterSelect({
-  value,
-  options,
-  onChange,
-  ariaLabel,
-  className = "",
-}: {
-  value: string
-  options: Option[]
-  onChange: (value: string) => void
-  ariaLabel: string
-  className?: string
-}) {
-  const selected = options.find((option) => option.value === value) ?? options[0]
+  const toggleStatusFilter = (
+    status: Status,
+  ) => {
+    setStatusFilters((current) =>
+      current.includes(status)
+        ? current.filter(
+            (item) => item !== status,
+          )
+        : [...current, status],
+    )
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={ariaLabel}
-          className={`inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground outline-none transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-white focus:outline-none ${className}`}
-        >
-          <span className="min-w-0 flex-1 truncate text-left">{selected?.label ?? ariaLabel}</span>
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        side="bottom"
-        align="start"
-        sideOffset={4}
-        avoidCollisions={false}
-        className="max-h-80 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto p-1"
-      >
-        {options.map((option) => (
-          <DropdownMenuItem
-            key={option.value || `all-${ariaLabel}`}
-            onClick={() => onChange(option.value)}
-            className={`h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs ${
-              option.value === value
-                ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/15 focus:text-blue-300"
-                : ""
-            }`}
-          >
-            <span className="min-w-0 flex-1 truncate">{option.label}</span>
-            {option.value === value ? (
-              <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-blue-400" />
-            ) : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") {
-    return "—"
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: "filter-status", category: "roster", division, summary: `Toggled ${getStatusLabel(status)} status filter on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`, details: { status } })
   }
 
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return String(value)
+  const selectAllStatuses = () => {
+    setStatusFilters(
+      statusOptions.map(
+        (status) => status.id,
+      ),
+    )
+
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: "filter-status", category: "roster", division, summary: `Selected all status filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
   }
 
-  try {
-    return JSON.stringify(value, null, 2)
-  } catch {
-    return String(value)
-  }
-}
-
-function displayChangeValue(value: unknown) {
-  if (value === null || value === undefined || value === "") {
-    return "—"
+  const clearStatuses = () => {
+    setStatusFilters([])
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: "clear-status-filters", category: "roster", division, summary: `Cleared status filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
   }
 
-  if (typeof value === "object") {
-    return formatValue(value)
-  }
+  /* ─────────────────────────────────────────────
+     Rank Filters
+  ───────────────────────────────────────────── */
 
-  return String(value)
-}
+  const toggleRankFilter = (
+    rank: string,
+  ) => {
+    setRankFilters((current) => {
+      const exists = current.some(
+        (item) =>
+          normalizeRank(item) ===
+          normalizeRank(rank),
+      )
 
-function ChangeList({ changes }: { changes: unknown }) {
-  if (!Array.isArray(changes) || changes.length === 0) {
-    return null
-  }
-
-  const visible = changes.slice(0, 120) as Array<
-    Record<string, unknown>
-  >
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-border">
-      {visible.map((change, index) => {
-        const oldValue = change.old
-        const newValue = change.new
-
-        const rank = String(
-          change.rank ??
-            change.name ??
-            change.discordId ??
-            `Change ${index + 1}`,
-        )
-
-        return (
-          <div
-            key={`${rank}-${index}`}
-            className="grid gap-4 border-b border-border p-3 last:border-b-0 md:grid-cols-[1.1fr_1fr_1fr]"
-          >
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {String(change.field ?? change.label ?? change.key ?? (change.rank ? "Rank" : "Change"))}
-              </p>
-
-              <p className="mt-1 break-words text-xs font-medium text-foreground">
-                {rank}
-              </p>
-            </div>
-
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Old
-              </p>
-
-              <p className="mt-1 break-words text-xs text-muted-foreground line-through decoration-red-500/70">
-                {displayChangeValue(oldValue)}
-              </p>
-            </div>
-
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                New
-              </p>
-
-              <p className="mt-1 break-words text-xs font-semibold text-emerald-400">
-                {displayChangeValue(newValue)}
-              </p>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function DetailPanel({
-  log,
-  profile,
-}: {
-  log: ActionLog
-  profile?: DiscordProfile
-}) {
-  const details = log.details ?? {}
-
-  const additionalDetails = Object.entries(details).filter(
-    ([key]) =>
-      key !== "changes" &&
-      key !== "old" &&
-      key !== "new",
-  )
-
-  return (
-    <div className="border-t border-border bg-muted/10 px-4 py-4">
-      <div className="grid gap-4">
-        <ChangeList changes={details.changes} />
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Changed by
-            </p>
-
-            <div className="mt-1">
-              <CopyMenu
-                name={profile?.displayName || log.userName || log.username || "Unknown user"}
-                id={log.userId}
-                callsign={log.callsign}
-                badgeNumber={log.badgeNumber}
-                rank={log.rank}
-                avatar={profile?.avatar || log.avatar}
-              />
-            </div>
-          </div>
-
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Entry
-            </p>
-
-            <p className="mt-1 font-mono text-xs font-medium text-foreground">
-              #{log.entryNumber}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Discord ID
-            </p>
-
-            <p className="mt-1 break-all text-xs font-medium text-foreground">
-              {log.userId || "—"}
-            </p>
-          </div>
-        </div>
-
-        {log.targetName || log.targetRank || log.targetUserId ? (
-          <div className="border-t border-border pt-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Target
-            </p>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              {log.targetName ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Name
-                  </p>
-
-                  <div className="mt-1">
-                    <CopyMenu
-                      name={log.targetName}
-                      id={log.targetUserId}
-                      callsign={String(
-                        details.targetCallsign ??
-                          details.callsign ??
-                          "",
-                      )}
-                      badgeNumber={String(
-                        details.targetBadgeNumber ??
-                          details.badgeNumber ??
-                          "",
-                      )}
-                      rank={log.targetRank}
-                    />
-                  </div>
-                </div>
-              ) : null}
-
-              {log.targetRank ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Rank
-                  </p>
-
-                  <p className="mt-1 text-xs font-medium">
-                    {log.targetRank}
-                  </p>
-                </div>
-              ) : null}
-
-              {log.targetUserId ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Discord ID
-                  </p>
-
-                  <p className="mt-1 break-all text-xs font-medium">
-                    {log.targetUserId}
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-
-        {additionalDetails.length > 0 ? (
-          <div className="border-t border-border pt-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Additional details
-            </p>
-
-            <div className="divide-y divide-border">
-              {additionalDetails.map(([key, value]) => (
-                <div
-                  key={key}
-                  className="grid gap-1 py-2 sm:grid-cols-[160px_1fr]"
-                >
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {actionLabel(key)}
-                  </span>
-
-                  <pre className="m-0 whitespace-pre-wrap break-words font-sans text-xs text-foreground/90">
-                    {formatValue(value)}
-                  </pre>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Action
-            </p>
-
-            <p className="mt-1 text-xs font-medium">
-              {actionLabel(log.action)}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Recorded
-            </p>
-
-            <p className="mt-1 text-xs font-medium">
-              {formatDateTime(log.createdAt)}
-            </p>
-          </div>
-        </div>
-
-        {log.path ? (
-          <p className="break-all border-t border-border pt-3 text-[10px] text-muted-foreground">
-            {log.path}
-          </p>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-export default function ActionLogs() {
-  const [logs, setLogs] = useState<ActionLog[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const [module, setModule] = useState<Module>("")
-  const [category, setCategory] = useState<Category>("")
-  const [division, setDivision] = useState<Division>("")
-  const [userId, setUserId] = useState("")
-  const [action, setAction] = useState("")
-  const [search, setSearch] = useState("")
-
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
-  const [pages, setPages] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [profiles, setProfiles] = useState<Record<string, DiscordProfile>>({})
-  const profilesRef = useRef<Record<string, DiscordProfile>>({})
-  const profileLoadingRef = useRef<Set<string>>(new Set())
-
-  const loadProfile = useCallback(async (discordId: string) => {
-    if (!discordId || profilesRef.current[discordId] || profileLoadingRef.current.has(discordId)) return
-    profileLoadingRef.current.add(discordId)
-    try {
-      const response = await fetch(`/api/promotion/discord-profile/${encodeURIComponent(discordId)}`, {
-        credentials: "include",
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      })
-      if (!response.ok) return
-      const data = (await response.json()) as { success?: boolean; profile?: DiscordProfile }
-      if (data.success && data.profile) {
-        profilesRef.current[discordId] = data.profile
-        setProfiles((current) => ({ ...current, [discordId]: data.profile! }))
-      }
-    } catch {
-      // Stored log identity remains usable if Discord cannot be reached.
-    } finally {
-      profileLoadingRef.current.delete(discordId)
-    }
-  }, [])
-
-  useEffect(() => {
-    for (const discordId of new Set(logs.map((log) => log.userId).filter(Boolean))) {
-      void loadProfile(discordId)
-    }
-  }, [logs, loadProfile])
-
-  const loadLogs = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(pageSize),
-      })
-
-      if (module) params.set("module", module)
-      if (category) params.set("category", category)
-      if (division) params.set("division", division)
-      if (userId) params.set("userId", userId)
-      if (action) params.set("action", action)
-      if (search.trim()) params.set("search", search.trim())
-
-      const response = await fetch(`/api/action-logs?${params.toString()}`, {
-        credentials: "include",
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      })
-
-      const data = (await response.json()) as ApiResponse
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.error || `Failed to load activity logs (${response.status}).`,
+      if (exists) {
+        return current.filter(
+          (item) =>
+            normalizeRank(item) !==
+            normalizeRank(rank),
         )
       }
 
-      const nextLogs = Array.isArray(data.logs) ? data.logs : []
-      setLogs(nextLogs)
-      setTotal(data.pagination?.total ?? 0)
-      setPages(Math.max(1, data.pagination?.pages ?? 1))
+      return [...current, rank]
+    })
 
-      if (data.pagination?.page && data.pagination.page !== page) {
-        setPage(data.pagination.page)
-      }
-    } catch (err) {
-      setLogs([])
-      setTotal(0)
-      setPages(1)
-      setError(err instanceof Error ? err.message : "Failed to load activity logs.")
-    } finally {
-      setLoading(false)
-    }
-  }, [action, category, division, module, page, pageSize, search, userId])
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: "filter-rank", category: "roster", division, targetRank: rank, summary: `Toggled ${rank} rank filter on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
+  }
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => void loadLogs(), search ? 250 : 0)
-    return () => window.clearTimeout(timer)
-  }, [loadLogs, search])
+  const selectAllRanks = () => {
+    setRankFilters([...rankOptions])
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: "filter-rank", category: "roster", division, summary: `Selected all rank filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`, details: { ranks: rankOptions } })
+  }
 
-  const userOptions = useMemo<Option[]>(() => {
-    const map = new Map<string, string>()
+  const clearRanks = () => {
+    setRankFilters([])
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: "clear-rank-filters", category: "roster", division, summary: `Cleared rank filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
+  }
 
-    for (const log of logs) {
-      if (!log.userId) continue
-      map.set(log.userId, log.userName || log.username || log.userId)
-    }
-
-    return [
-      { value: "", label: "Anyone" },
-      ...Array.from(map.entries())
-        .sort((a, b) => a[1].localeCompare(b[1]))
-        .map(([value, label]) => ({ value, label })),
-    ]
-  }, [logs])
-
-  const actionOptions = useMemo<Option[]>(() => {
-    const map = new Map<string, string>()
-
-    for (const log of logs) {
-      if (!log.action) continue
-      map.set(log.action, actionLabel(log.action))
-    }
-
-    return [
-      { value: "", label: "All actions" },
-      ...Array.from(map.entries())
-        .sort((a, b) => a[1].localeCompare(b[1]))
-        .map(([value, label]) => ({ value, label })),
-    ]
-  }, [logs])
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, ActionLog[]>()
-
-    for (const log of logs) {
-      const key = dateHeading(log.createdAt)
-      const current = map.get(key) ?? []
-      current.push(log)
-      map.set(key, current)
-    }
-
-    return Array.from(map.entries())
-  }, [logs])
+  /* ─────────────────────────────────────────────
+     Clear Filters
+  ───────────────────────────────────────────── */
 
   const clearFilters = () => {
-    setCategory("")
-    setDivision("")
-    setUserId("")
-    setAction("")
+    setStatusFilters([])
+    setRankFilters([])
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: "clear-filters", category: "roster", division, summary: `Cleared all status and rank filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
+  }
+
+  const clearSearch = () => {
     setSearch("")
-    setPage(1)
-    setExpanded(null)
+    setSelectedCopied(false)
+    void logAction({ module: "activity", action: "clear-search", category: "roster", division, summary: `Cleared the search on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
   }
 
-  const selectModule = (value: Module) => {
-    setModule(value)
-    setPage(1)
-    setExpanded(null)
-  }
+  const allVisibleSelected =
+    filteredMembers.length > 0 &&
+    filteredMembers
+      .filter(
+        (member) => member.discordId,
+      )
+      .every((member) =>
+        selectedIds.includes(
+          member.discordId,
+        ),
+      )
 
-  const start = total ? (page - 1) * pageSize + 1 : 0
-  const end = total ? Math.min(page * pageSize, total) : 0
-  const hasFilters = Boolean(category || division || userId || action || search)
+  const hasFilters =
+    Boolean(search.trim()) ||
+    (statusFilters.length > 0 &&
+      statusFilters.length < statusOptions.length) ||
+    (rankOptions.length > 0 &&
+      rankFilters.length > 0 &&
+      rankFilters.length < rankOptions.length)
+
+  const selectedStatusCount =
+    statusFilters.length
+
+  const selectedRankCount =
+    rankFilters.length
+
+  /* ─────────────────────────────────────────────
+     Render
+  ───────────────────────────────────────────── */
 
   return (
     <DashboardLayout>
-      <div className="mx-auto w-full max-w-[1120px] px-4 py-5 sm:px-6 lg:px-0">
-        <header className="mb-5 flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-500/25 bg-blue-500/10">
-              <History className="h-5 w-5 text-blue-400" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight">Activity Logs</h1>
-                <span className="rounded-full border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
-                  60 days
-                </span>
+      <div className="flex min-h-full flex-col gap-4 p-3 sm:gap-6 sm:p-6">
+        {/* HEADER */}
+
+        <div className="flex shrink-0 flex-col gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
+                <Shield className="h-5 w-5 text-blue-500" />
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                A numbered audit trail for roster, import, requirement, selection and management changes. Entries are retained for 60 days.
-              </p>
+
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  Activity Roster
+                </h1>
+
+                <p className="text-sm text-muted-foreground">
+                  View activity compliance and
+                  roster information for each
+                  division.
+                </p>
+              </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void loadLogs()}
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 text-white ${loading ? "animate-spin" : ""}`} />
-            {loading ? "Refreshing" : "Refresh"}
-          </button>
-        </header>
+          {/* Division Tabs */}
 
-        {/* Module tabs: intentionally flat, matching the reference layout. */}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          {moduleOptions.map((option) => {
-            const active = module === option.value
-            return (
-              <button
-                key={option.value || "all"}
-                type="button"
-                onClick={() => selectModule(option.value as Module)}
-                className={`h-8 rounded-lg border px-3 text-xs font-medium transition-all ${
-                  active
-                    ? "border-blue-500/60 bg-blue-500/10 text-blue-400"
-                    : "border-border bg-card text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-foreground"
-                }`}
-              >
-                {option.label}
-              </button>
-            )
-          })}
+          <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-fit">
+            <div className="inline-flex min-w-full items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1 sm:min-w-0">
+            {divisions.map((item) => {
+              const active =
+                division === item.id
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    if (
+                      division === item.id
+                    ) {
+                      return
+                    }
+
+                    setDivision(item.id)
+                    void logAction({ module: "activity", action: "change-division", category: "navigation", division: item.id, summary: `Switched Activity Roster to ${item.label}.` })
+                    setSearch("")
+                    setSelectedIds([])
+                    setSelectedCopied(false)
+                    setError(null)
+                  }}
+                  className={
+                    active
+                      ? "rounded-md bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-500 shadow-sm transition-colors sm:px-4 sm:text-sm shrink-0"
+                      : "rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground sm:px-4 sm:text-sm shrink-0"
+                  }
+                >
+                  {item.label}
+                </button>
+              )
+            })}
+            </div>
+          </div>
         </div>
 
-        {/* Search and filters stay visible at all times. */}
-        <div className="mb-5 flex flex-wrap items-center gap-2">
-          <div className="flex w-full min-w-0 max-w-[430px] flex-1 items-center gap-2 sm:w-auto">
+        {/* Stats */}
+
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <div className="rounded-xl border bg-card p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Total
+              </p>
+
+              <Users className="h-4 w-4 text-blue-500" />
+            </div>
+
+            <p className="mt-2 text-2xl font-semibold">
+              {stats.total}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-emerald-500/10 bg-card p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Compliant
+              </p>
+
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            </div>
+
+            <p className="mt-2 text-2xl font-semibold text-emerald-500">
+              {stats.compliant}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-red-500/10 bg-card p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Non-Compliant
+              </p>
+
+              <XCircle className="h-4 w-4 text-red-500" />
+            </div>
+
+            <p className="mt-2 text-2xl font-semibold text-red-500">
+              {stats.nonCompliant}
+            </p>
+          </div>
+
+          <div className="rounded-xl border bg-card p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Activity Hours
+              </p>
+
+              <Clock3 className="h-4 w-4 text-blue-500" />
+            </div>
+
+            <p className="mt-2 text-2xl font-semibold">
+              {stats.totalHours.toFixed(1)}
+            </p>
+          </div>
+        </div>
+
+        {/* Filters */}
+
+        <div className="rounded-xl border bg-card p-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+            {/* Search */}
+
             <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
               <input
+                type="text"
                 value={search}
                 onChange={(event) => {
-                  setSearch(event.target.value)
-                  setPage(1)
+                  setSearch(
+                    event.target.value,
+                  )
+                  setSelectedCopied(false)
                 }}
-                placeholder="Search entries, people, ranks, IDs..."
-                className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-500/60"
+                placeholder="Search name, callsign, badge, rank or Discord ID..."
+                className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
 
-            {hasFilters ? (
-              <button
+            {/* Clear Search */}
+
+            {search.trim() && (
+              <Button
                 type="button"
-                onClick={clearFilters}
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 px-1 text-xs font-medium text-white transition-colors hover:text-blue-300"
+                variant="ghost"
+                size="sm"
+                onClick={clearSearch}
+                className="shrink-0 gap-2 border border-blue-500/20 bg-blue-500/5 text-blue-400 transition-colors hover:bg-blue-500/15 hover:text-blue-300"
               >
-                <X className="h-3.5 w-3.5 text-white" />
-                Clear
-              </button>
-            ) : null}
+                <X className="h-4 w-4" />
+
+                Clear Search
+              </Button>
+            )}
+
+            {/* Status Filter */}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 xl:min-w-[170px]"
+                >
+                  <Filter className="h-4 w-4 text-blue-400" />
+
+                  <span>Status</span>
+
+                  {selectedStatusCount >
+                    0 && (
+                    <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
+                      {
+                        selectedStatusCount
+                      }
+                    </span>
+                  )}
+
+                  <ChevronDown className="ml-auto h-3.5 w-3.5 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent
+                align="end"
+                className="w-56"
+              >
+                <DropdownMenuItem
+                  onSelect={(event) =>
+                    event.preventDefault()
+                  }
+                  onClick={() => {
+                    if (
+                      statusFilters.length ===
+                      statusOptions.length
+                    ) {
+                      clearStatuses()
+                    } else {
+                      selectAllStatuses()
+                    }
+                  }}
+                  className="gap-2"
+                >
+                  <Checkbox
+                    checked={
+                      statusFilters.length ===
+                      statusOptions.length
+                    }
+                    tabIndex={-1}
+                    className="pointer-events-none"
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-blue-400" />
+
+                    <span className="font-medium">
+                      All Statuses
+                    </span>
+                  </div>
+                </DropdownMenuItem>
+
+                <div className="my-1 h-px bg-border" />
+
+                {statusOptions.map(
+                  (status) => {
+                    const Icon =
+                      status.icon
+
+                    const checked =
+                      statusFilters.includes(
+                        status.id,
+                      )
+
+                    return (
+                      <DropdownMenuItem
+                        key={status.id}
+                        onSelect={(event) =>
+                          event.preventDefault()
+                        }
+                        onClick={() =>
+                          toggleStatusFilter(
+                            status.id,
+                          )
+                        }
+                        className="gap-2"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          tabIndex={-1}
+                          className="pointer-events-none"
+                        />
+
+                        <Icon
+                          className={`h-4 w-4 ${
+                            status.id ===
+                            "compliant"
+                              ? "text-emerald-400"
+                              : "text-red-400"
+                          }`}
+                        />
+
+                        <span>
+                          {status.label}
+                        </span>
+                      </DropdownMenuItem>
+                    )
+                  },
+                )}
+
+                {statusFilters.length >
+                  0 && (
+                  <>
+                    <div className="my-1 h-px bg-border" />
+
+                    <DropdownMenuItem
+                      onClick={
+                        clearStatuses
+                      }
+                      className="gap-2 text-muted-foreground"
+                    >
+                      <X className="h-4 w-4" />
+
+                      Clear Statuses
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Rank Filter */}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 xl:min-w-[170px]"
+                >
+                  <Shield className="h-4 w-4 text-blue-400" />
+
+                  <span>Rank</span>
+
+                  {selectedRankCount >
+                    0 && (
+                    <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
+                      {selectedRankCount}
+                    </span>
+                  )}
+
+                  <ChevronDown className="ml-auto h-3.5 w-3.5 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent
+                align="end"
+                className="max-h-80 w-64 overflow-y-auto"
+              >
+                <DropdownMenuItem
+                  onSelect={(event) =>
+                    event.preventDefault()
+                  }
+                  onClick={() => {
+                    if (
+                      rankOptions.length > 0 &&
+                      rankFilters.length ===
+                        rankOptions.length
+                    ) {
+                      clearRanks()
+                    } else {
+                      selectAllRanks()
+                    }
+                  }}
+                  className="gap-2"
+                >
+                  <Checkbox
+                    checked={
+                      rankOptions.length > 0 &&
+                      rankFilters.length ===
+                        rankOptions.length
+                    }
+                    tabIndex={-1}
+                    className="pointer-events-none"
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-blue-400" />
+
+                    <span className="font-medium">
+                      All Ranks
+                    </span>
+                  </div>
+                </DropdownMenuItem>
+
+                <div className="my-1 h-px bg-border" />
+
+                {rankOptions.length ===
+                0 ? (
+                  <DropdownMenuItem
+                    disabled
+                  >
+                    No ranks available
+                  </DropdownMenuItem>
+                ) : (
+                  rankOptions.map(
+                    (rank) => {
+                      const checked =
+                        rankFilters.some(
+                          (item) =>
+                            normalizeRank(
+                              item,
+                            ) ===
+                            normalizeRank(
+                              rank,
+                            ),
+                        )
+
+                      return (
+                        <DropdownMenuItem
+                          key={rank}
+                          onSelect={(event) =>
+                            event.preventDefault()
+                          }
+                          onClick={() =>
+                            toggleRankFilter(
+                              rank,
+                            )
+                          }
+                          className="gap-2"
+                        >
+                          <Checkbox
+                            checked={
+                              checked
+                            }
+                            tabIndex={-1}
+                            className="pointer-events-none"
+                          />
+
+                          <Shield className="h-4 w-4 text-blue-400" />
+
+                          <span className="truncate">
+                            {rank}
+                          </span>
+                        </DropdownMenuItem>
+                      )
+                    },
+                  )
+                )}
+
+                {rankFilters.length >
+                  0 && (
+                  <>
+                    <div className="my-1 h-px bg-border" />
+
+                    <DropdownMenuItem
+                      onClick={
+                        clearRanks
+                      }
+                      className="gap-2 text-muted-foreground"
+                    >
+                      <X className="h-4 w-4" />
+
+                      Clear Ranks
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Selected Copy Actions */}
+
+            {selectedIds.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant={
+                      selectedCopied
+                        ? "default"
+                        : "outline"
+                    }
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {selectedCopied ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+
+                    {selectedCopied
+                      ? "Copied"
+                      : `Copy Selected (${selectedIds.length})`}
+
+                    {!selectedCopied && (
+                      <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+
+                {!selectedCopied && (
+                  <DropdownMenuContent
+                    align="end"
+                    className="max-h-72 w-64 overflow-y-auto"
+                  >
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Copy Discord IDs
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "discord-mention",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Copy Discord Mentions
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "name",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Copy Names
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "callsign",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Copy Callsigns
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "badge",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Copy Badge Numbers
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "rank",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <Copy className="h-4 w-4 text-blue-400" />
+                      Copy Ranks
+                    </DropdownMenuItem>
+
+                    <div className="my-1 h-px bg-border" />
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "name-discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Name + Discord ID
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "callsign-discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Callsign + Discord ID
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "callsign-name",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Callsign + Name
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "callsign-badge",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Callsign + Badge
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "badge-name",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Badge + Name
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "badge-discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Badge + Discord ID
+                    </DropdownMenuItem>
+
+                    <div className="my-1 h-px bg-border" />
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "callsign-name-discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Callsign + Name + Discord
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "callsign-badge-discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Callsign + Badge + Discord
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "name-badge-discord",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Name + Badge + Discord
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => void copySelected("callsign-badge-name")}
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Callsign + Badge + Name
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => void copySelected("callsign-badge-name-discord")}
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Callsign + Badge + Name + Discord
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => void copySelected("name-rank-discord")}
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Name + Rank + Discord
+                    </DropdownMenuItem>
+
+                    <div className="my-1 h-px bg-border" />
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void copySelected(
+                          "full",
+                        )
+                      }
+                      className="gap-2 text-sm"
+                    >
+                      <ClipboardList className="h-4 w-4 text-blue-400" />
+                      Copy Full Details
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                )}
+              </DropdownMenu>
+            )}
+
+            {/* Clear Filters */}
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="shrink-0 gap-2 border border-blue-500/20 bg-blue-500/5 text-blue-400 transition-colors hover:bg-blue-500/15 hover:text-blue-300"
+            >
+              <X className="h-4 w-4" />
+
+              Clear Filters
+            </Button>
+
+            {/* Google Sheets Refresh */}
+
+            <GoogleRosterRefresh
+              onRefreshed={() => {
+                void logAction({ module: "activity", action: "refresh-roster", category: "roster", division, summary: `Refreshed the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
+                void loadRoster(false)
+              }}
+            />
           </div>
 
-          <FilterSelect
-            value={userId}
-            options={userOptions}
-            onChange={(value) => { setUserId(value); setPage(1); setExpanded(null) }}
-            ariaLabel="People"
-            className="w-[170px]"
-          />
-          <FilterSelect
-            value={action}
-            options={actionOptions}
-            onChange={(value) => { setAction(value); setPage(1); setExpanded(null) }}
-            ariaLabel="Actions"
-            className="w-[160px]"
-          />
-          <FilterSelect
-            value={category}
-            options={categoryOptions}
-            onChange={(value) => { setCategory(value as Category); setPage(1); setExpanded(null) }}
-            ariaLabel="Categories"
-            className="w-[175px]"
-          />
-          <FilterSelect
-            value={division}
-            options={divisionOptions}
-            onChange={(value) => { setDivision(value as Division); setPage(1); setExpanded(null) }}
-            ariaLabel="Divisions"
-            className="w-[175px]"
-          />
+          {/* Active Filters */}
 
-          <span className="ml-auto text-xs text-muted-foreground">
-            {total.toLocaleString()} {total === 1 ? "change" : "changes"}
-          </span>
-        </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Filter className="h-3.5 w-3.5" />
 
-        {error ? (
-          <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
-            {error}
-          </div>
-        ) : null}
-
-        <section>
-          {loading && !logs.length ? (
-            <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
-              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-              Loading activity logs...
+              Active filters:
             </div>
-          ) : null}
 
-          {!loading && !logs.length ? (
-            <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
-              <History className="h-8 w-8 text-muted-foreground" />
-              <p className="mt-3 font-medium">No activity logs found</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Try clearing the filters or perform a dashboard action.
-              </p>
-            </div>
-          ) : null}
-
-          {grouped.map(([heading, group]) => (
-            <div key={heading} className="mb-6">
-              <div className="mb-2 px-0">
-                <span className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
-                  {heading}
-                </span>
-              </div>
-
-              <div className="space-y-1.5">
-                {group.map((log) => {
-                  const isOpen = expanded === log.id
+            {statusFilters.length === 0 &&
+            rankFilters.length === 0 ? (
+              <span className="text-xs text-muted-foreground">
+                None
+              </span>
+            ) : (
+              <>
+                {statusFilters.map(
+                (status) => {
+                  const Icon =
+                    getStatusIcon(status)
 
                   return (
-                    <article
-                      key={log.id}
-                      className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-blue-500/25 hover:bg-muted/20"
+                    <button
+                      key={`status-${status}`}
+                      type="button"
+                      onClick={() =>
+                        toggleStatusFilter(
+                          status,
+                        )
+                      }
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80 ${getStatusClasses(
+                        status,
+                      )}`}
                     >
-                      <button
-                        type="button"
-                        onClick={() => setExpanded(isOpen ? null : log.id)}
-                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/20 md:grid-cols-[44px_minmax(165px,0.65fr)_minmax(280px,2fr)_auto] md:items-center"
-                      >
-                        <div className="flex items-center">
-                          <span className="font-mono text-[10px] font-semibold text-blue-400">
-                            #{log.entryNumber}
-                          </span>
-                        </div>
+                      <Icon className="h-3 w-3" />
 
-                        <div className="min-w-0">
-                          <CopyMenu
-                            name={profiles[log.userId]?.displayName || log.userName || log.username || "Unknown User"}
-                            id={log.userId}
-                            callsign={log.callsign}
-                            badgeNumber={log.badgeNumber}
-                            rank={log.rank}
-                            avatar={profiles[log.userId]?.avatar || log.avatar}
-                            large
-                          />
-                        </div>
+                      {getStatusLabel(
+                        status,
+                      )}
 
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium leading-5 text-foreground">
-                            {log.summary}
-                          </p>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-                            <span className="text-blue-300/80">{relativeTime(log.createdAt)}</span>
+                      <X className="h-3 w-3" />
+                    </button>
+                  )
+                },
+              )}
 
-                            <span className="text-muted-foreground/60">•</span>
+                {rankFilters.map(
+                  (rank) => (
+                    <button
+                      key={`rank-${rank}`}
+                      type="button"
+                      onClick={() =>
+                        toggleRankFilter(
+                          rank,
+                        )
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
+                    >
+                      <Shield className="h-3 w-3" />
 
-                            <Tag className={tagClass("module", log.module)}>
-                              {moduleLabel(log.module)}
-                            </Tag>
+                      {rank}
 
-                            <Tag className={tagClass("division", log.division)}>
-                              {divisionLabel(log.division)}
-                            </Tag>
+                      <X className="h-3 w-3" />
+                    </button>
+                  ),
+                )}
+              </>
+            )}
+          </div>
+        </div>
 
-                            {log.category ? (
-                              <Tag className={tagClass("category", log.category)}>
-                                {actionLabel(log.category)}
-                              </Tag>
-                            ) : null}
+        {/* Error */}
+
+        {error && (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
+        {/* Roster */}
+
+        <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div>
+              <h2 className="font-medium">
+                {divisions.find(
+                  (item) =>
+                    item.id === division,
+                )?.label ??
+                  "Department"}{" "}
+                Roster
+              </h2>
+
+              <p className="text-xs text-muted-foreground">
+                Showing{" "}
+                {filteredMembers.length} of{" "}
+                {members.length} members
+              </p>
+            </div>
+
+            {selectedIds.length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                {selectedIds.length} selected
+              </div>
+            )}
+          </div>
+
+          {loading ? (
+            <div className="flex min-h-[300px] items-center justify-center">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+
+                Loading roster...
+              </div>
+            </div>
+          ) : filteredMembers.length ===
+            0 ? (
+            <div className="flex min-h-[300px] flex-col items-center justify-center gap-2 px-6 text-center">
+              <Users className="h-8 w-8 text-muted-foreground" />
+
+              <p className="font-medium">
+                No members found
+              </p>
+
+              <p className="text-sm text-muted-foreground">
+                {hasFilters
+                  ? "Try changing or clearing your filters."
+                  : "There are no valid roster members available."}
+              </p>
+
+              {hasFilters && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="mt-2"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1100px] text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30 text-left">
+                    <th className="w-12 px-4 py-3">
+                      <Checkbox
+                        checked={
+                          allVisibleSelected
+                        }
+                        onCheckedChange={
+                          toggleAllVisible
+                        }
+                        aria-label="Select all visible members"
+                      />
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Callsign
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Badge
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Name
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Rank
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Discord ID
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Time in Dept
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Time in Rank
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Required
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Activity
+                    </th>
+
+                    <th className="px-4 py-3 font-medium text-muted-foreground">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredMembers.map(
+                    (member) => {
+                      const selected =
+                        selectedIds.includes(
+                          member.discordId,
+                        )
+
+                      const StatusIcon =
+                        getStatusIcon(
+                          member.status,
+                        )
+
+                      return (
+                        <tr
+                          key={
+                            member.discordId ||
+                            `${member.badgeNumber}-${member.callsign}-${member.name}`
+                          }
+                          className={`border-b last:border-0 transition-colors hover:bg-muted/20 ${
+                            selected
+                              ? "bg-blue-500/5"
+                              : ""
+                          }`}
+                        >
+                          <td className="px-4 py-3">
+                            <Checkbox
+                              checked={
+                                selected
+                              }
+                              disabled={
+                                !member.discordId
+                              }
+                              aria-label={`Select ${member.name}`}
+                              onPointerDown={(
+                                event,
+                              ) => {
+                                shiftSelectingRef.current =
+                                  event.shiftKey
+                              }}
+                              onCheckedChange={() => {
+                                const shiftKey =
+                                  shiftSelectingRef.current
+
+                                shiftSelectingRef.current =
+                                  false
+
+                                handleMemberSelection(
+                                  member,
+                                  shiftKey,
+                                )
+                              }}
+                            />
+                          </td>
+
+                          <td className="px-4 py-3 font-medium">
+                            {member.callsign}
+                          </td>
+
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {member.badgeNumber}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {member.name}
+                          </td>
+
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {member.rank}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button type="button" title={member.discordId} className="mx-auto block max-w-full truncate bg-transparent px-1.5 py-1 font-mono text-[10px] text-blue-400 outline-none transition-colors hover:text-blue-300 hover:underline">
+                                  {member.discordId}
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent side="bottom" align="start" sideOffset={4} avoidCollisions={false} className="max-h-80 w-[285px] overflow-y-auto p-1">
+                                {([
+                                  ["discord", "Copy Discord ID"], ["discord-mention", "Copy Discord Mention"], ["name", "Copy Name"], ["callsign", "Copy Callsign"], ["badge", "Copy Badge Number"], ["rank", "Copy Rank"],
+                                ] as [CopyType, string][]).map(([type, label]) => (
+                                  <DropdownMenuItem key={type} onClick={() => void copyMember(type, member)} className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"><Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" /><span>{label}</span></DropdownMenuItem>
+                                ))}
+                                <div className="my-0.5 h-px bg-border" />
+                                {([
+                                  ["name-discord", "Name + Discord ID"], ["callsign-discord", "Callsign + Discord ID"], ["callsign-name", "Callsign + Name"], ["callsign-badge", "Callsign + Badge Number"], ["badge-name", "Badge Number + Name"], ["badge-discord", "Badge Number + Discord ID"],
+                                ] as [CopyType, string][]).map(([type, label]) => (
+                                  <DropdownMenuItem key={type} onClick={() => void copyMember(type, member)} className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"><Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" /><span>{label}</span></DropdownMenuItem>
+                                ))}
+                                <div className="my-0.5 h-px bg-border" />
+                                {([
+                                  ["callsign-name-discord", "Callsign + Name + Discord"], ["callsign-badge-discord", "Callsign + Badge + Discord"], ["name-badge-discord", "Name + Badge + Discord"], ["callsign-badge-name", "Callsign + Badge + Name"], ["callsign-badge-name-discord", "Callsign + Badge + Name + Discord"], ["name-rank-discord", "Name + Rank + Discord"],
+                                ] as [CopyType, string][]).map(([type, label]) => (
+                                  <DropdownMenuItem key={type} onClick={() => void copyMember(type, member)} className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"><Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" /><span>{label}</span></DropdownMenuItem>
+                                ))}
+                                <div className="my-0.5 h-px bg-border" />
+                                <DropdownMenuItem onClick={() => void copyMember("full", member)} className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"><Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" /><span>Copy Full Details</span></DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {member.timeInDept}
+                          </td>
+
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {member.timeInRank}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {member.requiredHours.toFixed(
+                              1,
+                            )}
+                            h
+                          </td>
+
+                          <td className="px-4 py-3 font-medium">
+                            {member.activityHours.toFixed(
+                              1,
+                            )}
+                            h
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusClasses(
+                                member.status,
+                              )}`}
+                            >
+                              <StatusIcon className="h-3.5 w-3.5" />
+
+                              {getStatusLabel(
+                                member.status,
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    },
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y md:hidden">
+              {filteredMembers.map((member) => {
+                const selected = selectedIds.includes(member.discordId)
+                const StatusIcon = getStatusIcon(member.status)
+
+                return (
+                  <div
+                    key={member.discordId || `${member.badgeNumber}-${member.callsign}-${member.name}`}
+                    className={`p-4 transition-colors ${selected ? "bg-blue-500/5" : ""}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="pt-0.5">
+                        <Checkbox
+                          checked={selected}
+                          disabled={!member.discordId}
+                          aria-label={`Select ${member.name}`}
+                          onPointerDown={(event) => {
+                            shiftSelectingRef.current = event.shiftKey
+                          }}
+                          onCheckedChange={() => {
+                            const shiftKey = shiftSelectingRef.current
+                            shiftSelectingRef.current = false
+                            handleMemberSelection(member, shiftKey)
+                          }}
+                        />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">{member.callsign}</p>
+                            <p className="truncate text-sm text-muted-foreground">{member.name}</p>
+                          </div>
+
+                          <div className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium ${getStatusClasses(member.status)}`}>
+                            <StatusIcon className="h-3 w-3" />
+                            {getStatusLabel(member.status)}
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-end gap-2">
-                          <Tag className={statusClass(log)}>
-                            {statusLabel(log)}
-                          </Tag>
-                          {isOpen ? (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
+                        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                          <div>
+                            <p className="text-muted-foreground">Badge</p>
+                            <p className="mt-0.5 truncate font-medium">{member.badgeNumber}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Rank</p>
+                            <p className="mt-0.5 truncate font-medium">{member.rank}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Activity</p>
+                            <p className="mt-0.5 font-medium">{member.activityHours.toFixed(1)}h</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Required</p>
+                            <p className="mt-0.5 font-medium">{member.requiredHours.toFixed(1)}h</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Time in Dept</p>
+                            <p className="mt-0.5 truncate font-medium">{member.timeInDept || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Time in Rank</p>
+                            <p className="mt-0.5 truncate font-medium">{member.timeInRank || "—"}</p>
+                          </div>
                         </div>
-                      </button>
 
-                      {isOpen ? (
-                        <DetailPanel
-                          log={log}
-                          profile={profiles[log.userId]}
-                        />
-                      ) : null}
-                    </article>
-                  )
-                })}
-              </div>
+                        <div className="mt-3 flex min-w-0 items-center gap-2">
+                          <span className="shrink-0 text-xs text-muted-foreground">Discord</span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button type="button" className="min-w-0 max-w-full truncate rounded-md px-2 py-1 font-mono text-[11px] text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300">
+                                {member.discordId}
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="max-h-80 w-[285px] overflow-y-auto p-1">
+                              {([
+                                ["discord", "Copy Discord ID"], ["discord-mention", "Copy Discord Mention"], ["name", "Copy Name"], ["callsign", "Copy Callsign"], ["badge", "Copy Badge Number"], ["rank", "Copy Rank"],
+                              ] as [CopyType, string][]).map(([type, label]) => (
+                                <DropdownMenuItem key={type} onClick={() => void copyMember(type, member)} className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"><Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" /><span>{label}</span></DropdownMenuItem>
+                              ))}
+                              <div className="my-0.5 h-px bg-border" />
+                              {([
+                                ["name-discord", "Name + Discord ID"], ["callsign-discord", "Callsign + Discord ID"], ["callsign-name", "Callsign + Name"], ["callsign-badge", "Callsign + Badge Number"], ["badge-name", "Badge Number + Name"], ["badge-discord", "Badge Number + Discord ID"],
+                              ] as [CopyType, string][]).map(([type, label]) => (
+                                <DropdownMenuItem key={type} onClick={() => void copyMember(type, member)} className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"><Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" /><span>{label}</span></DropdownMenuItem>
+                              ))}
+                              <div className="my-0.5 h-px bg-border" />
+                              {([
+                                ["callsign-name-discord", "Callsign + Name + Discord"], ["callsign-badge-discord", "Callsign + Badge + Discord"], ["name-badge-discord", "Name + Badge + Discord"], ["callsign-badge-name", "Callsign + Badge + Name"], ["callsign-badge-name-discord", "Callsign + Badge + Name + Discord"], ["name-rank-discord", "Name + Rank + Discord"],
+                              ] as [CopyType, string][]).map(([type, label]) => (
+                                <DropdownMenuItem key={type} onClick={() => void copyMember(type, member)} className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"><Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" /><span>{label}</span></DropdownMenuItem>
+                              ))}
+                              <div className="my-0.5 h-px bg-border" />
+                              <DropdownMenuItem onClick={() => void copyMember("full", member)} className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"><Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" /><span>Copy Full Details</span></DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          ))}
-        </section>
-
-        {total > 0 ? (
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>Page {page} of {pages}</span>
-              <FilterSelect
-                value={String(pageSize)}
-                options={[
-                  { value: "25", label: "25 / page" },
-                  { value: "50", label: "50 / page" },
-                  { value: "75", label: "75 / page" },
-                  { value: "100", label: "100 / page" },
-                ]}
-                onChange={(value) => {
-                  setPageSize(Number(value))
-                  setPage(1)
-                }}
-                ariaLabel="Pages"
-                className="w-[112px]"
-              />
-              <span>{start.toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()}</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={page <= 1 || loading}
-                onClick={() => setPage((value) => value - 1)}
-                className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                disabled={page >= pages || loading}
-                onClick={() => setPage((value) => value + 1)}
-                className="h-8 rounded-md border border-border px-3 text-xs transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        ) : null}
+            </>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   )
