@@ -69,6 +69,7 @@ type Wheel = {
   colors: string[]
   backgroundImage?: string
   centerImage?: string
+  entryImages?: Record<string, string>
   spinning: boolean
   rotation: number
 }
@@ -147,6 +148,7 @@ function makeWheel(index: number): Wheel {
     colors: [...WHEEL_COLORS],
     spinning: false,
     rotation: 0,
+    entryImages: {},
   }
 }
 
@@ -242,11 +244,6 @@ export default function SpinWheel() {
 
   const activeWheelIndex = Math.max(0, wheels.findIndex((wheel) => wheel.id === activeWheelId))
   const activeWheel = wheels[activeWheelIndex] ?? wheels[0]
-
-  const visibleEntries = useMemo(
-    () => (activeWheel?.entries ?? []).slice(0, MAX_VISIBLE_SEGMENTS),
-    [activeWheel],
-  )
 
   const allSpinning = wheels.some((wheel) => wheel.spinning)
 
@@ -373,16 +370,42 @@ export default function SpinWheel() {
     input.onchange = () => {
       const file = input.files?.[0]
       if (!file || !activeWheel) return
+
       const reader = new FileReader()
       reader.onload = () => {
         const value = String(reader.result ?? "")
+        if (!value) return
+
         if (type === "background") {
           updateWheel(activeWheel.id, (wheel) => ({ ...wheel, backgroundImage: value }))
-        } else if (type === "center") {
-          updateWheel(activeWheel.id, (wheel) => ({ ...wheel, centerImage: value }))
-        } else if (selectedEntryIndex < activeWheel.entries.length) {
-          toast.success("Entry image selected. Entry images are shown in advanced mode.")
+          toast.success("Background image added to the wheel.")
+          return
         }
+
+        if (type === "center") {
+          updateWheel(activeWheel.id, (wheel) => ({ ...wheel, centerImage: value }))
+          toast.success("Center image added to the wheel.")
+          return
+        }
+
+        if (!activeWheel.entries.length) {
+          toast.error("Add at least one entry before adding an entry image.")
+          return
+        }
+
+        // Entry images intentionally assign to exactly one random entry each time
+        // this action is used, matching the Wheel of Names behaviour.
+        const randomIndex = secureRandom(activeWheel.entries.length)
+        const randomEntry = activeWheel.entries[randomIndex]
+        updateWheel(activeWheel.id, (wheel) => ({
+          ...wheel,
+          entryImages: {
+            ...(wheel.entryImages ?? {}),
+            [String(randomIndex)]: value,
+          },
+        }))
+        setSelectedEntryIndex(randomIndex)
+        toast.success(`Image added to ${randomEntry || `Entry ${randomIndex + 1}`}.`)
       }
       reader.readAsDataURL(file)
     }
@@ -523,8 +546,8 @@ export default function SpinWheel() {
 
   if (!activeWheel) return null
 
-  const shortLabel = (entry: string) => {
-    const limit = visibleEntries.length <= 12 ? 18 : visibleEntries.length <= 24 ? 12 : 8
+  const shortLabel = (entry: string, count: number) => {
+    const limit = count <= 12 ? 18 : count <= 24 ? 12 : 8
     return entry.length > limit ? `${entry.slice(0, limit - 1)}…` : entry
   }
 
@@ -556,12 +579,11 @@ export default function SpinWheel() {
           <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_390px]">
             <section
               ref={wheelAreaRef}
-              className={`relative flex min-h-[680px] min-w-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-sm backdrop-blur ${fullscreen ? "fixed inset-3 z-[100] min-h-0" : ""}`}
-              style={activeWheel.backgroundImage ? { backgroundImage: `linear-gradient(rgba(0,0,0,.42),rgba(0,0,0,.42)),url(${activeWheel.backgroundImage})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+              className={`relative flex min-h-[680px] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-sm backdrop-blur ${fullscreen ? "fixed inset-3 z-[100] min-h-0" : ""}`}
             >
               <button
                 type="button"
-                className="absolute left-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-500 shadow-sm"
+                className="absolute left-3 top-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-500 shadow-sm"
                 onClick={() => setEntriesOpen((value) => !value)}
                 aria-label="Toggle sidebar"
               >
@@ -570,95 +592,191 @@ export default function SpinWheel() {
 
               <button
                 type="button"
-                className="absolute right-3 top-3 z-30 rounded-lg border border-border/70 bg-background/80 p-2 text-muted-foreground backdrop-blur hover:text-foreground"
+                className="absolute right-3 top-3 z-40 rounded-lg border border-border/70 bg-background/80 p-2 text-muted-foreground backdrop-blur hover:text-foreground"
                 onClick={() => setFullscreen((value) => !value)}
                 aria-label="Toggle fullscreen"
               >
                 <Maximize2 className="h-4 w-4" />
               </button>
 
-              <div className="absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-border/70 bg-background/85 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur">
-                {wheels.length} {wheels.length === 1 ? "wheel" : "wheels"} · {activeWheel.entries.length} entries
+              <div className="absolute left-1/2 top-4 z-40 -translate-x-1/2 rounded-full border border-border/70 bg-background/90 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur">
+                {wheels.length} {wheels.length === 1 ? "wheel" : "wheels"} · {wheels.reduce((total, wheel) => total + wheel.entries.length, 0)} entries
               </div>
 
-              <div className="relative flex w-full max-w-[780px] items-center justify-center px-5 pt-8">
-                <div className="absolute top-4 z-30 drop-shadow-lg">
-                  <div className="h-0 w-0 border-l-[17px] border-r-[17px] border-t-[35px] border-l-transparent border-r-transparent border-t-blue-500" />
-                </div>
+              <div
+                className={`min-h-0 flex-1 overflow-auto p-8 pt-14 ${
+                  wheels.length === 1
+                    ? "flex items-center justify-center"
+                    : "grid content-center grid-cols-1 gap-8 sm:grid-cols-2 xl:gap-10"
+                }`}
+              >
+                {wheels.map((wheel) => {
+                  const entries = wheel.entries.slice(0, MAX_VISIBLE_SEGMENTS)
+                  const wheelSize = wheels.length === 1
+                    ? "w-[min(70vh,700px,72vw)]"
+                    : wheels.length === 2
+                      ? "w-[min(38vw,520px)]"
+                      : wheels.length <= 4
+                        ? "w-[min(31vw,430px)]"
+                        : "w-[min(25vw,360px)]"
 
-                <div className="relative aspect-square w-[min(76vw,700px)] max-w-full rounded-full bg-background p-2 shadow-[0_0_90px_rgba(37,99,235,0.14)]">
-                  <div
-                    role="button"
-                    tabIndex={allSpinning || !visibleEntries.length ? -1 : 0}
-                    aria-label={`Spin ${activeWheel.name}`}
-                    onClick={() => spinWheel(activeWheel.id)}
-                    onKeyDown={(event) => {
-                      if ((event.key === "Enter" || event.key === " ") && !allSpinning && visibleEntries.length) {
-                        event.preventDefault()
-                        spinWheel(activeWheel.id)
-                      }
-                    }}
-                    className="relative h-full w-full cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-4 focus-visible:ring-offset-background"
-                    style={{
-                      transform: `rotate(${activeWheel.rotation}deg)`,
-                      transitionDuration: `${activeWheel.spinning ? activeWheel.duration : 0}000ms`,
-                      transitionTimingFunction: activeWheel.spinning ? "cubic-bezier(0.12,0.74,0.16,1)" : "linear",
-                    }}
-                  >
-                    <svg viewBox="0 0 400 400" className="h-full w-full overflow-visible rounded-full">
-                      <circle cx="200" cy="200" r="188" fill="var(--card)" />
-                      {visibleEntries.length ? visibleEntries.map((entry, index) => {
-                        const point = labelPoint(index, visibleEntries.length)
-                        const slice = 360 / visibleEntries.length
-                        const angle = -90 + index * slice + slice / 2
-                        return (
-                          <g key={`${entry}-${index}`}>
-                            <path
-                              d={segmentPath(index, visibleEntries.length)}
-                              fill={activeWheel.colors[index % activeWheel.colors.length]}
-                              stroke="rgba(255,255,255,0.28)"
-                              strokeWidth="1"
-                            />
-                            {visibleEntries.length <= 42 && (
-                              <text
-                                x={point.x}
-                                y={point.y}
-                                fill="white"
-                                textAnchor="middle"
-                                dominantBaseline="middle"
-                                fontSize={visibleEntries.length <= 12 ? 12 : visibleEntries.length <= 24 ? 9 : 6}
-                                fontWeight="600"
-                                transform={`rotate(${angle + 90} ${point.x} ${point.y})`}
+                  return (
+                    <div
+                      key={wheel.id}
+                      className={`relative flex min-w-0 flex-col items-center justify-center rounded-2xl p-3 transition-all ${
+                        wheel.id === activeWheel.id
+                          ? "bg-blue-500/[0.035]"
+                          : "bg-transparent"
+                      }`}
+                      onClick={() => setActiveWheelId(wheel.id)}
+                    >
+                      <div className="mb-2 flex w-full max-w-[520px] items-center justify-between px-2">
+                        <button
+                          type="button"
+                          className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                            wheel.id === activeWheel.id
+                              ? "border-blue-500/30 bg-blue-500/10 text-blue-500"
+                              : "border-border/70 bg-background/70 text-muted-foreground hover:text-foreground"
+                          }`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setActiveWheelId(wheel.id)
+                          }}
+                        >
+                          {wheel.name} · {wheel.entries.length}
+                        </button>
+                        {wheel.spinning && (
+                          <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-[10px] font-medium text-blue-500">
+                            Spinning...
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="relative flex w-full items-center justify-center">
+                        <div className="absolute top-[-7px] z-30 drop-shadow-lg">
+                          <div className="h-0 w-0 border-l-[13px] border-r-[13px] border-t-[27px] border-l-transparent border-r-transparent border-t-blue-500" />
+                        </div>
+
+                        <div className={`relative aspect-square ${wheelSize} max-w-full rounded-full bg-background p-1.5 shadow-[0_0_70px_rgba(37,99,235,0.12)]`}>
+                          <button
+                            type="button"
+                            className="relative block h-full w-full cursor-pointer rounded-full border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setActiveWheelId(wheel.id)
+                              spinWheel(wheel.id)
+                            }}
+                            disabled={allSpinning || !entries.length}
+                            aria-label={`Spin ${wheel.name}`}
+                          >
+                            <svg viewBox="0 0 400 400" className="h-full w-full overflow-visible rounded-full">
+                              <defs>
+                                <clipPath id={`wheel-bg-${wheel.id}`}>
+                                  <circle cx="200" cy="200" r="184" />
+                                </clipPath>
+                              </defs>
+
+                              <g
+                                style={{
+                                  transform: `rotate(${wheel.rotation}deg)`,
+                                  transformOrigin: "200px 200px",
+                                  transition: wheel.spinning
+                                    ? `transform ${wheel.duration}s cubic-bezier(0.12,0.74,0.16,1)`
+                                    : "none",
+                                }}
                               >
-                                {shortLabel(entry)}
-                              </text>
-                            )}
-                          </g>
-                        )
-                      }) : (
-                        <circle cx="200" cy="200" r="184" fill="#111827" />
-                      )}
+                                {wheel.backgroundImage && (
+                                  <image
+                                    href={wheel.backgroundImage}
+                                    x="16"
+                                    y="16"
+                                    width="368"
+                                    height="368"
+                                    preserveAspectRatio="xMidYMid slice"
+                                    opacity="0.5"
+                                    clipPath={`url(#wheel-bg-${wheel.id})`}
+                                  />
+                                )}
+                                {!wheel.backgroundImage && <circle cx="200" cy="200" r="188" fill="var(--card)" />}
 
-                      <circle cx="200" cy="200" r="50" fill="var(--card)" stroke="rgba(59,130,246,.45)" strokeWidth="3" />
-                      {activeWheel.centerImage ? (
-                        <image href={activeWheel.centerImage} x="170" y="170" width="60" height="60" preserveAspectRatio="xMidYMid slice" />
-                      ) : (
-                        <circle cx="200" cy="200" r="37" fill="#2563eb" />
-                      )}
-                    </svg>
-                  </div>
-                </div>
-              </div>
+                                {entries.length ? entries.map((entry, index) => {
+                                  const point = labelPoint(index, entries.length)
+                                  const slice = 360 / entries.length
+                                  const angle = -90 + index * slice + slice / 2
+                                  const entryImage = wheel.entryImages?.[String(index)]
+                                  const textOffset = entryImage ? (entries.length <= 12 ? 17 : 13) : 0
+                                  return (
+                                    <g key={`${wheel.id}-${index}-${entry}`}>
+                                      <path
+                                        d={segmentPath(index, entries.length)}
+                                        fill={wheel.colors[index % wheel.colors.length]}
+                                        fillOpacity={wheel.backgroundImage ? 0.8 : 1}
+                                        stroke="rgba(255,255,255,0.28)"
+                                        strokeWidth="1"
+                                      />
+                                      {entries.length <= 42 && (
+                                        <g transform={`rotate(${angle + 90} ${point.x} ${point.y})`}>
+                                          {entryImage && (
+                                            <image
+                                              href={entryImage}
+                                              x={point.x - (entries.length <= 12 ? 14 : 9)}
+                                              y={point.y - (entries.length <= 12 ? 28 : 19)}
+                                              width={entries.length <= 12 ? 28 : 18}
+                                              height={entries.length <= 12 ? 28 : 18}
+                                              preserveAspectRatio="xMidYMid slice"
+                                            />
+                                          )}
+                                          <text
+                                            x={point.x}
+                                            y={point.y + textOffset}
+                                            fill="white"
+                                            textAnchor="middle"
+                                            dominantBaseline="middle"
+                                            fontSize={entries.length <= 12 ? 12 : entries.length <= 24 ? 9 : 6}
+                                            fontWeight="600"
+                                          >
+                                            {shortLabel(entry, entries.length)}
+                                          </text>
+                                        </g>
+                                      )}
+                                    </g>
+                                  )
+                                }) : (
+                                  <circle cx="200" cy="200" r="184" fill="#111827" />
+                                )}
 
-              <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
-                <Button size="lg" className="min-w-36 shadow-lg" onClick={() => spinWheel(activeWheel.id)} disabled={allSpinning || !activeWheel.entries.length}>
-                  <Dices className="mr-2 h-5 w-5" />
-                  {activeWheel.spinning ? "Spinning..." : "Spin"}
-                </Button>
+                                <circle cx="200" cy="200" r="50" fill="var(--card)" stroke="rgba(59,130,246,.45)" strokeWidth="3" />
+                                {wheel.centerImage ? (
+                                  <image href={wheel.centerImage} x="170" y="170" width="60" height="60" preserveAspectRatio="xMidYMid slice" />
+                                ) : (
+                                  <circle cx="200" cy="200" r="37" fill="#2563eb" />
+                                )}
+                              </g>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        className="mt-3 min-w-28"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setActiveWheelId(wheel.id)
+                          spinWheel(wheel.id)
+                        }}
+                        disabled={allSpinning || !entries.length}
+                      >
+                        <Dices className="mr-2 h-4 w-4" />
+                        {wheel.spinning ? "Spinning..." : "Spin"}
+                      </Button>
+                    </div>
+                  )
+                })}
               </div>
 
               {wheels.length > 1 && (
-                <div className="absolute bottom-5 right-5 z-30">
+                <div className="absolute bottom-4 left-1/2 z-40 -translate-x-1/2">
                   <Button variant="outline" size="sm" onClick={spinAll} disabled={allSpinning || !wheels.some((wheel) => wheel.entries.length)}>
                     <Dices className="mr-2 h-4 w-4" />
                     Spin all wheels
@@ -670,7 +788,7 @@ export default function SpinWheel() {
             {entriesOpen && (
               <aside className="flex min-h-[680px] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-sm backdrop-blur">
                 <div className="flex shrink-0 items-center overflow-x-auto border-b border-border/70 bg-muted/10 px-2 pt-2">
-                  {wheels.map((wheel) => (
+                  {wheels.map((wheel, index) => (
                     <button
                       key={wheel.id}
                       type="button"
@@ -785,6 +903,13 @@ export default function SpinWheel() {
                                   <button type="button" className="p-0.5 text-muted-foreground hover:text-foreground" onClick={() => moveEntry(index, -1)} disabled={index === 0}><ArrowUp className="h-3.5 w-3.5" /></button>
                                   <button type="button" className="p-0.5 text-muted-foreground hover:text-foreground" onClick={() => moveEntry(index, 1)} disabled={index === activeWheel.entries.length - 1}><ArrowDown className="h-3.5 w-3.5" /></button>
                                 </div>
+                                {activeWheel.entryImages?.[String(index)] ? (
+                                  <img
+                                    src={activeWheel.entryImages[String(index)]}
+                                    alt=""
+                                    className="h-9 w-9 shrink-0 rounded-md border border-border object-cover"
+                                  />
+                                ) : null}
                                 <Input value={entry} onFocus={() => setSelectedEntryIndex(index)} onChange={(event) => setEntry(index, event.target.value)} className="h-9 flex-1" />
                                 <button type="button" onClick={() => duplicateEntry(index)} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" title="Duplicate"><Copy className="h-4 w-4" /></button>
                                 <button type="button" onClick={() => deleteEntry(index)} className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete"><X className="h-4 w-4" /></button>
