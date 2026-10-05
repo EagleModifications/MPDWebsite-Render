@@ -1039,7 +1039,6 @@ export default function Wheel({
           borderColor:
             "transparent",
 
-
           /*
            * Keep the slices clean.
            */
@@ -1323,11 +1322,24 @@ export default function Wheel({
             handleWheelKeyDown
           }
         >
-          {/* The wheel itself is clean — no surrounding card or border. */}
+          {/* ---------------------------------------------------------------- */}
+          {/* Wheel                                                             */}
+          {/* ---------------------------------------------------------------- */}
+          {/* Shadow is attached directly to the wheel. No backing disc. */}
           <div
-            ref={containerRef}
-            className="absolute inset-0 overflow-visible rounded-full [&>canvas]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.22)]"
-          />
+            className="
+              absolute
+              inset-0
+              overflow-visible
+              rounded-full
+              drop-shadow-[0_3px_3px_rgba(0,0,0,0.28)]
+            "
+          >
+            <div
+              ref={containerRef}
+              className="absolute inset-0 overflow-visible rounded-full"
+            />
+          </div>
 
           {/* ---------------------------------------------------------------- */}
           {/* Pointer                                                          */}
@@ -1338,11 +1350,11 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-38px]
+              right-[-48px]
               top-1/2
               z-50
-              h-[44px]
-              w-[52px]
+              h-[40px]
+              w-[48px]
               -translate-y-1/2
             "
             style={
@@ -1352,27 +1364,21 @@ export default function Wheel({
             }
             aria-hidden="true"
           >
-            {/*
-             * Wheel of Names style pointer: the arrow uses the exact
-             * colour of the slice it is pointing at. There is no heavy
-             * black outline or dark backing. A very soft shadow gives it
-             * the small raised/3D appearance from the reference.
-             */}
+            {/* Clean colour-matched triangle. No dark outline/backing. */}
             <div
-              className="absolute inset-0 drop-shadow-[0_2px_2px_rgba(0,0,0,0.20)]"
+              className="absolute inset-0 drop-shadow-[0_2px_2px_rgba(0,0,0,0.24)]"
               style={{
-                clipPath: "polygon(100% 0, 0 50%, 100% 100%)",
+                clipPath: "polygon(0 50%, 100% 0, 100% 100%)",
                 background: "var(--pointer-color)",
               }}
             />
 
-            {/* Soft highlight only along the upper half of the pointer. */}
+            {/* Tiny highlight for the soft raised appearance. */}
             <div
-              className="absolute inset-0 opacity-25"
+              className="absolute inset-0 opacity-20"
               style={{
-                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 88% 50%)",
-                background:
-                  "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0) 52%)",
+                clipPath: "polygon(0 50%, 100% 0, 100% 50%)",
+                background: "rgba(255,255,255,0.9)",
               }}
             />
           </div>
@@ -1381,7 +1387,7 @@ export default function Wheel({
           {/* Centre                                                           */}
           {/* ---------------------------------------------------------------- */}
 
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 aspect-square h-[20%] w-auto -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-white shadow-[0_5px_14px_rgba(0,0,0,0.30)]">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 aspect-square h-[17%] w-auto -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-white shadow-[0_3px_8px_rgba(0,0,0,0.24)]">
             {centerImage && (
               <img
                 src={centerImage}
@@ -1430,8 +1436,8 @@ export default function Wheel({
                   <path
                     id={`wheel-click-text-${wheelTextId}`}
                     d="
-                      M 265 405
-                      Q 500 245 735 405
+                      M 305 405
+                      Q 500 275 695 405
                     "
                     fill="none"
                   />
@@ -1440,22 +1446,24 @@ export default function Wheel({
                   <path
                     id={`wheel-control-text-${wheelTextId}`}
                     d="
-                      M 300 590
-                      Q 500 735 700 590
+                      M 340 575
+                      Q 500 675 660 575
                     "
                     fill="none"
                   />
                 </defs>
 
-                {/* Subtle soft shadow, not a heavy outline. */}
+                {/* White curved text with only a soft shadow. */}
                 <text
                   fill="#ffffff"
-                  fontSize="58"
+                  fontSize="48"
                   fontWeight="700"
                   fontFamily="Arial, Helvetica, sans-serif"
                   letterSpacing="-1"
                   textAnchor="middle"
-                  style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.42))" }}
+                  style={{
+                    filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.38))",
+                  }}
                 >
                   <textPath
                     href={`#wheel-click-text-${wheelTextId}`}
@@ -1467,12 +1475,14 @@ export default function Wheel({
 
                 <text
                   fill="#ffffff"
-                  fontSize="34"
+                  fontSize="29"
                   fontWeight="700"
                   fontFamily="Arial, Helvetica, sans-serif"
                   letterSpacing="-0.35"
                   textAnchor="middle"
-                  style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.42))" }}
+                  style={{
+                    filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.38))",
+                  }}
                 >
                   <textPath
                     href={`#wheel-control-text-${wheelTextId}`}
