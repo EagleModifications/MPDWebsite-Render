@@ -60,6 +60,8 @@ type SidebarProps = {
   onOpenWheel: () => void
   animateWinningEntryByWheel: Record<string, boolean>
   onAnimateWinningEntryChange: (wheelId: string, enabled: boolean) => void
+  launchConfettiByWheel: Record<string, boolean>
+  onLaunchConfettiChange: (wheelId: string, enabled: boolean) => void
   afterSoundByWheel: Record<string, string>
   afterVolumeByWheel: Record<string, number>
   onAfterSoundChange: (wheelId: string, sound: string) => void
@@ -1186,6 +1188,8 @@ function WheelCustomizeDialog({
   onClose,
   animateWinner,
   onAnimateWinnerChange,
+  launchConfetti,
+  onLaunchConfettiChange,
   onColorsChange,
   afterSound,
   afterVolume,
@@ -1206,6 +1210,8 @@ function WheelCustomizeDialog({
   onClose: () => void
   animateWinner: boolean
   onAnimateWinnerChange: (enabled: boolean) => void
+  launchConfetti: boolean
+  onLaunchConfettiChange: (enabled: boolean) => void
   onColorsChange: (colors: string[]) => void
   afterSound: string
   afterVolume: number
@@ -1544,6 +1550,7 @@ function WheelCustomizeDialog({
               <div className="border-t border-border/70 py-5">
                 <div className="flex flex-wrap gap-x-7 gap-y-4">
                   {check(animateWinner, onAnimateWinnerChange, "Animate winning entry")}
+                  {check(launchConfetti, onLaunchConfettiChange, "Launch confetti")}
                   {check(autoRemove, setAutoRemove, "Auto-remove winner after 5 seconds")}
                 </div>
               </div>
@@ -1713,6 +1720,8 @@ export default function Sidebar({
   onOpenWheel,
   animateWinningEntryByWheel,
   onAnimateWinningEntryChange,
+  launchConfettiByWheel,
+  onLaunchConfettiChange,
   afterSoundByWheel,
   afterVolumeByWheel,
   onAfterSoundChange,
@@ -3449,11 +3458,15 @@ export default function Sidebar({
         onAnimateWinnerChange={(enabled) =>
           onAnimateWinningEntryChange(activeWheelId, enabled)
         }
+        launchConfetti={launchConfettiByWheel[activeWheelId] ?? false}
+        onLaunchConfettiChange={(enabled) =>
+          onLaunchConfettiChange(activeWheelId, enabled)
+        }
         afterSound={afterSoundByWheel[activeWheelId] ?? "Subdued applause"}
         afterVolume={afterVolumeByWheel[activeWheelId] ?? 50}
         onAfterSoundChange={(sound) => onAfterSoundChange(activeWheelId, sound)}
         onAfterVolumeChange={(volume) => onAfterVolumeChange(activeWheelId, volume)}
-        spinSlowly={spinSlowlyByWheel[activeWheelId] ?? true}
+        spinSlowly={spinSlowlyByWheel[activeWheelId] ?? false}
         onSpinSlowlyChange={(enabled) => onSpinSlowlyChange(activeWheelId, enabled)}
         spinTime={spinTimeByWheel[activeWheelId] ?? 10}
         onSpinTimeChange={(seconds) => onSpinTimeChange(activeWheelId, seconds)}
