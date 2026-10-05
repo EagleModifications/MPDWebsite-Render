@@ -1369,15 +1369,9 @@ export default function Wheel({
           "
           style={{
             width: compact
-              ? wheelCount === 2
-                ? "min(44vw, calc(50vh - 70px), 500px)"
-                : wheelCount === 3
-                  ? "min(32vw, calc(50vh - 70px), 410px)"
-                  : wheelCount === 4
-                    ? "min(27vw, calc(50vh - 70px), 350px)"
-                    : "min(24vw, calc(50vh - 70px), 320px)"
-              : "min(56vw, 720px)",
-            maxWidth: compact ? "96%" : "78%",
+              ? "min(100%, calc(100vh - 150px))"
+              : "min(72vw, calc(100vh - 130px), 820px)",
+            maxWidth: "100%",
           }}
           onClick={
             handleWheelClick
