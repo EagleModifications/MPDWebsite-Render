@@ -51,6 +51,7 @@ const navItems: NavItem[] = [
     name: "Dashboard",
     href: "/dashboard",
     permission: [
+      "dashboard",
       "activitymanagement",
       "promotionmanagement",
     ],
