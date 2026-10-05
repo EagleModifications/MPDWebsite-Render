@@ -801,7 +801,7 @@ export default function SpinWheel() {
             </button>
             <button
               type="button"
-              onClick={resetToNewWheel}
+              onClick={requestNewWheel}
               className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
             >
               <FilePlus2 className="h-4 w-4" />
@@ -851,7 +851,7 @@ export default function SpinWheel() {
 
         <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_35%_35%,rgba(33,70,82,0.42),transparent_45%),radial-gradient(circle_at_78%_25%,rgba(81,42,91,0.28),transparent_42%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]">
           <div
-            className={`absolute inset-x-0 bottom-0 top-28 min-h-0 overflow-hidden transition-[padding] duration-300 ${
+            className={`absolute inset-x-0 bottom-0 top-40 min-h-0 overflow-hidden transition-[padding] duration-300 ${
               sidebarOpen ? "lg:pr-[500px]" : ""
             }`}
           >
