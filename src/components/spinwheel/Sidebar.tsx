@@ -72,8 +72,9 @@ type SidebarProps = {
   onSpinTimeChange: (wheelId: string, seconds: number) => void
   centerImageByWheel: Record<string, string | undefined>
   onCenterImageChange: (wheelId: string, image: string | undefined) => void
-  imageSizeByWheel: Record<string, "S" | "M" | "L">
-  onImageSizeChange: (wheelId: string, size: "S" | "M" | "L") => void
+  imageSizeByWheel: Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL">
+  onImageSizeChange: (wheelId: string, size: "XS" | "S" | "M" | "L" | "XL" | "XXL") => void
+  customizeRequest?: number
 }
 
 type Tab = "entries" | "results"
@@ -1223,8 +1224,8 @@ function WheelCustomizeDialog({
   onSpinTimeChange: (seconds: number) => void
   centerImage?: string
   onCenterImageChange: (image: string | undefined) => void
-  imageSize: "S" | "M" | "L"
-  onImageSizeChange: (size: "S" | "M" | "L") => void
+  imageSize: "XS" | "S" | "M" | "L" | "XL" | "XXL"
+  onImageSizeChange: (size: "XS" | "S" | "M" | "L" | "XL" | "XXL") => void
   currentColors: string[]
 }) {
   const [tab, setTab] = useState<"during" | "after" | "appearance">("during")
@@ -1668,19 +1669,36 @@ function WheelCustomizeDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border/70 py-5">
-                <div className="flex items-center gap-3 text-sm font-semibold">Image at the center of the wheel
-                  <button type="button" onClick={() => centerImageInputRef.current?.click()} className="flex h-10 w-24 items-center justify-center gap-2 rounded-md bg-blue-600 text-white transition hover:bg-blue-500">
+              <div className="grid grid-cols-[1fr_auto] items-center gap-6 border-b border-border/70 py-5">
+                <div className="flex min-w-0 items-center gap-3 text-sm font-semibold">
+                  <span className="whitespace-nowrap">Image at the center of the wheel</span>
+                  <button
+                    type="button"
+                    onClick={() => centerImageInputRef.current?.click()}
+                    className="flex h-10 w-20 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm transition hover:bg-blue-500"
+                    aria-label="Choose center image"
+                    title="Choose center image"
+                  >
                     <ImageIcon className="h-4 w-4" />
                   </button>
                   <input ref={centerImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleCenterImage} />
                 </div>
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  Image size
-                  <select value={imageSize} onChange={(event) => onImageSizeChange(event.target.value as "S" | "M" | "L")} className="h-10 rounded-md border border-border/70 bg-muted/70 px-3 text-sm outline-none focus:border-blue-500/60">
-                    <option>S</option><option>M</option><option>L</option>
+
+                <label className="flex shrink-0 items-center gap-3 text-sm font-semibold">
+                  <span>Image size</span>
+                  <select
+                    value={imageSize}
+                    onChange={(event) => onImageSizeChange(event.target.value as "XS" | "S" | "M" | "L" | "XL" | "XXL")}
+                    className="h-10 w-[72px] appearance-auto rounded-md border border-border/70 bg-muted/70 px-2 text-sm outline-none focus:border-blue-500/60"
+                  >
+                    <option value="XS">XS</option>
+                    <option value="S">S</option>
+                    <option value="M">M</option>
+                    <option value="L">L</option>
+                    <option value="XL">XL</option>
+                    <option value="XXL">XXL</option>
                   </select>
-                </div>
+                </label>
               </div>
 
               <div className="grid grid-cols-2 gap-x-8 gap-y-4 bg-muted/20 p-4">
@@ -1734,6 +1752,7 @@ export default function Sidebar({
   onCenterImageChange,
   imageSizeByWheel,
   onImageSizeChange,
+  customizeRequest = 0,
 }: SidebarProps) {
   const [tab, setTab] =
     useState<Tab>("entries")
@@ -1763,6 +1782,14 @@ export default function Sidebar({
 
   const [customizeWheelOpen, setCustomizeWheelOpen] =
     useState(false)
+
+  const previousCustomizeRequestRef = useRef(customizeRequest)
+
+  useEffect(() => {
+    if (customizeRequest === previousCustomizeRequestRef.current) return
+    previousCustomizeRequestRef.current = customizeRequest
+    setCustomizeWheelOpen(true)
+  }, [customizeRequest])
 
   const textEditingRef =
     useRef(false)
@@ -2690,7 +2717,7 @@ export default function Sidebar({
   return (
     <>
       <aside
-        className={`absolute inset-y-0 right-0 z-[150] flex h-full w-[468px] max-w-[calc(100vw-8px)] flex-col border-l border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
+        className={`absolute bottom-3 right-3 top-3 z-[150] flex h-auto w-[468px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
           open
             ? "translate-x-0"
             : "translate-x-full"
