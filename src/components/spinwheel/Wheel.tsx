@@ -1322,10 +1322,35 @@ export default function Wheel({
             handleWheelKeyDown
           }
         >
-          {/* The wheel itself is clean — no surrounding card or border. */}
+          {/* ---------------------------------------------------------------- */}
+          {/* 3D wheel rim / contour                                         */}
+          {/* ---------------------------------------------------------------- */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-0 rounded-full"
+            style={{
+              transform: "scale(1.012)",
+              background:
+                "linear-gradient(145deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.10) 16%, rgba(0,0,0,0.30) 48%, rgba(0,0,0,0.70) 100%)",
+              boxShadow:
+                "0 10px 18px rgba(0,0,0,0.42), 0 2px 5px rgba(0,0,0,0.55), inset 0 2px 2px rgba(255,255,255,0.34), inset 0 -4px 5px rgba(0,0,0,0.55)",
+            }}
+          />
+
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-[4px] z-[1] rounded-full"
+            style={{
+              background: "rgba(17,24,39,0.92)",
+              boxShadow:
+                "inset 0 1px 2px rgba(255,255,255,0.22), inset 0 -3px 4px rgba(0,0,0,0.65)",
+            }}
+          />
+
+          {/* The wheel canvas sits above the 3D rim. */}
           <div
             ref={containerRef}
-            className="absolute inset-0 overflow-visible rounded-full"
+            className="absolute inset-[7px] z-[2] overflow-visible rounded-full"
           />
 
           {/* ---------------------------------------------------------------- */}
@@ -1337,11 +1362,11 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-24px]
+              left-[96.5%]
               top-1/2
               z-50
-              h-[48px]
-              w-[62px]
+              h-[56px]
+              w-[72px]
               -translate-y-1/2
             "
             style={
@@ -1351,30 +1376,31 @@ export default function Wheel({
             }
             aria-hidden="true"
           >
-            {/* Deep outline gives the arrow the same raised/bevelled look as the reference. */}
+            {/* Dark bevel / outside contour. The left point is the exact pointer tip. */}
             <div
-              className="absolute inset-0 drop-shadow-[0_4px_5px_rgba(0,0,0,0.58)]"
+              className="absolute inset-0"
               style={{
-                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
-                background: "#111827",
+                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 86% 50%)",
+                background: "linear-gradient(145deg, #f8fafc 0%, #cbd5e1 13%, #475569 44%, #0f172a 100%)",
+                filter: "drop-shadow(0 5px 5px rgba(0,0,0,0.58))",
               }}
             />
 
-            {/* Exact colour of the entry currently under the pointer. */}
+            {/* Raised coloured face. */}
             <div
-              className="absolute inset-[3px]"
+              className="absolute inset-[4px]"
               style={{
-                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
-                background: "var(--pointer-color)",
+                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 87% 50%)",
+                background: "linear-gradient(160deg, rgba(255,255,255,0.72) 0%, var(--pointer-color) 24%, color-mix(in srgb, var(--pointer-color) 72%, #000 28%) 100%)",
               }}
             />
 
-            {/* Small highlight along the upper edge. */}
+            {/* Bevel highlight along the top edge. */}
             <div
-              className="absolute inset-[6px] opacity-45"
+              className="absolute inset-[7px]"
               style={{
-                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 88% 50%)",
-                background: "linear-gradient(180deg,rgba(255,255,255,0.72),rgba(255,255,255,0) 48%)",
+                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 89% 50%)",
+                background: "linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.04) 52%, rgba(0,0,0,0.22))",
               }}
             />
           </div>
@@ -1414,115 +1440,89 @@ export default function Wheel({
           {/* ---------------------------------------------------------------- */}
 
           {!isSpinning && (
-              <svg
-                className="
-                  pointer-events-none
-                  absolute
-                  inset-0
-                  z-35
-                  h-full
-                  w-full
-                  overflow-visible
-                "
-                viewBox="0 0 1000 1000"
-                aria-hidden="true"
+            <svg
+              className="pointer-events-none absolute inset-0 z-35 h-full w-full overflow-visible"
+              viewBox="0 0 1000 1000"
+              aria-hidden="true"
+            >
+              <defs>
+                {/* Higher, tighter upper arc like Wheel of Names. */}
+                <path
+                  id={`wheel-click-text-${wheelTextId}`}
+                  d="M 275 405 Q 500 220 725 405"
+                  fill="none"
+                />
+
+                {/* Deeper lower arc for the keyboard hint. */}
+                <path
+                  id={`wheel-control-text-${wheelTextId}`}
+                  d="M 330 585 Q 500 760 670 585"
+                  fill="none"
+                />
+              </defs>
+
+              {/* Click to spin: thick black contour/shadow first, then the white face. */}
+              <text
+                fill="#ffffff"
+                fontSize="57"
+                fontWeight="700"
+                fontFamily="Arial, Helvetica, sans-serif"
+                letterSpacing="-1.2"
+                textAnchor="middle"
+                paintOrder="stroke"
+                stroke="rgba(0,0,0,0.72)"
+                strokeWidth="8"
+                strokeLinejoin="round"
               >
-                <defs>
-                  {/* Exact upper arc used by the recording */}
-                  <path
-                    id={`wheel-click-text-${wheelTextId}`}
-                    d="
-                      M 265 405
-                      Q 500 245 735 405
-                    "
-                    fill="none"
-                  />
+                <textPath href={`#wheel-click-text-${wheelTextId}`} startOffset="50%">
+                  Click to spin
+                </textPath>
+              </text>
 
-                  {/* Lower instruction arc */}
-                  <path
-                    id={`wheel-control-text-${wheelTextId}`}
-                    d="
-                      M 300 590
-                      Q 500 735 700 590
-                    "
-                    fill="none"
-                  />
-                </defs>
+              <text
+                fill="#ffffff"
+                fontSize="57"
+                fontWeight="700"
+                fontFamily="Arial, Helvetica, sans-serif"
+                letterSpacing="-1.2"
+                textAnchor="middle"
+              >
+                <textPath href={`#wheel-click-text-${wheelTextId}`} startOffset="50%">
+                  Click to spin
+                </textPath>
+              </text>
 
-                {/* Click to spin shadow */}
-                <text
-                  fill="#ffffff"
-                  fontSize="50"
-                  fontWeight="700"
-                  fontFamily="Arial, Helvetica, sans-serif"
-                  letterSpacing="-1"
-                  textAnchor="middle"
-                  paintOrder="stroke"
-                  stroke="rgba(0,0,0,0.6)"
-                  strokeWidth="6"
-                >
-                  <textPath
-                    href={`#wheel-click-text-${wheelTextId}`}
-                    startOffset="50%"
-                  >
-                    Click to spin
-                  </textPath>
-                </text>
+              {/* Keyboard hint: smaller, heavier and clearly curved. */}
+              <text
+                fill="#ffffff"
+                fontSize="31"
+                fontWeight="700"
+                fontFamily="Arial, Helvetica, sans-serif"
+                letterSpacing="-0.5"
+                textAnchor="middle"
+                paintOrder="stroke"
+                stroke="rgba(0,0,0,0.72)"
+                strokeWidth="6"
+                strokeLinejoin="round"
+              >
+                <textPath href={`#wheel-control-text-${wheelTextId}`} startOffset="50%">
+                  or press ctrl+enter
+                </textPath>
+              </text>
 
-                {/* Click to spin */}
-                <text
-                  fill="#ffffff"
-                  fontSize="50"
-                  fontWeight="700"
-                  fontFamily="Arial, Helvetica, sans-serif"
-                  letterSpacing="-1"
-                  textAnchor="middle"
-                >
-                  <textPath
-                    href={`#wheel-click-text-${wheelTextId}`}
-                    startOffset="50%"
-                  >
-                    Click to spin
-                  </textPath>
-                </text>
-
-                {/* Ctrl + Enter shadow */}
-                <text
-                  fill="#ffffff"
-                  fontSize="31"
-                  fontWeight="700"
-                  fontFamily="Arial, Helvetica, sans-serif"
-                  letterSpacing="-0.35"
-                  textAnchor="middle"
-                  paintOrder="stroke"
-                  stroke="rgba(0,0,0,0.6)"
-                  strokeWidth="5"
-                >
-                  <textPath
-                    href={`#wheel-control-text-${wheelTextId}`}
-                    startOffset="50%"
-                  >
-                    or press ctrl+enter
-                  </textPath>
-                </text>
-
-                {/* Ctrl + Enter */}
-                <text
-                  fill="#ffffff"
-                  fontSize="31"
-                  fontWeight="700"
-                  fontFamily="Arial, Helvetica, sans-serif"
-                  letterSpacing="-0.35"
-                  textAnchor="middle"
-                >
-                  <textPath
-                    href={`#wheel-control-text-${wheelTextId}`}
-                    startOffset="50%"
-                  >
-                    or press ctrl+enter
-                  </textPath>
-                </text>
-              </svg>
+              <text
+                fill="#ffffff"
+                fontSize="31"
+                fontWeight="700"
+                fontFamily="Arial, Helvetica, sans-serif"
+                letterSpacing="-0.5"
+                textAnchor="middle"
+              >
+                <textPath href={`#wheel-control-text-${wheelTextId}`} startOffset="50%">
+                  or press ctrl+enter
+                </textPath>
+              </text>
+            </svg>
             )}
 
         </div>
