@@ -50,6 +50,14 @@ export default function SpinWheel() {
     useState<Record<string, string>>({})
   const [afterVolumeByWheel, setAfterVolumeByWheel] =
     useState<Record<string, number>>({})
+  const [spinSlowlyByWheel, setSpinSlowlyByWheel] =
+    useState<Record<string, boolean>>({})
+  const [spinTimeByWheel, setSpinTimeByWheel] =
+    useState<Record<string, number>>({})
+  const [centerImageByWheel, setCenterImageByWheel] =
+    useState<Record<string, string | undefined>>({})
+  const [imageSizeByWheel, setImageSizeByWheel] =
+    useState<Record<string, "S" | "M" | "L">>({})
 
   /*
    * The large background winner animation is separate from the winner
@@ -259,6 +267,11 @@ export default function SpinWheel() {
       return next
     })
 
+    setSpinSlowlyByWheel((current) => { const next = { ...current }; delete next[wheelId]; return next })
+    setSpinTimeByWheel((current) => { const next = { ...current }; delete next[wheelId]; return next })
+    setCenterImageByWheel((current) => { const next = { ...current }; delete next[wheelId]; return next })
+    setImageSizeByWheel((current) => { const next = { ...current }; delete next[wheelId]; return next })
+
     setWinners((current) =>
       current.filter((winner) => winner.wheelId !== wheelId),
     )
@@ -276,6 +289,22 @@ export default function SpinWheel() {
       }
     }
   }, [animatedWinner, wheels])
+
+  const handleSpinSlowlyChange = useCallback((wheelId: string, enabled: boolean) => {
+    setSpinSlowlyByWheel((current) => ({ ...current, [wheelId]: enabled }))
+  }, [])
+
+  const handleSpinTimeChange = useCallback((wheelId: string, seconds: number) => {
+    setSpinTimeByWheel((current) => ({ ...current, [wheelId]: seconds }))
+  }, [])
+
+  const handleCenterImageChange = useCallback((wheelId: string, image: string | undefined) => {
+    setCenterImageByWheel((current) => ({ ...current, [wheelId]: image }))
+  }, [])
+
+  const handleImageSizeChange = useCallback((wheelId: string, size: "S" | "M" | "L") => {
+    setImageSizeByWheel((current) => ({ ...current, [wheelId]: size }))
+  }, [])
 
   const addWheel = useCallback(() => {
     if (wheels.length >= MAX_WHEELS) {
@@ -436,13 +465,17 @@ export default function SpinWheel() {
               {wheels.map((wheel) => (
                 <div
                   key={wheel.id}
-                  className="relative flex min-h-0 min-w-0 items-center justify-center rounded-2xl border border-white/[0.035] bg-transparent"
+                  className="relative flex min-h-0 min-w-0 items-center justify-center bg-transparent"
                 >
                   <Wheel
                     items={wheel.items}
                     compact={wheels.length > 1}
                     afterSound={afterSoundByWheel[wheel.id] ?? "Subdued applause"}
                     afterVolume={afterVolumeByWheel[wheel.id] ?? 50}
+                    spinSlowly={spinSlowlyByWheel[wheel.id] ?? false}
+                    spinTime={spinTimeByWheel[wheel.id] ?? 10}
+                    centerImage={centerImageByWheel[wheel.id]}
+                    imageSize={imageSizeByWheel[wheel.id] ?? "S"}
                     onResult={(item) =>
                       handleResult(
                         wheel.id,
@@ -496,6 +529,14 @@ export default function SpinWheel() {
           afterVolumeByWheel={afterVolumeByWheel}
           onAfterSoundChange={handleAfterSoundChange}
           onAfterVolumeChange={handleAfterVolumeChange}
+          spinSlowlyByWheel={spinSlowlyByWheel}
+          onSpinSlowlyChange={handleSpinSlowlyChange}
+          spinTimeByWheel={spinTimeByWheel}
+          onSpinTimeChange={handleSpinTimeChange}
+          centerImageByWheel={centerImageByWheel}
+          onCenterImageChange={handleCenterImageChange}
+          imageSizeByWheel={imageSizeByWheel}
+          onImageSizeChange={handleImageSizeChange}
         />
 
         <button
