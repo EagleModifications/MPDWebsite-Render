@@ -13,6 +13,8 @@ type WheelState = {
   items: SpinWheelItem[]
 }
 
+const MAX_WHEELS = 10
+
 type SpinResult = {
   id: string
   wheelId: string
@@ -48,12 +50,6 @@ export default function SpinWheel() {
     useState<Record<string, string>>({})
   const [afterVolumeByWheel, setAfterVolumeByWheel] =
     useState<Record<string, number>>({})
-  const [duringSoundByWheel, setDuringSoundByWheel] =
-    useState<Record<string, string>>({})
-  const [duringVolumeByWheel, setDuringVolumeByWheel] =
-    useState<Record<string, number>>({})
-  const [clickRemoveSoundByWheel, setClickRemoveSoundByWheel] =
-    useState<Record<string, boolean>>({})
 
   /*
    * The large background winner animation is separate from the winner
@@ -202,36 +198,6 @@ export default function SpinWheel() {
     [],
   )
 
-  const handleDuringSoundChange = useCallback(
-    (wheelId: string, sound: string) => {
-      setDuringSoundByWheel((current) => ({
-        ...current,
-        [wheelId]: sound,
-      }))
-    },
-    [],
-  )
-
-  const handleDuringVolumeChange = useCallback(
-    (wheelId: string, volume: number) => {
-      setDuringVolumeByWheel((current) => ({
-        ...current,
-        [wheelId]: volume,
-      }))
-    },
-    [],
-  )
-
-  const handleClickRemoveSoundChange = useCallback(
-    (wheelId: string, enabled: boolean) => {
-      setClickRemoveSoundByWheel((current) => ({
-        ...current,
-        [wheelId]: enabled,
-      }))
-    },
-    [],
-  )
-
   const renameWheel = useCallback((wheelId: string, name: string) => {
     const trimmed = name.trim()
 
@@ -293,24 +259,6 @@ export default function SpinWheel() {
       return next
     })
 
-    setDuringSoundByWheel((current) => {
-      const next = { ...current }
-      delete next[wheelId]
-      return next
-    })
-
-    setDuringVolumeByWheel((current) => {
-      const next = { ...current }
-      delete next[wheelId]
-      return next
-    })
-
-    setClickRemoveSoundByWheel((current) => {
-      const next = { ...current }
-      delete next[wheelId]
-      return next
-    })
-
     setWinners((current) =>
       current.filter((winner) => winner.wheelId !== wheelId),
     )
@@ -330,12 +278,19 @@ export default function SpinWheel() {
   }, [animatedWinner, wheels])
 
   const addWheel = useCallback(() => {
+    if (wheels.length >= MAX_WHEELS) {
+      return
+    }
+
     const nextWheel = createWheel(wheels.length + 1)
 
-    setWheels((current) => [
-      ...current,
-      nextWheel,
-    ])
+    setWheels((current) => {
+      if (current.length >= MAX_WHEELS) {
+        return current
+      }
+
+      return [...current, nextWheel]
+    })
 
     setActiveWheelId(nextWheel.id)
     setSidebarOpen(true)
@@ -367,12 +322,6 @@ export default function SpinWheel() {
   }, [])
 
   const removeWinner = useCallback((result: SpinResult) => {
-    if (clickRemoveSoundByWheel[result.wheelId]) {
-      const audio = new Audio("/sounds/misc-spin/tick.mp3")
-      audio.volume = 0.5
-      void audio.play().catch(() => undefined)
-    }
-
     setWheels((current) =>
       current.map((wheel) =>
         wheel.id === result.wheelId
@@ -391,7 +340,7 @@ export default function SpinWheel() {
         (winner) => winner.id !== result.id,
       ),
     )
-  }, [clickRemoveSoundByWheel])
+  }, [])
 
   const hideWinner = useCallback((result: SpinResult) => {
     setWheels((current) =>
@@ -494,8 +443,6 @@ export default function SpinWheel() {
                     compact={wheels.length > 1}
                     afterSound={afterSoundByWheel[wheel.id] ?? "Subdued applause"}
                     afterVolume={afterVolumeByWheel[wheel.id] ?? 50}
-                    duringSound={duringSoundByWheel[wheel.id] ?? "Ticking sound"}
-                    duringVolume={duringVolumeByWheel[wheel.id] ?? 50}
                     onResult={(item) =>
                       handleResult(
                         wheel.id,
@@ -534,6 +481,7 @@ export default function SpinWheel() {
           onRenameWheel={renameWheel}
           onRemoveWheel={removeWheel}
           onAddWheel={addWheel}
+          canAddWheel={wheels.length < MAX_WHEELS}
           onSpinAllWheels={spinAllWheels}
           onOpenWheel={() =>
             setSidebarOpen(false)
@@ -548,12 +496,6 @@ export default function SpinWheel() {
           afterVolumeByWheel={afterVolumeByWheel}
           onAfterSoundChange={handleAfterSoundChange}
           onAfterVolumeChange={handleAfterVolumeChange}
-          duringSoundByWheel={duringSoundByWheel}
-          duringVolumeByWheel={duringVolumeByWheel}
-          onDuringSoundChange={handleDuringSoundChange}
-          onDuringVolumeChange={handleDuringVolumeChange}
-          clickRemoveSoundByWheel={clickRemoveSoundByWheel}
-          onClickRemoveSoundChange={handleClickRemoveSoundChange}
         />
 
         <button
@@ -643,9 +585,8 @@ export default function SpinWheel() {
               className="pointer-events-none fixed inset-0 z-[450] overflow-hidden"
             >
               <div
-                className="mpd-winner-entry-animation absolute left-1/2 top-1/2 max-w-[95vw] whitespace-nowrap text-center text-[clamp(4rem,13vw,12rem)] font-extrabold leading-none tracking-[-0.06em]"
+                className="mpd-winner-entry-animation absolute left-1/2 top-1/2 max-w-[95vw] whitespace-nowrap text-center text-[clamp(4rem,13vw,12rem)] font-extrabold leading-none tracking-[-0.06em] text-white"
                 style={{
-                  color: animatedWinner.item.color ?? "#ffffff",
                   animation:
                     "mpdWinnerEntryAnimation 1.9s cubic-bezier(0.16, 1, 0.3, 1) forwards",
                 }}
@@ -678,12 +619,7 @@ export default function SpinWheel() {
                 event.stopPropagation()
               }
             >
-              <div
-                className="flex min-h-[54px] items-center justify-between px-4 text-[#111]"
-                style={{
-                  backgroundColor: orderedWinners[0]?.item.color ?? "#79d99f",
-                }}
-              >
+              <div className="flex min-h-[54px] items-center justify-between bg-[#79d99f] px-4 text-[#111]">
                 <h2
                   id="winner-dialog-title"
                   className="text-[16px] font-bold"
