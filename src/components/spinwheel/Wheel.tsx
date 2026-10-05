@@ -22,6 +22,7 @@ type WheelProps = {
   onResult?: (item: SpinWheelItem) => void
   compact?: boolean
   wheelCount?: number
+  spinTrigger?: number
 }
 
 type ConfettiPiece = {
@@ -605,6 +606,7 @@ export default function Wheel({
   onResult,
   compact = false,
   wheelCount = 1,
+  spinTrigger = 0,
 }: WheelProps) {
   const containerRef =
     useRef<HTMLDivElement | null>(null)
@@ -869,6 +871,18 @@ export default function Wheel({
     getAudioContext,
     visibleItems.length,
   ])
+
+  const previousSpinTriggerRef = useRef(spinTrigger)
+
+  useEffect(() => {
+    if (previousSpinTriggerRef.current === spinTrigger) {
+      return
+    }
+
+    previousSpinTriggerRef.current = spinTrigger
+    getAudioContext()
+    spin()
+  }, [getAudioContext, spin, spinTrigger])
 
   /* ---------------------------------------------------------------------- */
   /* Ctrl + Enter                                                           */
@@ -1355,13 +1369,15 @@ export default function Wheel({
           "
           style={{
             width: compact
-              ? wheelCount <= 2
-                ? "min(42vw, calc(50vh - 150px), 520px)"
+              ? wheelCount === 2
+                ? "min(44vw, calc(50vh - 70px), 500px)"
                 : wheelCount === 3
-                  ? "min(30vw, calc(33vh - 120px), 430px)"
-                  : "min(24vw, calc(25vh - 110px), 360px)"
+                  ? "min(32vw, calc(50vh - 70px), 410px)"
+                  : wheelCount === 4
+                    ? "min(27vw, calc(50vh - 70px), 350px)"
+                    : "min(24vw, calc(50vh - 70px), 320px)"
               : "min(56vw, 720px)",
-            maxWidth: compact ? "92%" : "78%",
+            maxWidth: compact ? "96%" : "78%",
           }}
           onClick={
             handleWheelClick
