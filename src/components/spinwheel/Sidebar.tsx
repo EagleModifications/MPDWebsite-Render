@@ -5,7 +5,6 @@ import {
 } from "react"
 
 import {
-  ArrowUpDown,
   ChevronDown,
   Download,
   Image as ImageIcon,
@@ -94,12 +93,6 @@ export default function Sidebar({
   const [tab, setTab] =
     useState<Tab>("entries")
 
-  /*
-   * Keep the textarea separate from the parsed entries.
-   *
-   * This allows normal new lines, blank lines and
-   * pressing Enter without the value being rewritten.
-   */
   const [text, setText] = useState(() =>
     items
       .map((item) => item.label)
@@ -127,15 +120,8 @@ export default function Sidebar({
   const handleTextChange = (
     value: string,
   ) => {
-    /*
-     * The raw textarea value is preserved exactly.
-     * Empty lines remain visible while typing.
-     */
     setText(value)
 
-    /*
-     * Only non-empty lines become wheel entries.
-     */
     onChange(
       createItemsFromText(
         value,
@@ -177,31 +163,6 @@ export default function Sidebar({
     )
 
     onChange(shuffled)
-  }
-
-  const sortEntries = () => {
-    if (items.length < 2) {
-      return
-    }
-
-    const sorted = [...items].sort(
-      (a, b) =>
-        a.label.localeCompare(
-          b.label,
-          undefined,
-          {
-            sensitivity: "base",
-          },
-        ),
-    )
-
-    setText(
-      sorted
-        .map((item) => item.label)
-        .join("\n"),
-    )
-
-    onChange(sorted)
   }
 
   const handleImageFiles = (
@@ -255,20 +216,12 @@ export default function Sidebar({
       return
     }
 
-    /*
-     * Results are already stored in chronological
-     * order, so export them exactly as displayed.
-     */
     const content =
       results.join("\r\n")
 
     const saveWindow =
       window as SaveFilePickerWindow
 
-    /*
-     * Chrome / Edge:
-     * open the native Save File dialog.
-     */
     if (saveWindow.showSaveFilePicker) {
       try {
         const fileHandle =
@@ -300,10 +253,6 @@ export default function Sidebar({
 
         return
       } catch (error) {
-        /*
-         * User pressed Cancel.
-         * Do not download anything.
-         */
         if (
           error instanceof DOMException &&
           error.name === "AbortError"
@@ -313,10 +262,6 @@ export default function Sidebar({
       }
     }
 
-    /*
-     * Browser fallback where the native
-     * Save File Picker isn't available.
-     */
     const blob = new Blob(
       [content],
       {
@@ -347,20 +292,20 @@ export default function Sidebar({
     onNewWheel()
   }
 
-  const toggleWheelMenu = () => {
-    setWheelMenuOpen(
-      (current) => !current,
-    )
-
-    setImageMenuOpen(false)
-  }
-
   const toggleImageMenu = () => {
     setImageMenuOpen(
       (current) => !current,
     )
 
     setWheelMenuOpen(false)
+  }
+
+  const toggleWheelMenu = () => {
+    setWheelMenuOpen(
+      (current) => !current,
+    )
+
+    setImageMenuOpen(false)
   }
 
   return (
@@ -432,23 +377,6 @@ export default function Sidebar({
                   Shuffle
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={
-                    sortEntries
-                  }
-                  disabled={
-                    items.length < 2
-                  }
-                  className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold hover:bg-muted"
-                >
-                  <ArrowUpDown className="h-3.5 w-3.5" />
-                  Sort
-                </Button>
-
-                {/* Add image */}
                 <div
                   ref={imageMenuRef}
                   className="relative"
@@ -460,7 +388,7 @@ export default function Sidebar({
                     onClick={
                       toggleImageMenu
                     }
-                    className="h-9 gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 text-xs font-semibold text-blue-500 hover:bg-blue-500/15"
+                    className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold text-foreground hover:bg-muted"
                   >
                     <ImageIcon className="h-3.5 w-3.5" />
 
@@ -476,16 +404,38 @@ export default function Sidebar({
                   </Button>
 
                   {imageMenuOpen && (
-                    <div className="absolute left-0 top-11 z-[80] w-48 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-2xl">
+                    <div className="absolute left-0 top-11 z-[80] w-48 overflow-hidden rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl">
                       <button
                         type="button"
                         onClick={() =>
                           fileInputRef.current?.click()
                         }
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium transition-colors hover:bg-muted"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
                       >
                         <Upload className="h-4 w-4 text-muted-foreground" />
-                        Upload images
+                        Add background image
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          fileInputRef.current?.click()
+                        }
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                      >
+                        <Upload className="h-4 w-4 text-muted-foreground" />
+                        Add center image
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          fileInputRef.current?.click()
+                        }
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                      >
+                        <Upload className="h-4 w-4 text-muted-foreground" />
+                        Add image as entry
                       </button>
                     </div>
                   )}
@@ -502,7 +452,6 @@ export default function Sidebar({
                   />
                 </div>
 
-                {/* Advanced */}
                 <label className="ml-1 flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground">
                   <input
                     type="checkbox"
@@ -527,7 +476,7 @@ export default function Sidebar({
               </div>
             )}
 
-            {/* Entries textarea */}
+            {/* Entries */}
             <div className="min-h-0 flex-1 p-4">
               <textarea
                 value={text}
@@ -542,13 +491,12 @@ export default function Sidebar({
               />
             </div>
 
-            {/* Add wheel split button */}
+            {/* Add wheel */}
             <div className="shrink-0 border-t border-border/70 bg-muted/10 px-4 py-4">
               <div
                 ref={wheelMenuRef}
                 className="relative inline-flex"
               >
-                {/* Main Add wheel interaction */}
                 <button
                   type="button"
                   onClick={
@@ -563,7 +511,6 @@ export default function Sidebar({
                   Add wheel
                 </button>
 
-                {/* Separate dropdown interaction */}
                 <button
                   type="button"
                   aria-label="More wheel options"
@@ -615,17 +562,6 @@ export default function Sidebar({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  disabled
-                  className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold"
-                >
-                  <ArrowUpDown className="h-3.5 w-3.5" />
-                  Sort
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
                   onClick={
                     onClearResults
                   }
@@ -664,22 +600,18 @@ export default function Sidebar({
                     No results yet.
                   </div>
                 ) : (
-                  results.map(
-                    (result, index) => (
-                      <div
-                        key={`${result}-${index}`}
-                        className="flex items-center gap-3 border-b border-border/40 py-2.5 text-sm last:border-0"
-                      >
-                        <span className="w-7 shrink-0 text-right text-xs font-semibold text-muted-foreground">
-                          {index + 1}
-                        </span>
-
-                        <span className="min-w-0 truncate">
+                  <div className="space-y-1">
+                    {results.map(
+                      (result, index) => (
+                        <div
+                          key={`${result}-${index}`}
+                          className="border-b border-border/40 px-2 py-2.5 text-sm last:border-0"
+                        >
                           {result}
-                        </span>
-                      </div>
-                    ),
-                  )
+                        </div>
+                      ),
+                    )}
+                  </div>
                 )}
               </div>
             </div>
