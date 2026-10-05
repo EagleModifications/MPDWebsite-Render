@@ -96,16 +96,6 @@ export default function SpinWheel() {
     [wheels],
   )
 
-  const addWheel = useCallback(() => {
-    const next = createWheel(wheels.length + 1)
-    setWheels((current) => [...current, next])
-    setActiveWheelId(next.id)
-  }, [wheels.length])
-
-  const clearResults = useCallback(() => {
-    setResults([])
-  }, [])
-
   const renameWheel = useCallback((wheelId: string, name: string) => {
     const trimmed = name.trim()
     if (!trimmed) return
@@ -283,7 +273,6 @@ export default function SpinWheel() {
             handleWheelChange(activeWheelId, items)
           }
           onClearResults={clearResults}
-          onNewWheel={addWheel}
           onRenameWheel={renameWheel}
           onRemoveWheel={removeWheel}
           onOpenWheel={() => setSidebarOpen(false)}
