@@ -176,10 +176,7 @@ export default function Navbar() {
       }
     }
 
-    document.addEventListener(
-      "pointerdown",
-      handlePointerDown,
-    )
+    document.addEventListener("pointerdown", handlePointerDown)
 
     return () => {
       document.removeEventListener(
@@ -212,7 +209,6 @@ export default function Navbar() {
   }
 
   const visibleItems = navItems.filter(canViewItem)
-
   const visibleRosters = rosterItems.filter(canViewItem)
   const visibleSops = sopItems.filter(canViewItem)
 
@@ -237,15 +233,13 @@ export default function Navbar() {
     currentPath.startsWith("/documents/supervisor") ||
     currentPath.startsWith("/documents/command")
 
-  const rostersActive =
-    visibleRosters.some(
-      (item) => currentPath === item.href,
-    )
+  const rostersActive = visibleRosters.some(
+    (item) => currentPath === item.href,
+  )
 
-  const sopsActive =
-    visibleSops.some(
-      (item) => currentPath === item.href,
-    )
+  const sopsActive = visibleSops.some(
+    (item) => currentPath === item.href,
+  )
 
   const supervisorActive =
     currentPath.startsWith("/documents/supervisor")
@@ -278,24 +272,29 @@ export default function Navbar() {
 
   return (
     <header className="absolute left-0 top-0 z-50 w-full">
-      <div className="mx-auto flex h-20 max-w-[1600px] items-center justify-between px-6 lg:px-8">
-        <Link
-          to="/"
-          className="flex items-center gap-3"
-          onClick={closeMobileMenu}
-        >
-          <img
-            src="/logo.png"
-            alt="Metro Police Department"
-            className="h-11 w-auto"
-          />
+      <div className="mx-auto grid h-20 max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-6 lg:px-8">
 
-          <span className="text-lg font-semibold tracking-tight text-foreground">
-            Metro Police Department
-          </span>
-        </Link>
+        {/* Logo */}
+        <div className="flex items-center justify-start">
+          <Link
+            to="/"
+            className="flex items-center gap-3"
+            onClick={closeMobileMenu}
+          >
+            <img
+              src="/logo.png"
+              alt="Metro Police Department"
+              className="h-11 w-auto"
+            />
 
-        <nav className="hidden items-center gap-1 md:flex">
+            <span className="text-lg font-semibold tracking-tight text-foreground">
+              Metro Police Department
+            </span>
+          </Link>
+        </div>
+
+        {/* Desktop Navigation */}
+        <nav className="hidden items-center justify-center gap-1 md:flex">
           {visibleItems
             .filter((item) => item.name !== "Dashboard")
             .map((item) => (
@@ -370,10 +369,7 @@ export default function Navbar() {
                             <NavLink
                               key={item.href}
                               to={item.href}
-                              onClick={() => {
-                                setDocumentsOpen(false)
-                                setRostersOpen(false)
-                              }}
+                              onClick={closeMobileMenu}
                               className={({ isActive }) =>
                                 [
                                   "block rounded-lg px-3 py-2 text-sm transition-colors",
@@ -419,10 +415,7 @@ export default function Navbar() {
                             <NavLink
                               key={item.href}
                               to={item.href}
-                              onClick={() => {
-                                setDocumentsOpen(false)
-                                setSopsOpen(false)
-                              }}
+                              onClick={closeMobileMenu}
                               className={({ isActive }) =>
                                 [
                                   "block rounded-lg px-3 py-2 text-sm transition-colors",
@@ -443,11 +436,7 @@ export default function Navbar() {
                   {canViewSupervisor && (
                     <NavLink
                       to={supervisorItem.href}
-                      onClick={() => {
-                        setDocumentsOpen(false)
-                        setRostersOpen(false)
-                        setSopsOpen(false)
-                      }}
+                      onClick={closeMobileMenu}
                       className={[
                         "mt-1 block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                         supervisorActive
@@ -462,11 +451,7 @@ export default function Navbar() {
                   {canViewCommand && (
                     <NavLink
                       to={commandItem.href}
-                      onClick={() => {
-                        setDocumentsOpen(false)
-                        setRostersOpen(false)
-                        setSopsOpen(false)
-                      }}
+                      onClick={closeMobileMenu}
                       className={[
                         "mt-1 block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                         commandActive
@@ -502,7 +487,8 @@ export default function Navbar() {
             ))}
         </nav>
 
-        <div className="hidden items-center gap-2 md:flex">
+        {/* Desktop Actions */}
+        <div className="hidden items-center justify-end gap-2 md:flex">
           <ThemeToggle />
 
           {user ? (
@@ -532,7 +518,8 @@ export default function Navbar() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 md:hidden">
+        {/* Mobile Controls */}
+        <div className="flex items-center justify-end gap-2 md:hidden">
           <ThemeToggle />
 
           <Button
@@ -554,6 +541,7 @@ export default function Navbar() {
         </div>
       </div>
 
+      {/* Mobile Navigation */}
       {mobileOpen && (
         <div className="border-t border-border/50 bg-background/95 px-6 py-4 shadow-xl backdrop-blur-xl md:hidden">
           <nav className="mx-auto flex max-w-[1600px] flex-col gap-1">
