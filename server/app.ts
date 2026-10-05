@@ -695,11 +695,23 @@ function getGalleryPublicMediaUrl(
   media: GalleryMedia,
 ) {
   const originalUrl = cleanGalleryString(media.url)
+  const storageId = cleanGalleryString(media.storageId)
 
-  // IMPORTANT: keep an existing media URL when one is already present.
-  // Older gallery records can contain a storageId that predates the
-  // current GridFS bucket. Replacing a perfectly usable legacy URL with
-  // /api/gallery/file/<old-id> makes those images appear broken.
+  /*
+   * GridFS-backed media must always use the current application's
+   * gallery-file endpoint. Older records may contain an absolute URL
+   * generated from a previous APP_ORIGIN/domain. Returning that stale
+   * absolute URL is what causes existing images to become unavailable
+   * after a domain/deployment change.
+   *
+   * The relative URL also works on local development, Render previews,
+   * and the production custom domain without requiring APP_ORIGIN to be
+   * perfectly configured.
+   */
+  if (storageId && ObjectId.isValid(storageId)) {
+    return `/api/gallery/file/${storageId}`
+  }
+
   if (originalUrl) {
     if (originalUrl.startsWith("/")) {
       return APP_ORIGIN
@@ -708,15 +720,6 @@ function getGalleryPublicMediaUrl(
     }
 
     return originalUrl
-  }
-
-  if (media.storageId) {
-    const path =
-      `/api/gallery/file/${media.storageId}`
-
-    return APP_ORIGIN
-      ? `${APP_ORIGIN}${path}`
-      : path
   }
 
   return ""
