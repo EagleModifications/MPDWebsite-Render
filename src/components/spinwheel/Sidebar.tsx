@@ -51,6 +51,8 @@ type SidebarProps = {
   onClearResults: () => void
   onRenameWheel: (wheelId: string, name: string) => void
   onRemoveWheel: (wheelId: string) => void
+  onAddWheel: () => void
+  onSpinAllWheels: () => void
   onOpenWheel: () => void
 }
 
@@ -1098,6 +1100,8 @@ export default function Sidebar({
   onClearResults,
   onRenameWheel,
   onRemoveWheel,
+  onAddWheel,
+  onSpinAllWheels,
   onOpenWheel,
 }: SidebarProps) {
   const [tab, setTab] =
@@ -1992,6 +1996,12 @@ export default function Sidebar({
     setWheelMenuOpen(false)
   }
 
+  const toggleWheelMenu = (event: ReactMouseEvent) => {
+    event.stopPropagation()
+    setWheelMenuOpen((current) => !current)
+    setImageMenuOpen(false)
+  }
+
   const toggleImageMenu = (
     event: ReactMouseEvent,
   ) => {
@@ -2633,50 +2643,139 @@ export default function Sidebar({
           )}
 
           <div className="mt-auto shrink-0 border-t border-border/70 bg-muted/10 px-4 py-3">
-            <div className="grid gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onSelectWheel(activeWheelId)
-                  setTab("entries")
-                  onOpenWheel()
-                }}
-                className="flex h-10 w-full items-center justify-center rounded-md bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500"
-              >
-                Open wheel
-              </button>
-
+            <div className="relative">
               {wheels.length > 1 && (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCustomizeActiveWheel}
-                      className="flex h-10 min-w-0 items-center justify-center rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
-                    >
-                      <Palette className="mr-1.5 h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">Customize wheel {activeWheelNumber}</span>
-                    </button>
+                <div className="mb-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onSpinAllWheels}
+                    className="flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                  >
+                    <span className="text-sm leading-none">⟳</span>
+                    Spin all wheels
+                  </button>
 
+                  <div ref={wheelMenuRef} className="relative">
+                    <div className="flex h-9">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onAddWheel()
+                          setWheelMenuOpen(false)
+                        }}
+                        className="flex items-center gap-1.5 rounded-l-md border-r border-white/15 bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add wheel
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="More wheel options"
+                        aria-expanded={wheelMenuOpen}
+                        onClick={toggleWheelMenu}
+                        className="flex w-9 items-center justify-center rounded-r-md bg-blue-600 text-white shadow-sm transition hover:bg-blue-500"
+                      >
+                        <ChevronDown className={`h-4 w-4 transition-transform ${wheelMenuOpen ? "rotate-180" : ""}`} />
+                      </button>
+                    </div>
+
+                    {wheelMenuOpen && (
+                      <div className="absolute bottom-[calc(100%+6px)] left-0 z-[320] w-[145px] overflow-hidden rounded-md border border-border/70 bg-card p-1 shadow-2xl">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelectWheel(activeWheelId)
+                            setTab("entries")
+                            setWheelMenuOpen(false)
+                            onOpenWheel()
+                          }}
+                          className="flex h-9 w-full items-center gap-3 rounded px-2.5 text-left text-xs font-semibold text-foreground transition hover:bg-muted"
+                        >
+                          <span className="text-base leading-none">📁</span>
+                          Open wheel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {wheels.length === 1 && (
+                <div ref={wheelMenuRef} className="relative inline-flex">
+                  <div className="flex h-9">
                     <button
                       type="button"
-                      onClick={handleRenameActiveWheel}
-                      className="flex h-10 min-w-0 items-center justify-center rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                      onClick={() => {
+                        onAddWheel()
+                        setWheelMenuOpen(false)
+                      }}
+                      className="flex items-center gap-1.5 rounded-l-md border-r border-white/15 bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
                     >
-                      <Pencil className="mr-1.5 h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">Rename wheel {activeWheelNumber}</span>
+                      <Plus className="h-4 w-4" />
+                      Add wheel
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="More wheel options"
+                      aria-expanded={wheelMenuOpen}
+                      onClick={toggleWheelMenu}
+                      className="flex w-9 items-center justify-center rounded-r-md bg-blue-600 text-white shadow-sm transition hover:bg-blue-500"
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${wheelMenuOpen ? "rotate-180" : ""}`} />
                     </button>
                   </div>
 
+                  {wheelMenuOpen && (
+                    <div className="absolute bottom-[calc(100%+6px)] left-0 z-[320] w-[145px] overflow-hidden rounded-md border border-border/70 bg-card p-1 shadow-2xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectWheel(activeWheelId)
+                          setTab("entries")
+                          setWheelMenuOpen(false)
+                          onOpenWheel()
+                        }}
+                        className="flex h-9 w-full items-center gap-3 rounded px-2.5 text-left text-xs font-semibold text-foreground transition hover:bg-muted"
+                      >
+                        <span className="text-base leading-none">📁</span>
+                        Open wheel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {wheels.length > 1 && (
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={handleRemoveActiveWheel}
-                    className="flex h-10 w-full items-center justify-start rounded-md px-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+                    onClick={handleCustomizeActiveWheel}
+                    className="flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
                   >
-                    <Trash2 className="mr-2 h-4 w-4 shrink-0" />
-                    Remove wheel {activeWheelNumber}
+                    <Palette className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">Customize wheel {activeWheelNumber}</span>
                   </button>
-                </>
+
+                  <button
+                    type="button"
+                    onClick={handleRenameActiveWheel}
+                    className="flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                  >
+                    <Pencil className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">Rename wheel {activeWheelNumber}</span>
+                  </button>
+                </div>
+              )}
+
+              {wheels.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handleRemoveActiveWheel}
+                  className="mt-1 flex h-9 items-center justify-start gap-2 rounded-md px-2 text-xs font-semibold text-foreground transition hover:bg-muted hover:text-foreground"
+                >
+                  <Trash2 className="h-4 w-4 shrink-0" />
+                  Remove wheel {activeWheelNumber}
+                </button>
               )}
             </div>
           </div>
