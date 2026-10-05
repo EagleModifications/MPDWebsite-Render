@@ -3453,7 +3453,7 @@ export default function Sidebar({
         afterVolume={afterVolumeByWheel[activeWheelId] ?? 50}
         onAfterSoundChange={(sound) => onAfterSoundChange(activeWheelId, sound)}
         onAfterVolumeChange={(volume) => onAfterVolumeChange(activeWheelId, volume)}
-        spinSlowly={spinSlowlyByWheel[activeWheelId] ?? false}
+        spinSlowly={spinSlowlyByWheel[activeWheelId] ?? true}
         onSpinSlowlyChange={(enabled) => onSpinSlowlyChange(activeWheelId, enabled)}
         spinTime={spinTimeByWheel[activeWheelId] ?? 10}
         onSpinTimeChange={(seconds) => onSpinTimeChange(activeWheelId, seconds)}
