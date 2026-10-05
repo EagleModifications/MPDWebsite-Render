@@ -390,14 +390,26 @@ function playAfterSpinSound(sound: string, volume: number) {
 const halfThenSmoothStop = (t: number) => {
   if (t <= 0.5) return t
 
-  // Quintic continuation: position and velocity match at 50%, while
-  // acceleration eases to zero at the final stop.
+  /*
+   * First half: perfectly constant angular speed.
+   *
+   * Second half: a 7th-order braking curve.  It is constructed so that:
+   *   - position is continuous at 50%,
+   *   - velocity is continuous at 50%,
+   *   - acceleration is zero at 50%,
+   *   - jerk is zero at 50%,
+   *   - velocity, acceleration and jerk all reach zero at the final frame.
+   *
+   * That is much smoother than a normal ease-out because braking does not
+   * suddenly kick in when the wheel reaches the halfway point.
+   */
   const u = (t - 0.5) * 2
   const eased =
-    u +
-    3 * u ** 2 -
-    5 * u ** 3 +
-    2 * u ** 4
+    0.5 * u +
+    25 * u ** 4 -
+    (123 / 2) * u ** 5 +
+    52 * u ** 6 -
+    15 * u ** 7
 
   return 0.5 + 0.5 * eased
 }
@@ -532,15 +544,6 @@ export default function Wheel({
     useRef<HTMLDivElement | null>(null)
 
   const spinningRef =
-    useRef(false)
-
-  // Only true for a real user-triggered spin. This prevents the library's
-  // initial/rest callbacks from creating a phantom winner on refresh.
-  const activeSpinRef =
-    useRef(false)
-
-  // Idle rotation is separate from a real spin.
-  const idleSpinningRef =
     useRef(false)
 
   const cancelledSpinRef =
@@ -802,15 +805,8 @@ export default function Wheel({
       )
 
     cancelledSpinRef.current = false
-
-    // Stop the decorative idle rotation before beginning the real spin.
-    if (idleSpinningRef.current) {
-      idleSpinningRef.current = false
-      wheel.stop()
-    }
-
-    activeSpinRef.current = true
-    spinningRef.current = true
+    spinningRef.current =
+      true
 
     setIsSpinning(true)
 
@@ -830,16 +826,14 @@ export default function Wheel({
     /* Slow mode keeps the configured timing. Normal mode is much quicker,
        while both use the same halfway-braking curve. */
     const duration = slowly
-      ? Math.max(6500, Math.min(60000, configuredDuration))
-      : Math.max(2600, Math.min(3800, configuredDuration * 0.32))
-
-    const revolutions = slowly ? 7 : 10
+      ? configuredDuration
+      : Math.max(3200, Math.min(6000, configuredDuration * 0.45))
 
     wheel.spinToItem(
       selectedIndex,
       duration,
       true,
-      revolutions,
+      6,
       1,
       halfThenSmoothStop,
     )
@@ -921,8 +915,6 @@ export default function Wheel({
 
     spinningRef.current =
       false
-    activeSpinRef.current = false
-    idleSpinningRef.current = false
 
     setIsSpinning(false)
 
@@ -1057,9 +1049,7 @@ export default function Wheel({
 
           isInteractive: false,
 
-          // No resistance while idle; the idle rotation is intentionally
-          // continuous. A real spin supplies its own easing curve.
-          rotationResistance: 0,
+          rotationResistance: -35,
 
           rotationSpeedMax: 1000,
 
@@ -1109,15 +1099,8 @@ export default function Wheel({
           /* -------------------------------------------------------------- */
 
           onRest: (event) => {
-            // Ignore any rest callback that is not the end of a real user
-            // spin. This is important during construction/remount/refresh.
-            if (!activeSpinRef.current) {
-              return
-            }
-
             if (cancelledSpinRef.current) {
               cancelledSpinRef.current = false
-              activeSpinRef.current = false
               stopDuringSpinAudio()
               spinningRef.current = false
               setIsSpinning(false)
@@ -1156,8 +1139,8 @@ export default function Wheel({
 
             stopDuringSpinAudio()
 
-            activeSpinRef.current = false
-            spinningRef.current = false
+            spinningRef.current =
+              false
 
             setIsSpinning(false)
 
@@ -1190,14 +1173,6 @@ export default function Wheel({
       wheel
 
     /*
-     * Start the decorative idle rotation only after the wheel has been
-     * fully constructed. It is deliberately not a normal spin, so it never
-     * produces a winner.
-     */
-    idleSpinningRef.current = true
-    wheel.spin(14)
-
-    /*
      * Synchronise the pointer with the
      * actual rendered wheel immediately.
      */
@@ -1215,16 +1190,12 @@ export default function Wheel({
       actualIndex
 
     return () => {
-      // Mark the wheel inactive BEFORE removing/stopping it. The library may
-      // emit onRest during teardown; that must never create a winner.
-      idleSpinningRef.current = false
-      activeSpinRef.current = false
-      spinningRef.current = false
       wheel.remove()
 
-      if (wheelRef.current === wheel) {
-        wheelRef.current = null
-      }
+      wheelRef.current = null
+
+      spinningRef.current =
+        false
     }
   }, [
     visibleItems,
@@ -1242,10 +1213,6 @@ export default function Wheel({
   useEffect(() => {
     return () => {
 
-      idleSpinningRef.current = false
-      activeSpinRef.current = false
-      spinningRef.current = false
-      wheelRef.current?.stop()
       stopDuringSpinAudio()
 
       if (
@@ -1352,11 +1319,11 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-34px]
+              right-[-18px]
               top-1/2
               z-50
-              h-[48px]
-              w-[62px]
+              h-[54px]
+              w-[70px]
               -translate-y-1/2
             "
             style={
@@ -1370,17 +1337,18 @@ export default function Wheel({
             <div
               className="absolute inset-0 drop-shadow-[0_4px_5px_rgba(0,0,0,0.58)]"
               style={{
-                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
-                background: "#111827",
+                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 86% 50%)",
+                background: "linear-gradient(180deg,#e5e7eb 0%,#64748b 46%,#1e293b 100%)",
               }}
             />
 
             {/* Exact colour of the entry currently under the pointer. */}
             <div
-              className="absolute inset-[3px]"
+              className="absolute inset-[4px]"
               style={{
-                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
-                background: "var(--pointer-color)",
+                clipPath: "polygon(100% 0, 0 50%, 100% 100%, 86% 50%)",
+                background: "linear-gradient(180deg, color-mix(in srgb, var(--pointer-color) 78%, white), var(--pointer-color) 48%, color-mix(in srgb, var(--pointer-color) 72%, black))",
+                boxShadow: "inset 0 2px 2px rgba(255,255,255,0.45), inset 0 -2px 3px rgba(0,0,0,0.38)",
               }}
             />
 
