@@ -697,19 +697,11 @@ export default function Wheel({
   /* ---------------------------------------------------------------------- */
 
   /*
-   * spin-wheel reports the index using its pointer-angle convention.
-   * The visual pointer in this UI is the 3-o'clock pointer, so the visible
-   * slice is one segment clockwise from the reported boundary index. Keep
-   * this conversion in one place so the arrow colour and displayed winner
-   * stay aligned with the slice that is actually under the arrow.
+   * spin-wheel's currentIndex is the item actually under pointerAngle.
+   * Do not offset this index: the DOM pointer is positioned at the same
+   * 3-o'clock angle as pointerAngle, so the colour must use the exact
+   * reported item while the wheel is spinning.
    */
-  const getVisualPointerIndex = useCallback((index: number) => {
-    const count = colorsRef.current.length
-    if (count === 0) return 0
-
-    return (index + 1) % count
-  }, [])
-
   /*
    * This updates the DOM immediately.
    *
@@ -734,11 +726,8 @@ export default function Wheel({
             colors.length) %
           colors.length
 
-        const visualIndex =
-          getVisualPointerIndex(safeIndex)
-
         const color =
-          colors[visualIndex]
+          colors[safeIndex]
 
         if (!color) {
           return
@@ -767,7 +756,7 @@ export default function Wheel({
           setPointerColor(color)
         }
       },
-      [getVisualPointerIndex],
+      [],
     )
 
   const pointerColorRef =
@@ -1175,7 +1164,7 @@ export default function Wheel({
                 : eventIndex
 
             const selectedIndex =
-              getVisualPointerIndex(wheelIndex)
+              wheelIndex
 
             const selectedItem =
               itemsRef.current[
@@ -1224,7 +1213,7 @@ export default function Wheel({
     // The DOM pointer is positioned from the wheel container's actual
     // right edge, so it stays attached to the 3 o'clock point at every size.
     if (pointerRef.current) {
-      pointerRef.current.style.left = "calc(100% - 7px)"
+      pointerRef.current.style.left = "calc(100% - 2px)"
       pointerRef.current.style.right = "auto"
     }
 
@@ -1260,7 +1249,6 @@ export default function Wheel({
     visibleItems,
     visibleColors,
     setPointerForIndex,
-    getVisualPointerIndex,
     stopDuringSpinAudio,
     afterSound,
     afterVolume,
@@ -1401,26 +1389,27 @@ export default function Wheel({
             style={
               {
                 "--pointer-color": pointerColor,
-                left: "calc(100% - 12px)",
+                left: "calc(100% - 2px)",
               } as CSSProperties
             }
             aria-hidden="true"
           >
-            {/* Clean colour-matched triangle. The wide base sits on the wheel edge and the tip points outward, like the reference. */}
+            {/* Wheel of Names-style pointer: the tip points inward at the
+                selected slice and the wider end sits outside the wheel. */}
             <div
               className="absolute inset-0"
               style={{
-                filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.20)) drop-shadow(0 0 1px rgba(255,255,255,0.55))",
-                clipPath: "polygon(100% 50%, 0 0, 0 100%)",
+                filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.20)) drop-shadow(0 0 1px rgba(255,255,255,0.45))",
+                clipPath: "polygon(0 50%, 100% 0, 100% 100%)",
                 background: "var(--pointer-color)",
               }}
             />
 
-            {/* Very subtle edge highlight — no heavy outline or backing plate. */}
+            {/* Very subtle highlight on the upper half of the pointer. */}
             <div
-              className="absolute inset-0 opacity-20"
+              className="absolute inset-0 opacity-18"
               style={{
-                clipPath: "polygon(100% 50%, 0 0, 0 50%)",
+                clipPath: "polygon(0 50%, 100% 0, 100% 50%)",
                 background: "rgba(255,255,255,0.9)",
               }}
             />
