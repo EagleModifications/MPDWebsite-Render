@@ -328,6 +328,7 @@ function setEntryExtras(
 function createItemsFromText(
   text: string,
   existingItems: SpinWheelItem[],
+  palette: string[] = COLORS,
 ): SpinWheelItem[] {
   return text
     .split(/\r?\n/)
@@ -340,7 +341,7 @@ function createItemsFromText(
       label,
       color:
         existingItems[index]?.color ??
-        COLORS[index % COLORS.length],
+        palette[index % Math.max(1, palette.length)] ?? COLORS[index % COLORS.length],
       weight:
         existingItems[index]?.weight ??
         1,
@@ -1183,6 +1184,50 @@ function SoundDropdown({
 }
 
 
+function AppearanceDropdown({
+  value,
+  options,
+  onChange,
+}: {
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target
+      if (target instanceof Node && !ref.current?.contains(target)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} className="flex h-10 min-w-[84px] items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/60 px-3 text-sm font-semibold text-foreground outline-none transition-colors hover:bg-muted focus:border-blue-500/60">
+        <span>{value}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-[420] min-w-full overflow-hidden rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl">
+          <div className="max-h-[260px] overflow-y-auto">
+            {options.map((option) => (
+              <button key={option} type="button" role="option" aria-selected={option === value} onClick={() => { onChange(option); setOpen(false) }} className={`flex h-9 w-full items-center justify-between rounded-lg px-3 text-left text-xs font-semibold transition-colors ${option === value ? "bg-blue-500/10 text-blue-500" : "text-foreground hover:bg-muted"}`}>
+                <span>{option}</span>
+                {option === value && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function WheelCustomizeDialog({
   open,
   wheelNumber,
@@ -1606,14 +1651,14 @@ function WheelCustomizeDialog({
                 <button
                   type="button"
                   onClick={() => setThemeOpen((value) => !value)}
-                  className="flex h-9 min-w-[200px] items-center justify-center gap-3 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                  className="flex h-10 min-w-[220px] items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/60 px-3 text-sm font-semibold text-foreground shadow-sm transition hover:bg-muted"
                 >
                   Apply a theme
                   <ChevronDown className={`h-4 w-4 transition-transform ${themeOpen ? "rotate-180" : ""}`} />
                 </button>
 
                 {themeOpen && (
-                  <div className="absolute left-0 top-[calc(100%+4px)] z-[50] w-[285px] overflow-hidden rounded-md border border-white/10 bg-[#1c1c1c] shadow-2xl">
+                  <div className="absolute left-0 top-[calc(100%+6px)] z-[420] w-[285px] overflow-hidden rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl">
                     <div className="max-h-[520px] overflow-y-auto">
                       {WHEEL_THEMES.map(([name, colors]) => (
                         <button
@@ -1626,7 +1671,7 @@ function WheelCustomizeDialog({
                             onColorsChange(next)
                             setThemeOpen(false)
                           }}
-                          className="flex min-h-11 w-full items-center justify-between gap-4 px-5 py-2.5 text-left text-sm font-semibold text-white transition hover:bg-white/10"
+                          className="flex min-h-10 w-full items-center justify-between gap-4 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-foreground transition hover:bg-muted"
                         >
                           <span>{name}</span>
                           <span className="flex shrink-0 gap-1">
@@ -1675,7 +1720,7 @@ function WheelCustomizeDialog({
                   <button
                     type="button"
                     onClick={() => centerImageInputRef.current?.click()}
-                    className="flex h-10 w-12 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm transition hover:bg-blue-500"
+                    className="flex h-10 w-12 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/60 text-foreground shadow-sm transition hover:bg-muted"
                     aria-label="Choose center image"
                     title="Choose center image"
                   >
@@ -1684,21 +1729,14 @@ function WheelCustomizeDialog({
                   <input ref={centerImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleCenterImage} />
                 </div>
 
-                <label className="flex shrink-0 items-center gap-3 text-sm font-semibold">
+                <div className="flex shrink-0 items-center gap-3 text-sm font-semibold">
                   <span>Image size</span>
-                  <select
+                  <AppearanceDropdown
                     value={imageSize}
-                    onChange={(event) => onImageSizeChange(event.target.value as "XS" | "S" | "M" | "L" | "XL" | "XXL")}
-                    className="h-10 w-[72px] appearance-auto rounded-md border border-border/70 bg-muted/70 px-2 text-sm outline-none focus:border-blue-500/60"
-                  >
-                    <option value="XS">XS</option>
-                    <option value="S">S</option>
-                    <option value="M">M</option>
-                    <option value="L">L</option>
-                    <option value="XL">XL</option>
-                    <option value="XXL">XXL</option>
-                  </select>
-                </label>
+                    options={["XS", "S", "M", "L", "XL", "XXL"]}
+                    onChange={(value) => onImageSizeChange(value as "XS" | "S" | "M" | "L" | "XL" | "XXL")}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-x-8 gap-y-4 bg-muted/20 p-4">
@@ -1946,6 +1984,7 @@ export default function Sidebar({
       createItemsFromText(
         value,
         items,
+        currentEntryColors.length > 0 ? currentEntryColors : COLORS,
       ),
     )
   }
@@ -2047,10 +2086,9 @@ export default function Sidebar({
               "",
             ),
           color:
-            COLORS[
-              (items.length +
-                index) %
-                COLORS.length
+            (currentEntryColors.length > 0 ? currentEntryColors : COLORS)[
+              (items.length + index) %
+                (currentEntryColors.length > 0 ? currentEntryColors.length : COLORS.length)
             ],
           weight: 1,
           hidden: false,
@@ -2133,9 +2171,9 @@ export default function Sidebar({
       id: crypto.randomUUID(),
       label: `Entry ${items.length + 1}`,
       color:
-        COLORS[
+        (currentEntryColors.length > 0 ? currentEntryColors : COLORS)[
           items.length %
-            COLORS.length
+            (currentEntryColors.length > 0 ? currentEntryColors.length : COLORS.length)
         ],
       weight: 1,
       hidden: false,
@@ -2717,7 +2755,7 @@ export default function Sidebar({
   return (
     <>
       <aside
-        className={`absolute bottom-4 right-4 top-24 z-[150] flex h-auto w-[468px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
+        className={`absolute bottom-4 right-4 top-32 z-[150] flex h-auto w-[468px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
           open
             ? "translate-x-0"
             : "translate-x-full"
