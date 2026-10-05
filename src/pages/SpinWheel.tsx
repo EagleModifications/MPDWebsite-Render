@@ -6,15 +6,12 @@ import {
 } from "react"
 import {
   ChevronDown,
-  Eye,
-  EyeOff,
   ImagePlus,
   Maximize2,
   MoreHorizontal,
   Plus,
-  Settings2,
-  Shuffle,
   Sparkles,
+  Shuffle,
   Trophy,
   Trash2,
   Type,
@@ -86,11 +83,9 @@ function shuffleArray<T>(
     index > 0;
     index -= 1
   ) {
-    const randomIndex =
-      Math.floor(
-        Math.random() *
-          (index + 1),
-      )
+    const randomIndex = Math.floor(
+      Math.random() * (index + 1),
+    )
 
     ;[
       result[index],
@@ -113,9 +108,6 @@ export default function SpinWheel() {
 
   const idleRotationRef =
     useRef(false)
-
-  const winnerRef =
-    useRef<string | null>(null)
 
   const [entries, setEntries] =
     useState<WheelEntry[]>(
@@ -154,9 +146,49 @@ export default function SpinWheel() {
       (entry) => !entry.hidden,
     )
 
-  /*
-   * Creates the actual wheel.
-   */
+  const startIdleRotation =
+    useCallback(() => {
+      const wheel =
+        wheelRef.current
+
+      if (
+        !wheel ||
+        isSpinning ||
+        !visibleEntries.length ||
+        idleRotationRef.current
+      ) {
+        return
+      }
+
+      idleRotationRef.current =
+        true
+
+      /*
+       * Very slow continuous rotation.
+       * rotationResistance is 0, so the
+       * wheel continues indefinitely.
+       */
+      wheel.spin(7)
+    }, [
+      isSpinning,
+      visibleEntries.length,
+    ])
+
+  const stopIdleRotation =
+    useCallback(() => {
+      const wheel =
+        wheelRef.current
+
+      if (!wheel) {
+        return
+      }
+
+      idleRotationRef.current =
+        false
+
+      wheel.stop()
+    }, [])
+
   const createWheel =
     useCallback(() => {
       const container =
@@ -167,8 +199,9 @@ export default function SpinWheel() {
       }
 
       wheelRef.current?.remove()
-
       wheelRef.current = null
+      idleRotationRef.current =
+        false
 
       if (!visibleEntries.length) {
         return
@@ -188,7 +221,8 @@ export default function SpinWheel() {
           ),
 
           /*
-           * Pointer is on the right.
+           * Pointer is positioned on
+           * the right side.
            */
           pointerAngle: 90,
 
@@ -228,10 +262,8 @@ export default function SpinWheel() {
           ),
 
           /*
-           * This is important.
-           *
-           * The wheel is allowed to rotate
-           * forever when idle.
+           * Zero resistance means
+           * indefinite rotation.
            */
           rotationResistance: 0,
         },
@@ -240,9 +272,10 @@ export default function SpinWheel() {
       wheelRef.current = wheel
 
       wheel.onRest = (event) => {
-        /*
-         * Real spin has finished.
-         */
+        if (!isSpinning) {
+          return
+        }
+
         setIsSpinning(false)
 
         const winner =
@@ -251,7 +284,10 @@ export default function SpinWheel() {
           ]
 
         if (!winner) {
-          startIdleRotation()
+          window.setTimeout(
+            startIdleRotation,
+            250,
+          )
           return
         }
 
@@ -268,9 +304,6 @@ export default function SpinWheel() {
               ...current,
             ].slice(0, 25),
         )
-
-        winnerRef.current =
-          null
 
         if (hideSelected) {
           setEntries(
@@ -292,78 +325,18 @@ export default function SpinWheel() {
           `${winner.label} was selected`,
         )
 
-        /*
-         * Give the result a moment,
-         * then return to idle rotation.
-         */
         window.setTimeout(
-          () => {
-            startIdleRotation()
-          },
+          startIdleRotation,
           650,
         )
       }
     }, [
       hideSelected,
+      isSpinning,
+      startIdleRotation,
       visibleEntries,
     ])
 
-  /*
-   * Start the slow permanent rotation.
-   */
-  const startIdleRotation =
-    useCallback(() => {
-      const wheel =
-        wheelRef.current
-
-      if (
-        !wheel ||
-        isSpinning ||
-        !visibleEntries.length
-      ) {
-        return
-      }
-
-      if (idleRotationRef.current) {
-        return
-      }
-
-      idleRotationRef.current =
-        true
-
-      /*
-       * Very slow clockwise movement.
-       *
-       * rotationResistance = 0 means
-       * this will not slow down.
-       */
-      wheel.spin(7)
-    }, [
-      isSpinning,
-      visibleEntries.length,
-    ])
-
-  /*
-   * Stop the permanent idle rotation.
-   */
-  const stopIdleRotation =
-    useCallback(() => {
-      const wheel =
-        wheelRef.current
-
-      if (!wheel) {
-        return
-      }
-
-      idleRotationRef.current =
-        false
-
-      wheel.stop()
-    }, [])
-
-  /*
-   * Rebuild whenever entries change.
-   */
   useEffect(() => {
     createWheel()
 
@@ -375,10 +348,6 @@ export default function SpinWheel() {
     }
   }, [createWheel])
 
-  /*
-   * Start idle rotation after
-   * the wheel has been created.
-   */
   useEffect(() => {
     if (
       wheelRef.current &&
@@ -386,9 +355,12 @@ export default function SpinWheel() {
       !isSpinning
     ) {
       const timer =
-        window.setTimeout(() => {
-          startIdleRotation()
-        }, 150)
+        window.setTimeout(
+          () => {
+            startIdleRotation()
+          },
+          150,
+        )
 
       return () => {
         window.clearTimeout(
@@ -404,9 +376,6 @@ export default function SpinWheel() {
     startIdleRotation,
   ])
 
-  /*
-   * Real spin.
-   */
   const spin = useCallback(() => {
     const wheel =
       wheelRef.current
@@ -419,10 +388,6 @@ export default function SpinWheel() {
       return
     }
 
-    /*
-     * Stop the permanent slow rotation
-     * before starting the actual spin.
-     */
     stopIdleRotation()
 
     const winnerIndex =
@@ -437,9 +402,6 @@ export default function SpinWheel() {
     if (!winner) {
       return
     }
-
-    winnerRef.current =
-      winner.id
 
     setIsSpinning(true)
 
@@ -458,9 +420,6 @@ export default function SpinWheel() {
     visibleEntries,
   ])
 
-  /*
-   * Ctrl + Enter.
-   */
   useEffect(() => {
     function handleKeyboard(
       event: KeyboardEvent,
@@ -508,62 +467,6 @@ export default function SpinWheel() {
     setNewEntry("")
   }
 
-  function updateEntry(
-    id: string,
-    value: string,
-  ) {
-    setEntries(
-      (current) =>
-        current.map(
-          (entry) =>
-            entry.id === id
-              ? {
-                  ...entry,
-                  label: value,
-                }
-              : entry,
-        ),
-    )
-  }
-
-  function removeEntry(
-    id: string,
-  ) {
-    if (isSpinning) {
-      return
-    }
-
-    setEntries(
-      (current) =>
-        current.filter(
-          (entry) =>
-            entry.id !== id,
-        ),
-    )
-  }
-
-  function toggleHidden(
-    id: string,
-  ) {
-    if (isSpinning) {
-      return
-    }
-
-    setEntries(
-      (current) =>
-        current.map(
-          (entry) =>
-            entry.id === id
-              ? {
-                  ...entry,
-                  hidden:
-                    !entry.hidden,
-                }
-              : entry,
-        ),
-    )
-  }
-
   function shuffleEntries() {
     if (isSpinning) {
       return
@@ -583,6 +486,10 @@ export default function SpinWheel() {
               ],
           }),
         ),
+    )
+
+    toast.success(
+      "Entries shuffled.",
     )
   }
 
@@ -604,6 +511,10 @@ export default function SpinWheel() {
               },
             ),
         ),
+    )
+
+    toast.success(
+      "Entries sorted.",
     )
   }
 
@@ -665,15 +576,11 @@ export default function SpinWheel() {
 
   return (
     <div className="fixed inset-0 flex overflow-hidden bg-[#111111] text-white">
-      {/* =====================================================
-          WHEEL AREA
-      ====================================================== */}
+      {/* WHEEL */}
 
       <main className="relative min-w-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_50%_40%,#26343e_0%,#172129_42%,#111111_82%)]">
-        {/* subtle top lighting */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white/[0.04] to-transparent" />
 
-        {/* small edit button like screenshot */}
         <button
           type="button"
           onClick={() =>
@@ -689,13 +596,10 @@ export default function SpinWheel() {
           <Type className="h-4 w-4" />
         </button>
 
-        {/* wheel */}
         <div
           ref={wheelContainerRef}
           className={[
-            "absolute inset-0",
-            "flex items-center justify-center",
-            "select-none",
+            "absolute inset-0 flex items-center justify-center select-none",
             isSpinning
               ? "cursor-default"
               : "cursor-pointer",
@@ -707,16 +611,14 @@ export default function SpinWheel() {
           }}
         />
 
-        {/* right pointer */}
-        <div className="pointer-events-none absolute right-0 top-1/2 z-30 -translate-y-1/2">
-          <div className="relative">
-            <div className="absolute right-0 top-1/2 h-0 w-0 -translate-y-1/2 border-y-[24px] border-l-0 border-r-[50px] border-y-transparent border-r-emerald-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]" />
+        {/* RIGHT POINTER */}
 
-            <div className="absolute right-0 top-1/2 h-0 w-0 -translate-y-1/2 border-y-[20px] border-r-[42px] border-y-transparent border-r-[#70e0aa]" />
-          </div>
+        <div className="pointer-events-none absolute right-0 top-1/2 z-30 -translate-y-1/2">
+          <div className="h-0 w-0 border-y-[24px] border-r-[50px] border-y-transparent border-r-emerald-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]" />
         </div>
 
-        {/* center instruction */}
+        {/* CENTER TEXT */}
+
         {!isSpinning &&
           visibleEntries.length >
             0 && (
@@ -748,20 +650,19 @@ export default function SpinWheel() {
               </h2>
 
               <p className="mt-1 text-sm text-white/60">
-                Add entries using the panel
-                on the right.
+                Add entries using the
+                panel on the right.
               </p>
             </div>
           </div>
         )}
       </main>
 
-      {/* =====================================================
-          SIDEBAR
-      ====================================================== */}
+      {/* SIDEBAR */}
 
-      <aside className="flex w-[330px] shrink-0 flex-col border-l border-white/10 bg-[#1d1d1d] shadow-[-10px_0_35px_rgba(0,0,0,0.22)] xl:w-[380px] 2xl:w-[420px]">
-        {/* sidebar header */}
+      <aside className="relative flex w-[330px] shrink-0 flex-col border-l border-white/10 bg-[#1d1d1d] shadow-[-10px_0_35px_rgba(0,0,0,0.22)] xl:w-[380px] 2xl:w-[420px]">
+        {/* HEADER */}
+
         <div className="flex h-[50px] shrink-0 items-center border-b border-white/10 bg-[#202020]">
           <button
             type="button"
@@ -820,7 +721,8 @@ export default function SpinWheel() {
 
         {!showResults ? (
           <>
-            {/* controls */}
+            {/* CONTROLS */}
+
             <div className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#222222] px-4 py-3">
               <button
                 type="button"
@@ -828,7 +730,7 @@ export default function SpinWheel() {
                 onClick={
                   shuffleEntries
                 }
-                className="flex h-30px items-center gap-2 rounded bg-[#3b3b70] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#4a4a84] disabled:opacity-40"
+                className="flex items-center gap-2 rounded bg-[#3b3b70] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#4a4a84] disabled:opacity-40"
               >
                 <Shuffle className="h-3.5 w-3.5" />
                 Shuffle
@@ -868,11 +770,13 @@ export default function SpinWheel() {
                   }
                   className="h-3.5 w-3.5 accent-white"
                 />
+
                 Advanced
               </label>
             </div>
 
-            {/* entry editor */}
+            {/* TEXT ENTRY AREA */}
+
             <div className="min-h-0 flex-1 p-4">
               <div className="flex h-full min-h-[300px] flex-col overflow-hidden rounded border border-white/25 bg-[#181818]">
                 <textarea
@@ -885,10 +789,9 @@ export default function SpinWheel() {
                     .join("\n")}
                   onChange={(event) => {
                     const lines =
-                      event.target.value
-                        .split(
-                          /\r?\n/,
-                        )
+                      event.target.value.split(
+                        /\r?\n/,
+                      )
 
                     setEntries(
                       lines.map(
@@ -901,8 +804,7 @@ export default function SpinWheel() {
                               index
                             ]?.id ??
                             crypto.randomUUID(),
-                          label:
-                            line,
+                          label: line,
                           color:
                             COLORS[
                               index %
@@ -925,7 +827,8 @@ export default function SpinWheel() {
               </div>
             </div>
 
-            {/* bottom add wheel */}
+            {/* ADD ENTRY */}
+
             <div className="shrink-0 border-t border-white/10 bg-[#202020] p-3">
               <div className="flex gap-2">
                 <input
@@ -967,6 +870,8 @@ export default function SpinWheel() {
             </div>
           </>
         ) : (
+          /* RESULTS */
+
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
               <div>
@@ -1054,7 +959,8 @@ export default function SpinWheel() {
           </div>
         )}
 
-        {/* advanced */}
+        {/* ADVANCED */}
+
         {showAdvanced &&
           !showResults && (
             <div className="shrink-0 border-t border-white/10 bg-[#202020] p-4">
@@ -1166,7 +1072,8 @@ export default function SpinWheel() {
             </div>
           )}
 
-        {/* more menu */}
+        {/* MORE MENU */}
+
         {showMore && (
           <div className="absolute right-2 top-[48px] z-50 w-48 rounded-lg border border-white/15 bg-[#242424] p-1.5 shadow-2xl">
             <button
