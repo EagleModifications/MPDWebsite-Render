@@ -391,17 +391,25 @@ const halfThenSmoothStop = (t: number) => {
   if (t <= 0.5) return t
 
   /*
-   * Keep exactly the same constant angular speed through the first half.
-   * The second half uses a quintic curve whose velocity, acceleration and
-   * higher-order motion are eased toward zero, so braking begins smoothly
-   * at 50% and the final stop has no visible snap.
+   * First half: perfectly constant angular speed.
+   *
+   * Second half: a 7th-order braking curve.  It is constructed so that:
+   *   - position is continuous at 50%,
+   *   - velocity is continuous at 50%,
+   *   - acceleration is zero at 50%,
+   *   - jerk is zero at 50%,
+   *   - velocity, acceleration and jerk all reach zero at the final frame.
+   *
+   * That is much smoother than a normal ease-out because braking does not
+   * suddenly kick in when the wheel reaches the halfway point.
    */
   const u = (t - 0.5) * 2
   const eased =
     0.5 * u +
-    (7 / 3) * u ** 2 -
-    4 * u ** 4 +
-    (13 / 6) * u ** 5
+    25 * u ** 4 -
+    (123 / 2) * u ** 5 +
+    52 * u ** 6 -
+    15 * u ** 7
 
   return 0.5 + 0.5 * eased
 }
@@ -700,8 +708,6 @@ export default function Wheel({
         pointerColorRef.current =
           color
 
-        setPointerColor(color)
-
         if (
           pointerRef.current
         ) {
@@ -709,6 +715,17 @@ export default function Wheel({
             "--pointer-color",
             color,
           )
+        }
+
+        /*
+         * Do not trigger a React render for every slice crossed while the
+         * wheel is spinning. The pointer is updated directly in the DOM
+         * above, so React state is only needed while the wheel is idle.
+         * This keeps the canvas animation on requestAnimationFrame much
+         * steadier, especially during a fast spin.
+         */
+        if (!spinningRef.current) {
+          setPointerColor(color)
         }
       },
       [],
@@ -1270,8 +1287,8 @@ export default function Wheel({
           className="
             relative
             aspect-square
-            h-full
-            w-auto
+            h-auto
+            w-full
             max-h-full
             max-w-full
             shrink-0
@@ -1348,7 +1365,7 @@ export default function Wheel({
           {/* Centre                                                           */}
           {/* ---------------------------------------------------------------- */}
 
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 aspect-square h-[15%] w-auto -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full border-[3px] border-white/95 bg-white shadow-[0_5px_14px_rgba(0,0,0,0.38),inset_0_1px_2px_rgba(0,0,0,0.12)]">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 aspect-square h-[20%] w-auto -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-white shadow-[0_5px_14px_rgba(0,0,0,0.30)]">
             {centerImage && (
               <img
                 src={centerImage}
@@ -1483,9 +1500,9 @@ export default function Wheel({
         <div
           className="
             flex
-            h-full
+            h-auto
             max-h-full
-            w-auto
+            w-full
             max-w-full
             shrink-0
             aspect-square
