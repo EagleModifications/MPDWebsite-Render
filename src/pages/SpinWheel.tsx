@@ -145,6 +145,10 @@ export default function SpinWheel() {
     wheelButtons?.forEach((button) => button.click())
   }, [])
 
+  const clearResults = useCallback(() => {
+    setResults([])
+  }, [])
+
   const closeWinnerPopup = useCallback(() => {
     setWinners([])
   }, [])
