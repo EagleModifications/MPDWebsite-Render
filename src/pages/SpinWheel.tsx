@@ -36,7 +36,6 @@ export default function SpinWheel() {
   const [results, setResults] = useState<SpinResult[]>([])
   const [winners, setWinners] = useState<SpinResult[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [spinAllTrigger, setSpinAllTrigger] = useState(0)
 
   useEffect(() => {
     if (!activeWheelId && wheels[0]) {
@@ -105,10 +104,6 @@ export default function SpinWheel() {
 
   const clearResults = useCallback(() => {
     setResults([])
-  }, [])
-
-  const spinAllWheels = useCallback(() => {
-    setSpinAllTrigger((value) => value + 1)
   }, [])
 
   const renameWheel = useCallback((wheelId: string, name: string) => {
@@ -236,10 +231,10 @@ export default function SpinWheel() {
   )
 
   return (
-    <div className="h-dvh overflow-hidden bg-[#080b0e] text-foreground">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#080b0e] text-foreground">
       <Navbar />
 
-      <main className="relative h-[calc(100dvh-5rem)] min-h-0 overflow-hidden">
+      <main className="relative min-h-0 flex-1 overflow-hidden">
         <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_35%_35%,rgba(33,70,82,0.42),transparent_45%),radial-gradient(circle_at_78%_25%,rgba(81,42,91,0.28),transparent_42%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]">
           <div
             className={`absolute inset-0 min-h-0 overflow-hidden transition-[padding] duration-300 ${
@@ -247,7 +242,7 @@ export default function SpinWheel() {
             }`}
           >
             <div
-              className={`grid h-full min-h-0 w-full gap-8 p-8 ${
+              className={`grid h-full min-h-0 w-full gap-2 p-2 pr-4 ${
                 wheels.length === 1
                   ? "grid-cols-1 grid-rows-1"
                   : "grid-cols-2 auto-rows-fr"
@@ -261,7 +256,6 @@ export default function SpinWheel() {
                   <Wheel
                     items={wheel.items}
                     compact={wheels.length > 1}
-                    spinTrigger={spinAllTrigger}
                     onResult={(item) =>
                       handleResult(wheel.id, item)
                     }
@@ -290,9 +284,9 @@ export default function SpinWheel() {
           }
           onClearResults={clearResults}
           onNewWheel={addWheel}
-          onSpinAllWheels={spinAllWheels}
           onRenameWheel={renameWheel}
           onRemoveWheel={removeWheel}
+          onOpenWheel={() => setSidebarOpen(false)}
         />
 
         <button
