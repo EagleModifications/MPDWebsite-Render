@@ -59,6 +59,10 @@ type SidebarProps = {
   onOpenWheel: () => void
   animateWinningEntryByWheel: Record<string, boolean>
   onAnimateWinningEntryChange: (wheelId: string, enabled: boolean) => void
+  duringSoundByWheel: Record<string, string>
+  duringVolumeByWheel: Record<string, number>
+  onDuringSoundChange: (wheelId: string, sound: string) => void
+  onDuringVolumeChange: (wheelId: string, volume: number) => void
   afterSoundByWheel: Record<string, string>
   afterVolumeByWheel: Record<string, number>
   onAfterSoundChange: (wheelId: string, sound: string) => void
@@ -774,19 +778,27 @@ function ColorPickerPopover({
         {label}
       </span>
 
-      <input
-        type="range"
-        min={0}
-        max={255}
-        value={value}
-        onChange={(event) =>
-          updateRgb(
-            channel,
-            Number(event.target.value),
-          )
-        }
-        className="h-1.5 w-full cursor-pointer accent-blue-500"
-      />
+      <div className="group relative">
+        <div
+          className="pointer-events-none absolute -top-8 z-20 -translate-x-1/2 rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white opacity-0 shadow-lg ring-1 ring-blue-400/40 transition-opacity duration-100 group-hover:opacity-100 group-active:opacity-100"
+          style={{ left: `${(value / 255) * 100}%` }}
+        >
+          {value}
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={255}
+          value={value}
+          onChange={(event) =>
+            updateRgb(
+              channel,
+              Number(event.target.value),
+            )
+          }
+          className="h-1.5 w-full cursor-pointer accent-blue-500"
+        />
+      </div>
 
       <input
         type="number"
@@ -1178,6 +1190,10 @@ function WheelCustomizeDialog({
   animateWinner,
   onAnimateWinnerChange,
   onColorsChange,
+  duringSound,
+  duringVolume,
+  onDuringSoundChange,
+  onDuringVolumeChange,
   afterSound,
   afterVolume,
   onAfterSoundChange,
@@ -1189,14 +1205,16 @@ function WheelCustomizeDialog({
   animateWinner: boolean
   onAnimateWinnerChange: (enabled: boolean) => void
   onColorsChange: (colors: string[]) => void
+  duringSound: string
+  duringVolume: number
+  onDuringSoundChange: (sound: string) => void
+  onDuringVolumeChange: (volume: number) => void
   afterSound: string
   afterVolume: number
   onAfterSoundChange: (sound: string) => void
   onAfterVolumeChange: (volume: number) => void
 }) {
   const [tab, setTab] = useState<"during" | "after" | "appearance">("during")
-  const [duringSound, setDuringSound] = useState("Ticking sound")
-  const [duringVolume, setDuringVolume] = useState(50)
   const [displayDuplicates, setDisplayDuplicates] = useState(true)
   const [spinSlowly, setSpinSlowly] = useState(false)
   const [showTitle, setShowTitle] = useState(true)
@@ -1282,88 +1300,101 @@ function WheelCustomizeDialog({
     step: number,
     onChange: (value: number) => void,
     labels: string[],
-  ) => (
-    <div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="h-1.5 w-full cursor-pointer accent-blue-500"
-      />
-      <div className="mt-2 flex justify-between text-xs font-semibold text-muted-foreground">
-        {labels.map((label) => <span key={label}>{label}</span>)}
-      </div>
-    </div>
-  )
+  ) => {
+    const percentage = ((value - min) / Math.max(1, max - min)) * 100
 
-  const previewAfterSound = () => {
+    return (
+      <div className="group relative pt-1">
+        <div
+          className="pointer-events-none absolute -top-8 z-20 -translate-x-1/2 rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white opacity-0 shadow-lg ring-1 ring-blue-400/40 transition-opacity duration-100 group-hover:opacity-100 group-active:opacity-100"
+          style={{ left: `${percentage}%` }}
+        >
+          {value}
+        </div>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+          className="h-1.5 w-full cursor-pointer accent-blue-500"
+        />
+        <div className="mt-2 flex justify-between text-xs font-semibold text-muted-foreground">
+          {labels.map((label) => <span key={label}>{label}</span>)}
+        </div>
+      </div>
+    )
+  }
+
+  const soundFiles: Record<string, string> = {
+    "Subdued applause": "subdued-applause.mp3",
+    "Joke punchline": "joke-punchline.mp3",
+    "Announcement bell": "announcement-bell.mp3",
+    "Twinkling star": "twinkling-star.mp3",
+    "Correct answer ding": "correct-answer-ding.mp3",
+    "Synth bell": "synth-bell.mp3",
+    "Notification bell": "notification-bell.mp3",
+    "Loud applause": "loud-applause.mp3",
+    "Fanfare": "fanfare.mp3",
+    "Bell ringing": "bell-ringing.mp3",
+    "Cymbals": "cymbals.mp3",
+    "Thunder": "thunder.mp3",
+    "Cash register": "cash-register.mp3",
+    "Evil laugh": "evil-laugh.mp3",
+    "Microwave ding": "microwave-ding.mp3",
+    "Old phone ringing": "old-phone-ringing.mp3",
+    "Alarm clock": "alarm-clock.mp3",
+    "Fireworks": "fireworks.mp3",
+    "Game win ding": "game-win-ding.mp3",
+    "Wrong answer": "wrong-answer.mp3",
+    "Punch": "punch.mp3",
+    "Cat meow": "cat-meow.mp3",
+    "Wolf howl": "wolf-howl.mp3",
+    "Horse": "horse.mp3",
+    "Lion roar": "lion-roar.mp3",
+    "Sad trombone": "sad-trombone.mp3",
+    "Cinematic drum impact": "cinematic-drum-impact.mp3",
+    "Water splash": "water-splash.mp3",
+    "Gong": "gong.mp3",
+    "Doorbell": "doorbell.mp3",
+    "Church bell": "church-bell.mp3",
+    "Referee whistle": "referee-whistle.mp3",
+    "Boing": "boing.mp3",
+    "Angel choir": "angel-choir.mp3",
+    "Harp strum": "harp-strum.mp3",
+    "Breaker switch": "breaker-switch.mp3",
+    "Camera shutter & flash": "camera-shutter-flash.mp3",
+    "Lost game": "lost-game.mp3",
+    "Horror scream": "horror-scream.mp3",
+  }
+
+  const playPreview = (sound: string, folder: "during-spin" | "after-spin", volume: number) => {
     if (previewAudioRef.current) {
       previewAudioRef.current.pause()
       previewAudioRef.current.currentTime = 0
     }
-    if (afterSound === "No sound" || afterSound === "Inherit from wheel" || afterSound.startsWith("Speak result")) return
-    const files: Record<string, string> = {
-      "Subdued applause": "subdued-applause.mp3",
-      "Joke punchline": "joke-punchline.mp3",
-      "Announcement bell": "announcement-bell.mp3",
-      "Twinkling star": "twinkling-star.mp3",
-      "Correct answer ding": "correct-answer-ding.mp3",
-      "Synth bell": "synth-bell.mp3",
-      "Notification bell": "notification-bell.mp3",
-      "Loud applause": "loud-applause.mp3",
-      "Fanfare": "fanfare.mp3",
-      "Bell ringing": "bell-ringing.mp3",
-      "Cymbals": "cymbals.mp3",
-      "Thunder": "thunder.mp3",
-      "Cash register": "cash-register.mp3",
-      "Evil laugh": "evil-laugh.mp3",
-      "Microwave ding": "microwave-ding.mp3",
-      "Old phone ringing": "old-phone-ringing.mp3",
-      "Alarm clock": "alarm-clock.mp3",
-      "Fireworks": "fireworks.mp3",
-      "Game win ding": "game-win-ding.mp3",
-      "Wrong answer": "wrong-answer.mp3",
-      "Punch": "punch.mp3",
-      "Cat meow": "cat-meow.mp3",
-      "Wolf howl": "wolf-howl.mp3",
-      "Horse": "horse.mp3",
-      "Lion roar": "lion-roar.mp3",
-      "Sad trombone": "sad-trombone.mp3",
-      "Cinematic drum impact": "cinematic-drum-impact.mp3",
-      "Water splash": "water-splash.mp3",
-      "Gong": "gong.mp3",
-      "Doorbell": "doorbell.mp3",
-      "Church bell": "church-bell.mp3",
-      "Referee whistle": "referee-whistle.mp3",
-      "Boing": "boing.mp3",
-      "Angel choir": "angel-choir.mp3",
-      "Harp strum": "harp-strum.mp3",
-      "Breaker switch": "breaker-switch.mp3",
-      "Camera shutter & flash": "camera-shutter-flash.mp3",
-      "Lost game": "lost-game.mp3",
-      "Horror scream": "horror-scream.mp3",
-    }
-    const file = files[afterSound]
+    if (sound === "No sound" || sound === "Inherit from wheel" || sound.startsWith("Speak result")) return
+
+    const file = folder === "during-spin"
+      ? sound === "Ticking sound" ? "tick.mp3" : undefined
+      : soundFiles[sound]
     if (!file) return
-    const audio = new Audio(`/sounds/after-spin/${file}`)
-    audio.volume = afterVolume / 100
-    audio.onerror = () => {
-      const fallback = new Audio(`/sounds/after-spin/${file}`)
-      fallback.volume = afterVolume / 100
-      previewAudioRef.current = fallback
-      void fallback.play().catch(() => undefined)
-    }
+
+    const audio = new Audio(`/sounds/${folder}/${file}`)
+    audio.volume = Math.max(0, Math.min(1, volume / 100))
     previewAudioRef.current = audio
     void audio.play().catch(() => undefined)
   }
+
+  const previewDuringSound = () => playPreview(duringSound, "during-spin", duringVolume)
+  const previewAfterSound = () => playPreview(afterSound, "after-spin", afterVolume)
 
   const stopPreviewSound = () => {
     if (!previewAudioRef.current) return
     previewAudioRef.current.pause()
     previewAudioRef.current.currentTime = 0
+    previewAudioRef.current = null
   }
 
   return (
@@ -1413,19 +1444,19 @@ function WheelCustomizeDialog({
                 <label className="text-sm font-semibold">Sound</label>
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <SoundDropdown value={duringSound} onChange={setDuringSound} />
+                    <SoundDropdown value={duringSound} onChange={onDuringSoundChange} />
                   </div>
-                  <button type="button" aria-label="Preview sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                  <button type="button" aria-label="Preview sound" onClick={previewDuringSound} className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
                     <Play className="h-5 w-5 fill-current" />
                   </button>
-                  <button type="button" aria-label="Stop sound" className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
+                  <button type="button" aria-label="Stop sound" onClick={stopPreviewSound} className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition hover:bg-muted">
                     <Square className="h-4 w-4 fill-current" />
                   </button>
                 </div>
 
                 <label className="text-sm font-semibold">Volume</label>
                 <div>
-                  {slider(duringVolume, 0, 100, 1, setDuringVolume, ["0%", "25%", "50%", "75%", "100%"])}
+                  {slider(duringVolume, 0, 100, 1, onDuringVolumeChange, ["0%", "25%", "50%", "75%", "100%"])}
                 </div>
               </div>
 
@@ -1648,6 +1679,10 @@ export default function Sidebar({
   onOpenWheel,
   animateWinningEntryByWheel,
   onAnimateWinningEntryChange,
+  duringSoundByWheel,
+  duringVolumeByWheel,
+  onDuringSoundChange,
+  onDuringVolumeChange,
   afterSoundByWheel,
   afterVolumeByWheel,
   onAfterSoundChange,
@@ -3367,6 +3402,10 @@ export default function Sidebar({
         onAnimateWinnerChange={(enabled) =>
           onAnimateWinningEntryChange(activeWheelId, enabled)
         }
+        duringSound={duringSoundByWheel[activeWheelId] ?? "Ticking sound"}
+        duringVolume={duringVolumeByWheel[activeWheelId] ?? 50}
+        onDuringSoundChange={(sound) => onDuringSoundChange(activeWheelId, sound)}
+        onDuringVolumeChange={(volume) => onDuringVolumeChange(activeWheelId, volume)}
         afterSound={afterSoundByWheel[activeWheelId] ?? "Subdued applause"}
         afterVolume={afterVolumeByWheel[activeWheelId] ?? 50}
         onAfterSoundChange={(sound) => onAfterSoundChange(activeWheelId, sound)}
