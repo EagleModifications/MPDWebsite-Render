@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Dices, X } from "lucide-react"
 
 import Navbar from "@/components/home/Navbar"
@@ -36,6 +36,7 @@ export default function SpinWheel() {
   const [results, setResults] = useState<SpinResult[]>([])
   const [winners, setWinners] = useState<SpinResult[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const wheelAreaRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!activeWheelId && wheels[0]) {
@@ -129,8 +130,19 @@ export default function SpinWheel() {
     )
   }, [wheels])
 
-  const clearResults = useCallback(() => {
-    setResults([])
+  const addWheel = useCallback(() => {
+    const nextWheel = createWheel(wheels.length + 1)
+    setWheels((current) => [...current, nextWheel])
+    setActiveWheelId(nextWheel.id)
+    setSidebarOpen(true)
+  }, [wheels.length])
+
+  const spinAllWheels = useCallback(() => {
+    const wheelButtons = wheelAreaRef.current?.querySelectorAll<HTMLDivElement>(
+      '[role="button"][tabindex="0"]',
+    )
+
+    wheelButtons?.forEach((button) => button.click())
   }, [])
 
   const closeWinnerPopup = useCallback(() => {
@@ -279,6 +291,8 @@ export default function SpinWheel() {
           onClearResults={clearResults}
           onRenameWheel={renameWheel}
           onRemoveWheel={removeWheel}
+          onAddWheel={addWheel}
+          onSpinAllWheels={spinAllWheels}
           onOpenWheel={() => setSidebarOpen(false)}
         />
 
