@@ -387,8 +387,11 @@ const cubicOut = (t: number) => 1 - Math.pow(1 - t, 3)
 
 /* Constant cruising speed with a short, fully smooth stop. */
 const cruiseThenStop = (t: number) => {
-  const cruiseEnd = 0.82
+  // Keep a true, constant angular speed for most of the animation.
+  // Only the final section eases smoothly to zero.
+  const cruiseEnd = 0.84
   if (t <= cruiseEnd) return t
+
   const u = (t - cruiseEnd) / (1 - cruiseEnd)
   const eased = u * u * (3 - 2 * u)
   return cruiseEnd + eased * (1 - cruiseEnd)
@@ -694,7 +697,7 @@ export default function Wheel({
       selectedIndex,
       slowly ? duration : Math.max(3200, Math.min(12000, duration)),
       true,
-      slowly ? 3 : 6,
+      6,
       1,
       slowly ? cruiseThenStop : cubicOut,
     )
@@ -873,7 +876,7 @@ export default function Wheel({
            * Pointer is exactly on
            * the right-hand side.
            */
-          pointerAngle: 0,
+          pointerAngle: 90,
 
           borderWidth: 0,
 
@@ -1153,19 +1156,17 @@ export default function Wheel({
           }
         >
           {/* Subtle Wheel of Names-style edge — no surrounding card/box. */}
-          <div
-            className="pointer-events-none absolute inset-[-2px] rounded-full border-2 border-black/35 shadow-[0_7px_18px_rgba(0,0,0,0.42),inset_0_1px_2px_rgba(255,255,255,0.16)]"
-          />
+          {!compact && (
+            <div
+              className="pointer-events-none absolute inset-[-2px] rounded-full border-2 border-black/35 shadow-[0_7px_18px_rgba(0,0,0,0.42),inset_0_1px_2px_rgba(255,255,255,0.16)]"
+            />
+          )}
 
           <div
             ref={containerRef}
-            className="
-              absolute
-              inset-0
-              overflow-visible
-              rounded-full
-              shadow-[0_10px_28px_rgba(0,0,0,0.48)]
-            "
+            className={`absolute inset-0 overflow-visible rounded-full ${
+              compact ? "" : "shadow-[0_10px_28px_rgba(0,0,0,0.48)]"
+            }`}
           />
 
           {/* ---------------------------------------------------------------- */}
@@ -1177,11 +1178,11 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-17px]
+              right-[-15px]
               top-1/2
               z-50
-              h-[54px]
-              w-[70px]
+              h-[48px]
+              w-[62px]
               -translate-y-1/2
             "
             style={
@@ -1196,7 +1197,7 @@ export default function Wheel({
               className="absolute inset-0 drop-shadow-[0_4px_5px_rgba(0,0,0,0.58)]"
               style={{
                 clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
-                background: "linear-gradient(180deg,#111827 0%,#030712 48%,#111827 100%)",
+                background: "#111827",
               }}
             />
 
