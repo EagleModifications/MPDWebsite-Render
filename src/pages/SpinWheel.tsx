@@ -1,18 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Check,
   ChevronDown,
-  Clock3,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Dices,
+  Download,
   Eraser,
-  History,
+  Image as ImageIcon,
   Maximize2,
   Minus,
+  Palette,
   Plus,
   RotateCcw,
   Settings2,
   Shuffle,
+  SlidersHorizontal,
+  Trash2,
   Trophy,
   X,
 } from "lucide-react"
@@ -23,33 +32,23 @@ import Footer from "@/components/Footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-const STORAGE_KEY = "mpd-public-spin-wheel-v2"
-const MAX_VISIBLE_SEGMENTS = 80
+const STORAGE_KEY = "mpd-public-spin-wheel-v4"
+const MAX_WHEELS = 5
+const MAX_VISIBLE_SEGMENTS = 120
+const MAX_HISTORY = 100
 
 const WHEEL_COLORS = [
   "#2563eb",
   "#3b82f6",
-  "#60a5fa",
-  "#1d4ed8",
   "#0ea5e9",
-  "#38bdf8",
   "#6366f1",
-  "#818cf8",
+  "#8b5cf6",
+  "#14b8a6",
+  "#22c55e",
+  "#f59e0b",
+  "#ef4444",
+  "#ec4899",
 ]
-
-type HistoryItem = {
-  id: string
-  winner: string
-  at: string
-}
-
-type SavedState = {
-  entries: string[]
-  duration: number
-  removeWinner: boolean
-  confetti: boolean
-  history: HistoryItem[]
-}
 
 const defaultEntries = [
   "Officer 1",
@@ -62,9 +61,37 @@ const defaultEntries = [
   "Master Sergeant",
 ]
 
+type Wheel = {
+  id: string
+  name: string
+  entries: string[]
+  duration: number
+  removeWinner: boolean
+  confetti: boolean
+  colors: string[]
+  backgroundImage?: string
+  centerImage?: string
+  spinning: boolean
+  rotation: number
+}
+
+type ResultGroup = {
+  id: string
+  values: string[]
+  at: string
+}
+
+type SavedState = {
+  wheels: Array<Omit<Wheel, "spinning">>
+  activeWheelId: string
+  results: ResultGroup[]
+  resultsOpen: boolean
+}
+
+type Tab = "wheel" | "results"
+
 function secureRandom(max: number) {
   if (max <= 1) return 0
-
   const values = new Uint32Array(1)
   crypto.getRandomValues(values)
   return Math.floor((values[0] / 4294967296) * max)
@@ -72,18 +99,20 @@ function secureRandom(max: number) {
 
 function shuffle<T>(items: T[]) {
   const result = [...items]
-
   for (let index = result.length - 1; index > 0; index -= 1) {
     const next = secureRandom(index + 1)
     ;[result[index], result[next]] = [result[next], result[index]]
   }
-
   return result
+}
+
+function createId() {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID()
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
 function polar(cx: number, cy: number, radius: number, angle: number) {
   const radians = (angle * Math.PI) / 180
-
   return {
     x: cx + radius * Math.cos(radians),
     y: cy + radius * Math.sin(radians),
@@ -97,374 +126,503 @@ function segmentPath(index: number, count: number) {
   const startPoint = polar(200, 200, 184, start)
   const endPoint = polar(200, 200, 184, end)
   const largeArc = slice > 180 ? 1 : 0
-
   return `M 200 200 L ${startPoint.x} ${startPoint.y} A 184 184 0 ${largeArc} 1 ${endPoint.x} ${endPoint.y} Z`
 }
 
 function labelPoint(index: number, count: number) {
   const slice = 360 / count
-  const angle = -90 + index * slice + slice / 2
-  return polar(200, 200, 126, angle)
+  return polar(200, 200, 126, -90 + index * slice + slice / 2)
 }
 
 function normaliseRotation(value: number) {
   return ((value % 360) + 360) % 360
 }
 
-function createId() {
-  if (typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID()
+function makeWheel(index: number): Wheel {
+  return {
+    id: createId(),
+    name: `Wheel ${index + 1}`,
+    entries: index === 0 ? defaultEntries : [],
+    duration: 5,
+    removeWinner: false,
+    confetti: true,
+    colors: [...WHEEL_COLORS],
+    spinning: false,
+    rotation: 0,
   }
+}
 
-  return `${Date.now()}-${Math.random()}`
+function parseEntries(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
 }
 
 export default function SpinWheel() {
-  const [entries, setEntries] = useState(defaultEntries)
-  const [text, setText] = useState(defaultEntries.join("\n"))
-  const [duration, setDuration] = useState(5)
-  const [removeWinner, setRemoveWinner] = useState(false)
-  const [confetti, setConfetti] = useState(true)
-  const [history, setHistory] = useState<HistoryItem[]>([])
-  const [rotation, setRotation] = useState(0)
-  const [spinning, setSpinning] = useState(false)
-  const [winner, setWinner] = useState<string | null>(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
+  const [wheels, setWheels] = useState<Wheel[]>(() => [makeWheel(0)])
+  const [activeWheelId, setActiveWheelId] = useState("")
+  const [activeTab, setActiveTab] = useState<Tab>("wheel")
+  const [results, setResults] = useState<ResultGroup[]>([])
   const [entriesOpen, setEntriesOpen] = useState(true)
-  const [shareOpen, setShareOpen] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [imageMenuOpen, setImageMenuOpen] = useState(false)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
+  const [resultWinner, setResultWinner] = useState<string | null>(null)
   const [showConfetti, setShowConfetti] = useState(false)
-  const wheelRef = useRef<HTMLDivElement>(null)
-  const spinTimeoutRef = useRef<number | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [selectedEntryIndex, setSelectedEntryIndex] = useState(0)
+  const [loaded, setLoaded] = useState(false)
+  const wheelAreaRef = useRef<HTMLDivElement>(null)
+  const timersRef = useRef<number[]>([])
 
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search)
-      const sharedEntries = params.get("entries")
+      const shared = params.get("wheels")
 
-      if (sharedEntries) {
-        const nextEntries = sharedEntries
-          .split("|")
-          .map((entry) => entry.trim())
-          .filter(Boolean)
-
-        if (nextEntries.length) {
-          setEntries(nextEntries)
-          setText(nextEntries.join("\n"))
+      if (shared) {
+        const decoded = JSON.parse(atob(shared)) as SavedState
+        if (Array.isArray(decoded.wheels) && decoded.wheels.length) {
+          const restored = decoded.wheels.slice(0, MAX_WHEELS).map((wheel, index) => ({
+            ...makeWheel(index),
+            ...wheel,
+            spinning: false,
+            rotation: Number(wheel.rotation) || 0,
+          }))
+          setWheels(restored)
+          setActiveWheelId(restored.find((wheel) => wheel.id === decoded.activeWheelId)?.id ?? restored[0].id)
+          setResults(Array.isArray(decoded.results) ? decoded.results.slice(0, MAX_HISTORY) : [])
+          setLoaded(true)
+          return
         }
-
-        const spinTime = Number(params.get("spinTime"))
-        if (Number.isFinite(spinTime)) {
-          setDuration(Math.min(15, Math.max(1, spinTime)))
-        }
-
-        return
       }
 
       const stored = localStorage.getItem(STORAGE_KEY)
-      if (!stored) return
-
-      const parsed = JSON.parse(stored) as SavedState
-
-      if (Array.isArray(parsed.entries) && parsed.entries.length) {
-        setEntries(parsed.entries)
-        setText(parsed.entries.join("\n"))
-      }
-
-      if (typeof parsed.duration === "number") {
-        setDuration(Math.min(15, Math.max(1, parsed.duration)))
-      }
-
-      if (typeof parsed.removeWinner === "boolean") {
-        setRemoveWinner(parsed.removeWinner)
-      }
-
-      if (typeof parsed.confetti === "boolean") {
-        setConfetti(parsed.confetti)
-      }
-
-      if (Array.isArray(parsed.history)) {
-        setHistory(parsed.history.slice(0, 30))
+      if (stored) {
+        const parsed = JSON.parse(stored) as SavedState
+        if (Array.isArray(parsed.wheels) && parsed.wheels.length) {
+          const restored = parsed.wheels.slice(0, MAX_WHEELS).map((wheel, index) => ({
+            ...makeWheel(index),
+            ...wheel,
+            spinning: false,
+            rotation: Number(wheel.rotation) || 0,
+          }))
+          setWheels(restored)
+          setActiveWheelId(restored.find((wheel) => wheel.id === parsed.activeWheelId)?.id ?? restored[0].id)
+          setResults(Array.isArray(parsed.results) ? parsed.results.slice(0, MAX_HISTORY) : [])
+          setLoaded(true)
+          return
+        }
       }
     } catch {
-      // Ignore invalid saved state.
+      // Invalid shared/local state falls back to the default wheel.
     }
+
+    const initial = makeWheel(0)
+    setWheels([initial])
+    setActiveWheelId(initial.id)
+    setLoaded(true)
   }, [])
 
   useEffect(() => {
+    if (!loaded) return
     const state: SavedState = {
-      entries,
-      duration,
-      removeWinner,
-      confetti,
-      history,
+      wheels: wheels.map(({ spinning: _spinning, ...wheel }) => wheel),
+      activeWheelId,
+      results: results.slice(0, MAX_HISTORY),
+      resultsOpen: activeTab === "results",
     }
-
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  }, [entries, duration, removeWinner, confetti, history])
+  }, [wheels, activeWheelId, results, activeTab, loaded])
 
   useEffect(() => {
     return () => {
-      if (spinTimeoutRef.current !== null) {
-        window.clearTimeout(spinTimeoutRef.current)
-      }
+      timersRef.current.forEach((timer) => window.clearTimeout(timer))
     }
   }, [])
 
-  useEffect(() => {
-    if (!winner) return
-
-    const timeout = window.setTimeout(() => setWinner(null), 12000)
-    return () => window.clearTimeout(timeout)
-  }, [winner])
+  const activeWheelIndex = Math.max(0, wheels.findIndex((wheel) => wheel.id === activeWheelId))
+  const activeWheel = wheels[activeWheelIndex] ?? wheels[0]
 
   const visibleEntries = useMemo(
-    () => entries.slice(0, MAX_VISIBLE_SEGMENTS),
-    [entries],
+    () => (activeWheel?.entries ?? []).slice(0, MAX_VISIBLE_SEGMENTS),
+    [activeWheel],
   )
 
-  const syncEntries = (value: string) => {
-    setText(value)
+  const allSpinning = wheels.some((wheel) => wheel.spinning)
+  const activeTabLabel = activeTab === "results" ? "Results" : activeWheel?.name ?? "Wheel 1"
 
-    const next = value
-      .split(/\r?\n/)
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-
-    setEntries(next)
+  const updateWheel = (id: string, updater: (wheel: Wheel) => Wheel) => {
+    setWheels((current) => current.map((wheel) => (wheel.id === id ? updater(wheel) : wheel)))
   }
 
-  const spin = () => {
-    if (spinning || !visibleEntries.length) return
+  const syncActiveEntries = (value: string) => {
+    if (!activeWheel) return
+    updateWheel(activeWheel.id, (wheel) => ({ ...wheel, entries: parseEntries(value) }))
+  }
 
-    const winnerIndex = secureRandom(visibleEntries.length)
-    const slice = 360 / visibleEntries.length
+  const setEntry = (index: number, value: string) => {
+    if (!activeWheel) return
+    updateWheel(activeWheel.id, (wheel) => {
+      const entries = [...wheel.entries]
+      entries[index] = value
+      return { ...wheel, entries }
+    })
+  }
+
+  const addEntry = () => {
+    if (!activeWheel) return
+    updateWheel(activeWheel.id, (wheel) => ({
+      ...wheel,
+      entries: [...wheel.entries, `Entry ${wheel.entries.length + 1}`],
+    }))
+    setSelectedEntryIndex(activeWheel.entries.length)
+  }
+
+  const deleteEntry = (index: number) => {
+    if (!activeWheel) return
+    updateWheel(activeWheel.id, (wheel) => ({
+      ...wheel,
+      entries: wheel.entries.filter((_, entryIndex) => entryIndex !== index),
+    }))
+    setSelectedEntryIndex((current) => Math.max(0, Math.min(current, activeWheel.entries.length - 2)))
+  }
+
+  const duplicateEntry = (index: number) => {
+    if (!activeWheel) return
+    updateWheel(activeWheel.id, (wheel) => {
+      const entries = [...wheel.entries]
+      entries.splice(index + 1, 0, entries[index])
+      return { ...wheel, entries }
+    })
+  }
+
+  const moveEntry = (index: number, direction: -1 | 1) => {
+    if (!activeWheel) return
+    updateWheel(activeWheel.id, (wheel) => {
+      const nextIndex = index + direction
+      if (nextIndex < 0 || nextIndex >= wheel.entries.length) return wheel
+      const entries = [...wheel.entries]
+      ;[entries[index], entries[nextIndex]] = [entries[nextIndex], entries[index]]
+      return { ...wheel, entries }
+    })
+    setSelectedEntryIndex(index + direction)
+  }
+
+  const shuffleActive = () => {
+    if (!activeWheel) return
+    updateWheel(activeWheel.id, (wheel) => ({ ...wheel, entries: shuffle(wheel.entries) }))
+  }
+
+  const sortActive = () => {
+    if (!activeWheel) return
+    updateWheel(activeWheel.id, (wheel) => ({
+      ...wheel,
+      entries: [...wheel.entries].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })),
+    }))
+  }
+
+  const clearActive = () => {
+    if (!activeWheel) return
+    updateWheel(activeWheel.id, (wheel) => ({ ...wheel, entries: [] }))
+    setSelectedEntryIndex(0)
+  }
+
+  const restoreActive = () => {
+    if (!activeWheel) return
+    updateWheel(activeWheel.id, (wheel) => ({
+      ...wheel,
+      entries: [...defaultEntries],
+      rotation: 0,
+    }))
+  }
+
+  const addWheel = () => {
+    if (wheels.length >= MAX_WHEELS) {
+      toast.error(`You can have a maximum of ${MAX_WHEELS} wheels.`)
+      return
+    }
+    const wheel = makeWheel(wheels.length)
+    setWheels((current) => [...current, wheel])
+    setActiveWheelId(wheel.id)
+    setActiveTab("wheel")
+  }
+
+  const removeWheel = () => {
+    if (!activeWheel || wheels.length === 1) {
+      toast.error("At least one wheel must remain.")
+      return
+    }
+    const next = wheels.filter((wheel) => wheel.id !== activeWheel.id)
+    const nextIndex = Math.min(activeWheelIndex, next.length - 1)
+    setWheels(next)
+    setActiveWheelId(next[nextIndex].id)
+    setActiveTab("wheel")
+  }
+
+  const renameActive = () => {
+    if (!activeWheel) return
+    const name = window.prompt("Wheel name", activeWheel.name)?.trim()
+    if (!name) return
+    updateWheel(activeWheel.id, (wheel) => ({ ...wheel, name }))
+  }
+
+  const addImage = (type: "background" | "center" | "entry") => {
+    setImageMenuOpen(false)
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = "image/*"
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (!file || !activeWheel) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        const value = String(reader.result ?? "")
+        if (type === "background") {
+          updateWheel(activeWheel.id, (wheel) => ({ ...wheel, backgroundImage: value }))
+        } else if (type === "center") {
+          updateWheel(activeWheel.id, (wheel) => ({ ...wheel, centerImage: value }))
+        } else if (selectedEntryIndex < activeWheel.entries.length) {
+          toast.success("Entry image selected. Entry images are shown in advanced mode.")
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+    input.click()
+  }
+
+  const spinWheel = (wheelId: string, selectedIndexOverride?: number, options?: { recordResult?: boolean; showWinner?: boolean }) => {
+    const recordResult = options?.recordResult ?? true
+    const showWinner = options?.showWinner ?? true
+    const wheel = wheels.find((item) => item.id === wheelId)
+    if (!wheel || wheel.spinning || !wheel.entries.length) return
+
+    const visible = wheel.entries.slice(0, MAX_VISIBLE_SEGMENTS)
+    const winnerIndex = selectedIndexOverride ?? secureRandom(visible.length)
+    const slice = 360 / visible.length
     const centerAngle = winnerIndex * slice + slice / 2
-    const current = normaliseRotation(rotation)
+    const current = normaliseRotation(wheel.rotation)
     const targetOffset = normaliseRotation(-centerAngle - current)
     const turns = 6 + secureRandom(4)
-    const nextRotation = rotation + targetOffset + turns * 360
-    const selectedWinner = visibleEntries[winnerIndex]
+    const nextRotation = wheel.rotation + targetOffset + turns * 360
+    const selectedWinner = visible[winnerIndex]
 
-    setSpinning(true)
-    setWinner(null)
-    setRotation(nextRotation)
+    updateWheel(wheel.id, (currentWheel) => ({
+      ...currentWheel,
+      spinning: true,
+      rotation: nextRotation,
+    }))
 
-    spinTimeoutRef.current = window.setTimeout(() => {
-      setSpinning(false)
-      setWinner(selectedWinner)
-      setHistory((currentHistory) => [
+    const timer = window.setTimeout(() => {
+      updateWheel(wheel.id, (currentWheel) => ({
+        ...currentWheel,
+        spinning: false,
+        entries: currentWheel.removeWinner
+          ? currentWheel.entries.filter((entry) => entry !== selectedWinner)
+          : currentWheel.entries,
+      }))
+
+      if (showWinner) setResultWinner(selectedWinner)
+      if (showWinner && wheel.confetti) setShowConfetti(true)
+
+      if (showWinner && wheel.confetti) {
+        const confettiTimer = window.setTimeout(() => setShowConfetti(false), 2200)
+        timersRef.current.push(confettiTimer)
+      }
+
+      if (recordResult) {
+        setResults((current) => [
+          {
+            id: createId(),
+            values: [selectedWinner],
+            at: new Date().toISOString(),
+          },
+          ...current,
+        ].slice(0, MAX_HISTORY))
+      }
+    }, wheel.duration * 1000)
+
+    timersRef.current.push(timer)
+  }
+
+  const spinAll = () => {
+    const eligible = wheels.filter((wheel) => wheel.entries.length && !wheel.spinning)
+    if (!eligible.length || allSpinning) return
+
+    const selectedWinners: string[] = []
+    eligible.forEach((wheel) => {
+      const visible = wheel.entries.slice(0, MAX_VISIBLE_SEGMENTS)
+      const index = secureRandom(visible.length)
+      selectedWinners.push(visible[index])
+      spinWheel(wheel.id, index, { recordResult: false, showWinner: false })
+    })
+
+    const maxDuration = Math.max(...eligible.map((wheel) => wheel.duration))
+    const timer = window.setTimeout(() => {
+      const combined = selectedWinners.join(" - ")
+      setResultWinner(combined)
+      setResults((current) => [
         {
           id: createId(),
-          winner: selectedWinner,
+          values: selectedWinners,
           at: new Date().toISOString(),
         },
-        ...currentHistory,
-      ].slice(0, 30))
-
-      if (removeWinner) {
-        const remaining = entries.filter((entry) => entry !== selectedWinner)
-        setEntries(remaining)
-        setText(remaining.join("\n"))
-      }
-
-      if (confetti) {
-        setShowConfetti(true)
-        window.setTimeout(() => setShowConfetti(false), 2600)
-      }
-    }, duration * 1000)
+        ...current,
+      ].slice(0, MAX_HISTORY))
+    }, maxDuration * 1000 + 100)
+    timersRef.current.push(timer)
   }
 
-  const clearEntries = () => {
-    setEntries([])
-    setText("")
-    setWinner(null)
+  const copyResults = async () => {
+    const text = results.map((result) => result.values.join(" - ")).join("\n")
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success("Results copied")
+    } catch {
+      toast.error("Unable to copy results")
+    }
   }
 
-  const restoreDefaults = () => {
-    setEntries(defaultEntries)
-    setText(defaultEntries.join("\n"))
-    setWinner(null)
-    setRotation(0)
+  const exportResults = () => {
+    const content = results.map((result) => result.values.join(" - ")).join("\n")
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = "mpd-spin-wheel-results.txt"
+    anchor.click()
+    URL.revokeObjectURL(url)
   }
 
-  const shareWheel = async () => {
+  const sortResults = () => {
+    setResults((current) => [...current].sort((a, b) =>
+      a.values.join(" - ").localeCompare(b.values.join(" - "), undefined, { sensitivity: "base" }),
+    ))
+  }
+
+  const clearResults = () => setResults([])
+
+  const shareWheels = async () => {
+    const state: SavedState = {
+      wheels: wheels.map(({ spinning: _spinning, ...wheel }) => wheel),
+      activeWheelId,
+      results: [],
+      resultsOpen: false,
+    }
+    const encoded = btoa(JSON.stringify(state))
     const url = new URL(window.location.href)
-    url.searchParams.set("entries", entries.join("|"))
-    url.searchParams.set("spinTime", String(duration))
-
+    url.searchParams.set("wheels", encoded)
     try {
       await navigator.clipboard.writeText(url.toString())
       toast.success("Wheel link copied", {
-        description: "Anyone with the link can open this wheel.",
+        description: "The current wheels and entries are included.",
       })
-      setShareOpen(false)
     } catch {
-      setShareOpen(true)
+      toast.error("Unable to copy the wheel link")
     }
   }
 
-  const copyEntries = async () => {
-    try {
-      await navigator.clipboard.writeText(entries.join("\n"))
-      toast.success("Entries copied")
-    } catch {
-      toast.error("Unable to copy entries")
-    }
-  }
+  if (!activeWheel) return null
 
-  const sortEntries = () => {
-    const sorted = [...entries].sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" }),
-    )
-
-    setEntries(sorted)
-    setText(sorted.join("\n"))
-  }
-
-  const shuffleEntries = () => {
-    const shuffled = shuffle(entries)
-    setEntries(shuffled)
-    setText(shuffled.join("\n"))
+  const shortLabel = (entry: string) => {
+    const limit = visibleEntries.length <= 12 ? 18 : visibleEntries.length <= 24 ? 12 : 8
+    return entry.length > limit ? `${entry.slice(0, limit - 1)}…` : entry
   }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
 
-      <main className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(59,130,246,0.10),transparent_34%)]" />
+      <main className="relative min-h-[calc(100vh-4rem)] overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_35%_15%,rgba(59,130,246,0.10),transparent_35%)]" />
 
-        <div className="relative mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10">
-              <Dices className="h-6 w-6 text-blue-500" />
+        <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[1600px] flex-col px-3 py-3 sm:px-5 lg:px-6">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-500">Metro Police Department</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight">Spin the Wheel</h1>
             </div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-500">
-              Metro Police Department
-            </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-              Spin the Wheel
-            </h1>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-              Add names, officers, tasks or anything else and let the wheel make the random selection for you.
-            </p>
+            <div className="hidden items-center gap-2 sm:flex">
+              <Button variant="outline" size="sm" onClick={() => void shareWheels()}>
+                <Copy className="mr-2 h-4 w-4" />
+                Share
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCustomizeOpen(true)}>
+                <Settings2 className="mr-2 h-4 w-4" />
+                Customize
+              </Button>
+            </div>
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setHistoryOpen((value) => !value)}>
-              <History className="mr-2 h-4 w-4" />
-              History
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => void shareWheel()}>
-              <Copy className="mr-2 h-4 w-4" />
-              Share Wheel
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setSettingsOpen((value) => !value)}>
-              <Settings2 className="mr-2 h-4 w-4" />
-              Customize
-            </Button>
-          </div>
-
-          {historyOpen && (
-            <section className="mx-auto mt-4 max-w-5xl rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">Spin history</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Recent winners are saved on this device.
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setHistory([])}
-                  disabled={!history.length}
-                  aria-label="Clear spin history"
-                >
-                  <Eraser className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {history.slice(0, 8).map((item) => (
-                  <div key={item.id} className="rounded-xl border border-border/70 bg-background/70 px-3 py-2.5">
-                    <p className="truncate text-sm font-medium">{item.winner}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {new Date(item.at).toLocaleString("en-GB")}
-                    </p>
-                  </div>
-                ))}
-                {!history.length && (
-                  <p className="text-xs text-muted-foreground">No spins yet.</p>
-                )}
-              </div>
-            </section>
-          )}
-
-          <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <section className="relative flex min-h-[650px] items-center justify-center overflow-hidden rounded-3xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur sm:p-8">
-              <div className="absolute left-5 top-5 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
-                <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
-                {entries.length} {entries.length === 1 ? "entry" : "entries"}
-              </div>
+          <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_390px]">
+            <section
+              ref={wheelAreaRef}
+              className={`relative flex min-h-[680px] min-w-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-sm backdrop-blur ${fullscreen ? "fixed inset-3 z-[100] min-h-0" : ""}`}
+              style={activeWheel.backgroundImage ? { backgroundImage: `linear-gradient(rgba(0,0,0,.42),rgba(0,0,0,.42)),url(${activeWheel.backgroundImage})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+            >
+              <button
+                type="button"
+                className="absolute left-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-500 shadow-sm"
+                onClick={() => setEntriesOpen((value) => !value)}
+                aria-label="Toggle sidebar"
+              >
+                {entriesOpen ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+              </button>
 
               <button
                 type="button"
-                className="absolute right-5 top-5 rounded-lg border border-border/70 bg-background/80 p-2 text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() => wheelRef.current?.requestFullscreen?.()}
-                aria-label="Fullscreen wheel"
+                className="absolute right-3 top-3 z-30 rounded-lg border border-border/70 bg-background/80 p-2 text-muted-foreground backdrop-blur hover:text-foreground"
+                onClick={() => setFullscreen((value) => !value)}
+                aria-label="Toggle fullscreen"
               >
                 <Maximize2 className="h-4 w-4" />
               </button>
 
-              <div className="relative flex w-full max-w-[660px] items-center justify-center pt-8">
-                <div className="absolute top-0 z-30 drop-shadow-lg">
-                  <div className="h-0 w-0 border-l-[15px] border-r-[15px] border-t-[32px] border-l-transparent border-r-transparent border-t-blue-500" />
+              <div className="absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-border/70 bg-background/85 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur">
+                {wheels.length} {wheels.length === 1 ? "wheel" : "wheels"} · {activeWheel.entries.length} entries
+              </div>
+
+              <div className="relative flex w-full max-w-[780px] items-center justify-center px-5 pt-8">
+                <div className="absolute top-4 z-30 drop-shadow-lg">
+                  <div className="h-0 w-0 border-l-[17px] border-r-[17px] border-t-[35px] border-l-transparent border-r-transparent border-t-blue-500" />
                 </div>
 
-                <div
-                  ref={wheelRef}
-                  className="relative aspect-square w-[min(82vw,610px)] max-w-full rounded-full bg-background p-2 shadow-[0_0_80px_rgba(37,99,235,0.12)]"
-                >
+                <div className="relative aspect-square w-[min(76vw,700px)] max-w-full rounded-full bg-background p-2 shadow-[0_0_90px_rgba(37,99,235,0.14)]">
                   <div
                     role="button"
-                    tabIndex={spinning || !entries.length ? -1 : 0}
-                    aria-label="Spin the wheel"
-                    onClick={spin}
+                    tabIndex={allSpinning || !visibleEntries.length ? -1 : 0}
+                    aria-label={`Spin ${activeWheel.name}`}
+                    onClick={() => spinWheel(activeWheel.id)}
                     onKeyDown={(event) => {
-                      if ((event.key === "Enter" || event.key === " ") && !spinning && entries.length) {
+                      if ((event.key === "Enter" || event.key === " ") && !allSpinning && visibleEntries.length) {
                         event.preventDefault()
-                        spin()
+                        spinWheel(activeWheel.id)
                       }
                     }}
                     className="relative h-full w-full cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-4 focus-visible:ring-offset-background"
                     style={{
-                      transform: `rotate(${rotation}deg)`,
-                      transitionDuration: `${spinning ? duration : 0}000ms`,
-                      transitionTimingFunction: spinning ? "cubic-bezier(0.12, 0.74, 0.16, 1)" : "linear",
+                      transform: `rotate(${activeWheel.rotation}deg)`,
+                      transitionDuration: `${activeWheel.spinning ? activeWheel.duration : 0}000ms`,
+                      transitionTimingFunction: activeWheel.spinning ? "cubic-bezier(0.12,0.74,0.16,1)" : "linear",
                     }}
                   >
                     <svg viewBox="0 0 400 400" className="h-full w-full overflow-visible rounded-full">
                       <circle cx="200" cy="200" r="188" fill="var(--card)" />
-
-                      {visibleEntries.length > 0 ? visibleEntries.map((entry, index) => {
+                      {visibleEntries.length ? visibleEntries.map((entry, index) => {
                         const point = labelPoint(index, visibleEntries.length)
                         const slice = 360 / visibleEntries.length
                         const angle = -90 + index * slice + slice / 2
-                        const shortLabel = entry.length > (visibleEntries.length <= 12 ? 18 : 11)
-                          ? `${entry.slice(0, visibleEntries.length <= 12 ? 17 : 10)}…`
-                          : entry
-
                         return (
                           <g key={`${entry}-${index}`}>
                             <path
                               d={segmentPath(index, visibleEntries.length)}
-                              fill={WHEEL_COLORS[index % WHEEL_COLORS.length]}
-                              stroke="rgba(255,255,255,0.22)"
+                              fill={activeWheel.colors[index % activeWheel.colors.length]}
+                              stroke="rgba(255,255,255,0.28)"
                               strokeWidth="1"
                             />
-                            {visibleEntries.length <= 36 && (
+                            {visibleEntries.length <= 42 && (
                               <text
                                 x={point.x}
                                 y={point.y}
@@ -475,7 +633,7 @@ export default function SpinWheel() {
                                 fontWeight="600"
                                 transform={`rotate(${angle + 90} ${point.x} ${point.y})`}
                               >
-                                {shortLabel}
+                                {shortLabel(entry)}
                               </text>
                             )}
                           </g>
@@ -484,197 +642,239 @@ export default function SpinWheel() {
                         <circle cx="200" cy="200" r="184" fill="#111827" />
                       )}
 
-                      <circle cx="200" cy="200" r="48" fill="var(--card)" stroke="rgba(59,130,246,0.5)" strokeWidth="3" />
-                      <circle cx="200" cy="200" r="36" fill="#2563eb" />
-                      <text x="200" y="201" textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="11" fontWeight="700">
-                        SPIN
-                      </text>
+                      <circle cx="200" cy="200" r="50" fill="var(--card)" stroke="rgba(59,130,246,.45)" strokeWidth="3" />
+                      {activeWheel.centerImage ? (
+                        <image href={activeWheel.centerImage} x="170" y="170" width="60" height="60" preserveAspectRatio="xMidYMid slice" />
+                      ) : (
+                        <circle cx="200" cy="200" r="37" fill="#2563eb" />
+                      )}
                     </svg>
                   </div>
                 </div>
               </div>
 
-              <div className="absolute bottom-5 left-1/2 -translate-x-1/2">
-                <Button
-                  size="lg"
-                  className="min-w-36 rounded-xl shadow-lg shadow-blue-500/15"
-                  onClick={spin}
-                  disabled={spinning || !entries.length}
-                >
+              <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
+                <Button size="lg" className="min-w-36 shadow-lg" onClick={() => spinWheel(activeWheel.id)} disabled={allSpinning || !activeWheel.entries.length}>
                   <Dices className="mr-2 h-5 w-5" />
-                  {spinning ? "Spinning..." : "SPIN"}
+                  {activeWheel.spinning ? "Spinning..." : "Spin"}
                 </Button>
               </div>
-            </section>
 
-            <aside className="overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
-              <div className="flex items-center justify-between border-b border-border/70 px-4 py-4">
-                <div>
-                  <p className="text-sm font-semibold">Entries</p>
-                  <p className="mt-1 text-xs text-muted-foreground">One entry per line</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEntriesOpen((value) => !value)}
-                  className="rounded-lg p-2 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                  aria-label="Toggle entries"
-                >
-                  <ChevronDown className={`h-4 w-4 transition-transform ${entriesOpen ? "rotate-180" : ""}`} />
-                </button>
-              </div>
-
-              {entriesOpen && (
-                <div className="p-4">
-                  <textarea
-                    value={text}
-                    onChange={(event) => syncEntries(event.target.value)}
-                    placeholder="Enter names, ranks, tasks..."
-                    className="min-h-[310px] w-full resize-y rounded-2xl border border-border bg-background px-3 py-3 text-sm leading-6 outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
-                  />
-
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <Button variant="outline" size="sm" onClick={shuffleEntries} disabled={!entries.length}>
-                      <Shuffle className="mr-2 h-4 w-4" />
-                      Shuffle
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={sortEntries} disabled={!entries.length}>
-                      <ChevronDown className="mr-2 h-4 w-4 rotate-90" />
-                      Sort
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={copyEntries} disabled={!entries.length}>
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={clearEntries} disabled={!entries.length}>
-                      <Eraser className="mr-2 h-4 w-4" />
-                      Clear
-                    </Button>
-                  </div>
-
-                  <div className="mt-4 rounded-xl border border-border/70 bg-background/50 p-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Total entries</span>
-                      <span className="font-semibold">{entries.length}</span>
-                    </div>
-                    {entries.length > MAX_VISIBLE_SEGMENTS && (
-                      <p className="mt-1 text-[11px] text-amber-500">
-                        Only the first {MAX_VISIBLE_SEGMENTS} entries are displayed on the wheel.
-                      </p>
-                    )}
-                  </div>
-
-                  <Button variant="outline" className="mt-3 w-full" onClick={restoreDefaults}>
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    Restore Example Entries
+              {wheels.length > 1 && (
+                <div className="absolute bottom-5 right-5 z-30">
+                  <Button variant="outline" size="sm" onClick={spinAll} disabled={allSpinning || !wheels.some((wheel) => wheel.entries.length)}>
+                    <Dices className="mr-2 h-4 w-4" />
+                    Spin all wheels
                   </Button>
                 </div>
               )}
-            </aside>
+            </section>
+
+            {entriesOpen && (
+              <aside className="flex min-h-[680px] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-sm backdrop-blur">
+                <div className="flex shrink-0 items-center overflow-x-auto border-b border-border/70 bg-muted/10 px-2 pt-2">
+                  {wheels.map((wheel, index) => (
+                    <button
+                      key={wheel.id}
+                      type="button"
+                      onClick={() => { setActiveWheelId(wheel.id); setActiveTab("wheel") }}
+                      className={`relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors ${activeTab === "wheel" && wheel.id === activeWheelId ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {wheel.name}
+                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{wheel.entries.length}</span>
+                      {activeTab === "wheel" && wheel.id === activeWheelId && <span className="absolute inset-x-2 bottom-0 h-0.5 bg-blue-500" />}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("results")}
+                    className={`relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors ${activeTab === "results" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    Results
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{results.length}</span>
+                    {activeTab === "results" && <span className="absolute inset-x-2 bottom-0 h-0.5 bg-blue-500" />}
+                  </button>
+                </div>
+
+                {activeTab === "results" ? (
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex shrink-0 flex-wrap gap-2 border-b border-border/70 p-3">
+                      <Button variant="outline" size="sm" onClick={sortResults} disabled={!results.length}>
+                        <ArrowUp className="mr-2 h-4 w-4" />
+                        Sort
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={clearResults} disabled={!results.length}>
+                        <X className="mr-2 h-4 w-4" />
+                        Clear results
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={exportResults} disabled={!results.length}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export results
+                      </Button>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                      {results.length ? results.map((result) => (
+                        <div key={result.id} className="border-b border-border/70 px-2 py-2.5 last:border-b-0">
+                          <p className="text-sm font-medium leading-5">{result.values.join(" - ")}</p>
+                          <p className="mt-1 text-[10px] text-muted-foreground">{new Date(result.at).toLocaleString("en-GB")}</p>
+                        </div>
+                      )) : (
+                        <div className="flex h-full min-h-48 items-center justify-center text-center text-xs text-muted-foreground">Spin a wheel to create results.</div>
+                      )}
+                    </div>
+                    <div className="shrink-0 border-t border-border/70 p-3">
+                      <Button variant="outline" className="w-full" onClick={() => void copyResults()} disabled={!results.length}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy results
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border/70 p-3">
+                      <Button variant="outline" size="sm" onClick={shuffleActive} disabled={!activeWheel.entries.length}>
+                        <Shuffle className="mr-2 h-4 w-4" />
+                        Shuffle
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={sortActive} disabled={!activeWheel.entries.length}>
+                        <ArrowDown className="mr-2 h-4 w-4" />
+                        Sort
+                      </Button>
+                      <div className="relative">
+                        <Button variant="outline" size="sm" onClick={() => setImageMenuOpen((value) => !value)}>
+                          <ImageIcon className="mr-2 h-4 w-4" />
+                          Add image
+                          <ChevronDown className={`ml-2 h-3.5 w-3.5 transition-transform ${imageMenuOpen ? "rotate-180" : ""}`} />
+                        </Button>
+                        {imageMenuOpen && (
+                          <div className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-lg border border-border bg-popover p-1 shadow-xl">
+                            <button type="button" onClick={() => addImage("background")} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-muted">
+                              <div className="h-5 w-5 rounded-full bg-blue-500" />
+                              Add background image
+                            </button>
+                            <button type="button" onClick={() => addImage("center")} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-muted">
+                              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted"><Dices className="h-3 w-3" /></div>
+                              Add center image
+                            </button>
+                            <button type="button" onClick={() => addImage("entry")} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-muted">
+                              <div className="h-5 w-5 rounded bg-muted" />
+                              Add image as entry
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                        <input type="checkbox" checked={advancedOpen} onChange={(event) => setAdvancedOpen(event.target.checked)} className="h-4 w-4 accent-blue-500" />
+                        Advanced
+                      </label>
+                    </div>
+
+                    {!advancedOpen ? (
+                      <div className="min-h-0 flex-1 p-3">
+                        <textarea
+                          value={activeWheel.entries.join("\n")}
+                          onChange={(event) => syncActiveEntries(event.target.value)}
+                          placeholder="Enter one entry per line..."
+                          className="h-full min-h-[470px] w-full resize-none rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
+                        />
+                      </div>
+                    ) : (
+                      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                        <div className="space-y-2">
+                          {activeWheel.entries.map((entry, index) => (
+                            <div key={`${index}-${entry}`} className="rounded-lg border border-border/70 bg-background/60 p-2.5">
+                              <div className="flex items-center gap-2">
+                                <div className="flex flex-col">
+                                  <button type="button" className="p-0.5 text-muted-foreground hover:text-foreground" onClick={() => moveEntry(index, -1)} disabled={index === 0}><ArrowUp className="h-3.5 w-3.5" /></button>
+                                  <button type="button" className="p-0.5 text-muted-foreground hover:text-foreground" onClick={() => moveEntry(index, 1)} disabled={index === activeWheel.entries.length - 1}><ArrowDown className="h-3.5 w-3.5" /></button>
+                                </div>
+                                <Input value={entry} onFocus={() => setSelectedEntryIndex(index)} onChange={(event) => setEntry(index, event.target.value)} className="h-9 flex-1" />
+                                <button type="button" onClick={() => duplicateEntry(index)} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" title="Duplicate"><Copy className="h-4 w-4" /></button>
+                                <button type="button" onClick={() => deleteEntry(index)} className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete"><X className="h-4 w-4" /></button>
+                              </div>
+                              <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+                                <span>Entry {index + 1}</span>
+                                <span>Weight 1 · {(100 / Math.max(1, activeWheel.entries.length)).toFixed(1)}%</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {advancedOpen && (
+                      <div className="shrink-0 border-t border-border/70 p-3">
+                        <Button className="w-full" onClick={addEntry}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add entry
+                        </Button>
+                      </div>
+                    )}
+
+                    <div className="shrink-0 border-t border-border/70 p-3">
+                      <div className="flex gap-2">
+                        <Button variant="outline" className="flex-1" onClick={clearActive} disabled={!activeWheel.entries.length}>
+                          <Eraser className="mr-2 h-4 w-4" />
+                          Clear list
+                        </Button>
+                        <Button variant="outline" className="flex-1" onClick={restoreActive}>
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Restore
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="shrink-0 border-t border-border/70 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="relative">
+                      <Button variant="outline" size="sm" onClick={addWheel} disabled={wheels.length >= MAX_WHEELS}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add wheel
+                        <ChevronDown className="ml-2 h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">{wheels.length}/{MAX_WHEELS} wheels</span>
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button variant="ghost" size="sm" onClick={renameActive}>
+                      Rename {activeWheel.name}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setCustomizeOpen(true)}>
+                      <Palette className="mr-2 h-4 w-4" />
+                      Customize
+                    </Button>
+                    {wheels.length > 1 && (
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={removeWheel}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove {activeWheel.name}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </aside>
+            )}
           </div>
-
-          {settingsOpen && (
-            <section className="mx-auto mt-5 max-w-5xl rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">Customize wheel</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Control how the wheel behaves.</p>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-border/70 p-3">
-                  <div className="flex items-center gap-2">
-                    <Clock3 className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm font-medium">Spin duration</span>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <Button variant="outline" size="icon" onClick={() => setDuration((value) => Math.max(1, value - 1))}>
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <Input value={`${duration}s`} readOnly className="text-center" />
-                    <Button variant="outline" size="icon" onClick={() => setDuration((value) => Math.min(15, value + 1))}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setRemoveWinner((value) => !value)}
-                  className={`rounded-xl border p-3 text-left transition-colors ${removeWinner ? "border-blue-500/30 bg-blue-500/5" : "border-border/70 hover:bg-muted/20"}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Remove winner</span>
-                    <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${removeWinner ? "border-blue-500 bg-blue-500 text-white" : "border-border"}`}>
-                      {removeWinner && <Check className="h-3 w-3" />}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">Remove the selected entry after each spin.</p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setConfetti((value) => !value)}
-                  className={`rounded-xl border p-3 text-left transition-colors ${confetti ? "border-blue-500/30 bg-blue-500/5" : "border-border/70 hover:bg-muted/20"}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Winner effects</span>
-                    <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${confetti ? "border-blue-500 bg-blue-500 text-white" : "border-border"}`}>
-                      {confetti && <Check className="h-3 w-3" />}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">Show a small winner celebration after the spin.</p>
-                </button>
-              </div>
-            </section>
-          )}
-
-          {shareOpen && (
-            <section className="mx-auto mt-4 max-w-2xl rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">Share this wheel</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Copy this link to share the current entries and spin duration.</p>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => setShareOpen(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="mt-3 rounded-xl border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground break-all">
-                {window.location.href}
-              </div>
-            </section>
-          )}
         </div>
       </main>
 
-      {winner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setWinner(null)
-        }}>
-          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-blue-500/20 bg-card p-7 text-center shadow-2xl">
-            <button
-              type="button"
-              className="absolute right-3 top-3 rounded-lg p-2 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              onClick={() => setWinner(null)}
-              aria-label="Close winner"
-            >
+      {resultWinner && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) setResultWinner(null) }}>
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-blue-500/20 bg-card p-7 text-center shadow-2xl">
+            <button type="button" className="absolute right-3 top-3 rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => setResultWinner(null)} aria-label="Close winner">
               <X className="h-4 w-4" />
             </button>
-
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10">
               <Trophy className="h-7 w-7 text-blue-500" />
             </div>
-            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.24em] text-blue-500">Winner</p>
-            <h2 className="mt-2 break-words text-3xl font-bold tracking-tight">{winner}</h2>
-            <p className="mt-2 text-sm text-muted-foreground">The wheel has selected this entry.</p>
-
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.22em] text-blue-500">Winner</p>
+            <h2 className="mt-2 break-words text-3xl font-bold tracking-tight">{resultWinner}</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Selected from {wheels.length > 1 ? "the active wheels" : activeWheel.name}.</p>
             <div className="mt-6 flex justify-center gap-2">
-              <Button variant="outline" onClick={() => setWinner(null)}>Close</Button>
-              <Button onClick={() => { setWinner(null); window.setTimeout(spin, 150) }} disabled={entries.length === 0}>
+              <Button variant="outline" onClick={() => setResultWinner(null)}>Close</Button>
+              <Button onClick={() => { setResultWinner(null); window.setTimeout(() => spinWheel(activeWheel.id), 150) }} disabled={allSpinning || !activeWheel.entries.length}>
                 <Dices className="mr-2 h-4 w-4" />
                 Spin Again
               </Button>
@@ -683,15 +883,54 @@ export default function SpinWheel() {
         </div>
       )}
 
+      {customizeOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) setCustomizeOpen(false) }}>
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-semibold"><SlidersHorizontal className="h-4 w-4 text-blue-500" />Customize {activeWheel.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Control how this wheel spins and handles winners.</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setCustomizeOpen(false)}><X className="h-4 w-4" /></Button>
+            </div>
+            <div className="grid gap-3 p-5 sm:grid-cols-2">
+              <div className="rounded-xl border border-border/70 p-3">
+                <p className="text-xs font-semibold">Spin duration</p>
+                <div className="mt-3 flex items-center gap-2">
+                  <Button variant="outline" size="icon" onClick={() => updateWheel(activeWheel.id, (wheel) => ({ ...wheel, duration: Math.max(1, wheel.duration - 1) }))}><Minus className="h-4 w-4" /></Button>
+                  <Input value={`${activeWheel.duration}s`} readOnly className="text-center" />
+                  <Button variant="outline" size="icon" onClick={() => updateWheel(activeWheel.id, (wheel) => ({ ...wheel, duration: Math.min(15, wheel.duration + 1) }))}><Plus className="h-4 w-4" /></Button>
+                </div>
+              </div>
+              <button type="button" onClick={() => updateWheel(activeWheel.id, (wheel) => ({ ...wheel, removeWinner: !wheel.removeWinner }))} className={`rounded-xl border p-3 text-left ${activeWheel.removeWinner ? "border-blue-500/30 bg-blue-500/5" : "border-border/70"}`}>
+                <div className="flex items-center justify-between"><span className="text-sm font-medium">Remove winner</span><span className={`flex h-5 w-5 items-center justify-center rounded-full border ${activeWheel.removeWinner ? "border-blue-500 bg-blue-500 text-white" : "border-border"}`}>{activeWheel.removeWinner && <Check className="h-3 w-3" />}</span></div>
+                <p className="mt-1 text-xs text-muted-foreground">Remove the winner after each spin.</p>
+              </button>
+              <button type="button" onClick={() => updateWheel(activeWheel.id, (wheel) => ({ ...wheel, confetti: !wheel.confetti }))} className={`rounded-xl border p-3 text-left ${activeWheel.confetti ? "border-blue-500/30 bg-blue-500/5" : "border-border/70"}`}>
+                <div className="flex items-center justify-between"><span className="text-sm font-medium">Winner effects</span><span className={`flex h-5 w-5 items-center justify-center rounded-full border ${activeWheel.confetti ? "border-blue-500 bg-blue-500 text-white" : "border-border"}`}>{activeWheel.confetti && <Check className="h-3 w-3" />}</span></div>
+                <p className="mt-1 text-xs text-muted-foreground">Show the winner celebration.</p>
+              </button>
+              <div className="rounded-xl border border-border/70 p-3">
+                <p className="text-xs font-semibold">Wheel actions</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { updateWheel(activeWheel.id, (wheel) => ({ ...wheel, rotation: 0 })); setCustomizeOpen(false) }}>Reset rotation</Button>
+                  <Button variant="outline" size="sm" onClick={() => { setResults([]); setCustomizeOpen(false) }}>Clear results</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showConfetti && (
-        <div className="pointer-events-none fixed inset-0 z-[60] overflow-hidden" aria-hidden="true">
-          {Array.from({ length: 28 }, (_, index) => (
+        <div className="pointer-events-none fixed inset-0 z-[130] overflow-hidden" aria-hidden="true">
+          {Array.from({ length: 32 }, (_, index) => (
             <span
               key={index}
               className="absolute left-1/2 top-1/2 h-2 w-1 rounded-full bg-blue-500"
               style={{
-                transform: `rotate(${index * 13}deg) translateY(-${100 + (index % 7) * 24}px)`,
-                animation: `mpd-wheel-confetti 1.8s ease-out ${index * 18}ms forwards`,
+                transform: `rotate(${index * 11}deg) translateY(-${120 + (index % 8) * 24}px)`,
+                animation: `mpd-wheel-confetti 1.8s ease-out ${index * 16}ms forwards`,
                 opacity: 0.9 - (index % 4) * 0.12,
               }}
             />
