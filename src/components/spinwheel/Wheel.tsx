@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent,
 } from "react"
 import { Wheel as SpinWheel } from "spin-wheel"
 
@@ -46,12 +47,6 @@ const CONFETTI_COLORS = [
   "#38bdf8",
 ]
 
-/*
- * Generate bright pastel colours.
- *
- * Colours are stored by entry ID so editing or reordering
- * entries does not randomly recolour the entire wheel.
- */
 function createRandomColor() {
   const hue = Math.floor(Math.random() * 360)
 
@@ -98,9 +93,7 @@ function useRandomItemColors(
 }
 
 /*
- * Creates a short mechanical click/tick.
- *
- * No external sound file is required.
+ * Short mechanical ticking sound.
  */
 function playTick(
   audioContext: AudioContext | null,
@@ -156,8 +149,8 @@ function playTick(
 }
 
 /*
- * Generates a quiet applause sound using filtered
- * noise bursts rather than requiring an audio asset.
+ * Generates a quiet applause sound using
+ * filtered noise bursts.
  */
 function playApplause(
   audioContext: AudioContext | null,
@@ -194,11 +187,11 @@ function playApplause(
     audioContext.destination,
   )
 
-  /*
-   * Multiple small noise bursts create a
-   * subdued crowd/applause texture.
-   */
-  for (let index = 0; index < 28; index += 1) {
+  for (
+    let index = 0;
+    index < 28;
+    index += 1
+  ) {
     const offset =
       Math.random() * 0.85
 
@@ -275,6 +268,7 @@ function playApplause(
     gain.connect(master)
 
     source.start(start)
+
     source.stop(
       start + duration + 0.01,
     )
@@ -357,9 +351,6 @@ export default function Wheel({
   const [isSpinning, setIsSpinning] =
     useState(false)
 
-  const [currentIndex, setCurrentIndex] =
-    useState(0)
-
   const [pointerColor, setPointerColor] =
     useState("#60a5fa")
 
@@ -367,14 +358,14 @@ export default function Wheel({
     useState<ConfettiPiece[]>([])
 
   /*
-   * Generate stable random colours.
+   * Stable random colours.
    */
   const randomColors =
     useRandomItemColors(items)
 
   /*
-   * Hidden entries do not participate in the
-   * actual wheel.
+   * Hidden entries are excluded from
+   * the actual wheel.
    */
   const visibleItems = useMemo(
     () =>
@@ -395,7 +386,8 @@ export default function Wheel({
   )
 
   /*
-   * Keep current items accessible to callbacks.
+   * Keep the latest visible items
+   * available to the wheel callbacks.
    */
   const itemsRef =
     useRef(visibleItems)
@@ -406,8 +398,8 @@ export default function Wheel({
   }, [visibleItems])
 
   /*
-   * Keep result callback current without
-   * rebuilding the wheel.
+   * Keep the latest result callback
+   * without recreating the wheel.
    */
   const onResultRef =
     useRef(onResult)
@@ -418,8 +410,7 @@ export default function Wheel({
   }, [onResult])
 
   /*
-   * Initialise Web Audio only after the user
-   * interacts with the page.
+   * Initialise Web Audio after interaction.
    */
   const getAudioContext =
     useCallback(() => {
@@ -459,8 +450,8 @@ export default function Wheel({
     }, [])
 
   /*
-   * Change the arrow colour to the colour
-   * of the segment currently under it.
+   * Update the arrow colour to match
+   * the segment currently underneath it.
    */
   const updatePointerColor =
     useCallback(
@@ -493,6 +484,7 @@ export default function Wheel({
       confettiTimerRef.current =
         setTimeout(() => {
           setConfetti([])
+
           confettiTimerRef.current =
             null
         }, 2800)
@@ -516,10 +508,6 @@ export default function Wheel({
     const audio =
       getAudioContext()
 
-    /*
-     * Make sure the first click can unlock
-     * audio playback.
-     */
     if (audio) {
       void audio.resume()
     }
@@ -536,9 +524,8 @@ export default function Wheel({
 
     setConfetti([])
 
-    /*
-     * Longer spin with a smooth deceleration.
-     */
+    lastTickIndexRef.current = null
+
     wheel.spinToItem(
       selectedIndex,
       4400,
@@ -552,11 +539,11 @@ export default function Wheel({
   ])
 
   /*
-   * Ctrl + Enter.
+   * Ctrl + Enter shortcut.
    */
   useEffect(() => {
     const handleKeyDown = (
-      event: KeyboardEvent,
+      event: globalThis.KeyboardEvent,
     ) => {
       if (
         event.ctrlKey &&
@@ -587,7 +574,7 @@ export default function Wheel({
   ])
 
   /*
-   * Create the actual CrazyTim wheel.
+   * Create the actual spin-wheel instance.
    */
   useEffect(() => {
     const container =
@@ -608,8 +595,6 @@ export default function Wheel({
     if (visibleItems.length === 0) {
       currentIndexRef.current = 0
 
-      setCurrentIndex(0)
-
       setPointerColor("#60a5fa")
 
       return
@@ -625,8 +610,6 @@ export default function Wheel({
 
     currentIndexRef.current =
       initialIndex
-
-    setCurrentIndex(initialIndex)
 
     const initialColor =
       visibleColors[initialIndex]
@@ -658,34 +641,26 @@ export default function Wheel({
           }),
         ),
 
-        /*
-         * Fill the available space.
-         */
         radius: 0.965,
 
         /*
-         * Right-side pointer.
+         * Pointer is positioned on the
+         * right-hand side.
          */
         pointerAngle: 0,
 
-        /*
-         * Strong but clean wheel outline.
-         */
         borderWidth: 2.5,
 
         borderColor:
           "rgba(255,255,255,0.72)",
 
-        /*
-         * Segment separators.
-         */
         lineWidth: 1.5,
 
         lineColor:
           "rgba(255,255,255,0.42)",
 
         /*
-         * Radial labels.
+         * Radial entry labels.
          */
         itemLabelAlign: "right",
 
@@ -699,9 +674,8 @@ export default function Wheel({
         itemLabelFontSizeMax: 43,
 
         /*
-         * White outline around black entry text.
-         * This makes the names stand out against
-         * similarly coloured segments.
+         * Strong white outline around
+         * the entry text.
          */
         itemLabelStrokeColor:
           "rgba(255,255,255,0.78)",
@@ -711,7 +685,8 @@ export default function Wheel({
         itemLabelBaselineOffset: 0,
 
         /*
-         * We control clicking/spinning ourselves.
+         * Wheel controls are handled by
+         * our React component.
          */
         isInteractive: false,
 
@@ -720,7 +695,7 @@ export default function Wheel({
         rotationSpeedMax: 1000,
 
         /*
-         * Tick every time the pointer enters
+         * Tick whenever the pointer enters
          * another segment.
          */
         onCurrentIndexChange: (
@@ -732,13 +707,8 @@ export default function Wheel({
           currentIndexRef.current =
             index
 
-          setCurrentIndex(index)
-
           updatePointerColor(index)
 
-          /*
-           * Avoid an unnecessary duplicate tick.
-           */
           if (
             lastTickIndexRef.current !==
             index
@@ -746,13 +716,12 @@ export default function Wheel({
             lastTickIndexRef.current =
               index
 
-            const audio =
-              audioContextRef.current
-
             if (
               spinningRef.current
             ) {
-              playTick(audio)
+              playTick(
+                audioContextRef.current,
+              )
             }
           }
         },
@@ -772,10 +741,6 @@ export default function Wheel({
           currentIndexRef.current =
             selectedIndex
 
-          setCurrentIndex(
-            selectedIndex,
-          )
-
           updatePointerColor(
             selectedIndex,
           )
@@ -793,7 +758,7 @@ export default function Wheel({
           )
 
           /*
-           * Celebration.
+           * Confetti celebration.
            */
           launchConfetti()
 
@@ -812,10 +777,6 @@ export default function Wheel({
 
     currentIndexRef.current =
       actualIndex
-
-    setCurrentIndex(
-      actualIndex,
-    )
 
     updatePointerColor(
       actualIndex,
@@ -839,7 +800,7 @@ export default function Wheel({
   ])
 
   /*
-   * Cleanup.
+   * Cleanup audio and confetti.
    */
   useEffect(() => {
     return () => {
@@ -860,7 +821,7 @@ export default function Wheel({
   }, [])
 
   /*
-   * Clicking the wheel starts the spin.
+   * Clicking the wheel starts spinning.
    */
   const handleWheelClick = () => {
     if (
@@ -874,10 +835,10 @@ export default function Wheel({
   }
 
   /*
-   * Keyboard activation for the wheel.
+   * Keyboard activation.
    */
   const handleWheelKeyDown = (
-    event: React.KeyboardEvent,
+    event: KeyboardEvent,
   ) => {
     if (
       event.key === "Enter" ||
@@ -897,15 +858,11 @@ export default function Wheel({
       {visibleItems.length > 0 ? (
         <div
           className="relative aspect-square w-[min(78vw,calc(100vh-130px),1000px)] max-w-[94%] drop-shadow-[0_14px_28px_rgba(0,0,0,0.42)]"
-          onClick={
-            handleWheelClick
-          }
+          onClick={handleWheelClick}
           role="button"
           tabIndex={0}
           aria-label="Spin wheel"
-          onKeyDown={
-            handleWheelKeyDown
-          }
+          onKeyDown={handleWheelKeyDown}
         >
           {/* Wheel */}
           <div
@@ -913,12 +870,7 @@ export default function Wheel({
             className="absolute inset-0 overflow-visible"
           />
 
-          {/* 
-            Larger arrow.
-
-            It is intentionally pulled inward so the
-            point sits closer to the wheel's edge.
-          */}
+          {/* Pointer */}
           <div
             className="pointer-events-none absolute right-[-13px] top-1/2 z-40 -translate-y-1/2"
             aria-hidden="true"
@@ -941,7 +893,7 @@ export default function Wheel({
                 }}
               />
 
-              {/* White highlight/outline */}
+              {/* White outline */}
               <div
                 className="absolute inset-[2px]"
                 style={{
@@ -952,7 +904,7 @@ export default function Wheel({
                 }}
               />
 
-              {/* Actual coloured arrow */}
+              {/* Coloured pointer */}
               <div
                 className="absolute inset-[4px]"
                 style={{
@@ -972,12 +924,7 @@ export default function Wheel({
           {/* White centre */}
           <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 h-[17%] w-[17%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_3px_14px_rgba(0,0,0,0.24)]" />
 
-          {/* 
-            Curved Wheel-of-Names-style instructions.
-            
-            SVG textPath gives us real curved text instead
-            of the previous two rotated straight lines.
-          */}
+          {/* Curved instructions */}
           {!isSpinning && (
             <svg
               className="pointer-events-none absolute inset-0 z-35 h-full w-full overflow-visible"
@@ -985,14 +932,12 @@ export default function Wheel({
               aria-hidden="true"
             >
               <defs>
-                {/* Upper curve */}
                 <path
                   id="spin-text-top"
                   d="M 230 355 A 300 300 0 0 1 770 355"
                   fill="none"
                 />
 
-                {/* Lower curve */}
                 <path
                   id="spin-text-bottom"
                   d="M 275 650 A 265 265 0 0 0 725 650"
@@ -1000,7 +945,7 @@ export default function Wheel({
                 />
               </defs>
 
-              {/* Top text shadow */}
+              {/* Top shadow */}
               <text
                 fill="rgba(0,0,0,0.58)"
                 fontSize="48"
@@ -1041,7 +986,7 @@ export default function Wheel({
                 </textPath>
               </text>
 
-              {/* Bottom text shadow */}
+              {/* Bottom shadow */}
               <text
                 fill="rgba(0,0,0,0.58)"
                 fontSize="34"
@@ -1089,25 +1034,24 @@ export default function Wheel({
             >
               {confetti.map(
                 (piece) => {
-                  const style: CSSProperties =
-                    {
-                      left: `${piece.x}%`,
-                      top: `${piece.y}%`,
-                      width: `${piece.size}px`,
-                      height:
-                        piece.shape ===
-                        "rectangle"
-                          ? `${piece.size * 1.8}px`
-                          : `${piece.size}px`,
-                      backgroundColor:
-                        piece.color,
-                      transform:
-                        `rotate(${piece.rotation}deg)`,
-                      animationDelay:
-                        `${piece.delay}s`,
-                      animationDuration:
-                        `${piece.duration}s`,
-                    }
+                  const style: CSSProperties = {
+                    left: `${piece.x}%`,
+                    top: `${piece.y}%`,
+                    width: `${piece.size}px`,
+                    height:
+                      piece.shape ===
+                      "rectangle"
+                        ? `${piece.size * 1.8}px`
+                        : `${piece.size}px`,
+                    backgroundColor:
+                      piece.color,
+                    transform:
+                      `rotate(${piece.rotation}deg)`,
+                    animationDelay:
+                      `${piece.delay}s`,
+                    animationDuration:
+                      `${piece.duration}s`,
+                  }
 
                   return (
                     <span
@@ -1155,11 +1099,7 @@ export default function Wheel({
             100% {
               opacity: 0;
               transform:
-                translate3d(
-                  calc((var(--random-x, 0) * 1px)),
-                  420px,
-                  0
-                )
+                translate3d(0, 420px, 0)
                 rotate(720deg)
                 scale(1);
             }
