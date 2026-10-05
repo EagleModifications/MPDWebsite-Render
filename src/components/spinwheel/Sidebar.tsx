@@ -2055,13 +2055,13 @@ export default function Sidebar({
   return (
     <>
       <aside
-        className={`absolute right-0 top-0 z-50 h-full w-[468px] max-w-[calc(100vw-8px)] border-l border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
+        className={`absolute inset-y-0 right-0 z-[150] flex h-full w-[468px] max-w-[calc(100vw-8px)] flex-col border-l border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
           open
             ? "translate-x-0"
             : "translate-x-full"
         }`}
       >
-        <div className="flex h-full flex-col">
+        <div className="flex min-h-0 h-full flex-col">
           <div className="flex h-12 shrink-0 items-end overflow-x-auto border-b border-border/70 bg-card/80 px-1">
             {wheels.map((wheel) => (
               <button
@@ -2655,7 +2655,7 @@ export default function Sidebar({
             </>
           )}
 
-          <div className="shrink-0 border-t border-border/70 bg-muted/10 px-4 py-3">
+          <div className="mt-auto shrink-0 border-t border-border/70 bg-muted/10 px-4 py-3">
             <div className="flex flex-wrap items-center gap-2">
                   {wheels.length > 1 && (
                     <button
