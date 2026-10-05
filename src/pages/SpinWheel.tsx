@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   ArrowDown,
   ArrowUp,
@@ -171,7 +171,6 @@ export default function SpinWheel() {
   const [resultWinner, setResultWinner] = useState<string | null>(null)
   const [showConfetti, setShowConfetti] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
-  const [selectedEntryIndex, setSelectedEntryIndex] = useState(0)
   const [loaded, setLoaded] = useState(false)
   const wheelAreaRef = useRef<HTMLDivElement>(null)
   const timersRef = useRef<number[]>([])
@@ -271,7 +270,6 @@ export default function SpinWheel() {
       ...wheel,
       entries: [...wheel.entries, `Entry ${wheel.entries.length + 1}`],
     }))
-    setSelectedEntryIndex(activeWheel.entries.length)
   }
 
   const deleteEntry = (index: number) => {
@@ -280,7 +278,6 @@ export default function SpinWheel() {
       ...wheel,
       entries: wheel.entries.filter((_, entryIndex) => entryIndex !== index),
     }))
-    setSelectedEntryIndex((current) => Math.max(0, Math.min(current, activeWheel.entries.length - 2)))
   }
 
   const duplicateEntry = (index: number) => {
@@ -301,7 +298,6 @@ export default function SpinWheel() {
       ;[entries[index], entries[nextIndex]] = [entries[nextIndex], entries[index]]
       return { ...wheel, entries }
     })
-    setSelectedEntryIndex(index + direction)
   }
 
   const shuffleActive = () => {
@@ -320,7 +316,6 @@ export default function SpinWheel() {
   const clearActive = () => {
     if (!activeWheel) return
     updateWheel(activeWheel.id, (wheel) => ({ ...wheel, entries: [] }))
-    setSelectedEntryIndex(0)
   }
 
   const restoreActive = () => {
@@ -404,7 +399,6 @@ export default function SpinWheel() {
             [String(randomIndex)]: value,
           },
         }))
-        setSelectedEntryIndex(randomIndex)
         toast.success(`Image added to ${randomEntry || `Entry ${randomIndex + 1}`}.`)
       }
       reader.readAsDataURL(file)
@@ -788,7 +782,7 @@ export default function SpinWheel() {
             {entriesOpen && (
               <aside className="flex min-h-[680px] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-sm backdrop-blur">
                 <div className="flex shrink-0 items-center overflow-x-auto border-b border-border/70 bg-muted/10 px-2 pt-2">
-                  {wheels.map((wheel, index) => (
+                  {wheels.map((wheel) => (
                     <button
                       key={wheel.id}
                       type="button"
@@ -910,7 +904,7 @@ export default function SpinWheel() {
                                     className="h-9 w-9 shrink-0 rounded-md border border-border object-cover"
                                   />
                                 ) : null}
-                                <Input value={entry} onFocus={() => setSelectedEntryIndex(index)} onChange={(event) => setEntry(index, event.target.value)} className="h-9 flex-1" />
+                                <Input value={entry} onChange={(event) => setEntry(index, event.target.value)} className="h-9 flex-1" />
                                 <button type="button" onClick={() => duplicateEntry(index)} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" title="Duplicate"><Copy className="h-4 w-4" /></button>
                                 <button type="button" onClick={() => deleteEntry(index)} className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete"><X className="h-4 w-4" /></button>
                               </div>
