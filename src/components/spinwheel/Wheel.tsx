@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Wheel } from "spin-wheel"
+import { Wheel as SpinWheel } from "spin-wheel"
 
 export type SpinWheelItem = {
   id: string
@@ -8,8 +8,9 @@ export type SpinWheelItem = {
   weight?: number
 }
 
-type SpinWheelCanvasProps = {
+type WheelProps = {
   items: SpinWheelItem[]
+  onResult?: (item: SpinWheelItem) => void
 }
 
 const FALLBACK_COLORS = [
@@ -21,18 +22,19 @@ const FALLBACK_COLORS = [
   "#94a3b8",
 ]
 
-export default function SpinWheelCanvas({
+export default function Wheel({
   items,
-}: SpinWheelCanvasProps) {
+  onResult,
+}: WheelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const wheelRef = useRef<Wheel | null>(null)
+  const wheelRef = useRef<SpinWheel | null>(null)
   const spinningRef = useRef(false)
   const [isSpinning, setIsSpinning] = useState(false)
 
-  const handleSpin = useCallback(() => {
+  const spin = useCallback(() => {
     const wheel = wheelRef.current
 
-    if (!wheel || items.length === 0 || spinningRef.current) {
+    if (!wheel || !items.length || spinningRef.current) {
       return
     }
 
@@ -41,7 +43,7 @@ export default function SpinWheelCanvas({
     spinningRef.current = true
     setIsSpinning(true)
 
-    wheel.spinToItem(index, 4200, true, 5, 1)
+    wheel.spinToItem(index, 4200, true, 6, 1)
   }, [items.length])
 
   useEffect(() => {
@@ -56,11 +58,11 @@ export default function SpinWheelCanvas({
     spinningRef.current = false
     setIsSpinning(false)
 
-    if (items.length === 0) {
+    if (!items.length) {
       return
     }
 
-    const wheel = new Wheel(container, {
+    const wheel = new SpinWheel(container, {
       items: items.map((item, index) => ({
         label: item.label || "Untitled",
         value: item.id,
@@ -72,21 +74,28 @@ export default function SpinWheelCanvas({
       radius: 0.92,
       pointerAngle: 0,
       borderWidth: 2,
-      borderColor: "rgba(255,255,255,0.18)",
+      borderColor: "rgba(255,255,255,0.2)",
       lineWidth: 1,
-      lineColor: "rgba(255,255,255,0.24)",
+      lineColor: "rgba(255,255,255,0.22)",
       itemLabelAlign: "right",
       itemLabelRadius: 0.78,
-      itemLabelRadiusMax: 0.28,
+      itemLabelRadiusMax: 0.3,
       itemLabelFont: "Inter, ui-sans-serif, system-ui, sans-serif",
-      itemLabelFontSizeMax: 32,
+      itemLabelFontSizeMax: 34,
       itemLabelStrokeWidth: 0,
       isInteractive: false,
       rotationResistance: -35,
-      rotationSpeedMax: 900,
+      rotationSpeedMax: 1000,
       onRest: () => {
+        const selectedIndex = wheel.getCurrentIndex()
+        const selectedItem = items[selectedIndex]
+
         spinningRef.current = false
         setIsSpinning(false)
+
+        if (selectedItem) {
+          onResult?.(selectedItem)
+        }
       },
     })
 
@@ -97,53 +106,41 @@ export default function SpinWheelCanvas({
       wheelRef.current = null
       spinningRef.current = false
     }
-  }, [items])
+  }, [items, onResult])
 
   return (
-    <div className="relative flex min-h-[620px] min-w-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur sm:p-6 lg:min-h-0 lg:p-8">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.08),transparent_58%)]" />
+    <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-background">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.09),transparent_55%)]" />
 
-      <div className="relative flex w-full max-w-[min(82vh,980px)] flex-col items-center">
+      {items.length > 0 ? (
         <div
-          className="relative aspect-square w-full"
+          ref={containerRef}
+          className="relative aspect-square w-[min(78vw,calc(100vh-150px),1050px)] max-w-[92%]"
           aria-label="Spin wheel"
         >
-          <div
-            ref={containerRef}
-            className="absolute inset-0"
-          />
-
-          {items.length > 0 && (
-            <div className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2">
-              <div className="h-0 w-0 border-l-[17px] border-r-[17px] border-t-[32px] border-l-transparent border-r-transparent border-t-foreground drop-shadow-lg" />
-            </div>
-          )}
-
-          {items.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="flex aspect-square w-full max-w-[700px] items-center justify-center rounded-full border border-dashed border-border/80 bg-background/40">
-                <div className="px-6 text-center">
-                  <p className="text-sm font-semibold">
-                    Your wheel is empty
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Add entries from the panel to get started.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="pointer-events-none absolute left-1/2 top-[-1px] z-20 -translate-x-1/2">
+            <div className="h-0 w-0 border-l-[20px] border-r-[20px] border-t-[38px] border-l-transparent border-r-transparent border-t-foreground drop-shadow-xl" />
+          </div>
         </div>
+      ) : (
+        <div className="flex aspect-square w-[min(65vw,calc(100vh-180px),780px)] max-w-[80%] items-center justify-center rounded-full border border-dashed border-border/80 bg-card/40">
+          <div className="px-6 text-center">
+            <p className="text-lg font-semibold">Your wheel is empty</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Add entries from the sidebar to get started.
+            </p>
+          </div>
+        </div>
+      )}
 
-        <button
-          type="button"
-          disabled={!items.length || isSpinning}
-          onClick={handleSpin}
-          className="mt-5 inline-flex h-11 min-w-36 items-center justify-center rounded-xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {isSpinning ? "Spinning..." : "Spin"}
-        </button>
-      </div>
+      <button
+        type="button"
+        disabled={!items.length || isSpinning}
+        onClick={spin}
+        className="absolute bottom-8 left-1/2 z-30 inline-flex h-12 min-w-40 -translate-x-1/2 items-center justify-center rounded-xl bg-blue-600 px-7 text-sm font-bold text-white shadow-lg shadow-blue-950/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {isSpinning ? "Spinning..." : "SPIN"}
+      </button>
     </div>
   )
 }
