@@ -44,6 +44,10 @@ export default function SpinWheel() {
    */
   const [animateWinningEntryByWheel, setAnimateWinningEntryByWheel] =
     useState<Record<string, boolean>>({})
+  const [duringSoundByWheel, setDuringSoundByWheel] =
+    useState<Record<string, string>>({})
+  const [duringVolumeByWheel, setDuringVolumeByWheel] =
+    useState<Record<string, number>>({})
   const [afterSoundByWheel, setAfterSoundByWheel] =
     useState<Record<string, string>>({})
   const [afterVolumeByWheel, setAfterVolumeByWheel] =
@@ -176,6 +180,20 @@ export default function SpinWheel() {
     [animatedWinner],
   )
 
+  const handleDuringSoundChange = useCallback(
+    (wheelId: string, sound: string) => {
+      setDuringSoundByWheel((current) => ({ ...current, [wheelId]: sound }))
+    },
+    [],
+  )
+
+  const handleDuringVolumeChange = useCallback(
+    (wheelId: string, volume: number) => {
+      setDuringVolumeByWheel((current) => ({ ...current, [wheelId]: volume }))
+    },
+    [],
+  )
+
   const handleAfterSoundChange = useCallback(
     (wheelId: string, sound: string) => {
       setAfterSoundByWheel((current) => ({
@@ -240,6 +258,18 @@ export default function SpinWheel() {
     })
 
     setAnimateWinningEntryByWheel((current) => {
+      const next = { ...current }
+      delete next[wheelId]
+      return next
+    })
+
+    setDuringSoundByWheel((current) => {
+      const next = { ...current }
+      delete next[wheelId]
+      return next
+    })
+
+    setDuringVolumeByWheel((current) => {
       const next = { ...current }
       delete next[wheelId]
       return next
@@ -395,6 +425,16 @@ export default function SpinWheel() {
     [winners, wheels],
   )
 
+  const getWinnerTextColor = useCallback((color?: string) => {
+    const hex = color?.replace("#", "") ?? "3b82f6"
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return "#ffffff"
+    const r = Number.parseInt(hex.slice(0, 2), 16)
+    const g = Number.parseInt(hex.slice(2, 4), 16)
+    const b = Number.parseInt(hex.slice(4, 6), 16)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.62 ? "#111111" : "#ffffff"
+  }, [])
+
   const wheelSummaries = useMemo(
     () =>
       wheels.map((wheel) => ({
@@ -432,6 +472,8 @@ export default function SpinWheel() {
                   <Wheel
                     items={wheel.items}
                     compact={wheels.length > 1}
+                    duringSound={duringSoundByWheel[wheel.id] ?? "Ticking sound"}
+                    duringVolume={duringVolumeByWheel[wheel.id] ?? 50}
                     afterSound={afterSoundByWheel[wheel.id] ?? "Subdued applause"}
                     afterVolume={afterVolumeByWheel[wheel.id] ?? 50}
                     onResult={(item) =>
@@ -482,6 +524,10 @@ export default function SpinWheel() {
           onAnimateWinningEntryChange={
             handleAnimateWinningEntryChange
           }
+          duringSoundByWheel={duringSoundByWheel}
+          duringVolumeByWheel={duringVolumeByWheel}
+          onDuringSoundChange={handleDuringSoundChange}
+          onDuringVolumeChange={handleDuringVolumeChange}
           afterSoundByWheel={afterSoundByWheel}
           afterVolumeByWheel={afterVolumeByWheel}
           onAfterSoundChange={handleAfterSoundChange}
@@ -579,6 +625,8 @@ export default function SpinWheel() {
                 style={{
                   animation:
                     "mpdWinnerEntryAnimation 1.9s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+                  color: animatedWinner.item.color ?? "#ffffff",
+                  textShadow: `0 8px 40px ${animatedWinner.item.color ?? "#ffffff"}66`,
                 }}
               >
                 {animatedWinner.item.label}
@@ -609,7 +657,13 @@ export default function SpinWheel() {
                 event.stopPropagation()
               }
             >
-              <div className="flex min-h-[54px] items-center justify-between bg-[#79d99f] px-4 text-[#111]">
+              <div
+                className="flex min-h-[54px] items-center justify-between px-4"
+                style={{
+                  backgroundColor: orderedWinners[0]?.item.color ?? "#3b82f6",
+                  color: getWinnerTextColor(orderedWinners[0]?.item.color),
+                }}
+              >
                 <h2
                   id="winner-dialog-title"
                   className="text-[16px] font-bold"
@@ -623,7 +677,7 @@ export default function SpinWheel() {
                   type="button"
                   onClick={closeWinnerPopup}
                   aria-label="Close winner popup"
-                  className="rounded p-1.5 text-black/70 transition hover:bg-black/10 hover:text-black"
+                  className="rounded p-1.5 opacity-70 transition hover:bg-black/10 hover:opacity-100"
                 >
                   <X className="h-4 w-4" />
                 </button>
