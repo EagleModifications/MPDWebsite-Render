@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Dices, X } from "lucide-react"
+import confetti from "canvas-confetti"
 
 import Navbar from "@/components/home/Navbar"
 import Sidebar from "@/components/spinwheel/Sidebar"
@@ -22,11 +23,33 @@ type SpinResult = {
   item: SpinWheelItem
 }
 
+const DEFAULT_ENTRIES = [
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+]
+
 function createWheel(index: number): WheelState {
   return {
     id: crypto.randomUUID(),
     name: `Wheel ${index}`,
-    items: [],
+    items: DEFAULT_ENTRIES.map((label, itemIndex) => ({
+      id: crypto.randomUUID(),
+      label,
+      color: [
+        "#3b82f6",
+        "#64748b",
+        "#0ea5e9",
+        "#334155",
+        "#60a5fa",
+        "#94a3b8",
+      ][itemIndex],
+      weight: 1,
+      hidden: false,
+    })),
   }
 }
 
@@ -70,6 +93,8 @@ export default function SpinWheel() {
   const wheelAreaRef = useRef<HTMLDivElement | null>(null)
   const winnerAnimationTimeoutRef =
     useRef<ReturnType<typeof setTimeout> | null>(null)
+  const confettiEndRef = useRef(0)
+  const confettiFrameRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!activeWheelId && wheels[0]) {
@@ -90,6 +115,9 @@ export default function SpinWheel() {
       if (winnerAnimationTimeoutRef.current) {
         clearTimeout(winnerAnimationTimeoutRef.current)
       }
+      if (confettiFrameRef.current !== null) {
+        cancelAnimationFrame(confettiFrameRef.current)
+      }
     }
   }, [])
 
@@ -105,6 +133,54 @@ export default function SpinWheel() {
     },
     [],
   )
+
+  const launchWinnerCelebration = useCallback(() => {
+    // Wheel of Names-style celebration: repeated fireworks from changing
+    // positions for five seconds. Each burst then naturally falls away.
+    const end = Date.now() + 5000
+    confettiEndRef.current = end
+
+    if (confettiFrameRef.current !== null) {
+      cancelAnimationFrame(confettiFrameRef.current)
+      confettiFrameRef.current = null
+    }
+
+    const frame = () => {
+      const now = Date.now()
+      if (now >= confettiEndRef.current) {
+        confettiFrameRef.current = null
+        return
+      }
+
+      const bursts = 2 + Math.floor(Math.random() * 2)
+      for (let i = 0; i < bursts; i += 1) {
+        const x = 0.08 + Math.random() * 0.84
+        const y = 0.12 + Math.random() * 0.58
+        const leftOrRight = Math.random() > 0.5
+        confetti({
+          particleCount: 24 + Math.floor(Math.random() * 18),
+          angle: leftOrRight ? 60 + Math.random() * 35 : 95 + Math.random() * 35,
+          spread: 48 + Math.random() * 55,
+          startVelocity: 38 + Math.random() * 28,
+          decay: 0.91 + Math.random() * 0.025,
+          gravity: 0.78 + Math.random() * 0.28,
+          drift: (Math.random() - 0.5) * 0.7,
+          scalar: 0.75 + Math.random() * 0.45,
+          ticks: 180 + Math.floor(Math.random() * 100),
+          origin: { x, y },
+          colors: [
+            "#3b82f6", "#60a5fa", "#0ea5e9", "#22c55e",
+            "#facc15", "#f97316", "#ef4444", "#a855f7",
+          ],
+          zIndex: 1000,
+        })
+      }
+
+      confettiFrameRef.current = requestAnimationFrame(frame)
+    }
+
+    frame()
+  }, [])
 
   const handleResult = useCallback(
     (wheelId: string, item: SpinWheelItem) => {
@@ -135,6 +211,8 @@ export default function SpinWheel() {
         result,
       ])
 
+      launchWinnerCelebration()
+
       /*
        * "Animate winning entry" is the switch that controls this exact
        * animation. When it is disabled, the normal winner popup still
@@ -160,7 +238,7 @@ export default function SpinWheel() {
         }
       }
     },
-    [animateWinningEntryByWheel, wheels],
+    [animateWinningEntryByWheel, launchWinnerCelebration, wheels],
   )
 
   const handleAnimateWinningEntryChange = useCallback(
@@ -451,28 +529,30 @@ export default function SpinWheel() {
         <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_35%_35%,rgba(33,70,82,0.42),transparent_45%),radial-gradient(circle_at_78%_25%,rgba(81,42,91,0.28),transparent_42%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]">
           <div
             className={`absolute inset-0 min-h-0 overflow-hidden transition-[padding] duration-300 ${
-              sidebarOpen ? "lg:pr-[468px]" : ""
+              sidebarOpen ? "lg:pr-[520px]" : ""
             }`}
           >
             <div
               ref={wheelAreaRef}
-              className={`grid h-full min-h-0 w-full gap-2 p-2 pr-4 ${
+              className={`grid h-full min-h-0 w-full ${
                 wheels.length === 1
-                  ? "grid-cols-1 grid-rows-1"
-                  : "grid-cols-2 auto-rows-fr"
+                  ? "grid-cols-1 grid-rows-1 p-2"
+                  : "grid-cols-2 auto-rows-fr gap-x-8 gap-y-5 p-6 lg:gap-x-10 lg:gap-y-6 lg:p-10"
               }`}
             >
               {wheels.map((wheel) => (
                 <div
                   key={wheel.id}
-                  className="relative flex min-h-0 min-w-0 items-center justify-center bg-transparent"
+                  className={`relative flex min-h-0 min-w-0 items-center justify-center bg-transparent ${
+                    wheels.length > 1 ? "p-4 lg:p-6" : ""
+                  }`}
                 >
                   <Wheel
                     items={wheel.items}
                     compact={wheels.length > 1}
                     afterSound={afterSoundByWheel[wheel.id] ?? "Subdued applause"}
                     afterVolume={afterVolumeByWheel[wheel.id] ?? 50}
-                    spinSlowly={spinSlowlyByWheel[wheel.id] ?? false}
+                    spinSlowly={spinSlowlyByWheel[wheel.id] ?? true}
                     spinTime={spinTimeByWheel[wheel.id] ?? 10}
                     centerImage={centerImageByWheel[wheel.id]}
                     imageSize={imageSizeByWheel[wheel.id] ?? "S"}
