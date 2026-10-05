@@ -71,13 +71,20 @@ type Props = {
 
 const clean = (value: unknown) => String(value ?? "").trim()
 
-const ACTIVITY_HEADER = `**<:metropd:1396157575011237979> METRO POLICE DEPARTMENT <:metropd:1396157575011237979>**`
-const ACTIVITY_TITLE = "**📋 WEEKLY ACTIVITY REMOVALS📋**"
+const DISCORD_HEADER = `**<:metropd:1396157575011237979> METRO POLICE DEPARTMENT <:metropd:1396157575011237979>**`
 const DIVIDER = "━━━━━━━━━━━━━━━━━━━━━━"
+
+const ACTIVITY_TITLE = "**📋 WEEKLY ACTIVITY REMOVALS 📋**"
 const ACTIVITY_INTRO =
   "The Metro Police Department recognizes the following officers for their participation and contributions to departmental activities throughout the week. The following members have been removed from the activity list based on their activity status and participation. Please review the members listed below and ensure all activity records are kept accurate and up to date."
 const ACTIVITY_NOTES =
-  "**🏆 ACTIVITY NOTES 🏆**\nActivity lists are made based off hours and if you feel like this was wrong feel free to make a ticket in <#1183194105455579207> ."
+  "**🏆 ACTIVITY NOTES 🏆**\nActivity lists are made based off hours and if you feel like this was wrong feel free to make a ticket in <#1183194105455579207>."
+
+const PROMOTION_TITLE = "**📋 WEEKLY PROMOTIONS 📋**"
+const PROMOTION_INTRO =
+  "The Metro Police Department proudly recognizes the following officers for their hard work, dedication, and consistent performance throughout the week. Promotions are awarded to those who continue to demonstrate professionalism, reliability, and a strong commitment to the department’s standards. Please join us in congratulating the following members on their advancement."
+const PROMOTION_NOTES =
+  "**🏆 PROMOTION NOTES 🏆**\nPromotions are based on activity, performance, professionalism, leadership, and compliance with Metro PD SOP/GSOP and Cali RP rules. If you believe a you was missed for a promotion feel free to make a ticket in <#1183194105455579207>."
 
 const strikeLabel = (strike: number) => {
   if (strike === 1) return "Activity Strike 1 (Warning):"
@@ -190,7 +197,13 @@ export default function RosterListDialog({
     if (!open) return
     const own = current.find((item) => item.scope === scope)
     const fallback = scope === "user" ? current.find((item) => item.scope === "global") : null
-    setSelected(own?.selectedUserIds?.length ? own.selectedUserIds : fallback?.selectedUserIds?.length ? fallback.selectedUserIds : initialSelectedIds)
+    setSelected(
+      own?.selectedUserIds?.length
+        ? own.selectedUserIds
+        : fallback?.selectedUserIds?.length
+          ? fallback.selectedUserIds
+          : initialSelectedIds,
+    )
   }, [scope, open, current, initialSelectedIds])
 
   const savedStrikeMap = useMemo(
@@ -248,17 +261,28 @@ export default function RosterListDialog({
   )
 
   const copyText = useMemo(() => {
+    const now = Math.floor(Date.now() / 1000)
+
     if (!strikeMode) {
       return [
-        `**<:metropd:1396157575011237979> METRO POLICE DEPARTMENT <:metropd:1396157575011237979>**`,
-        `**📋 WEEKLY ${title.toUpperCase()}📋**`,
-        `Week of ${week}`,
+        DISCORD_HEADER,
+        PROMOTION_TITLE,
+        PROMOTION_INTRO,
         DIVIDER,
         ...selectedMembers.map((member) => `• <@${member.discordId}>`),
+        "",
+        DIVIDER,
+        PROMOTION_NOTES,
+        `**Promotion Date:** <t:${now}:F> (<t:${now}:t>)`,
       ].join("\n")
     }
 
-    const sections: string[] = [ACTIVITY_HEADER, ACTIVITY_TITLE, ACTIVITY_INTRO, DIVIDER]
+    const sections: string[] = [
+      DISCORD_HEADER,
+      ACTIVITY_TITLE,
+      ACTIVITY_INTRO,
+      DIVIDER,
+    ]
 
     for (const strike of [1, 2, 3]) {
       const strikeMembers = previewMembers.filter((item) => item.strike === strike)
@@ -270,11 +294,10 @@ export default function RosterListDialog({
       sections.push(DIVIDER)
     }
 
-    const now = Math.floor(Date.now() / 1000)
     sections.push(ACTIVITY_NOTES)
-    sections.push(`**Promotion Date:** <t:${now}:F>`)
+    sections.push(`**Promotion Date:** <t:${now}:F> (<t:${now}:t>)`)
     return sections.join("\n")
-  }, [strikeMode, title, week, selectedMembers, previewMembers])
+  }, [strikeMode, selectedMembers, previewMembers])
 
   const copyPreview = async () => {
     try {
@@ -304,7 +327,9 @@ export default function RosterListDialog({
   }
 
   const clearAll = () => {
-    setSelected((currentIds) => currentIds.filter((id) => !filteredMembers.some((member) => member.discordId === id)))
+    setSelected((currentIds) =>
+      currentIds.filter((id) => !filteredMembers.some((member) => member.discordId === id)),
+    )
   }
 
   const save = async () => {
@@ -568,7 +593,7 @@ export default function RosterListDialog({
                 {strikeMode ? (
                   <div className="rounded-lg border bg-muted/10 p-4 text-sm leading-6">
                     <p className="font-semibold">&lt;:metropd:1396157575011237979&gt; METRO POLICE DEPARTMENT &lt;:metropd:1396157575011237979&gt;</p>
-                    <p className="font-semibold">📋 WEEKLY ACTIVITY REMOVALS📋</p>
+                    <p className="font-semibold">📋 WEEKLY ACTIVITY REMOVALS 📋</p>
                     <p className="mt-3">{ACTIVITY_INTRO}</p>
                     <p>{DIVIDER}</p>
                     {[1, 2, 3].map((strike) => {
@@ -584,15 +609,23 @@ export default function RosterListDialog({
                       )
                     })}
                     <p className="font-semibold">🏆 ACTIVITY NOTES 🏆</p>
-                    <p>Activity lists are made based off hours and if you feel like this was wrong feel free to make a ticket in &lt;#1183194105455579207&gt; .</p>
+                    <p>Activity lists are made based off hours and if you feel like this was wrong feel free to make a ticket in &lt;#1183194105455579207&gt;.</p>
                     <p className="mt-2"><strong>Promotion Date:</strong> {new Date().toLocaleString()}</p>
                   </div>
                 ) : (
                   <div className="rounded-lg border bg-muted/10 p-4 text-sm leading-6">
                     <p className="font-semibold">&lt;:metropd:1396157575011237979&gt; METRO POLICE DEPARTMENT &lt;:metropd:1396157575011237979&gt;</p>
-                    <p className="font-semibold">📋 WEEKLY {title.toUpperCase()}📋</p>
+                    <p className="font-semibold">📋 WEEKLY PROMOTIONS 📋</p>
+                    <p className="mt-3">{PROMOTION_INTRO}</p>
                     <p>{DIVIDER}</p>
-                    {selectedMembers.length ? selectedMembers.map((member) => <p key={member.discordId}>• {member.name || "Unknown"}</p>) : <p className="text-muted-foreground">Select members to preview the message.</p>}
+                    {selectedMembers.length
+                      ? selectedMembers.map((member) => <p key={member.discordId}>• {member.name || "Unknown"}</p>)
+                      : <p className="text-muted-foreground">Select members to preview the message.</p>}
+                    <p className="h-5" aria-hidden="true" />
+                    <p>{DIVIDER}</p>
+                    <p className="font-semibold">🏆 PROMOTION NOTES 🏆</p>
+                    <p>Promotions are based on departmental requirements, performance, and overall conduct. If you believe a promotion has been missed or incorrectly processed, please open a ticket in &lt;#1183194105455579207&gt;.</p>
+                    <p className="mt-2"><strong>Promotion Date:</strong> {new Date().toLocaleString()}</p>
                   </div>
                 )}
               </div>
