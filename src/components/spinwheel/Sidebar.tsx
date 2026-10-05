@@ -1691,7 +1691,7 @@ export default function Sidebar({
 
               <div className="max-h-[calc(100vh-120px)] overflow-y-auto">
                 {/* Entry navigation */}
-                <div className="flex h-16 items-center gap-3 border-b border-border/70 px-5">
+                <div className="flex h-16 items-center gap-4 border-b border-border/70 px-5">
                   <button
                     type="button"
                     aria-label="Previous entry"
