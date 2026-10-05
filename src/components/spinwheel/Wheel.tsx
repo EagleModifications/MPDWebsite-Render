@@ -34,12 +34,15 @@ type WheelProps = {
 }
 
 
-function createRandomColor() {
-  const hue = Math.floor(Math.random() * 360)
-  const saturation = 52 + Math.floor(Math.random() * 12)
-  const lightness = 56 + Math.floor(Math.random() * 10)
+const WHEEL_OF_NAMES_COLORS = [
+  "#e30620",
+  "#3867df",
+  "#00a51a",
+  "#f7b913",
+] as const
 
-  return `hsl(${hue} ${saturation}% ${lightness}%)`
+function getDefaultWheelColor(index: number) {
+  return WHEEL_OF_NAMES_COLORS[index % WHEEL_OF_NAMES_COLORS.length]
 }
 
 /* -------------------------------------------------------------------------- */
@@ -64,17 +67,17 @@ function useRandomItemColors(items: SpinWheelItem[]) {
       }
     }
 
-    for (const item of items) {
+    for (const [index, item] of items.entries()) {
       if (!colors.has(item.id)) {
         colors.set(
           item.id,
-          item.color ?? createRandomColor(),
+          item.color ?? getDefaultWheelColor(index),
         )
       }
 
       /*
-       * If an explicit colour was supplied by the
-       * entry editor, always use it.
+       * Explicit entry colours always win over the default
+       * Wheel of Names palette.
        */
       if (item.color) {
         colors.set(item.id, item.color)
@@ -450,6 +453,21 @@ type SpinWheelInternals = {
  * drawing routine so each entry gets its own fitted font size instead. The
  * wheel/canvas/animation logic remains the library implementation.
  */
+function getLabelColor(background: string) {
+  const hex = background.replace("#", "").trim()
+
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+    const r = Number.parseInt(hex.slice(0, 2), 16)
+    const g = Number.parseInt(hex.slice(2, 4), 16)
+    const b = Number.parseInt(hex.slice(4, 6), 16)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+
+    return luminance > 0.62 ? "#111111" : "#ffffff"
+  }
+
+  return "#ffffff"
+}
+
 function enablePerItemLabelSizing(wheel: SpinWheel) {
   const internal = wheel as unknown as SpinWheelInternals
 
@@ -460,9 +478,9 @@ function enablePerItemLabelSizing(wheel: SpinWheel) {
      * reach.  Reserve a little more than the centre circle radius here so
      * long labels are reduced before they can approach the white button.
      */
-    const protectedCenterRadius = 0.23
+    const protectedCenterRadius = 0.235
     const usableLabelRadius = Math.max(
-      0.20,
+      0.28,
       internal._itemLabelRadius - protectedCenterRadius,
     )
 
@@ -598,7 +616,7 @@ export default function Wheel({
     useState(false)
 
   const [pointerColor, setPointerColor] =
-    useState("#5fc78b")
+    useState("#b9b9b9")
 
 
   /*
@@ -697,11 +715,19 @@ export default function Wheel({
   /* ---------------------------------------------------------------------- */
 
   /*
-   * spin-wheel's currentIndex is the item actually under pointerAngle.
-   * Do not offset this index: the DOM pointer is positioned at the same
-   * 3-o'clock angle as pointerAngle, so the colour must use the exact
-   * reported item while the wheel is spinning.
+   * spin-wheel reports the index using its pointer-angle convention.
+   * The visual pointer in this UI is the 3-o'clock pointer, so the visible
+   * slice is one segment clockwise from the reported boundary index. Keep
+   * this conversion in one place so the arrow colour and displayed winner
+   * stay aligned with the slice that is actually under the arrow.
    */
+  const getVisualPointerIndex = useCallback((index: number) => {
+    const count = colorsRef.current.length
+    if (count === 0) return 0
+
+    return (index + 1) % count
+  }, [])
+
   /*
    * This updates the DOM immediately.
    *
@@ -726,8 +752,11 @@ export default function Wheel({
             colors.length) %
           colors.length
 
+        const visualIndex =
+          getVisualPointerIndex(safeIndex)
+
         const color =
-          colors[safeIndex]
+          colors[visualIndex]
 
         if (!color) {
           return
@@ -756,7 +785,7 @@ export default function Wheel({
           setPointerColor(color)
         }
       },
-      [],
+      [getVisualPointerIndex],
     )
 
   const pointerColorRef =
@@ -960,11 +989,11 @@ export default function Wheel({
       currentIndexRef.current = 0
 
       setPointerColor(
-        "#5fc78b",
+        "#b9b9b9",
       )
 
       pointerColorRef.current =
-        "#5fc78b"
+        "#b9b9b9"
 
       return
     }
@@ -978,27 +1007,16 @@ export default function Wheel({
     currentIndexRef.current =
       initialIndex
 
-    const initialColor =
-      visibleColors[
-        initialIndex
-      ]
+    const initialColor = "#b9b9b9"
 
-    if (initialColor) {
-      setPointerColor(
+    setPointerColor(initialColor)
+    pointerColorRef.current = initialColor
+
+    if (pointerRef.current) {
+      pointerRef.current.style.setProperty(
+        "--pointer-color",
         initialColor,
       )
-
-      pointerColorRef.current =
-        initialColor
-
-      if (
-        pointerRef.current
-      ) {
-        pointerRef.current.style.setProperty(
-          "--pointer-color",
-          initialColor,
-        )
-      }
     }
 
     // Keep a generous maximum. enablePerItemLabelSizing() below makes the
@@ -1037,7 +1055,7 @@ export default function Wheel({
                   ],
 
                 labelColor:
-                  "#111111",
+                  getLabelColor(visibleColors[index]),
               }),
             ),
 
@@ -1068,13 +1086,15 @@ export default function Wheel({
           /*
            * Wheel of Names style labels.
            */
-          itemLabelAlign: "right",
+          itemLabelAlign: "center",
 
-          /* Keep labels close to the rim while the custom renderer below
-           * guarantees they stop before the centre button. */
-          itemLabelRadius: 0.94,
+          /*
+           * Wheel of Names places labels comfortably inside each segment
+           * rather than hard against the rim.
+           */
+          itemLabelRadius: 0.67,
 
-          itemLabelRadiusMax: 0.30,
+          itemLabelRadiusMax: 0.34,
 
           itemLabelFont:
             "Arial, Helvetica, sans-serif",
@@ -1164,7 +1184,7 @@ export default function Wheel({
                 : eventIndex
 
             const selectedIndex =
-              wheelIndex
+              getVisualPointerIndex(wheelIndex)
 
             const selectedItem =
               itemsRef.current[
@@ -1213,7 +1233,7 @@ export default function Wheel({
     // The DOM pointer is positioned from the wheel container's actual
     // right edge, so it stays attached to the 3 o'clock point at every size.
     if (pointerRef.current) {
-      pointerRef.current.style.left = "calc(100% - 2px)"
+      pointerRef.current.style.left = "calc(100% - 8px)"
       pointerRef.current.style.right = "auto"
     }
 
@@ -1249,6 +1269,7 @@ export default function Wheel({
     visibleItems,
     visibleColors,
     setPointerForIndex,
+    getVisualPointerIndex,
     stopDuringSpinAudio,
     afterSound,
     afterVolume,
@@ -1382,34 +1403,34 @@ export default function Wheel({
               absolute
               top-1/2
               z-50
-              h-[46px]
-              w-[42px]
+              h-[38px]
+              w-[34px]
               -translate-y-1/2
             "
             style={
               {
                 "--pointer-color": pointerColor,
-                left: "calc(100% - 2px)",
+                left: "calc(100% - 8px)",
               } as CSSProperties
             }
             aria-hidden="true"
           >
-            {/* Wheel of Names-style pointer: the tip points inward at the
-                selected slice and the wider end sits outside the wheel. */}
+            {/* Clean colour-matched triangle. The wide base sits on the wheel edge and the tip points outward, like the reference. */}
             <div
               className="absolute inset-0"
               style={{
-                filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.20)) drop-shadow(0 0 1px rgba(255,255,255,0.45))",
+                filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.20)) drop-shadow(0 0 1px rgba(255,255,255,0.55))",
                 clipPath: "polygon(0 50%, 100% 0, 100% 100%)",
                 background: "var(--pointer-color)",
+                border: "1px solid rgba(90,90,90,0.55)",
               }}
             />
 
-            {/* Very subtle highlight on the upper half of the pointer. */}
+            {/* Very subtle edge highlight — no heavy outline or backing plate. */}
             <div
-              className="absolute inset-0 opacity-18"
+              className="absolute inset-0 opacity-20"
               style={{
-                clipPath: "polygon(0 50%, 100% 0, 100% 50%)",
+                clipPath: "polygon(0 50%, 100% 0, 100% 12%)",
                 background: "rgba(255,255,255,0.9)",
               }}
             />
@@ -1419,8 +1440,8 @@ export default function Wheel({
           {/* Centre                                                           */}
           {/* ---------------------------------------------------------------- */}
 
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 aspect-square h-[20%] w-auto -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,0.28),0_0_1px_rgba(255,255,255,0.55)]">
-            {centerImage && (
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 aspect-square h-[39%] w-auto -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,0.28),0_0_1px_rgba(255,255,255,0.55)]">
+            {centerImage ? (
               <img
                 src={centerImage}
                 alt=""
@@ -1442,6 +1463,12 @@ export default function Wheel({
                     "100%",
                 }}
               />
+            ) : (
+              <span className="absolute inset-0 flex items-center justify-center px-4 text-center font-normal text-[#444]">
+                <span className="text-[clamp(10px,2.2vw,24px)]">
+                  Wheel of Names
+                </span>
+              </span>
             )}
           </div>
 
