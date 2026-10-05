@@ -1190,7 +1190,7 @@ export default function Wheel({
     // The DOM pointer is positioned from the wheel container's actual
     // right edge, so it stays attached to the 3 o'clock point at every size.
     if (pointerRef.current) {
-      pointerRef.current.style.left = "calc(100% - 2px)"
+      pointerRef.current.style.left = "calc(100% - 7px)"
       pointerRef.current.style.right = "auto"
     }
 
@@ -1339,7 +1339,7 @@ export default function Wheel({
               inset-0
               overflow-visible
               rounded-full
-              drop-shadow-[0_3px_3px_rgba(0,0,0,0.28)]
+              drop-shadow-[0_1px_2px_rgba(0,0,0,0.32)]
             "
           >
             <div
@@ -1359,22 +1359,23 @@ export default function Wheel({
               absolute
               top-1/2
               z-50
-              h-[42px]
-              w-[52px]
+              h-[46px]
+              w-[36px]
               -translate-y-1/2
             "
             style={
               {
                 "--pointer-color": pointerColor,
-                left: "calc(100% - 2px)",
+                left: "calc(100% - 7px)",
               } as CSSProperties
             }
             aria-hidden="true"
           >
             {/* Clean colour-matched triangle. Its point touches the wheel edge. */}
             <div
-              className="absolute inset-0 drop-shadow-[0_2px_2px_rgba(0,0,0,0.24)]"
+              className="absolute inset-0"
               style={{
+                filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.28)) drop-shadow(0 0 1px rgba(255,255,255,0.42))",
                 clipPath: "polygon(0 50%, 100% 0, 100% 100%)",
                 background: "var(--pointer-color)",
               }}
@@ -1394,7 +1395,7 @@ export default function Wheel({
           {/* Centre                                                           */}
           {/* ---------------------------------------------------------------- */}
 
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 aspect-square h-[17%] w-auto -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-white shadow-[0_3px_8px_rgba(0,0,0,0.24)]">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-40 aspect-square h-[20%] w-auto -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,0.28),0_0_1px_rgba(255,255,255,0.55)]">
             {centerImage && (
               <img
                 src={centerImage}
