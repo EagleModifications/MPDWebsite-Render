@@ -1187,6 +1187,13 @@ export default function Wheel({
     currentIndexRef.current = actualInitialIndex
     setPointerForIndex(actualInitialIndex)
 
+    // The DOM pointer is positioned from the wheel container's actual
+    // right edge, so it stays attached to the 3 o'clock point at every size.
+    if (pointerRef.current) {
+      pointerRef.current.style.left = "calc(100% - 2px)"
+      pointerRef.current.style.right = "auto"
+    }
+
     wheelRef.current =
       wheel
 
@@ -1305,8 +1312,8 @@ export default function Wheel({
           className="
             relative
             aspect-square
-            h-auto
-            w-full
+            h-full
+            w-auto
             max-h-full
             max-w-full
             shrink-0
@@ -1350,21 +1357,21 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-48px]
               top-1/2
               z-50
-              h-[40px]
-              w-[48px]
+              h-[42px]
+              w-[52px]
               -translate-y-1/2
             "
             style={
               {
                 "--pointer-color": pointerColor,
+                left: "calc(100% - 2px)",
               } as CSSProperties
             }
             aria-hidden="true"
           >
-            {/* Clean colour-matched triangle. No dark outline/backing. */}
+            {/* Clean colour-matched triangle. Its point touches the wheel edge. */}
             <div
               className="absolute inset-0 drop-shadow-[0_2px_2px_rgba(0,0,0,0.24)]"
               style={{
@@ -1373,7 +1380,7 @@ export default function Wheel({
               }}
             />
 
-            {/* Tiny highlight for the soft raised appearance. */}
+            {/* Very subtle highlight — no outline and no dark backing. */}
             <div
               className="absolute inset-0 opacity-20"
               style={{
