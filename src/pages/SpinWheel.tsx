@@ -129,6 +129,10 @@ export default function SpinWheel() {
     )
   }, [wheels])
 
+  const clearResults = useCallback(() => {
+    setResults([])
+  }, [])
+
   const closeWinnerPopup = useCallback(() => {
     setWinners([])
   }, [])
