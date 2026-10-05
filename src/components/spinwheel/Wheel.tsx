@@ -387,46 +387,33 @@ function playAfterSpinSound(sound: string, volume: number) {
  * deceleration exactly at the halfway point. The first derivative is
  * continuous at 50%, so there is no visible jerk when braking begins.
  */
-const slowSpinEase = (t: number) => {
+const halfThenSmoothStop = (t: number) => {
   if (t <= 0.5) return t
 
-  // Keep a normal, steady speed through the first half, then brake with a
-  // high-order curve. The final frames ease into the stop like a glide.
+  // Second half: a seventh-order braking curve with continuous velocity,
+  // acceleration and jerk at the halfway point and a true zero velocity at rest.
   const u = (t - 0.5) * 2
   const eased =
     u -
     15 * u ** 4 +
     39 * u ** 5 -
-    34 * u ** 6 +
+    34 * u ** 6 -
     10 * u ** 7
 
   return 0.5 + 0.5 * eased
 }
 
-const fastSpinEase = (t: number) => {
-  // Start at normal speed, build smoothly to the fast cruise speed, hold
-  // that speed until halfway, then use the same smooth braking/glide.
-  if (t <= 0.18) {
-    const u = t / 0.18
-    const eased = -u ** 5 + 4 * u ** 4 - 6 * u ** 3 + 4 * u ** 2
-    return 0.18 * eased
+const fastBuildThenSmoothStop = (t: number) => {
+  if (t <= 0.2) {
+    // Build from rest to normal running speed without a sudden kick.
+    const u = t / 0.2
+    return 0.2 * (u * u * (2 - u))
   }
 
-  if (t <= 0.5) {
-    return t
-  }
+  if (t <= 0.5) return t
 
-  const u = (t - 0.5) * 2
-  const eased =
-    u -
-    15 * u ** 4 +
-    39 * u ** 5 -
-    34 * u ** 6 +
-    10 * u ** 7
-
-  return 0.5 + 0.5 * eased
+  return halfThenSmoothStop(t)
 }
-
 
 type SpinWheelInternals = {
   _context: CanvasRenderingContext2D | null
@@ -558,9 +545,6 @@ export default function Wheel({
     useRef<HTMLDivElement | null>(null)
 
   const spinningRef =
-    useRef(false)
-
-  const idleSpinningRef =
     useRef(false)
 
   const cancelledSpinRef =
@@ -750,6 +734,7 @@ export default function Wheel({
 
   const pointerColorRef =
     useRef("#5fc78b")
+  const idleSpinningRef = useRef(false)
 
   const stopDuringSpinAudio = useCallback(() => {
     const audio = duringSpinAudioRef.current
@@ -805,6 +790,11 @@ export default function Wheel({
       return
     }
 
+    if (idleSpinningRef.current) {
+      wheel.stop()
+      idleSpinningRef.current = false
+    }
+
     const audio =
       getAudioContext()
 
@@ -820,13 +810,6 @@ export default function Wheel({
         Math.random() *
           visibleItems.length,
       )
-
-    if (idleSpinningRef.current) {
-      cancelledSpinRef.current = true
-      wheel.stop()
-      idleSpinningRef.current = false
-      cancelledSpinRef.current = false
-    }
 
     cancelledSpinRef.current = false
     spinningRef.current =
@@ -847,24 +830,19 @@ export default function Wheel({
     const configuredDuration = Math.max(1500, Math.min(60000, spinTimeRef.current * 1000))
     const slowly = spinSlowlyRef.current
 
-    /*
-     * Slow mode keeps the configured duration and uses a true normal-speed
-     * cruise for the first half. The default mode is deliberately faster:
-     * it accelerates from a normal start into a fast cruise, then starts
-     * braking at exactly 50% and glides into the final position.
-     */
+    /* Slow: constant speed to 50%, then a long glide.
+       Normal/fast: build speed during the first 20%, hold it to 50%, then
+       use the same long braking glide. */
     const duration = slowly
-      ? configuredDuration
-      : Math.max(3000, Math.min(5200, configuredDuration * 0.38))
-
-    const revolutions = slowly ? 6 : 8
-    const easing = slowly ? slowSpinEase : fastSpinEase
+      ? Math.max(5000, Math.min(60000, configuredDuration))
+      : Math.max(3200, Math.min(5200, configuredDuration * 0.42))
+    const easing = slowly ? halfThenSmoothStop : fastBuildThenSmoothStop
 
     wheel.spinToItem(
       selectedIndex,
       duration,
       true,
-      revolutions,
+      slowly ? 6 : 7,
       1,
       easing,
     )
@@ -1080,9 +1058,7 @@ export default function Wheel({
 
           isInteractive: false,
 
-          // The idle animation uses wheel.spin(7). Zero resistance keeps it
-          // at a constant, very gentle speed until a real spin starts.
-          rotationResistance: 0,
+          rotationResistance: -35,
 
           rotationSpeedMax: 1000,
 
@@ -1222,15 +1198,13 @@ export default function Wheel({
     lastTickIndexRef.current =
       actualIndex
 
-    // Gentle continuous idle rotation. spin-wheel documents `spin()` as the
-    // native continuous rotation method; with resistance 0 it remains smooth
-    // instead of slowing itself down.
+    // Keep the wheel gently moving while it is idle. A real spin stops this
+    // continuous rotation first, then starts the selected winner animation.
     wheel.spin(14)
     idleSpinningRef.current = true
 
     return () => {
       idleSpinningRef.current = false
-      cancelledSpinRef.current = true
       wheel.stop()
       wheel.remove()
 
@@ -1329,8 +1303,8 @@ export default function Wheel({
           className="
             relative
             aspect-square
-            h-full
-            w-auto
+            h-auto
+            w-full
             max-h-full
             max-w-full
             shrink-0
@@ -1361,11 +1335,11 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-22px]
+              right-[-24px]
               top-1/2
               z-50
-              h-[42px]
-              w-[52px]
+              h-[48px]
+              w-[62px]
               -translate-y-1/2
             "
             style={
@@ -1377,7 +1351,7 @@ export default function Wheel({
           >
             {/* Deep outline gives the arrow the same raised/bevelled look as the reference. */}
             <div
-              className="absolute inset-0 drop-shadow-[0_5px_7px_rgba(0,0,0,0.68)]"
+              className="absolute inset-0 drop-shadow-[0_4px_5px_rgba(0,0,0,0.58)]"
               style={{
                 clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
                 background: "#111827",
@@ -1386,7 +1360,7 @@ export default function Wheel({
 
             {/* Exact colour of the entry currently under the pointer. */}
             <div
-              className="absolute inset-[2.5px]"
+              className="absolute inset-[3px]"
               style={{
                 clipPath: "polygon(100% 0, 0 50%, 100% 100%, 84% 50%)",
                 background: "var(--pointer-color)",
@@ -1395,10 +1369,10 @@ export default function Wheel({
 
             {/* Small highlight along the upper edge. */}
             <div
-              className="absolute inset-[5px] opacity-50"
+              className="absolute inset-[6px] opacity-45"
               style={{
                 clipPath: "polygon(100% 0, 0 50%, 100% 100%, 88% 50%)",
-                background: "linear-gradient(180deg,rgba(255,255,255,0.82),rgba(255,255,255,0.08) 46%,rgba(0,0,0,0.18) 100%)",
+                background: "linear-gradient(180deg,rgba(255,255,255,0.72),rgba(255,255,255,0) 48%)",
               }}
             />
           </div>
@@ -1412,9 +1386,7 @@ export default function Wheel({
               <img
                 src={centerImage}
                 alt=""
-                className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${
-                  imageSize === "XXL" ? "h-full w-full object-cover" : "object-contain"
-                }`}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 object-contain"
                 style={{
                   width:
                     imageSize === "XS" ? "25%" :
