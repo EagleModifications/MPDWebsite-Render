@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   Minus,
   Palette,
+  Pipette,
   Plus,
   Scale,
   Shuffle,
@@ -41,6 +42,7 @@ type SidebarProps = {
 }
 
 type Tab = "entries" | "results"
+type ColorTab = "hex" | "rgb" | "wheel"
 
 const COLORS = [
   "#3b82f6",
@@ -49,6 +51,74 @@ const COLORS = [
   "#334155",
   "#60a5fa",
   "#94a3b8",
+]
+
+const COLOR_GALLERY = [
+  "#ef4444",
+  "#f97316",
+  "#f59e0b",
+  "#eab308",
+  "#84cc16",
+  "#22c55e",
+  "#10b981",
+  "#14b8a6",
+  "#06b6d4",
+  "#0ea5e9",
+  "#3b82f6",
+  "#6366f1",
+  "#8b5cf6",
+  "#a855f7",
+  "#d946ef",
+  "#ec4899",
+  "#f43f5e",
+
+  "#fecaca",
+  "#fed7aa",
+  "#fde68a",
+  "#fef08a",
+  "#d9f99d",
+  "#bbf7d0",
+  "#a7f3d0",
+  "#99f6e4",
+  "#a5f3fc",
+  "#bae6fd",
+  "#bfdbfe",
+  "#c7d2fe",
+  "#ddd6fe",
+  "#e9d5ff",
+  "#f5d0fe",
+  "#fbcfe8",
+  "#fecdd3",
+
+  "#991b1b",
+  "#9a3412",
+  "#92400e",
+  "#854d0e",
+  "#3f6212",
+  "#166534",
+  "#065f46",
+  "#115e59",
+  "#155e75",
+  "#075985",
+  "#1e40af",
+  "#3730a3",
+  "#5b21b6",
+  "#6b21a8",
+  "#86198f",
+  "#9d174d",
+  "#9f1239",
+
+  "#000000",
+  "#171717",
+  "#262626",
+  "#404040",
+  "#525252",
+  "#737373",
+  "#a3a3a3",
+  "#d4d4d4",
+  "#e5e5e5",
+  "#f5f5f5",
+  "#ffffff",
 ]
 
 type SaveFilePickerOptions = {
@@ -70,12 +140,29 @@ type SaveFilePickerWindow = Window & {
   showSaveFilePicker?: (
     options?: SaveFilePickerOptions,
   ) => Promise<SaveFilePickerHandle>
+  EyeDropper?: new () => {
+    open: () => Promise<{
+      sRGBHex: string
+    }>
+  }
 }
 
 type EntryExtras = {
   sound?: string
   popupMessage?: string
   image?: string
+}
+
+type RGB = {
+  r: number
+  g: number
+  b: number
+}
+
+type HSV = {
+  h: number
+  s: number
+  v: number
 }
 
 const extras = new Map<string, EntryExtras>()
@@ -147,6 +234,739 @@ function getWeightPercentage(
   )
 }
 
+function normalizeHex(value: string) {
+  let hex = value.trim()
+
+  if (!hex.startsWith("#")) {
+    hex = `#${hex}`
+  }
+
+  if (/^#[0-9a-fA-F]{3}$/.test(hex)) {
+    return `#${hex
+      .slice(1)
+      .split("")
+      .map((character) => `${character}${character}`)
+      .join("")
+      .toLowerCase()}`
+  }
+
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+    return hex.toLowerCase()
+  }
+
+  return "#3b82f6"
+}
+
+function hexToRgb(hex: string): RGB {
+  const normalized = normalizeHex(hex)
+  const value = normalized.slice(1)
+
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16),
+  }
+}
+
+function rgbToHex({
+  r,
+  g,
+  b,
+}: RGB) {
+  return `#${[r, g, b]
+    .map((value) =>
+      Math.max(
+        0,
+        Math.min(255, Math.round(value)),
+      )
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`
+}
+
+function rgbToHsv({
+  r,
+  g,
+  b,
+}: RGB): HSV {
+  const red = r / 255
+  const green = g / 255
+  const blue = b / 255
+
+  const max = Math.max(
+    red,
+    green,
+    blue,
+  )
+
+  const min = Math.min(
+    red,
+    green,
+    blue,
+  )
+
+  const delta = max - min
+
+  let h = 0
+
+  if (delta !== 0) {
+    if (max === red) {
+      h =
+        60 *
+        (((green - blue) / delta) % 6)
+    } else if (max === green) {
+      h =
+        60 *
+        ((blue - red) / delta + 2)
+    } else {
+      h =
+        60 *
+        ((red - green) / delta + 4)
+    }
+  }
+
+  if (h < 0) {
+    h += 360
+  }
+
+  const s =
+    max === 0
+      ? 0
+      : delta / max
+
+  return {
+    h,
+    s,
+    v: max,
+  }
+}
+
+function hsvToRgb({
+  h,
+  s,
+  v,
+}: HSV): RGB {
+  const c = v * s
+  const x =
+    c *
+    (1 -
+      Math.abs(
+        ((h / 60) % 2) - 1,
+      ))
+  const m = v - c
+
+  let r = 0
+  let g = 0
+  let b = 0
+
+  if (h < 60) {
+    r = c
+    g = x
+  } else if (h < 120) {
+    r = x
+    g = c
+  } else if (h < 180) {
+    g = c
+    b = x
+  } else if (h < 240) {
+    g = x
+    b = c
+  } else if (h < 300) {
+    r = x
+    b = c
+  } else {
+    r = c
+    b = x
+  }
+
+  return {
+    r: (r + m) * 255,
+    g: (g + m) * 255,
+    b: (b + m) * 255,
+  }
+}
+
+function hsvToHex(hsv: HSV) {
+  return rgbToHex(
+    hsvToRgb(hsv),
+  )
+}
+
+function clampColorValue(value: number) {
+  return Math.max(
+    0,
+    Math.min(255, Math.round(value)),
+  )
+}
+
+function ColorPicker({
+  color,
+  onChange,
+  onClose,
+}: {
+  color: string
+  onChange: (color: string) => void
+  onClose: () => void
+}) {
+  const [tab, setTab] =
+    useState<ColorTab>("hex")
+
+  const [hexInput, setHexInput] =
+    useState(normalizeHex(color))
+
+  const [hsv, setHsv] =
+    useState<HSV>(() =>
+      rgbToHsv(
+        hexToRgb(color),
+      ),
+    )
+
+  const pickerRef =
+    useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const normalized =
+      normalizeHex(color)
+
+    setHexInput(normalized)
+    setHsv(
+      rgbToHsv(
+        hexToRgb(normalized),
+      ),
+    )
+  }, [color])
+
+  useEffect(() => {
+    const handleClick = (
+      event: MouseEvent,
+    ) => {
+      const target = event.target
+
+      if (!(target instanceof Node)) {
+        return
+      }
+
+      if (
+        !pickerRef.current?.contains(
+          target,
+        )
+      ) {
+        onClose()
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleClick,
+    )
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleClick,
+      )
+    }
+  }, [onClose])
+
+  const rgb = useMemo(
+    () => hexToRgb(color),
+    [color],
+  )
+
+  const setColor = (
+    nextColor: string,
+  ) => {
+    const normalized =
+      normalizeHex(nextColor)
+
+    setHexInput(normalized)
+
+    const nextHsv =
+      rgbToHsv(
+        hexToRgb(normalized),
+      )
+
+    setHsv(nextHsv)
+    onChange(normalized)
+  }
+
+  const updateRgb = (
+    channel: keyof RGB,
+    value: number,
+  ) => {
+    const nextRgb = {
+      ...rgb,
+      [channel]:
+        clampColorValue(value),
+    }
+
+    setColor(
+      rgbToHex(nextRgb),
+    )
+  }
+
+  const updateHsv = (
+    changes: Partial<HSV>,
+  ) => {
+    const nextHsv = {
+      ...hsv,
+      ...changes,
+    }
+
+    setHsv(nextHsv)
+    setColor(
+      hsvToHex(nextHsv),
+    )
+  }
+
+  const handleHexChange = (
+    value: string,
+  ) => {
+    setHexInput(value)
+
+    if (
+      /^#?[0-9a-fA-F]{6}$/.test(
+        value,
+      ) ||
+      /^#?[0-9a-fA-F]{3}$/.test(
+        value,
+      )
+    ) {
+      setColor(value)
+    }
+  }
+
+  const useEyeDropper =
+    async () => {
+      const pickerWindow =
+        window as SaveFilePickerWindow
+
+      if (!pickerWindow.EyeDropper) {
+        return
+      }
+
+      try {
+        const eyeDropper =
+          new pickerWindow.EyeDropper()
+
+        const result =
+          await eyeDropper.open()
+
+        setColor(result.sRGBHex)
+      } catch {
+        // User cancelled the browser eyedropper.
+      }
+    }
+
+  const handleSaturationValueClick = (
+    event: ReactMouseEvent<HTMLDivElement>,
+  ) => {
+    const rect =
+      event.currentTarget.getBoundingClientRect()
+
+    const saturation = Math.max(
+      0,
+      Math.min(
+        1,
+        (event.clientX - rect.left) /
+          rect.width,
+      ),
+    )
+
+    const value = Math.max(
+      0,
+      Math.min(
+        1,
+        1 -
+          (event.clientY -
+            rect.top) /
+            rect.height,
+      ),
+    )
+
+    updateHsv({
+      s: saturation,
+      v: value,
+    })
+  }
+
+  const handleHueClick = (
+    event: ReactMouseEvent<HTMLDivElement>,
+  ) => {
+    const rect =
+      event.currentTarget.getBoundingClientRect()
+
+    const centerX =
+      rect.left + rect.width / 2
+
+    const centerY =
+      rect.top + rect.height / 2
+
+    const angle =
+      Math.atan2(
+        event.clientY - centerY,
+        event.clientX - centerX,
+      ) *
+      (180 / Math.PI)
+
+    const hue =
+      (angle + 90 + 360) % 360
+
+    updateHsv({
+      h: hue,
+    })
+  }
+
+  const tabClass = (
+    current: ColorTab,
+  ) =>
+    `flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+      tab === current
+        ? "bg-background text-foreground shadow-sm"
+        : "text-muted-foreground hover:text-foreground"
+    }`
+
+  const pickerSupported =
+    Boolean(
+      (window as SaveFilePickerWindow)
+        .EyeDropper,
+    )
+
+  return (
+    <div
+      ref={pickerRef}
+      className="absolute left-0 top-12 z-[150] w-[330px] overflow-hidden rounded-xl border border-border/70 bg-card shadow-2xl"
+      onMouseDown={(event) =>
+        event.stopPropagation()
+      }
+    >
+      {/* Tabs */}
+      <div className="border-b border-border/70 p-2">
+        <div className="flex rounded-lg bg-muted/60 p-1">
+          <button
+            type="button"
+            onClick={() =>
+              setTab("hex")
+            }
+            className={tabClass("hex")}
+          >
+            HEX
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setTab("rgb")
+            }
+            className={tabClass("rgb")}
+          >
+            RGB
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setTab("wheel")
+            }
+            className={tabClass("wheel")}
+          >
+            Wheel
+          </button>
+        </div>
+      </div>
+
+      {/* Current color / editor */}
+      <div className="p-3">
+        {tab === "hex" && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div
+                className="h-10 w-10 shrink-0 rounded-lg border border-border/70 shadow-inner"
+                style={{
+                  backgroundColor: color,
+                }}
+              />
+
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                  #
+                </span>
+
+                <input
+                  value={hexInput.replace(
+                    /^#/,
+                    "",
+                  )}
+                  onChange={(event) =>
+                    handleHexChange(
+                      `#${event.target.value}`,
+                    )
+                  }
+                  onBlur={() =>
+                    setHexInput(
+                      normalizeHex(
+                        hexInput,
+                      ),
+                    )
+                  }
+                  className="h-10 w-full rounded-lg border border-border/70 bg-muted/60 pl-7 pr-3 font-mono text-sm text-foreground outline-none focus:border-blue-500/60"
+                  maxLength={6}
+                  spellCheck={false}
+                />
+              </div>
+
+              <button
+                type="button"
+                aria-label="Pick color from screen"
+                title={
+                  pickerSupported
+                    ? "Pick color from screen"
+                    : "Eyedropper is not supported in this browser"
+                }
+                disabled={
+                  !pickerSupported
+                }
+                onClick={
+                  useEyeDropper
+                }
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Pipette className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {tab === "rgb" && (
+          <div className="space-y-3">
+            {(
+              [
+                ["R", "r"],
+                ["G", "g"],
+                ["B", "b"],
+              ] as const
+            ).map(
+              ([
+                label,
+                channel,
+              ]) => (
+                <div
+                  key={channel}
+                  className="flex items-center gap-3"
+                >
+                  <span className="w-4 text-xs font-semibold text-foreground">
+                    {label}
+                  </span>
+
+                  <input
+                    type="range"
+                    min="0"
+                    max="255"
+                    value={
+                      rgb[channel]
+                    }
+                    onChange={(event) =>
+                      updateRgb(
+                        channel,
+                        Number(
+                          event.target
+                            .value,
+                        ),
+                      )
+                    }
+                    className="min-w-0 flex-1 accent-blue-500"
+                  />
+
+                  <input
+                    type="number"
+                    min="0"
+                    max="255"
+                    value={
+                      rgb[channel]
+                    }
+                    onChange={(event) =>
+                      updateRgb(
+                        channel,
+                        Number(
+                          event.target
+                            .value,
+                        ),
+                      )
+                    }
+                    className="h-8 w-14 rounded-md border border-border/70 bg-muted/60 px-2 text-center text-xs text-foreground outline-none focus:border-blue-500/60"
+                  />
+                </div>
+              ),
+            )}
+          </div>
+        )}
+
+        {tab === "wheel" && (
+          <div className="flex items-center justify-center py-1">
+            <div
+              className="relative flex h-[190px] w-[190px] cursor-crosshair items-center justify-center rounded-full"
+              style={{
+                background:
+                  "conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+              }}
+              onClick={
+                handleHueClick
+              }
+            >
+              <div className="absolute inset-[25px] rounded-full border-2 border-white/70 bg-card shadow-lg" />
+
+              <div
+                className="absolute left-1/2 top-1/2 h-[150px] w-[150px] -translate-x-1/2 -translate-y-1/2 cursor-crosshair rounded-full"
+                style={{
+                  background: `linear-gradient(to bottom, transparent, #000), linear-gradient(to right, #fff, hsl(${hsv.h} 100% 50%))`,
+                }}
+                onClick={
+                  handleSaturationValueClick
+                }
+              >
+                <div
+                  className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-md"
+                  style={{
+                    left: `${hsv.s * 100}%`,
+                    top: `${
+                      (1 - hsv.v) * 100
+                    }%`,
+                  }}
+                />
+              </div>
+
+              <div
+                className="pointer-events-none absolute h-7 w-7 rounded-full border-2 border-white shadow-lg"
+                style={{
+                  backgroundColor:
+                    color,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Gallery */}
+        <div className="mt-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold text-foreground">
+              Gallery
+            </span>
+
+            <button
+              type="button"
+              aria-label="Pick color from screen"
+              title={
+                pickerSupported
+                  ? "Pick color from screen"
+                  : "Eyedropper is not supported in this browser"
+              }
+              disabled={
+                !pickerSupported
+              }
+              onClick={
+                useEyeDropper
+              }
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Pipette className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-17 overflow-hidden rounded-lg border border-border/70">
+            {COLOR_GALLERY.map(
+              (galleryColor) => (
+                <button
+                  key={galleryColor}
+                  type="button"
+                  aria-label={`Use ${galleryColor}`}
+                  title={galleryColor}
+                  onClick={() =>
+                    setColor(
+                      galleryColor,
+                    )
+                  }
+                  className="aspect-square min-w-0 border-r border-b border-black/10 transition-transform hover:z-10 hover:scale-110"
+                  style={{
+                    backgroundColor:
+                      galleryColor,
+                  }}
+                />
+              ),
+            )}
+          </div>
+        </div>
+
+        {/* RGB sliders always visible */}
+        <div className="mt-4 border-t border-border/70 pt-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold text-foreground">
+              RGB
+            </span>
+
+            <span className="font-mono text-[11px] text-muted-foreground">
+              {rgb.r}, {rgb.g}, {rgb.b}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {(
+              [
+                ["R", "r", "#ef4444"],
+                ["G", "g", "#22c55e"],
+                ["B", "b", "#3b82f6"],
+              ] as const
+            ).map(
+              ([
+                label,
+                channel,
+                accent,
+              ]) => (
+                <div
+                  key={channel}
+                  className="flex items-center gap-2"
+                >
+                  <span className="w-4 text-[11px] font-semibold text-muted-foreground">
+                    {label}
+                  </span>
+
+                  <input
+                    type="range"
+                    min="0"
+                    max="255"
+                    value={
+                      rgb[channel]
+                    }
+                    onChange={(event) =>
+                      updateRgb(
+                        channel,
+                        Number(
+                          event.target
+                            .value,
+                        ),
+                      )
+                    }
+                    className="min-w-0 flex-1"
+                    style={{
+                      accentColor:
+                        accent,
+                    }}
+                  />
+
+                  <span className="w-8 text-right font-mono text-[11px] text-muted-foreground">
+                    {rgb[channel]}
+                  </span>
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Sidebar({
   open,
   items,
@@ -173,11 +993,22 @@ export default function Sidebar({
   const [wheelMenuOpen, setWheelMenuOpen] =
     useState(false)
 
+  const [
+    colorPickerOpen,
+    setColorPickerOpen,
+  ] = useState(false)
+
   const textEditingRef =
     useRef(false)
 
   const fileInputRef =
     useRef<HTMLInputElement | null>(null)
+
+  const entryImageInputRef =
+    useRef<HTMLInputElement | null>(null)
+
+  const entryImageTargetRef =
+    useRef<string | null>(null)
 
   const imageMenuRef =
     useRef<HTMLDivElement | null>(null)
@@ -306,7 +1137,6 @@ export default function Sidebar({
     value: string,
   ) => {
     textEditingRef.current = true
-
     setText(value)
 
     onChange(
@@ -441,6 +1271,62 @@ export default function Sidebar({
 
     event.target.value = ""
     setImageMenuOpen(false)
+  }
+
+  const handleEntryImageFile = (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file =
+      event.target.files?.[0]
+
+    const targetId =
+      entryImageTargetRef.current
+
+    if (!file || !targetId) {
+      event.target.value = ""
+      return
+    }
+
+    const reader =
+      new FileReader()
+
+    reader.onload = () => {
+      if (
+        typeof reader.result !==
+        "string"
+      ) {
+        return
+      }
+
+      setEntryExtras(
+        targetId,
+        {
+          image:
+            reader.result,
+        },
+      )
+
+      if (
+        settingsDraft?.id ===
+        targetId
+      ) {
+        setSettingsImage(
+          reader.result,
+        )
+      }
+    }
+
+    reader.readAsDataURL(file)
+
+    event.target.value = ""
+    entryImageTargetRef.current = null
+  }
+
+  const openEntryImagePicker = (
+    id: string,
+  ) => {
+    entryImageTargetRef.current = id
+    entryImageInputRef.current?.click()
   }
 
   const addEntry = () => {
@@ -662,6 +1548,8 @@ export default function Sidebar({
     setSettingsImage(
       entryExtras.image,
     )
+
+    setColorPickerOpen(false)
   }
 
   const closeSettings = () => {
@@ -670,6 +1558,7 @@ export default function Sidebar({
     setSettingsSound("")
     setSettingsPopupMessage("")
     setSettingsImage(undefined)
+    setColorPickerOpen(false)
   }
 
   const saveSettings = () => {
@@ -773,6 +1662,8 @@ export default function Sidebar({
     setSettingsDraft({
       ...duplicated,
     })
+
+    setColorPickerOpen(false)
   }
 
   const deleteSettingsEntry = () => {
@@ -832,6 +1723,8 @@ export default function Sidebar({
     setSettingsImage(
       entryExtras.image,
     )
+
+    setColorPickerOpen(false)
   }
 
   const handleSettingsImage = (
@@ -1017,7 +1910,6 @@ export default function Sidebar({
         }`}
       >
         <div className="flex h-full flex-col">
-          {/* Tabs */}
           <div className="flex h-12 shrink-0 items-end border-b border-border/70 bg-card/80 px-1">
             <button
               type="button"
@@ -1058,7 +1950,6 @@ export default function Sidebar({
 
           {tab === "entries" ? (
             <>
-              {/* Toolbar */}
               <div className="shrink-0 border-b border-border/70 px-4 py-3">
                 <div className="flex items-center gap-2">
                   <Button
@@ -1329,15 +2220,23 @@ export default function Sidebar({
                                         />
                                       </label>
 
+                                      {/* Direct entry image picker */}
                                       <button
                                         type="button"
                                         aria-label={`Add image to ${item.label}`}
+                                        title="Set entry image"
                                         onClick={() =>
-                                          openSettings(
-                                            index,
+                                          openEntryImagePicker(
+                                            item.id,
                                           )
                                         }
-                                        className="flex h-9 w-10 shrink-0 items-center justify-center rounded-md text-foreground transition hover:bg-muted"
+                                        className={`flex h-9 w-10 shrink-0 items-center justify-center rounded-md text-foreground transition ${
+                                          getExtras(
+                                            item.id,
+                                          ).image
+                                            ? "bg-blue-500/10 text-blue-500"
+                                            : "hover:bg-muted"
+                                        }`}
                                       >
                                         <ImageIcon className="h-4 w-4" />
                                       </button>
@@ -1555,11 +2454,9 @@ export default function Sidebar({
                       >
                         <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
 
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">
-                            Open wheel
-                          </span>
-                        </div>
+                        <span className="text-sm font-medium">
+                          Open wheel
+                        </span>
                       </button>
                     </div>
                   )}
@@ -1636,11 +2533,22 @@ export default function Sidebar({
         </div>
       </aside>
 
+      {/* Shared entry image picker */}
+      <input
+        ref={entryImageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={
+          handleEntryImageFile
+        }
+      />
+
       {/* Advanced entry settings */}
       {settingsEntryIndex !== null &&
         settingsDraft && (
           <div
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[3px]"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-background/60 p-4 backdrop-blur-sm"
             onMouseDown={(event) => {
               if (
                 event.target ===
@@ -1654,7 +2562,7 @@ export default function Sidebar({
               role="dialog"
               aria-modal="true"
               aria-labelledby="advanced-entry-settings-title"
-              className="w-full max-w-[640px] overflow-hidden rounded-2xl border border-border/70 bg-card text-foreground shadow-2xl"
+              className="w-full max-w-[680px] overflow-hidden rounded-2xl border border-border/70 bg-card text-foreground shadow-2xl"
             >
               {/* Header */}
               <div className="flex h-[68px] items-center justify-between border-b border-border/70 bg-card px-5">
@@ -1691,7 +2599,7 @@ export default function Sidebar({
 
               <div className="max-h-[calc(100vh-120px)] overflow-y-auto">
                 {/* Entry navigation */}
-                <div className="flex h-16 items-center gap-4 border-b border-border/70 px-5">
+                <div className="flex min-h-[76px] items-center gap-5 border-b border-border/70 px-5">
                   <button
                     type="button"
                     aria-label="Previous entry"
@@ -1704,12 +2612,12 @@ export default function Sidebar({
                         settingsEntryIndex - 1,
                       )
                     }
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-muted/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                   >
                     <ArrowLeft className="h-4 w-4" />
                   </button>
 
-                  <div className="min-w-[100px]">
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-muted-foreground">
                       Entry
                     </p>
@@ -1735,7 +2643,7 @@ export default function Sidebar({
                         settingsEntryIndex + 1,
                       )
                     }
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-muted/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                   >
                     <ArrowRight className="h-4 w-4" />
                   </button>
@@ -1798,8 +2706,12 @@ export default function Sidebar({
                       setSettingsImage(
                         undefined,
                       )
+
+                      setColorPickerOpen(
+                        false,
+                      )
                     }}
-                    className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-500"
+                    className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-[0_2px_8px_rgba(59,130,246,0.25)] transition-colors hover:bg-blue-500"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
@@ -1883,42 +2795,62 @@ export default function Sidebar({
                   </div>
 
                   {/* Color */}
-                  <div className="grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
+                  <div className="relative grid grid-cols-[130px_1fr] items-center gap-4 border-b border-border/50 py-4">
                     <label className="text-sm font-medium text-foreground">
                       Color
                     </label>
 
                     <div className="flex items-center justify-between gap-3">
-                      <label
-                        className="relative flex h-10 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-border/70 shadow-sm"
-                        style={{
-                          backgroundColor:
-                            settingsDraft.color ??
-                            "#3b82f6",
-                        }}
-                        title="Change color"
-                      >
-                        <Palette className="h-4 w-4 text-black/80" />
-
-                        <input
-                          type="color"
-                          value={
-                            settingsDraft.color ??
-                            "#3b82f6"
+                      <div className="relative">
+                        <button
+                          type="button"
+                          aria-label="Open color picker"
+                          aria-expanded={
+                            colorPickerOpen
                           }
-                          onChange={(event) =>
-                            updateSettingsDraft(
-                              {
-                                color:
-                                  event
-                                    .target
-                                    .value,
-                              },
+                          onClick={() =>
+                            setColorPickerOpen(
+                              (current) =>
+                                !current,
                             )
                           }
-                          className="absolute inset-0 cursor-pointer opacity-0"
-                        />
-                      </label>
+                          className="relative flex h-10 w-12 items-center justify-center overflow-hidden rounded-lg border border-border/70 bg-background shadow-sm transition hover:border-blue-500/50"
+                        >
+                          <span
+                            className="absolute inset-1 rounded-md"
+                            style={{
+                              backgroundColor:
+                                settingsDraft.color ??
+                                "#3b82f6",
+                            }}
+                          />
+
+                          <Palette className="relative z-10 h-4 w-4 text-black/80 drop-shadow-[0_1px_1px_rgba(255,255,255,0.55)]" />
+                        </button>
+
+                        {colorPickerOpen && (
+                          <ColorPicker
+                            color={
+                              settingsDraft.color ??
+                              "#3b82f6"
+                            }
+                            onChange={(
+                              color,
+                            ) =>
+                              updateSettingsDraft(
+                                {
+                                  color,
+                                },
+                              )
+                            }
+                            onClose={() =>
+                              setColorPickerOpen(
+                                false,
+                              )
+                            }
+                          />
+                        )}
+                      </div>
 
                       <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted">
                         <ImageIcon className="h-4 w-4 text-muted-foreground" />
