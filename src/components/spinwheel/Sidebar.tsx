@@ -95,8 +95,7 @@ export default function Sidebar({
   onClearResults,
   onNewWheel,
 }: SidebarProps) {
-  const [tab, setTab] =
-    useState<Tab>("entries")
+  const [tab, setTab] = useState<Tab>("entries")
 
   const [text, setText] = useState(() =>
     items
@@ -104,8 +103,7 @@ export default function Sidebar({
       .join("\n"),
   )
 
-  const [advanced, setAdvanced] =
-    useState(false)
+  const [advanced, setAdvanced] = useState(false)
 
   const [imageMenuOpen, setImageMenuOpen] =
     useState(false)
@@ -123,14 +121,10 @@ export default function Sidebar({
     useRef<HTMLDivElement | null>(null)
 
   /*
-   * Close any dropdown when clicking anywhere
-   * outside of that dropdown.
+   * Close dropdowns when clicking outside.
    */
   useEffect(() => {
-    if (
-      !imageMenuOpen &&
-      !wheelMenuOpen
-    ) {
+    if (!imageMenuOpen && !wheelMenuOpen) {
       return
     }
 
@@ -173,14 +167,9 @@ export default function Sidebar({
         handleDocumentClick,
       )
     }
-  }, [
-    imageMenuOpen,
-    wheelMenuOpen,
-  ])
+  }, [imageMenuOpen, wheelMenuOpen])
 
-  const handleTextChange = (
-    value: string,
-  ) => {
+  const handleTextChange = (value: string) => {
     setText(value)
 
     onChange(
@@ -203,15 +192,11 @@ export default function Sidebar({
       index > 0;
       index -= 1
     ) {
-      const randomIndex =
-        Math.floor(
-          Math.random() * (index + 1),
-        )
+      const randomIndex = Math.floor(
+        Math.random() * (index + 1),
+      )
 
-      ;[
-        shuffled[index],
-        shuffled[randomIndex],
-      ] = [
+      ;[shuffled[index], shuffled[randomIndex]] = [
         shuffled[randomIndex],
         shuffled[index],
       ]
@@ -263,8 +248,8 @@ export default function Sidebar({
       return
     }
 
-    const imageEntries =
-      files.map((file, index) => ({
+    const imageEntries = files.map(
+      (file, index) => ({
         id: crypto.randomUUID(),
 
         label: file.name.replace(
@@ -279,7 +264,8 @@ export default function Sidebar({
           ],
 
         weight: 1,
-      }))
+      }),
+    )
 
     const nextItems = [
       ...items,
@@ -303,8 +289,7 @@ export default function Sidebar({
       return
     }
 
-    const content =
-      results.join("\r\n")
+    const content = results.join("\r\n")
 
     const saveWindow =
       window as SaveFilePickerWindow
@@ -312,25 +297,19 @@ export default function Sidebar({
     if (saveWindow.showSaveFilePicker) {
       try {
         const fileHandle =
-          await saveWindow.showSaveFilePicker(
-            {
-              suggestedName:
-                "spin-wheel-results.txt",
+          await saveWindow.showSaveFilePicker({
+            suggestedName:
+              "spin-wheel-results.txt",
 
-              types: [
-                {
-                  description:
-                    "Text file",
-
-                  accept: {
-                    "text/plain": [
-                      ".txt",
-                    ],
-                  },
+            types: [
+              {
+                description: "Text file",
+                accept: {
+                  "text/plain": [".txt"],
                 },
-              ],
-            },
-          )
+              },
+            ],
+          })
 
         const writable =
           await fileHandle.createWritable()
@@ -349,12 +328,9 @@ export default function Sidebar({
       }
     }
 
-    const blob = new Blob(
-      [content],
-      {
-        type: "text/plain;charset=utf-8",
-      },
-    )
+    const blob = new Blob([content], {
+      type: "text/plain;charset=utf-8",
+    })
 
     const url =
       URL.createObjectURL(blob)
@@ -382,10 +358,6 @@ export default function Sidebar({
 
   const handleOpenWheel = () => {
     setWheelMenuOpen(false)
-
-    // Open wheel functionality can be
-    // connected here when wheel saving/loading
-    // is implemented.
   }
 
   const toggleImageMenu = (
@@ -423,38 +395,42 @@ export default function Sidebar({
       <div className="flex h-full flex-col">
         {/* Tabs */}
         <div className="flex h-12 shrink-0 items-end border-b border-border/70 bg-card/80 px-1">
+          {/* Entries */}
           <button
             type="button"
-            onClick={() =>
-              setTab("entries")
-            }
-            className={`flex h-12 items-center gap-1.5 border-b-2 px-4 text-sm font-semibold transition ${
+            onClick={() => setTab("entries")}
+            className={`flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors ${
               tab === "entries"
-                ? "border-blue-500 text-foreground"
+                ? "border-foreground text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            Entries
+            <span>Entries</span>
 
-            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-bold leading-none text-muted-foreground">
+            <span
+              aria-label={`${items.length} entries`}
+              className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-muted-foreground/20 px-1.5 text-[11px] font-bold leading-none text-muted-foreground"
+            >
               {items.length}
             </span>
           </button>
 
+          {/* Results */}
           <button
             type="button"
-            onClick={() =>
-              setTab("results")
-            }
-            className={`flex h-12 items-center gap-1.5 border-b-2 px-4 text-sm font-semibold transition ${
+            onClick={() => setTab("results")}
+            className={`flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors ${
               tab === "results"
-                ? "border-blue-500 text-foreground"
+                ? "border-foreground text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            Results
+            <span>Results</span>
 
-            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-bold leading-none text-muted-foreground">
+            <span
+              aria-label={`${results.length} results`}
+              className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-muted-foreground/20 px-1.5 text-[11px] font-bold leading-none text-muted-foreground"
+            >
               {results.length}
             </span>
           </button>
@@ -470,12 +446,8 @@ export default function Sidebar({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={
-                    shuffleEntries
-                  }
-                  disabled={
-                    items.length < 2
-                  }
+                  onClick={shuffleEntries}
+                  disabled={items.length < 2}
                   className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold hover:bg-muted"
                 >
                   <Shuffle className="h-3.5 w-3.5" />
@@ -488,9 +460,7 @@ export default function Sidebar({
                   variant="secondary"
                   size="sm"
                   onClick={sortEntries}
-                  disabled={
-                    items.length < 2
-                  }
+                  disabled={items.length < 2}
                   className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold hover:bg-muted"
                 >
                   <ArrowDownAZ className="h-3.5 w-3.5" />
@@ -506,9 +476,7 @@ export default function Sidebar({
                     type="button"
                     variant="secondary"
                     size="sm"
-                    onClick={
-                      toggleImageMenu
-                    }
+                    onClick={toggleImageMenu}
                     className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold text-foreground hover:bg-muted"
                   >
                     <ImageIcon className="h-3.5 w-3.5" />
@@ -534,7 +502,6 @@ export default function Sidebar({
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
                       >
                         <Upload className="h-4 w-4 text-muted-foreground" />
-
                         Add background image
                       </button>
 
@@ -546,7 +513,6 @@ export default function Sidebar({
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
                       >
                         <Upload className="h-4 w-4 text-muted-foreground" />
-
                         Add center image
                       </button>
 
@@ -558,7 +524,6 @@ export default function Sidebar({
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
                       >
                         <Upload className="h-4 w-4 text-muted-foreground" />
-
                         Add image as entry
                       </button>
                     </div>
@@ -570,9 +535,7 @@ export default function Sidebar({
                     accept="image/*"
                     multiple
                     className="hidden"
-                    onChange={
-                      handleImageFiles
-                    }
+                    onChange={handleImageFiles}
                   />
                 </div>
 
@@ -624,25 +587,18 @@ export default function Sidebar({
               >
                 <button
                   type="button"
-                  onClick={
-                    handleNewWheel
-                  }
+                  onClick={handleNewWheel}
                   className="inline-flex h-10 items-center gap-2 rounded-l-lg border border-blue-500/20 bg-blue-500/10 px-4 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-500/15"
                 >
                   <Plus className="h-4 w-4" />
-
                   Add wheel
                 </button>
 
                 <button
                   type="button"
                   aria-label="More wheel options"
-                  aria-expanded={
-                    wheelMenuOpen
-                  }
-                  onClick={
-                    toggleWheelMenu
-                  }
+                  aria-expanded={wheelMenuOpen}
+                  onClick={toggleWheelMenu}
                   className="inline-flex h-10 w-10 items-center justify-center rounded-r-lg border border-l-0 border-blue-500/20 bg-blue-500/10 text-blue-500 transition-colors hover:bg-blue-500/15"
                 >
                   <ChevronDown
@@ -656,12 +612,9 @@ export default function Sidebar({
 
                 {wheelMenuOpen && (
                   <div className="absolute bottom-12 left-0 z-[90] w-60 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-2xl">
-                    {/* Open wheel */}
                     <button
                       type="button"
-                      onClick={
-                        handleOpenWheel
-                      }
+                      onClick={handleOpenWheel}
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
                     >
                       <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -686,12 +639,8 @@ export default function Sidebar({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={
-                    onClearResults
-                  }
-                  disabled={
-                    results.length === 0
-                  }
+                  onClick={onClearResults}
+                  disabled={results.length === 0}
                   className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold hover:bg-muted"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -702,12 +651,8 @@ export default function Sidebar({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={
-                    exportResults
-                  }
-                  disabled={
-                    results.length === 0
-                  }
+                  onClick={exportResults}
+                  disabled={results.length === 0}
                   className="h-9 gap-1.5 rounded-lg border border-border/70 bg-muted/60 px-3 text-xs font-semibold hover:bg-muted"
                 >
                   <Download className="h-3.5 w-3.5" />
