@@ -391,25 +391,19 @@ const halfThenSmoothStop = (t: number) => {
   if (t <= 0.5) return t
 
   /*
-   * First half: perfectly constant angular speed.
-   *
-   * Second half: a 7th-order braking curve.  It is constructed so that:
-   *   - position is continuous at 50%,
-   *   - velocity is continuous at 50%,
-   *   - acceleration is zero at 50%,
-   *   - jerk is zero at 50%,
-   *   - velocity, acceleration and jerk all reach zero at the final frame.
-   *
-   * That is much smoother than a normal ease-out because braking does not
-   * suddenly kick in when the wheel reaches the halfway point.
+   * The first half is genuinely constant-speed. The second half is a
+   * 7th-order braking curve whose velocity, acceleration and jerk match the
+   * constant-speed section at the halfway point, then all reach zero at the
+   * final frame. This prevents the little "kick" that the previous curve
+   * could produce when braking began.
    */
   const u = (t - 0.5) * 2
   const eased =
-    0.5 * u +
-    25 * u ** 4 -
-    (123 / 2) * u ** 5 +
-    52 * u ** 6 -
-    15 * u ** 7
+    u -
+    15 * u ** 4 +
+    39 * u ** 5 -
+    34 * u ** 6 +
+    10 * u ** 7
 
   return 0.5 + 0.5 * eased
 }
@@ -544,6 +538,9 @@ export default function Wheel({
     useRef<HTMLDivElement | null>(null)
 
   const spinningRef =
+    useRef(false)
+
+  const idleSpinningRef =
     useRef(false)
 
   const cancelledSpinRef =
@@ -804,6 +801,13 @@ export default function Wheel({
           visibleItems.length,
       )
 
+    if (idleSpinningRef.current) {
+      cancelledSpinRef.current = true
+      wheel.stop()
+      idleSpinningRef.current = false
+      cancelledSpinRef.current = false
+    }
+
     cancelledSpinRef.current = false
     spinningRef.current =
       true
@@ -1049,7 +1053,9 @@ export default function Wheel({
 
           isInteractive: false,
 
-          rotationResistance: -35,
+          // The idle animation uses wheel.spin(7). Zero resistance keeps it
+          // at a constant, very gentle speed until a real spin starts.
+          rotationResistance: 0,
 
           rotationSpeedMax: 1000,
 
@@ -1189,7 +1195,16 @@ export default function Wheel({
     lastTickIndexRef.current =
       actualIndex
 
+    // Gentle continuous idle rotation. spin-wheel documents `spin()` as the
+    // native continuous rotation method; with resistance 0 it remains smooth
+    // instead of slowing itself down.
+    wheel.spin(7)
+    idleSpinningRef.current = true
+
     return () => {
+      idleSpinningRef.current = false
+      cancelledSpinRef.current = true
+      wheel.stop()
       wheel.remove()
 
       wheelRef.current = null
@@ -1287,8 +1302,8 @@ export default function Wheel({
           className="
             relative
             aspect-square
-            h-auto
-            w-full
+            h-full
+            w-auto
             max-h-full
             max-w-full
             shrink-0
@@ -1319,7 +1334,7 @@ export default function Wheel({
             className="
               pointer-events-none
               absolute
-              right-[-40px]
+              right-[-22px]
               top-1/2
               z-50
               h-[42px]
