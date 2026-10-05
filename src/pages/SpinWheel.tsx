@@ -5,8 +5,8 @@ import Navbar from "@/components/home/Navbar"
 
 import SpinWheelCanvas, {
   type SpinWheelItem,
-} from "@/components/spinwheel/SpinWheelCanvas"
-import SpinWheelSidebar from "@/components/spinwheel/SpinWheelSidebar"
+} from "@/components/spinwheel/Wheel"
+import SpinWheelSidebar from "@/components/spinwheel/Sidebar"
 
 export default function SpinWheel() {
   const [items, setItems] = useState<SpinWheelItem[]>([])
