@@ -775,16 +775,6 @@ export default function SpinWheel() {
     setNewEntry("")
   }, [newEntry])
 
-  const removeEntry =
-    useCallback((id: string) => {
-      setEntries((current) =>
-        current.filter(
-          (entry) =>
-            entry.id !== id,
-        ),
-      )
-    }, [])
-
   const shuffleEntries =
     useCallback(() => {
       if (isSpinningRef.current) {
