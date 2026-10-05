@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
-import { Check, ChevronDown, Dices, FilePlus2, FolderOpen, Palette, Pencil, Save, Share2, X } from "lucide-react"
+import { ChevronDown, FilePlus2, FolderOpen, Palette, Pencil, Save, X } from "lucide-react"
 import confetti from "canvas-confetti"
 
 import Navbar from "@/components/home/Navbar"
@@ -32,46 +32,6 @@ const DEFAULT_ENTRIES = [
   "6",
 ]
 
-function encodeSharePayload(value: unknown) {
-  const bytes = new TextEncoder().encode(JSON.stringify(value))
-  let binary = ""
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")
-}
-
-function decodeSharePayload(value: string) {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/")
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4)
-  const binary = atob(padded)
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
-  return JSON.parse(new TextDecoder().decode(bytes)) as {
-    version?: number
-    title?: string
-    description?: string
-    wheels?: WheelState[]
-    settings?: {
-      animateWinningEntryByWheel?: Record<string, boolean>
-      launchConfettiByWheel?: Record<string, boolean>
-      afterSoundByWheel?: Record<string, string>
-      afterVolumeByWheel?: Record<string, number>
-      spinSlowlyByWheel?: Record<string, boolean>
-      spinTimeByWheel?: Record<string, number>
-      centerImageByWheel?: Record<string, string | undefined>
-      imageSizeByWheel?: Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL">
-    }
-  }
-}
-
-function getReadableTextColor(hex: string) {
-  const clean = hex.replace("#", "")
-  if (clean.length !== 6) return "#111111"
-  const r = Number.parseInt(clean.slice(0, 2), 16)
-  const g = Number.parseInt(clean.slice(2, 4), 16)
-  const b = Number.parseInt(clean.slice(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.62 ? "#111111" : "#ffffff"
-}
-
 function createWheel(index: number): WheelState {
   return {
     id: crypto.randomUUID(),
@@ -101,12 +61,6 @@ export default function SpinWheel() {
   const [results, setResults] = useState<SpinResult[]>([])
   const [winners, setWinners] = useState<SpinResult[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [wheelTitle, setWheelTitle] = useState("Spin Wheel")
-  const [wheelDescription, setWheelDescription] = useState(
-    "Create and spin custom wheels for Metro Police Department activities, selections, and more.",
-  )
-  const [shareDialogOpen, setShareDialogOpen] = useState(false)
-  const [shareCopied, setShareCopied] = useState(false)
 
   /*
    * This is deliberately stored per wheel because the Customize wheel
@@ -141,8 +95,8 @@ export default function SpinWheel() {
   const wheelAreaRef = useRef<HTMLDivElement | null>(null)
   const winnerAnimationTimeoutRef =
     useRef<ReturnType<typeof setTimeout> | null>(null)
-  const confettiEndRef = useRef(0)
-  const confettiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const confettiFrameRef = useRef<number | null>(null)
+  const lastConfettiBurstRef = useRef(0)
   const [customizeRequest, setCustomizeRequest] = useState(0)
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const openFileInputRef = useRef<HTMLInputElement | null>(null)
@@ -162,54 +116,12 @@ export default function SpinWheel() {
   }, [activeWheelId, wheels])
 
   useEffect(() => {
-    const hash = window.location.hash
-    const match = hash.match(/^#share=(.+)$/)
-    if (!match) return
-
-    try {
-      const parsed = decodeSharePayload(match[1])
-      if (!Array.isArray(parsed.wheels) || parsed.wheels.length < 1 || parsed.wheels.length > MAX_WHEELS) return
-
-      const loaded = parsed.wheels.map((wheel, index) => ({
-        id: typeof wheel.id === "string" ? wheel.id : crypto.randomUUID(),
-        name: typeof wheel.name === "string" && wheel.name.trim() ? wheel.name : `Wheel ${index + 1}`,
-        items: Array.isArray(wheel.items) ? wheel.items.map((item) => ({
-          id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
-          label: typeof item.label === "string" ? item.label : String(item.label ?? ""),
-          color: typeof item.color === "string" ? item.color : undefined,
-          weight: typeof item.weight === "number" ? item.weight : 1,
-          hidden: Boolean(item.hidden),
-        })) : [],
-      }))
-
-      setWheels(loaded)
-      setActiveWheelId(loaded[0].id)
-      setResults([])
-      setWinners([])
-      setWheelTitle(typeof parsed.title === "string" && parsed.title.trim() ? parsed.title : "Spin Wheel")
-      setWheelDescription(typeof parsed.description === "string" ? parsed.description : "")
-      const settings = parsed.settings ?? {}
-      setAnimateWinningEntryByWheel(settings.animateWinningEntryByWheel ?? {})
-      setLaunchConfettiByWheel(settings.launchConfettiByWheel ?? {})
-      setAfterSoundByWheel(settings.afterSoundByWheel ?? {})
-      setAfterVolumeByWheel(settings.afterVolumeByWheel ?? {})
-      setSpinSlowlyByWheel(settings.spinSlowlyByWheel ?? {})
-      setSpinTimeByWheel(settings.spinTimeByWheel ?? {})
-      setCenterImageByWheel(settings.centerImageByWheel ?? {})
-      setImageSizeByWheel(settings.imageSizeByWheel ?? {})
-      window.history.replaceState(null, "", window.location.pathname + window.location.search)
-    } catch {
-      // Ignore malformed share links and keep the normal new wheel.
-    }
-  }, [])
-
-  useEffect(() => {
     return () => {
       if (winnerAnimationTimeoutRef.current) {
         clearTimeout(winnerAnimationTimeoutRef.current)
       }
-      if (confettiTimerRef.current !== null) {
-        clearTimeout(confettiTimerRef.current)
+      if (confettiFrameRef.current !== null) {
+        cancelAnimationFrame(confettiFrameRef.current)
       }
     }
   }, [])
@@ -228,59 +140,51 @@ export default function SpinWheel() {
   )
 
   const launchWinnerCelebration = useCallback(() => {
-    if (confettiTimerRef.current !== null) {
-      clearTimeout(confettiTimerRef.current)
-      confettiTimerRef.current = null
+    /* One small fireworks burst every ~1/3 second for five seconds. */
+    const end = Date.now() + 5000
+
+    if (confettiFrameRef.current !== null) {
+      cancelAnimationFrame(confettiFrameRef.current)
+      confettiFrameRef.current = null
     }
 
-    const startedAt = Date.now()
-    const duration = 5000
-    let burst = 0
-    let previousX = -1
-    let previousY = -1
+    lastConfettiBurstRef.current = 0
 
     const fire = () => {
-      const elapsed = Date.now() - startedAt
-      if (elapsed >= duration || burst >= 16) {
-        confettiTimerRef.current = null
+      const now = Date.now()
+
+      if (now >= end) {
+        confettiFrameRef.current = null
         return
       }
 
-      let x = 0.08 + Math.random() * 0.84
-      let y = 0.08 + Math.random() * 0.68
-      let attempts = 0
-      while (Math.abs(x - previousX) < 0.18 && Math.abs(y - previousY) < 0.14 && attempts < 8) {
-        x = 0.08 + Math.random() * 0.84
-        y = 0.08 + Math.random() * 0.68
-        attempts += 1
+      if (now - lastConfettiBurstRef.current >= 333) {
+        lastConfettiBurstRef.current = now
+
+        const x = 0.05 + Math.random() * 0.90
+        const y = 0.05 + Math.random() * 0.78
+
+        confetti({
+          particleCount: 34 + Math.floor(Math.random() * 10),
+          angle: 90,
+          spread: 360,
+          startVelocity: 27 + Math.random() * 8,
+          decay: 0.90 + Math.random() * 0.025,
+          gravity: 0.90 + Math.random() * 0.25,
+          drift: (Math.random() - 0.5) * 0.45,
+          scalar: 0.70 + Math.random() * 0.28,
+          ticks: 55 + Math.floor(Math.random() * 20),
+          origin: { x, y },
+          colors: [
+            '#3b82f6', '#60a5fa', '#0ea5e9', '#22c55e',
+            '#facc15', '#f97316', '#ef4444', '#a855f7',
+            '#f472b6',
+          ],
+          zIndex: 1000,
+        })
       }
-      previousX = x
-      previousY = y
-      burst += 1
 
-      confetti({
-        particleCount: 42 + Math.floor(Math.random() * 14),
-        angle: 90,
-        spread: 360,
-        startVelocity: 30 + Math.random() * 12,
-        decay: 0.91 + Math.random() * 0.025,
-        gravity: 0.72 + Math.random() * 0.18,
-        drift: (Math.random() - 0.5) * 0.7,
-        scalar: 0.72 + Math.random() * 0.30,
-        ticks: 72 + Math.floor(Math.random() * 18),
-        origin: { x, y },
-        colors: [
-          "#3b82f6", "#60a5fa", "#0ea5e9", "#22c55e",
-          "#facc15", "#f97316", "#ef4444", "#a855f7",
-          "#f472b6", "#ffffff",
-        ],
-        zIndex: 9999,
-        useWorker: false,
-        disableForReducedMotion: false,
-      })
-
-      const nextDelay = Math.max(0, 333 - (Date.now() - startedAt) % 333)
-      confettiTimerRef.current = setTimeout(fire, nextDelay)
+      confettiFrameRef.current = requestAnimationFrame(fire)
     }
 
     fire()
@@ -523,8 +427,6 @@ export default function SpinWheel() {
     setImageSizeByWheel({})
     setSidebarOpen(true)
     setSaveMenuOpen(false)
-    setWheelTitle("Spin Wheel")
-    setWheelDescription("Create and spin custom wheels for Metro Police Department activities, selections, and more.")
   }, [])
 
   const requestCustomize = useCallback(() => {
@@ -540,8 +442,6 @@ export default function SpinWheel() {
       try {
         const parsed = JSON.parse(raw) as {
           version?: number
-          title?: string
-          description?: string
           wheels?: WheelState[]
           settings?: {
             animateWinningEntryByWheel?: Record<string, boolean>
@@ -563,7 +463,7 @@ export default function SpinWheel() {
           id: typeof wheel.id === "string" ? wheel.id : crypto.randomUUID(),
           name: typeof wheel.name === "string" && wheel.name.trim() ? wheel.name : `Wheel ${index + 1}`,
           items: Array.isArray(wheel.items)
-            ? wheel.items.map((item) => ({
+            ? wheel.items.map((item, itemIndex) => ({
                 id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
                 label: typeof item.label === "string" ? item.label : String(item.label ?? ""),
                 color: item.color,
@@ -575,8 +475,6 @@ export default function SpinWheel() {
 
         setWheels(loaded)
         setActiveWheelId(loaded[0].id)
-        setWheelTitle(typeof parsed.title === "string" && parsed.title.trim() ? parsed.title : "Spin Wheel")
-        setWheelDescription(typeof parsed.description === "string" ? parsed.description : "Create and spin custom wheels for Metro Police Department activities, selections, and more.")
         setResults([])
         setWinners([])
 
@@ -599,8 +497,6 @@ export default function SpinWheel() {
   const saveWheelFile = useCallback((extension: "wheel" | "json") => {
     const payload = {
       version: 1,
-      title: wheelTitle,
-      description: wheelDescription,
       wheels,
       settings: {
         animateWinningEntryByWheel,
@@ -634,45 +530,7 @@ export default function SpinWheel() {
     spinTimeByWheel,
     centerImageByWheel,
     imageSizeByWheel,
-    wheelTitle,
-    wheelDescription,
   ])
-
-  const createShareLink = useCallback(() => {
-    const payload = {
-      version: 1,
-      title: wheelTitle.trim() || "Spin Wheel",
-      description: wheelDescription,
-      wheels,
-      settings: {
-        animateWinningEntryByWheel,
-        launchConfettiByWheel,
-        afterSoundByWheel,
-        afterVolumeByWheel,
-        spinSlowlyByWheel,
-        spinTimeByWheel,
-        centerImageByWheel,
-        imageSizeByWheel,
-      },
-    }
-    return `${window.location.origin}${window.location.pathname}#share=${encodeSharePayload(payload)}`
-  }, [
-    wheelTitle, wheelDescription, wheels, animateWinningEntryByWheel,
-    launchConfettiByWheel, afterSoundByWheel, afterVolumeByWheel,
-    spinSlowlyByWheel, spinTimeByWheel, centerImageByWheel, imageSizeByWheel,
-  ])
-
-  const copyShareLink = useCallback(() => {
-    const link = createShareLink()
-    if (!navigator.clipboard) {
-      window.prompt("Copy this share link", link)
-      return
-    }
-    void navigator.clipboard.writeText(link).then(() => {
-      setShareCopied(true)
-      window.setTimeout(() => setShareCopied(false), 1800)
-    })
-  }, [createShareLink])
 
   const addWheel = useCallback(() => {
     if (wheels.length >= MAX_WHEELS) {
@@ -688,42 +546,6 @@ export default function SpinWheel() {
 
       return [...current, nextWheel]
     })
-
-    // Every newly-created wheel starts with the same Wheel of Names-style
-    // defaults. Keep these explicitly per-wheel so a new wheel never inherits
-    // the settings of whichever wheel was active before it was added.
-    setAnimateWinningEntryByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: false,
-    }))
-    setLaunchConfettiByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: false,
-    }))
-    setAfterSoundByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: "Subdued applause",
-    }))
-    setAfterVolumeByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: 50,
-    }))
-    setSpinSlowlyByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: false,
-    }))
-    setSpinTimeByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: 10,
-    }))
-    setCenterImageByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: undefined,
-    }))
-    setImageSizeByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: "S",
-    }))
 
     setActiveWheelId(nextWheel.id)
     setSidebarOpen(true)
@@ -852,69 +674,50 @@ export default function SpinWheel() {
       <Navbar />
 
       <main className="relative min-h-screen pt-20">
-        <section className="absolute left-5 right-5 top-3 z-[220]">
-          <div className={`transition-[max-width] duration-300 ${sidebarOpen ? "max-w-[calc(100%-500px)]" : "max-w-full"}`}>
-            <div className="flex items-start gap-3">
-              <div className="mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-400 shadow-sm">
-                <Dices className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-400">TOOLS</div>
-                <h1 className="mt-0.5 truncate text-2xl font-bold tracking-tight text-white">{wheelTitle}</h1>
-                <p className="mt-0.5 max-w-3xl truncate text-sm text-white/55">{wheelDescription}</p>
-              </div>
-            </div>
+        <div className="pointer-events-none absolute left-4 top-4 z-[220] flex items-center gap-2">
+          <button
+            type="button"
+            onClick={requestCustomize}
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:bg-black/75"
+            aria-label="Customize wheel"
+            title="Customize wheel"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
 
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShareDialogOpen(true)}
-                className="flex h-10 items-center justify-center rounded-full border border-white/10 bg-black/55 px-3 text-white shadow-lg backdrop-blur-xl transition hover:bg-black/75"
-                aria-label="Edit title and description"
-                title="Edit title and description"
-              >
-                <Pencil className="h-4 w-4" />
+          <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/10 bg-black/45 p-1.5 shadow-lg backdrop-blur-xl">
+            <button type="button" onClick={requestCustomize} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
+              <Palette className="h-4 w-4" />
+              Customize
+            </button>
+            <button type="button" onClick={resetToNewWheel} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
+              <FilePlus2 className="h-4 w-4" />
+              New
+            </button>
+            <button type="button" onClick={() => openFileInputRef.current?.click()} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
+              <FolderOpen className="h-4 w-4" />
+              Open
+            </button>
+            <div className="relative">
+              <button type="button" onClick={() => setSaveMenuOpen((value) => !value)} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10" aria-expanded={saveMenuOpen}>
+                <Save className="h-4 w-4" />
+                Save
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${saveMenuOpen ? "rotate-180" : ""}`} />
               </button>
-
-              <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-[#151515]/95 p-1.5 shadow-xl backdrop-blur-xl">
-                <button type="button" onClick={requestCustomize} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
-                  <Palette className="h-4 w-4" />
-                  Customize
-                </button>
-                <button type="button" onClick={resetToNewWheel} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
-                  <FilePlus2 className="h-4 w-4" />
-                  New
-                </button>
-                <button type="button" onClick={() => openFileInputRef.current?.click()} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
-                  <FolderOpen className="h-4 w-4" />
-                  Open
-                </button>
-                <button type="button" onClick={() => { setShareDialogOpen(true); copyShareLink() }} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
-                  <Share2 className="h-4 w-4" />
-                  Share
-                </button>
-                <div className="relative">
-                  <button type="button" onClick={() => setSaveMenuOpen((value) => !value)} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10" aria-expanded={saveMenuOpen}>
-                    <Save className="h-4 w-4" />
-                    Save
-                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${saveMenuOpen ? "rotate-180" : ""}`} />
-                  </button>
-                  {saveMenuOpen && (
-                    <div className="absolute left-0 top-[calc(100%+6px)] z-[300] w-36 overflow-hidden rounded-lg border border-white/10 bg-[#181818] p-1 shadow-2xl">
-                      <button type="button" onClick={() => saveWheelFile("wheel")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .wheel</button>
-                      <button type="button" onClick={() => saveWheelFile("json")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .json</button>
-                    </div>
-                  )}
+              {saveMenuOpen && (
+                <div className="absolute left-0 top-[calc(100%+6px)] z-[300] w-36 overflow-hidden rounded-lg border border-white/10 bg-[#181818] p-1 shadow-2xl">
+                  <button type="button" onClick={() => saveWheelFile("wheel")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .wheel</button>
+                  <button type="button" onClick={() => saveWheelFile("json")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .json</button>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
           <input ref={openFileInputRef} type="file" accept=".wheel,.json,application/json" className="hidden" onChange={openWheelFile} />
-        </section>
+        </div>
         <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_35%_35%,rgba(33,70,82,0.42),transparent_45%),radial-gradient(circle_at_78%_25%,rgba(81,42,91,0.28),transparent_42%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]">
           <div
-            className={`absolute inset-0 min-h-0 overflow-hidden pt-36 transition-[padding] duration-300 ${
+            className={`absolute inset-0 min-h-0 overflow-hidden pt-16 transition-[padding] duration-300 ${
               sidebarOpen ? "lg:pr-[500px]" : ""
             }`}
           >
@@ -1039,76 +842,6 @@ export default function SpinWheel() {
           </span>
         </button>
 
-        {shareDialogOpen && (
-          <div
-            className="fixed inset-0 z-[700] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) setShareDialogOpen(false)
-            }}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="share-wheel-title"
-              className="w-full max-w-[640px] overflow-hidden rounded-xl border border-white/10 bg-[#1d1d1d] text-white shadow-2xl"
-              onMouseDown={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/15 text-blue-400">
-                  <Pencil className="h-4 w-4" />
-                </div>
-                <h2 id="share-wheel-title" className="text-lg font-semibold">Edit title and description</h2>
-                <button type="button" onClick={() => setShareDialogOpen(false)} className="ml-auto rounded-lg p-2 text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Close">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="space-y-4 p-5">
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-white/65">Wheel title</label>
-                  <input
-                    value={wheelTitle}
-                    onChange={(event) => setWheelTitle(event.target.value)}
-                    placeholder="Wheel title"
-                    className="h-11 w-full rounded-lg border border-white/10 bg-[#303030] px-3 text-sm text-white outline-none transition focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-white/65">Wheel description</label>
-                  <textarea
-                    value={wheelDescription}
-                    onChange={(event) => setWheelDescription(event.target.value)}
-                    placeholder="Wheel description"
-                    rows={4}
-                    className="w-full resize-none rounded-lg border border-white/10 bg-[#303030] px-3 py-3 text-sm text-white outline-none transition focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="rounded-lg border border-white/10 bg-black/20 p-3">
-                  <div className="mb-2 text-xs font-semibold text-white/60">Share link</div>
-                  <div className="flex gap-2">
-                    <input
-                      readOnly
-                      value={createShareLink()}
-                      className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#111] px-3 text-xs text-white/70 outline-none"
-                      onFocus={(event) => event.currentTarget.select()}
-                    />
-                    <button type="button" onClick={copyShareLink} className="flex h-10 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white transition hover:bg-blue-500">
-                      {shareCopied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
-                      {shareCopied ? "Copied" : "Copy"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
-                <button type="button" onClick={() => setShareDialogOpen(false)} className="h-10 rounded-lg px-4 text-sm font-semibold text-white/70 transition hover:bg-white/10 hover:text-white">Cancel</button>
-                <button type="button" onClick={() => setShareDialogOpen(false)} className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-500">OK</button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/*
          * Wheel of Names-style background winner animation.
          *
@@ -1186,21 +919,15 @@ export default function SpinWheel() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="winner-dialog-title"
-              className="w-full max-w-[820px] overflow-hidden rounded-xl bg-[#191919] shadow-[0_24px_80px_rgba(0,0,0,0.75)] ring-1 ring-black/50"
+              className="w-full max-w-[680px] overflow-hidden rounded-[4px] bg-[#191919] shadow-[0_18px_60px_rgba(0,0,0,0.7)] ring-1 ring-black/50"
               onMouseDown={(event) =>
                 event.stopPropagation()
               }
             >
-              <div
-                className="flex min-h-[70px] items-center justify-between px-6 text-[#111]"
-                style={{
-                  backgroundColor: orderedWinners[0]?.item.color ?? "#79d99f",
-                  color: getReadableTextColor(orderedWinners[0]?.item.color ?? "#79d99f"),
-                }}
-              >
+              <div className="flex min-h-[54px] items-center justify-between bg-[#79d99f] px-4 text-[#111]">
                 <h2
                   id="winner-dialog-title"
-                  className="text-xl font-bold"
+                  className="text-[16px] font-bold"
                 >
                   {orderedWinners.length === 1
                     ? "We have a winner!"
@@ -1211,7 +938,7 @@ export default function SpinWheel() {
                   type="button"
                   onClick={closeWinnerPopup}
                   aria-label="Close winner popup"
-                  className="rounded-lg p-2 text-black/70 transition hover:bg-black/10 hover:text-black"
+                  className="rounded p-1.5 text-black/70 transition hover:bg-black/10 hover:text-black"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -1222,13 +949,13 @@ export default function SpinWheel() {
                   (result) => (
                     <div
                       key={result.id}
-                      className="grid grid-cols-[1fr_auto] items-center gap-5 px-6 py-6 sm:grid-cols-[130px_1fr_auto]"
+                      className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-4 sm:grid-cols-[110px_1fr_auto]"
                     >
-                      <div className="text-sm font-bold uppercase tracking-wide text-white/45">
+                      <div className="text-xs font-bold uppercase tracking-wide text-white/45">
                         {result.wheelName}
                       </div>
 
-                      <div className="min-w-0 truncate text-center text-[36px] font-medium tracking-[-0.8px] text-white sm:text-left">
+                      <div className="min-w-0 truncate text-center text-[25px] font-normal tracking-[-0.5px] text-white sm:text-left">
                         {result.item.label}
                       </div>
 
