@@ -354,7 +354,7 @@ function playAfterSpinSound(sound: string, volume: number) {
 
   if (!file) return
 
-  const audio = new Audio(`/sounds/afterspin/${file}`)
+  const audio = new Audio(`/sounds/after-spin/${file}`)
   audio.volume = Math.max(0, Math.min(1, volume / 100))
   audio.onerror = () => {
     const fallback = new Audio(`/sounds/after-spin/${file}`)
