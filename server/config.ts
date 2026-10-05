@@ -1,7 +1,10 @@
 import "dotenv/config"
 
-function required(name: string): string {
-  const value = process.env[name]?.trim()
+function required(
+  name: string,
+): string {
+  const value =
+    process.env[name]?.trim()
 
   if (!value) {
     throw new Error(
@@ -16,7 +19,10 @@ function optional(
   name: string,
   fallback = "",
 ): string {
-  return process.env[name]?.trim() ?? fallback
+  return (
+    process.env[name]?.trim() ??
+    fallback
+  )
 }
 
 export const env = {
@@ -25,13 +31,19 @@ export const env = {
   ───────────────────────────────────────────── */
 
   discordClientId:
-    required("DISCORD_CLIENT_ID"),
+    required(
+      "DISCORD_CLIENT_ID",
+    ),
 
   discordClientSecret:
-    required("DISCORD_CLIENT_SECRET"),
+    required(
+      "DISCORD_CLIENT_SECRET",
+    ),
 
   discordRedirectUri:
-    required("DISCORD_REDIRECT_URI"),
+    required(
+      "DISCORD_REDIRECT_URI",
+    ),
 
   /* ─────────────────────────────────────────────
      Google authentication
@@ -45,17 +57,24 @@ export const env = {
   googlePrivateKey:
     required(
       "GOOGLE_PRIVATE_KEY",
-    ).replace(/\\n/g, "\n"),
+    ).replace(
+      /\\n/g,
+      "\n",
+    ),
 
   /* ─────────────────────────────────────────────
      Existing Google roster/import system
   ───────────────────────────────────────────── */
 
   googleSheetId:
-    required("GOOGLE_SHEET_ID"),
+    required(
+      "GOOGLE_SHEET_ID",
+    ),
 
   rosterSheetName:
-    required("GOOGLE_SHEET_ROSTER_IMPORT"),
+    required(
+      "GOOGLE_SHEET_ROSTER_IMPORT",
+    ),
 
   /* ─────────────────────────────────────────────
      Main Roster
@@ -143,7 +162,18 @@ export const env = {
   ───────────────────────────────────────────── */
 
   sessionSecret:
-    required("SESSION_SECRET"),
+    required(
+      "SESSION_SECRET",
+    ),
+
+  /* ─────────────────────────────────────────────
+     Wheel of Names
+  ───────────────────────────────────────────── */
+
+  wheelOfNamesApiKey:
+    optional(
+      "WHEEL_OF_NAMES_API_KEY",
+    ),
 
   /* ─────────────────────────────────────────────
      Server
@@ -151,7 +181,8 @@ export const env = {
 
   port:
     Number(
-      process.env.PORT ?? 3001,
+      process.env.PORT ??
+        3001,
     ),
 
   appOrigin:
