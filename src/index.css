@@ -312,3 +312,14 @@ body,
 
   z-index: 50 !important;
 }
+
+@keyframes mpd-wheel-confetti {
+  0% {
+    opacity: 0.9;
+    margin-top: 0;
+  }
+  100% {
+    opacity: 0;
+    margin-top: 260px;
+  }
+}
