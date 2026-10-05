@@ -387,16 +387,11 @@ function playAfterSpinSound(sound: string, volume: number) {
  * deceleration exactly at the halfway point. The first derivative is
  * continuous at 50%, so there is no visible jerk when braking begins.
  */
-const halfThenSmoothStop = (t: number) => {
+const slowSpinEase = (t: number) => {
   if (t <= 0.5) return t
 
-  /*
-   * The first half is genuinely constant-speed. The second half is a
-   * 7th-order braking curve whose velocity, acceleration and jerk match the
-   * constant-speed section at the halfway point, then all reach zero at the
-   * final frame. This prevents the little "kick" that the previous curve
-   * could produce when braking began.
-   */
+  // Keep a normal, steady speed through the first half, then brake with a
+  // high-order curve. The final frames ease into the stop like a glide.
   const u = (t - 0.5) * 2
   const eased =
     u -
@@ -407,6 +402,31 @@ const halfThenSmoothStop = (t: number) => {
 
   return 0.5 + 0.5 * eased
 }
+
+const fastSpinEase = (t: number) => {
+  // Start at normal speed, build smoothly to the fast cruise speed, hold
+  // that speed until halfway, then use the same smooth braking/glide.
+  if (t <= 0.18) {
+    const u = t / 0.18
+    const eased = -u ** 5 + 4 * u ** 4 - 6 * u ** 3 + 4 * u ** 2
+    return 0.18 * eased
+  }
+
+  if (t <= 0.5) {
+    return t
+  }
+
+  const u = (t - 0.5) * 2
+  const eased =
+    u -
+    15 * u ** 4 +
+    39 * u ** 5 -
+    34 * u ** 6 +
+    10 * u ** 7
+
+  return 0.5 + 0.5 * eased
+}
+
 
 type SpinWheelInternals = {
   _context: CanvasRenderingContext2D | null
@@ -827,19 +847,26 @@ export default function Wheel({
     const configuredDuration = Math.max(1500, Math.min(60000, spinTimeRef.current * 1000))
     const slowly = spinSlowlyRef.current
 
-    /* Slow mode keeps the configured timing. Normal mode is much quicker,
-       while both use the same halfway-braking curve. */
+    /*
+     * Slow mode keeps the configured duration and uses a true normal-speed
+     * cruise for the first half. The default mode is deliberately faster:
+     * it accelerates from a normal start into a fast cruise, then starts
+     * braking at exactly 50% and glides into the final position.
+     */
     const duration = slowly
       ? configuredDuration
-      : Math.max(3200, Math.min(6000, configuredDuration * 0.45))
+      : Math.max(3000, Math.min(5200, configuredDuration * 0.38))
+
+    const revolutions = slowly ? 6 : 8
+    const easing = slowly ? slowSpinEase : fastSpinEase
 
     wheel.spinToItem(
       selectedIndex,
       duration,
       true,
-      6,
+      revolutions,
       1,
-      halfThenSmoothStop,
+      easing,
     )
   }, [
     getAudioContext,
@@ -1198,7 +1225,7 @@ export default function Wheel({
     // Gentle continuous idle rotation. spin-wheel documents `spin()` as the
     // native continuous rotation method; with resistance 0 it remains smooth
     // instead of slowing itself down.
-    wheel.spin(7)
+    wheel.spin(14)
     idleSpinningRef.current = true
 
     return () => {
@@ -1322,7 +1349,7 @@ export default function Wheel({
           {/* The wheel itself is clean — no surrounding card or border. */}
           <div
             ref={containerRef}
-            className="absolute inset-0 overflow-visible rounded-full shadow-[0_10px_18px_rgba(0,0,0,0.42),0_2px_4px_rgba(255,255,255,0.10)]"
+            className="absolute inset-0 overflow-visible rounded-full"
           />
 
           {/* ---------------------------------------------------------------- */}
@@ -1385,7 +1412,9 @@ export default function Wheel({
               <img
                 src={centerImage}
                 alt=""
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 object-contain"
+                className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${
+                  imageSize === "XXL" ? "h-full w-full object-cover" : "object-contain"
+                }`}
                 style={{
                   width:
                     imageSize === "XS" ? "25%" :
