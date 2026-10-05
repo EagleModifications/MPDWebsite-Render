@@ -1070,6 +1070,11 @@ export default function PromotionRoster() {
     setSelectedCopied(false)
   }
 
+  const clearSearch = () => {
+    setSearch("")
+    setSelectedCopied(false)
+  }
+
   /* ─────────────────────────────────────────────
      Clear Filters
   ───────────────────────────────────────────── */
@@ -1397,8 +1402,8 @@ export default function PromotionRoster() {
 
         {/* Filters */}
 
-        <div className="rounded-xl border bg-card p-3 sm:p-4">
-          <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
+        <div className="rounded-xl border bg-card p-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
             {/* Search */}
 
             <div className="relative min-w-0 flex-1">
@@ -1408,9 +1413,7 @@ export default function PromotionRoster() {
                 type="text"
                 value={search}
                 onChange={(event) => {
-                  setSearch(
-                    event.target.value,
-                  )
+                  setSearch(event.target.value)
                   setSelectedCopied(false)
                 }}
                 placeholder="Search name, callsign, badge, rank or Discord ID..."
@@ -1418,18 +1421,18 @@ export default function PromotionRoster() {
               />
             </div>
 
-            {/* Clear Filters */}
+            {/* Clear Search */}
 
-            {hasFilters && (
+            {search.trim() && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={clearFilters}
-                className="shrink-0 gap-2 text-white hover:bg-white/5 hover:text-white"
+                onClick={clearSearch}
+                className="shrink-0 gap-2 bg-transparent text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
               >
                 <X className="h-4 w-4" />
-                Clear
+                Clear Search
               </Button>
             )}
 
@@ -1447,12 +1450,9 @@ export default function PromotionRoster() {
 
                   <span>Status</span>
 
-                  {selectedStatusCount >
-                    0 && (
+                  {selectedStatusCount > 0 && (
                     <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
-                      {
-                        selectedStatusCount
-                      }
+                      {selectedStatusCount}
                     </span>
                   )}
 
@@ -1465,9 +1465,7 @@ export default function PromotionRoster() {
                 className="w-56"
               >
                 <DropdownMenuItem
-                  onSelect={(event) =>
-                    event.preventDefault()
-                  }
+                  onSelect={(event) => event.preventDefault()}
                   onClick={() => {
                     if (
                       statusFilters.length ===
@@ -1500,65 +1498,50 @@ export default function PromotionRoster() {
 
                 <div className="my-1 h-px bg-border" />
 
-                {statusOptions.map(
-                  (status) => {
-                    const Icon =
-                      status.icon
+                {statusOptions.map((status) => {
+                  const Icon = status.icon
+                  const checked =
+                    statusFilters.includes(status.id)
 
-                    const checked =
-                      statusFilters.includes(
-                        status.id,
-                      )
+                  return (
+                    <DropdownMenuItem
+                      key={status.id}
+                      onSelect={(event) =>
+                        event.preventDefault()
+                      }
+                      onClick={() =>
+                        toggleStatusFilter(status.id)
+                      }
+                      className="gap-2"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        tabIndex={-1}
+                        className="pointer-events-none"
+                      />
 
-                    return (
-                      <DropdownMenuItem
-                        key={status.id}
-                        onSelect={(event) =>
-                          event.preventDefault()
-                        }
-                        onClick={() =>
-                          toggleStatusFilter(
-                            status.id,
-                          )
-                        }
-                        className="gap-2"
-                      >
-                        <Checkbox
-                          checked={checked}
-                          tabIndex={-1}
-                          className="pointer-events-none"
-                        />
+                      <Icon
+                        className={`h-4 w-4 ${
+                          status.id === "compliant"
+                            ? "text-emerald-400"
+                            : "text-red-400"
+                        }`}
+                      />
 
-                        <Icon
-                          className={`h-4 w-4 ${
-                            status.id ===
-                            "compliant"
-                              ? "text-emerald-400"
-                              : "text-red-400"
-                          }`}
-                        />
+                      <span>{status.label}</span>
+                    </DropdownMenuItem>
+                  )
+                })}
 
-                        <span>
-                          {status.label}
-                        </span>
-                      </DropdownMenuItem>
-                    )
-                  },
-                )}
-
-                {statusFilters.length >
-                  0 && (
+                {statusFilters.length > 0 && (
                   <>
                     <div className="my-1 h-px bg-border" />
 
                     <DropdownMenuItem
-                      onClick={
-                        clearStatuses
-                      }
+                      onClick={clearStatuses}
                       className="gap-2 text-muted-foreground"
                     >
                       <X className="h-4 w-4" />
-
                       Clear Statuses
                     </DropdownMenuItem>
                   </>
@@ -1580,8 +1563,7 @@ export default function PromotionRoster() {
 
                   <span>Rank</span>
 
-                  {selectedRankCount >
-                    0 && (
+                  {selectedRankCount > 0 && (
                     <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
                       {selectedRankCount}
                     </span>
@@ -1596,9 +1578,7 @@ export default function PromotionRoster() {
                 className="max-h-80 w-64 overflow-y-auto"
               >
                 <DropdownMenuItem
-                  onSelect={(event) =>
-                    event.preventDefault()
-                  }
+                  onSelect={(event) => event.preventDefault()}
                   onClick={() => {
                     if (
                       rankOptions.length > 0 &&
@@ -1633,72 +1613,55 @@ export default function PromotionRoster() {
 
                 <div className="my-1 h-px bg-border" />
 
-                {rankOptions.length ===
-                0 ? (
-                  <DropdownMenuItem
-                    disabled
-                  >
+                {rankOptions.length === 0 ? (
+                  <DropdownMenuItem disabled>
                     No ranks available
                   </DropdownMenuItem>
                 ) : (
-                  rankOptions.map(
-                    (rank) => {
-                      const checked =
-                        rankFilters.some(
-                          (item) =>
-                            normalizeRank(
-                              item,
-                            ) ===
-                            normalizeRank(
-                              rank,
-                            ),
-                        )
-
-                      return (
-                        <DropdownMenuItem
-                          key={rank}
-                          onSelect={(event) =>
-                            event.preventDefault()
-                          }
-                          onClick={() =>
-                            toggleRankFilter(
-                              rank,
-                            )
-                          }
-                          className="gap-2"
-                        >
-                          <Checkbox
-                            checked={
-                              checked
-                            }
-                            tabIndex={-1}
-                            className="pointer-events-none"
-                          />
-
-                          <Shield className="h-4 w-4 text-blue-400" />
-
-                          <span className="truncate">
-                            {rank}
-                          </span>
-                        </DropdownMenuItem>
+                  rankOptions.map((rank) => {
+                    const checked =
+                      rankFilters.some(
+                        (item) =>
+                          normalizeRank(item) ===
+                          normalizeRank(rank),
                       )
-                    },
-                  )
+
+                    return (
+                      <DropdownMenuItem
+                        key={rank}
+                        onSelect={(event) =>
+                          event.preventDefault()
+                        }
+                        onClick={() =>
+                          toggleRankFilter(rank)
+                        }
+                        className="gap-2"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          tabIndex={-1}
+                          className="pointer-events-none"
+                        />
+
+                        <Shield className="h-4 w-4 text-blue-400" />
+
+                        <span className="truncate">
+                          {rank}
+                        </span>
+                      </DropdownMenuItem>
+                    )
+                  })
                 )}
 
-                {rankFilters.length >
-                  0 && (
+                {rankFilters.length > 0 && (
                   <>
                     <div className="my-1 h-px bg-border" />
 
                     <DropdownMenuItem
-                      onClick={
-                        clearRanks
-                      }
+                      onClick={clearRanks}
                       className="gap-2 text-muted-foreground"
                     >
                       <X className="h-4 w-4" />
-
                       Clear Ranks
                     </DropdownMenuItem>
                   </>
@@ -1758,11 +1721,7 @@ export default function PromotionRoster() {
                     className="max-h-72 w-64 overflow-y-auto"
                   >
                     <DropdownMenuItem
-                      onClick={() =>
-                        void copySelected(
-                          "discord",
-                        )
-                      }
+                      onClick={() => void copySelected("discord")}
                       className="gap-2 text-sm"
                     >
                       <Copy className="h-4 w-4 text-blue-400" />
@@ -1771,9 +1730,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "discord-mention",
-                        )
+                        void copySelected("discord-mention")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1782,11 +1739,7 @@ export default function PromotionRoster() {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                      onClick={() =>
-                        void copySelected(
-                          "name",
-                        )
-                      }
+                      onClick={() => void copySelected("name")}
                       className="gap-2 text-sm"
                     >
                       <Copy className="h-4 w-4 text-blue-400" />
@@ -1794,11 +1747,7 @@ export default function PromotionRoster() {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                      onClick={() =>
-                        void copySelected(
-                          "callsign",
-                        )
-                      }
+                      onClick={() => void copySelected("callsign")}
                       className="gap-2 text-sm"
                     >
                       <Copy className="h-4 w-4 text-blue-400" />
@@ -1806,11 +1755,7 @@ export default function PromotionRoster() {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                      onClick={() =>
-                        void copySelected(
-                          "badge",
-                        )
-                      }
+                      onClick={() => void copySelected("badge")}
                       className="gap-2 text-sm"
                     >
                       <Copy className="h-4 w-4 text-blue-400" />
@@ -1818,11 +1763,7 @@ export default function PromotionRoster() {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                      onClick={() =>
-                        void copySelected(
-                          "rank",
-                        )
-                      }
+                      onClick={() => void copySelected("rank")}
                       className="gap-2 text-sm"
                     >
                       <Copy className="h-4 w-4 text-blue-400" />
@@ -1833,9 +1774,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "name-discord",
-                        )
+                        void copySelected("name-discord")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1845,9 +1784,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "callsign-discord",
-                        )
+                        void copySelected("callsign-discord")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1857,9 +1794,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "callsign-name",
-                        )
+                        void copySelected("callsign-name")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1869,9 +1804,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "callsign-badge",
-                        )
+                        void copySelected("callsign-badge")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1881,9 +1814,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "badge-name",
-                        )
+                        void copySelected("badge-name")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1893,9 +1824,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "badge-discord",
-                        )
+                        void copySelected("badge-discord")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1907,9 +1836,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "callsign-name-discord",
-                        )
+                        void copySelected("callsign-name-discord")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1919,9 +1846,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "callsign-badge-discord",
-                        )
+                        void copySelected("callsign-badge-discord")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1931,9 +1856,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "name-badge-discord",
-                        )
+                        void copySelected("name-badge-discord")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1943,9 +1866,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "callsign-badge-name",
-                        )
+                        void copySelected("callsign-badge-name")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1955,9 +1876,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "callsign-badge-name-discord",
-                        )
+                        void copySelected("callsign-badge-name-discord")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1967,9 +1886,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        void copySelected(
-                          "name-rank-discord",
-                        )
+                        void copySelected("name-rank-discord")
                       }
                       className="gap-2 text-sm"
                     >
@@ -1980,11 +1897,7 @@ export default function PromotionRoster() {
                     <div className="my-1 h-px bg-border" />
 
                     <DropdownMenuItem
-                      onClick={() =>
-                        void copySelected(
-                          "full",
-                        )
-                      }
+                      onClick={() => void copySelected("full")}
                       className="gap-2 text-sm"
                     >
                       <Copy className="h-4 w-4 text-blue-400" />
@@ -1998,75 +1911,76 @@ export default function PromotionRoster() {
             {/* Google Sheets Refresh */}
 
             <GoogleRosterRefresh
-              onRefreshed={() =>
-                loadRoster(false)
-              }
+              onRefreshed={() => loadRoster(false)}
             />
           </div>
 
           {/* Active Filters */}
 
-          {(statusFilters.length > 0 ||
-            rankFilters.length > 0) && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Filter className="h-3.5 w-3.5" />
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Filter className="h-3.5 w-3.5" />
+              Active filters:
+            </div>
 
-                Active filters:
-              </div>
-
-              {statusFilters.map(
-                (status) => {
-                  const Icon =
-                    getStatusIcon(status)
+            {statusFilters.length === 0 &&
+            rankFilters.length === 0 ? (
+              <span className="text-xs text-muted-foreground">
+                None
+              </span>
+            ) : (
+              <>
+                {statusFilters.map((status) => {
+                  const Icon = getStatusIcon(status)
 
                   return (
                     <button
                       key={`status-${status}`}
                       type="button"
                       onClick={() =>
-                        toggleStatusFilter(
-                          status,
-                        )
+                        toggleStatusFilter(status)
                       }
                       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80 ${getStatusClasses(
                         status,
                       )}`}
                     >
                       <Icon className="h-3 w-3" />
-
-                      {getStatusLabel(
-                        status,
-                      )}
-
+                      {getStatusLabel(status)}
                       <X className="h-3 w-3" />
                     </button>
                   )
-                },
-              )}
+                })}
 
-              {rankFilters.map(
-                (rank) => (
+                {rankFilters.map((rank) => (
                   <button
                     key={`rank-${rank}`}
                     type="button"
                     onClick={() =>
-                      toggleRankFilter(
-                        rank,
-                      )
+                      toggleRankFilter(rank)
                     }
                     className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
                   >
                     <Shield className="h-3 w-3" />
-
                     {rank}
-
                     <X className="h-3 w-3" />
                   </button>
-                ),
-              )}
-            </div>
-          )}
+                ))}
+              </>
+            )}
+
+            {hasFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="h-7 gap-1.5 bg-transparent px-2 text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Error */}
