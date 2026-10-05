@@ -261,7 +261,6 @@ export default function SpinWheel() {
                   <Wheel
                     items={wheel.items}
                     compact={wheels.length > 1}
-                    wheelCount={wheels.length}
                     spinTrigger={spinAllTrigger}
                     onResult={(item) =>
                       handleResult(wheel.id, item)
