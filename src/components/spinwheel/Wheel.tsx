@@ -49,22 +49,14 @@ const CONFETTI_COLORS = [
 
 function createRandomColor() {
   const hue = Math.floor(Math.random() * 360)
-
-  const saturation =
-    58 + Math.floor(Math.random() * 18)
-
-  const lightness =
-    62 + Math.floor(Math.random() * 14)
+  const saturation = 58 + Math.floor(Math.random() * 18)
+  const lightness = 62 + Math.floor(Math.random() * 14)
 
   return `hsl(${hue} ${saturation}% ${lightness}%)`
 }
 
-function useRandomItemColors(
-  items: SpinWheelItem[],
-) {
-  const colorsRef = useRef(
-    new Map<string, string>(),
-  )
+function useRandomItemColors(items: SpinWheelItem[]) {
+  const colorsRef = useRef(new Map<string, string>())
 
   return useMemo(() => {
     const colors = colorsRef.current
@@ -81,10 +73,7 @@ function useRandomItemColors(
 
     for (const item of items) {
       if (!colors.has(item.id)) {
-        colors.set(
-          item.id,
-          createRandomColor(),
-        )
+        colors.set(item.id, item.color ?? createRandomColor())
       }
     }
 
@@ -92,9 +81,10 @@ function useRandomItemColors(
   }, [items])
 }
 
-/*
- * Short mechanical ticking sound.
- */
+/* -------------------------------------------------------------------------- */
+/* Audio                                                                      */
+/* -------------------------------------------------------------------------- */
+
 function playTick(
   audioContext: AudioContext | null,
 ) {
@@ -108,21 +98,18 @@ function playTick(
 
   const now = audioContext.currentTime
 
-  const oscillator =
-    audioContext.createOscillator()
-
-  const gain =
-    audioContext.createGain()
+  const oscillator = audioContext.createOscillator()
+  const gain = audioContext.createGain()
 
   oscillator.type = "square"
 
   oscillator.frequency.setValueAtTime(
-    1450,
+    1500,
     now,
   )
 
   oscillator.frequency.exponentialRampToValueAtTime(
-    720,
+    700,
     now + 0.025,
   )
 
@@ -132,7 +119,7 @@ function playTick(
   )
 
   gain.gain.exponentialRampToValueAtTime(
-    0.055,
+    0.045,
     now + 0.002,
   )
 
@@ -148,10 +135,6 @@ function playTick(
   oscillator.stop(now + 0.04)
 }
 
-/*
- * Generates a quiet applause sound using
- * filtered noise bursts.
- */
 function playApplause(
   audioContext: AudioContext | null,
 ) {
@@ -165,8 +148,7 @@ function playApplause(
 
   const now = audioContext.currentTime
 
-  const master =
-    audioContext.createGain()
+  const master = audioContext.createGain()
 
   master.gain.setValueAtTime(
     0.0001,
@@ -174,7 +156,7 @@ function playApplause(
   )
 
   master.gain.exponentialRampToValueAtTime(
-    0.12,
+    0.08,
     now + 0.08,
   )
 
@@ -187,11 +169,7 @@ function playApplause(
     audioContext.destination,
   )
 
-  for (
-    let index = 0;
-    index < 28;
-    index += 1
-  ) {
+  for (let index = 0; index < 28; index += 1) {
     const offset =
       Math.random() * 0.85
 
@@ -199,11 +177,10 @@ function playApplause(
       0.035 +
       Math.random() * 0.075
 
-    const bufferSize =
-      Math.floor(
-        audioContext.sampleRate *
-          duration,
-      )
+    const bufferSize = Math.floor(
+      audioContext.sampleRate *
+        duration,
+    )
 
     const buffer =
       audioContext.createBuffer(
@@ -237,11 +214,9 @@ function playApplause(
     source.buffer = buffer
 
     filter.type = "bandpass"
-
     filter.frequency.value =
       1500 +
       Math.random() * 1800
-
     filter.Q.value = 0.7
 
     const start =
@@ -253,8 +228,8 @@ function playApplause(
     )
 
     gain.gain.exponentialRampToValueAtTime(
-      0.018 +
-        Math.random() * 0.025,
+      0.012 +
+        Math.random() * 0.018,
       start + 0.006,
     )
 
@@ -268,12 +243,15 @@ function playApplause(
     gain.connect(master)
 
     source.start(start)
-
     source.stop(
       start + duration + 0.01,
     )
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Confetti                                                                   */
+/* -------------------------------------------------------------------------- */
 
 function createConfetti(): ConfettiPiece[] {
   return Array.from(
@@ -284,12 +262,12 @@ function createConfetti(): ConfettiPiece[] {
         index,
 
       x:
-        25 +
-        Math.random() * 50,
+        20 +
+        Math.random() * 60,
 
       y:
-        38 +
-        Math.random() * 12,
+        35 +
+        Math.random() * 15,
 
       rotation:
         Math.random() * 360,
@@ -320,6 +298,10 @@ function createConfetti(): ConfettiPiece[] {
     }),
   )
 }
+
+/* -------------------------------------------------------------------------- */
+/* Wheel                                                                      */
+/* -------------------------------------------------------------------------- */
 
 export default function Wheel({
   items,
@@ -357,14 +339,11 @@ export default function Wheel({
   const [confetti, setConfetti] =
     useState<ConfettiPiece[]>([])
 
-  /*
-   * Stable random colours.
-   */
   const randomColors =
     useRandomItemColors(items)
 
   /*
-   * Hidden entries are excluded from
+   * Hidden entries are not placed onto
    * the actual wheel.
    */
   const visibleItems = useMemo(
@@ -375,19 +354,27 @@ export default function Wheel({
     [items],
   )
 
+  /*
+   * Keep the exact colour associated
+   * with each visible entry.
+   */
   const visibleColors = useMemo(
     () =>
       visibleItems.map(
         (item) =>
           randomColors.get(item.id) ??
-          createRandomColor(),
+          item.color ??
+          "#60a5fa",
       ),
-    [visibleItems, randomColors],
+    [
+      visibleItems,
+      randomColors,
+    ],
   )
 
   /*
-   * Keep the latest visible items
-   * available to the wheel callbacks.
+   * Keep callbacks supplied by the parent
+   * without rebuilding the wheel.
    */
   const itemsRef =
     useRef(visibleItems)
@@ -397,10 +384,6 @@ export default function Wheel({
       visibleItems
   }, [visibleItems])
 
-  /*
-   * Keep the latest result callback
-   * without recreating the wheel.
-   */
   const onResultRef =
     useRef(onResult)
 
@@ -410,7 +393,7 @@ export default function Wheel({
   }, [onResult])
 
   /*
-   * Initialise Web Audio after interaction.
+   * Web Audio.
    */
   const getAudioContext =
     useCallback(() => {
@@ -450,8 +433,9 @@ export default function Wheel({
     }, [])
 
   /*
-   * Update the arrow colour to match
-   * the segment currently underneath it.
+   * The pointer colour is always taken
+   * directly from the entry currently
+   * underneath the pointer.
    */
   const updatePointerColor =
     useCallback(
@@ -467,7 +451,7 @@ export default function Wheel({
     )
 
   /*
-   * Launch the confetti celebration.
+   * Confetti.
    */
   const launchConfetti =
     useCallback(() => {
@@ -479,7 +463,9 @@ export default function Wheel({
         )
       }
 
-      setConfetti(createConfetti())
+      setConfetti(
+        createConfetti(),
+      )
 
       confettiTimerRef.current =
         setTimeout(() => {
@@ -491,7 +477,7 @@ export default function Wheel({
     }, [])
 
   /*
-   * Spin to a random visible entry.
+   * Start spinning.
    */
   const spin = useCallback(() => {
     const wheel =
@@ -521,7 +507,6 @@ export default function Wheel({
     spinningRef.current = true
 
     setIsSpinning(true)
-
     setConfetti([])
 
     lastTickIndexRef.current = null
@@ -539,7 +524,7 @@ export default function Wheel({
   ])
 
   /*
-   * Ctrl + Enter shortcut.
+   * Ctrl + Enter.
    */
   useEffect(() => {
     const handleKeyDown = (
@@ -552,7 +537,6 @@ export default function Wheel({
         event.preventDefault()
 
         getAudioContext()
-
         spin()
       }
     }
@@ -574,7 +558,7 @@ export default function Wheel({
   ])
 
   /*
-   * Create the actual spin-wheel instance.
+   * Create the actual wheel.
    */
   useEffect(() => {
     const container =
@@ -585,28 +569,26 @@ export default function Wheel({
     }
 
     container.innerHTML = ""
-
     wheelRef.current = null
-
     spinningRef.current = false
 
     setIsSpinning(false)
 
     if (visibleItems.length === 0) {
       currentIndexRef.current = 0
-
       setPointerColor("#60a5fa")
-
       return
     }
 
     /*
-     * Preserve the current segment where possible.
+     * Keep the previous segment selected
+     * when possible.
      */
-    const initialIndex = Math.min(
-      currentIndexRef.current,
-      visibleItems.length - 1,
-    )
+    const initialIndex =
+      Math.min(
+        currentIndexRef.current,
+        visibleItems.length - 1,
+      )
 
     currentIndexRef.current =
       initialIndex
@@ -622,51 +604,60 @@ export default function Wheel({
 
     const wheel =
       new SpinWheel(container, {
-        items: visibleItems.map(
-          (item, index) => ({
-            label:
-              item.label ||
-              "Untitled",
+        items:
+          visibleItems.map(
+            (item, index) => ({
+              label:
+                item.label ||
+                "Untitled",
 
-            value: item.id,
+              value: item.id,
 
-            weight:
-              item.weight ?? 1,
+              weight:
+                item.weight ?? 1,
 
-            backgroundColor:
-              visibleColors[index],
+              backgroundColor:
+                visibleColors[index],
 
-            labelColor:
-              "#111111",
-          }),
-        ),
-
-        radius: 0.965,
+              labelColor:
+                "#111111",
+            }),
+          ),
 
         /*
-         * Pointer is positioned on the
-         * right-hand side.
+         * Large wheel like Wheel of Names.
+         */
+        radius: 0.975,
+
+        /*
+         * Pointer sits on the right.
          */
         pointerAngle: 0,
 
-        borderWidth: 2.5,
+        /*
+         * Only the outside edge remains.
+         *
+         * Segment divider lines are completely
+         * removed to match the reference.
+         */
+        borderWidth: 3,
 
         borderColor:
-          "rgba(255,255,255,0.72)",
+          "rgba(15,23,42,0.58)",
 
-        lineWidth: 1.5,
+        lineWidth: 0,
 
         lineColor:
-          "rgba(255,255,255,0.42)",
+          "transparent",
 
         /*
-         * Radial entry labels.
+         * Large radial labels.
          */
         itemLabelAlign: "right",
 
         itemLabelRadius: 0.79,
 
-        itemLabelRadiusMax: 0.27,
+        itemLabelRadiusMax: 0.28,
 
         itemLabelFont:
           "Inter, ui-sans-serif, system-ui, sans-serif",
@@ -674,19 +665,19 @@ export default function Wheel({
         itemLabelFontSizeMax: 43,
 
         /*
-         * Strong white outline around
-         * the entry text.
+         * Black lettering with a strong
+         * white contour so every name stands
+         * out from its coloured segment.
          */
         itemLabelStrokeColor:
-          "rgba(255,255,255,0.78)",
+          "rgba(255,255,255,0.92)",
 
-        itemLabelStrokeWidth: 1.7,
+        itemLabelStrokeWidth: 2.5,
 
         itemLabelBaselineOffset: 0,
 
         /*
-         * Wheel controls are handled by
-         * our React component.
+         * React controls interaction.
          */
         isInteractive: false,
 
@@ -695,8 +686,8 @@ export default function Wheel({
         rotationSpeedMax: 1000,
 
         /*
-         * Tick whenever the pointer enters
-         * another segment.
+         * Update the pointer to the exact
+         * segment currently underneath it.
          */
         onCurrentIndexChange: (
           event,
@@ -707,8 +698,19 @@ export default function Wheel({
           currentIndexRef.current =
             index
 
+          /*
+           * This is intentionally based on
+           * the same colour array used to
+           * create the wheel.
+           *
+           * Therefore the arrow and segment
+           * cannot receive different colours.
+           */
           updatePointerColor(index)
 
+          /*
+           * Tick once per segment.
+           */
           if (
             lastTickIndexRef.current !==
             index
@@ -727,7 +729,7 @@ export default function Wheel({
         },
 
         /*
-         * Winner.
+         * Spin complete.
          */
         onRest: (event) => {
           const selectedIndex =
@@ -750,16 +752,10 @@ export default function Wheel({
 
           setIsSpinning(false)
 
-          /*
-           * Subdued applause.
-           */
           playApplause(
             audioContextRef.current,
           )
 
-          /*
-           * Confetti celebration.
-           */
           launchConfetti()
 
           if (selectedItem) {
@@ -789,7 +785,6 @@ export default function Wheel({
       wheel.remove()
 
       wheelRef.current = null
-
       spinningRef.current = false
     }
   }, [
@@ -800,7 +795,7 @@ export default function Wheel({
   ])
 
   /*
-   * Cleanup audio and confetti.
+   * Cleanup.
    */
   useEffect(() => {
     return () => {
@@ -821,7 +816,7 @@ export default function Wheel({
   }, [])
 
   /*
-   * Clicking the wheel starts spinning.
+   * Wheel click.
    */
   const handleWheelClick = () => {
     if (
@@ -845,138 +840,193 @@ export default function Wheel({
       event.key === " "
     ) {
       event.preventDefault()
-
       handleWheelClick()
     }
   }
 
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-background">
-      {/* Subtle background */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.045),transparent_60%)]" />
+      {/* Background */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.035),transparent_62%)]" />
 
       {visibleItems.length > 0 ? (
         <div
-          className="relative aspect-square w-[min(78vw,calc(100vh-130px),1000px)] max-w-[94%] drop-shadow-[0_14px_28px_rgba(0,0,0,0.42)]"
+          className="
+            relative
+            aspect-square
+            w-[min(78vw,calc(100vh-130px),1000px)]
+            max-w-[94%]
+            overflow-visible
+            drop-shadow-[0_18px_34px_rgba(0,0,0,0.52)]
+          "
           onClick={handleWheelClick}
           role="button"
           tabIndex={0}
           aria-label="Spin wheel"
-          onKeyDown={handleWheelKeyDown}
+          onKeyDown={
+            handleWheelKeyDown
+          }
         >
-          {/* Wheel */}
+          {/* ---------------------------------------------------------------- */}
+          {/* Wheel                                                            */}
+          {/* ---------------------------------------------------------------- */}
+
           <div
             ref={containerRef}
-            className="absolute inset-0 overflow-visible"
+            className="
+              absolute
+              inset-0
+              overflow-visible
+              rounded-full
+              drop-shadow-[0_4px_8px_rgba(0,0,0,0.55)]
+            "
           />
 
-          {/* Pointer */}
+          {/* ---------------------------------------------------------------- */}
+          {/* 3D Pointer                                                       */}
+          {/* ---------------------------------------------------------------- */}
+
           <div
-            className="pointer-events-none absolute right-[-13px] top-1/2 z-40 -translate-y-1/2"
+            className="
+              pointer-events-none
+              absolute
+              right-[-13px]
+              top-1/2
+              z-40
+              -translate-y-1/2
+            "
             aria-hidden="true"
           >
             <div
-              className="relative h-[62px] w-[64px]"
+              className="
+                relative
+                h-[64px]
+                w-[70px]
+              "
               style={{
                 filter:
-                  "drop-shadow(0 3px 5px rgba(0,0,0,0.75)) drop-shadow(0 0 2px rgba(255,255,255,0.65))",
+                  "drop-shadow(0 5px 6px rgba(0,0,0,0.72)) drop-shadow(0 1px 1px rgba(0,0,0,0.9))",
               }}
             >
-              {/* Dark outline */}
+              {/* Deep outer contour */}
               <div
                 className="absolute inset-0"
                 style={{
                   clipPath:
                     "polygon(100% 0, 0 50%, 100% 100%, 77% 50%)",
                   background:
-                    "rgba(15,23,42,0.92)",
+                    "linear-gradient(180deg,#111827 0%,#020617 48%,#111827 100%)",
                 }}
               />
 
-              {/* White outline */}
+              {/* Metallic/light edge */}
               <div
                 className="absolute inset-[2px]"
                 style={{
                   clipPath:
                     "polygon(100% 0, 0 50%, 100% 100%, 77% 50%)",
                   background:
-                    "rgba(255,255,255,0.78)",
+                    "linear-gradient(180deg,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0.58) 48%,rgba(255,255,255,0.9) 100%)",
                 }}
               />
 
-              {/* Coloured pointer */}
+              {/* Exact segment colour */}
               <div
                 className="absolute inset-[4px]"
                 style={{
                   clipPath:
                     "polygon(100% 0, 0 50%, 100% 100%, 77% 50%)",
-                  backgroundColor:
-                    pointerColor,
+                  background:
+                    `linear-gradient(180deg, ${pointerColor}, color-mix(in srgb, ${pointerColor} 78%, #000 22%))`,
                   transition:
-                    "background-color 90ms ease",
-                  boxShadow:
-                    "inset 0 1px 2px rgba(255,255,255,0.45)",
+                    "background 90ms ease",
                 }}
+              />
+
+              {/* Highlight */}
+              <div
+                className="absolute inset-[5px]"
+                style={{
+                  clipPath:
+                    "polygon(100% 0, 0 50%, 100% 100%, 77% 50%)",
+                  background:
+                    "linear-gradient(180deg,rgba(255,255,255,0.28) 0%,rgba(255,255,255,0.05) 45%,rgba(0,0,0,0.12) 100%)",
+                }}
+              />
+
+              {/* Small glossy edge */}
+              <div
+                className="absolute left-[10%] top-[19%] h-[10%] w-[48%] rounded-full bg-white/35 blur-[1px]"
               />
             </div>
           </div>
 
-          {/* White centre */}
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 h-[17%] w-[17%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_3px_14px_rgba(0,0,0,0.24)]" />
+          {/* ---------------------------------------------------------------- */}
+          {/* Centre                                                           */}
+          {/* ---------------------------------------------------------------- */}
 
-          {/* Curved instructions */}
+          <div
+            className="
+              pointer-events-none
+              absolute
+              left-1/2
+              top-1/2
+              z-30
+              h-[17%]
+              w-[17%]
+              -translate-x-1/2
+              -translate-y-1/2
+              rounded-full
+              border
+              border-black/10
+              bg-white
+              shadow-[0_5px_18px_rgba(0,0,0,0.32),inset_0_1px_2px_rgba(255,255,255,0.95)]
+            "
+          />
+
+          {/* ---------------------------------------------------------------- */}
+          {/* Instructions                                                     */}
+          {/* ---------------------------------------------------------------- */}
+
           {!isSpinning && (
             <svg
-              className="pointer-events-none absolute inset-0 z-35 h-full w-full overflow-visible"
+              className="
+                pointer-events-none
+                absolute
+                inset-0
+                z-35
+                h-full
+                w-full
+                overflow-visible
+              "
               viewBox="0 0 1000 1000"
               aria-hidden="true"
             >
               <defs>
                 <path
                   id="spin-text-top"
-                  d="M 230 355 A 300 300 0 0 1 770 355"
+                  d="M 235 355 Q 500 170 765 355"
                   fill="none"
                 />
 
                 <path
                   id="spin-text-bottom"
-                  d="M 275 650 A 265 265 0 0 0 725 650"
+                  d="M 270 650 Q 500 775 730 650"
                   fill="none"
                 />
               </defs>
 
-              {/* Top shadow */}
-              <text
-                fill="rgba(0,0,0,0.58)"
-                fontSize="48"
-                fontWeight="800"
-                fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
-                letterSpacing="-1.5"
-                textAnchor="middle"
-                paintOrder="stroke"
-                stroke="rgba(0,0,0,0.42)"
-                strokeWidth="5"
-                dy="6"
-              >
-                <textPath
-                  href="#spin-text-top"
-                  startOffset="50%"
-                >
-                  Click to spin
-                </textPath>
-              </text>
-
-              {/* Top text */}
+              {/* Top heavy shadow */}
               <text
                 fill="#ffffff"
                 fontSize="48"
-                fontWeight="800"
+                fontWeight="900"
                 fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
                 letterSpacing="-1.5"
                 textAnchor="middle"
                 paintOrder="stroke"
-                stroke="rgba(255,255,255,0.3)"
-                strokeWidth="1"
+                stroke="#111111"
+                strokeWidth="8"
               >
                 <textPath
                   href="#spin-text-top"
@@ -986,18 +1036,35 @@ export default function Wheel({
                 </textPath>
               </text>
 
-              {/* Bottom shadow */}
+              {/* Top subtle highlight */}
               <text
-                fill="rgba(0,0,0,0.58)"
+                fill="#ffffff"
+                fontSize="48"
+                fontWeight="900"
+                fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
+                letterSpacing="-1.5"
+                textAnchor="middle"
+                opacity="0.98"
+              >
+                <textPath
+                  href="#spin-text-top"
+                  startOffset="50%"
+                >
+                  Click to spin
+                </textPath>
+              </text>
+
+              {/* Bottom heavy shadow */}
+              <text
+                fill="#ffffff"
                 fontSize="34"
-                fontWeight="800"
+                fontWeight="900"
                 fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
                 letterSpacing="-0.7"
                 textAnchor="middle"
                 paintOrder="stroke"
-                stroke="rgba(0,0,0,0.42)"
-                strokeWidth="4"
-                dy="6"
+                stroke="#111111"
+                strokeWidth="7"
               >
                 <textPath
                   href="#spin-text-bottom"
@@ -1011,7 +1078,7 @@ export default function Wheel({
               <text
                 fill="#ffffff"
                 fontSize="34"
-                fontWeight="800"
+                fontWeight="900"
                 fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
                 letterSpacing="-0.7"
                 textAnchor="middle"
@@ -1026,37 +1093,62 @@ export default function Wheel({
             </svg>
           )}
 
-          {/* Confetti */}
+          {/* ---------------------------------------------------------------- */}
+          {/* Confetti                                                         */}
+          {/* ---------------------------------------------------------------- */}
+
           {confetti.length > 0 && (
             <div
-              className="pointer-events-none absolute inset-0 z-50 overflow-visible"
+              className="
+                pointer-events-none
+                absolute
+                inset-0
+                z-50
+                overflow-visible
+              "
               aria-hidden="true"
             >
               {confetti.map(
                 (piece) => {
-                  const style: CSSProperties = {
-                    left: `${piece.x}%`,
-                    top: `${piece.y}%`,
-                    width: `${piece.size}px`,
-                    height:
-                      piece.shape ===
-                      "rectangle"
-                        ? `${piece.size * 1.8}px`
-                        : `${piece.size}px`,
-                    backgroundColor:
-                      piece.color,
-                    transform:
-                      `rotate(${piece.rotation}deg)`,
-                    animationDelay:
-                      `${piece.delay}s`,
-                    animationDuration:
-                      `${piece.duration}s`,
-                  }
+                  const style: CSSProperties =
+                    {
+                      left:
+                        `${piece.x}%`,
+
+                      top:
+                        `${piece.y}%`,
+
+                      width:
+                        `${piece.size}px`,
+
+                      height:
+                        piece.shape ===
+                        "rectangle"
+                          ? `${piece.size * 1.8}px`
+                          : `${piece.size}px`,
+
+                      backgroundColor:
+                        piece.color,
+
+                      transform:
+                        `rotate(${piece.rotation}deg)`,
+
+                      animationDelay:
+                        `${piece.delay}s`,
+
+                      animationDuration:
+                        `${piece.duration}s`,
+                    }
 
                   return (
                     <span
                       key={piece.id}
-                      className="absolute rounded-[1px] shadow-sm animate-[confetti-fall_1.8s_ease-out_forwards]"
+                      className="
+                        absolute
+                        rounded-[1px]
+                        shadow-[0_1px_3px_rgba(0,0,0,0.35)]
+                        animate-[confetti-fall_1.8s_ease-out_forwards]
+                      "
                       style={style}
                     />
                   )
@@ -1066,7 +1158,21 @@ export default function Wheel({
           )}
         </div>
       ) : (
-        <div className="flex aspect-square w-[min(62vw,calc(100vh-180px),760px)] max-w-[78%] items-center justify-center rounded-full border border-border/70 bg-card/30 shadow-xl">
+        <div
+          className="
+            flex
+            aspect-square
+            w-[min(62vw,calc(100vh-180px),760px)]
+            max-w-[78%]
+            items-center
+            justify-center
+            rounded-full
+            border
+            border-border/70
+            bg-card/30
+            shadow-[0_18px_40px_rgba(0,0,0,0.45)]
+          "
+        >
           <div className="px-6 text-center">
             <p className="text-lg font-semibold">
               Your wheel is empty
@@ -1080,7 +1186,10 @@ export default function Wheel({
         </div>
       )}
 
-      {/* Confetti animation */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Confetti animation                                                 */}
+      {/* ------------------------------------------------------------------ */}
+
       <style>
         {`
           @keyframes confetti-fall {
