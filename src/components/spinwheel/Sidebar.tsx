@@ -1348,7 +1348,7 @@ function WheelCustomizeDialog({
     }
     const file = files[afterSound]
     if (!file) return
-    const audio = new Audio(`/sounds/afterspin/${file}`)
+    const audio = new Audio(`/sounds/after-spin/${file}`)
     audio.volume = afterVolume / 100
     audio.onerror = () => {
       const fallback = new Audio(`/sounds/after-spin/${file}`)
