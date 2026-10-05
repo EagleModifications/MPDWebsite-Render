@@ -30,7 +30,7 @@ type WheelProps = {
   spinSlowly?: boolean
   spinTime?: number
   centerImage?: string
-  imageSize?: "S" | "M" | "L"
+  imageSize?: "XS" | "S" | "M" | "L" | "XL" | "XXL"
 }
 
 
@@ -1372,8 +1372,20 @@ export default function Wheel({
                 alt=""
                 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 object-contain"
                 style={{
-                  width: imageSize === "L" ? "88%" : imageSize === "M" ? "70%" : "52%",
-                  height: imageSize === "L" ? "88%" : imageSize === "M" ? "70%" : "52%",
+                  width:
+                    imageSize === "XS" ? "25%" :
+                    imageSize === "S" ? "40%" :
+                    imageSize === "M" ? "55%" :
+                    imageSize === "L" ? "70%" :
+                    imageSize === "XL" ? "85%" :
+                    "100%",
+                  height:
+                    imageSize === "XS" ? "25%" :
+                    imageSize === "S" ? "40%" :
+                    imageSize === "M" ? "55%" :
+                    imageSize === "L" ? "70%" :
+                    imageSize === "XL" ? "85%" :
+                    "100%",
                 }}
               />
             )}
