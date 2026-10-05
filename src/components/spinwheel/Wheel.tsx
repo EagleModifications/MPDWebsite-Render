@@ -22,6 +22,8 @@ type WheelProps = {
   onResult?: (item: SpinWheelItem) => void
   compact?: boolean
   spinTrigger?: number
+  duringSound?: string
+  duringVolume?: number
   afterSound?: string
   afterVolume?: number
 }
@@ -110,194 +112,33 @@ function useRandomItemColors(items: SpinWheelItem[]) {
 /* Audio                                                                      */
 /* -------------------------------------------------------------------------- */
 
-type AudioContextWithWebkit = typeof AudioContext & {
-  new (): AudioContext
+const DURING_SPIN_SOUND_FILES: Record<string, string> = {
+  "Ticking sound": "tick.mp3",
 }
 
-function getAudioContextClass() {
-  if (
-    typeof window === "undefined"
-  ) {
-    return null
-  }
-
-  const windowWithWebkit =
-    window as Window & {
-      webkitAudioContext?: AudioContextWithWebkit
-    }
-
-  return (
-    window.AudioContext ??
-    windowWithWebkit.webkitAudioContext ??
-    null
-  )
-}
-
-/*
- * Short mechanical wheel click.
- *
- * This deliberately uses:
- * - a triangle oscillator
- * - a tiny burst of filtered noise
- * - a very short envelope
- *
- * This sounds much closer to the sharp click heard
- * when Wheel of Names passes an entry.
- */
-function playTick(
-  audioContext: AudioContext | null,
+function playDuringSpinSound(
+  sound: string,
+  volume: number,
+  audioRef: { current: HTMLAudioElement | null },
 ) {
-  if (!audioContext) {
-    return
+  if (sound === "No sound" || sound === "Inherit from wheel") return
+
+  const file = sound === "Random sound"
+    ? "tick.mp3"
+    : DURING_SPIN_SOUND_FILES[sound]
+
+  if (!file) return
+
+  const previous = audioRef.current
+  if (previous) {
+    previous.pause()
+    previous.currentTime = 0
   }
 
-  if (audioContext.state === "suspended") {
-    void audioContext.resume()
-  }
-
-  const now =
-    audioContext.currentTime
-
-  const master =
-    audioContext.createGain()
-
-  master.gain.setValueAtTime(
-    0.0001,
-    now,
-  )
-
-  master.gain.exponentialRampToValueAtTime(
-    0.075,
-    now + 0.001,
-  )
-
-  master.gain.exponentialRampToValueAtTime(
-    0.0001,
-    now + 0.045,
-  )
-
-  master.connect(
-    audioContext.destination,
-  )
-
-  /* Tonal click */
-
-  const oscillator =
-    audioContext.createOscillator()
-
-  const oscillatorGain =
-    audioContext.createGain()
-
-  oscillator.type = "triangle"
-
-  oscillator.frequency.setValueAtTime(
-    1450,
-    now,
-  )
-
-  oscillator.frequency.exponentialRampToValueAtTime(
-    620,
-    now + 0.028,
-  )
-
-  oscillatorGain.gain.setValueAtTime(
-    0.0001,
-    now,
-  )
-
-  oscillatorGain.gain.exponentialRampToValueAtTime(
-    0.7,
-    now + 0.001,
-  )
-
-  oscillatorGain.gain.exponentialRampToValueAtTime(
-    0.0001,
-    now + 0.035,
-  )
-
-  oscillator.connect(
-    oscillatorGain,
-  )
-
-  oscillatorGain.connect(master)
-
-  oscillator.start(now)
-  oscillator.stop(now + 0.045)
-
-  /* Mechanical noise */
-
-  const duration = 0.035
-
-  const bufferSize =
-    Math.floor(
-      audioContext.sampleRate *
-        duration,
-    )
-
-  const buffer =
-    audioContext.createBuffer(
-      1,
-      bufferSize,
-      audioContext.sampleRate,
-    )
-
-  const data =
-    buffer.getChannelData(0)
-
-  for (
-    let index = 0;
-    index < bufferSize;
-    index += 1
-  ) {
-    const envelope =
-      Math.pow(
-        1 - index / bufferSize,
-        3,
-      )
-
-    data[index] =
-      (Math.random() * 2 - 1) *
-      envelope
-  }
-
-  const source =
-    audioContext.createBufferSource()
-
-  const filter =
-    audioContext.createBiquadFilter()
-
-  const noiseGain =
-    audioContext.createGain()
-
-  source.buffer = buffer
-
-  filter.type = "highpass"
-  filter.frequency.value = 1800
-  filter.Q.value = 0.8
-
-  noiseGain.gain.setValueAtTime(
-    0.0001,
-    now,
-  )
-
-  noiseGain.gain.exponentialRampToValueAtTime(
-    0.22,
-    now + 0.001,
-  )
-
-  noiseGain.gain.exponentialRampToValueAtTime(
-    0.0001,
-    now + duration,
-  )
-
-  source.connect(filter)
-  filter.connect(noiseGain)
-  noiseGain.connect(master)
-
-  source.start(now)
-  source.stop(
-    now + duration + 0.005,
-  )
+  const audio = new Audio(`/sounds/during-spin/${file}`)
+  audio.volume = Math.max(0, Math.min(1, volume / 100))
+  audioRef.current = audio
+  void audio.play().catch(() => undefined)
 }
 
 const AFTER_SPIN_SOUND_FILES: Record<string, string> = {
@@ -354,7 +195,7 @@ function playAfterSpinSound(sound: string, volume: number) {
 
   if (!file) return
 
-  const audio = new Audio(`/sounds/after-spin/${file}`)
+  const audio = new Audio(`/sounds/afterspin/${file}`)
   audio.volume = Math.max(0, Math.min(1, volume / 100))
   audio.onerror = () => {
     const fallback = new Audio(`/sounds/after-spin/${file}`)
@@ -469,6 +310,8 @@ export default function Wheel({
   onResult,
   compact = false,
   spinTrigger = 0,
+  duringSound = "Ticking sound",
+  duringVolume = 50,
   afterSound = "Subdued applause",
   afterVolume = 50,
 }: WheelProps) {
@@ -487,11 +330,11 @@ export default function Wheel({
   const currentIndexRef =
     useRef(0)
 
-  const audioContextRef =
-    useRef<AudioContext | null>(null)
-
   const lastTickIndexRef =
     useRef<number | null>(null)
+
+  const duringAudioRef =
+    useRef<HTMLAudioElement | null>(null)
 
   const confettiTimerRef =
     useRef<ReturnType<
@@ -560,43 +403,6 @@ export default function Wheel({
     onResultRef.current =
       onResult
   }, [onResult])
-
-  /* ---------------------------------------------------------------------- */
-  /* Audio context                                                          */
-  /* ---------------------------------------------------------------------- */
-
-  const getAudioContext =
-    useCallback(() => {
-      if (
-        typeof window ===
-        "undefined"
-      ) {
-        return null
-      }
-
-      if (
-        !audioContextRef.current
-      ) {
-        const AudioContextClass =
-          getAudioContextClass()
-
-        if (!AudioContextClass) {
-          return null
-        }
-
-        audioContextRef.current =
-          new AudioContextClass()
-      }
-
-      if (
-        audioContextRef.current.state ===
-        "suspended"
-      ) {
-        void audioContextRef.current.resume()
-      }
-
-      return audioContextRef.current
-    }, [])
 
   /* ---------------------------------------------------------------------- */
   /* Pointer                                                                */
@@ -696,13 +502,6 @@ export default function Wheel({
       return
     }
 
-    const audio =
-      getAudioContext()
-
-    if (audio) {
-      void audio.resume()
-    }
-
     setConfetti([])
 
     lastTickIndexRef.current =
@@ -731,10 +530,7 @@ export default function Wheel({
       5,
       1,
     )
-  }, [
-    getAudioContext,
-    visibleItems.length,
-  ])
+  }, [visibleItems.length])
 
   const previousSpinTriggerRef = useRef(spinTrigger)
 
@@ -744,9 +540,8 @@ export default function Wheel({
     }
 
     previousSpinTriggerRef.current = spinTrigger
-    getAudioContext()
     spin()
-  }, [getAudioContext, spin, spinTrigger])
+  }, [spin, spinTrigger])
 
   /* ---------------------------------------------------------------------- */
   /* Ctrl + Enter                                                           */
@@ -762,7 +557,6 @@ export default function Wheel({
       ) {
         event.preventDefault()
 
-        getAudioContext()
         spin()
       }
     }
@@ -778,10 +572,7 @@ export default function Wheel({
         handleKeyDown,
       )
     }
-  }, [
-    getAudioContext,
-    spin,
-  ])
+  }, [spin])
 
   /* ---------------------------------------------------------------------- */
   /* Create wheel                                                           */
@@ -961,8 +752,10 @@ export default function Wheel({
                 if (
                   spinningRef.current
                 ) {
-                  playTick(
-                    audioContextRef.current,
+                  playDuringSpinSound(
+                    duringSound,
+                    duringVolume,
+                    duringAudioRef,
                   )
                 }
               }
@@ -1057,6 +850,8 @@ export default function Wheel({
     visibleColors,
     setPointerForIndex,
     launchConfetti,
+    duringSound,
+    duringVolume,
     afterSound,
     afterVolume,
   ])
@@ -1075,10 +870,10 @@ export default function Wheel({
         )
       }
 
-      if (
-        audioContextRef.current
-      ) {
-        void audioContextRef.current.close()
+      if (duringAudioRef.current) {
+        duringAudioRef.current.pause()
+        duringAudioRef.current.currentTime = 0
+        duringAudioRef.current = null
       }
     }
   }, [])
