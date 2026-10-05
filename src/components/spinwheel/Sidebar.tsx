@@ -55,6 +55,8 @@ type SidebarProps = {
   onAddWheel: () => void
   onSpinAllWheels: () => void
   onOpenWheel: () => void
+  animateWinningEntryByWheel: Record<string, boolean>
+  onAnimateWinningEntryChange: (wheelId: string, enabled: boolean) => void
 }
 
 type Tab = "entries" | "results"
@@ -1096,10 +1098,14 @@ function WheelCustomizeDialog({
   open,
   wheelNumber,
   onClose,
+  animateWinner,
+  onAnimateWinnerChange,
 }: {
   open: boolean
   wheelNumber: number
   onClose: () => void
+  animateWinner: boolean
+  onAnimateWinnerChange: (enabled: boolean) => void
 }) {
   const [tab, setTab] = useState<"during" | "after" | "appearance">("during")
   const [duringSound, setDuringSound] = useState("Ticking sound")
@@ -1112,7 +1118,6 @@ function WheelCustomizeDialog({
 
   const [afterSound, setAfterSound] = useState("Subdued applause")
   const [afterVolume, setAfterVolume] = useState(50)
-  const [animateWinner, setAnimateWinner] = useState(false)
   const [launchConfetti, setLaunchConfetti] = useState(true)
   const [autoRemove, setAutoRemove] = useState(false)
   const [displayPopup, setDisplayPopup] = useState(true)
@@ -1321,7 +1326,7 @@ function WheelCustomizeDialog({
 
               <div className="border-t border-border/70 py-5">
                 <div className="flex flex-wrap gap-x-7 gap-y-4">
-                  {check(animateWinner, setAnimateWinner, "Animate winning entry")}
+                  {check(animateWinner, onAnimateWinnerChange, "Animate winning entry")}
                   {check(launchConfetti, setLaunchConfetti, "Launch confetti")}
                   {check(autoRemove, setAutoRemove, "Auto-remove winner after 5 seconds")}
                 </div>
@@ -1461,6 +1466,8 @@ export default function Sidebar({
   onAddWheel,
   onSpinAllWheels,
   onOpenWheel,
+  animateWinningEntryByWheel,
+  onAnimateWinningEntryChange,
 }: SidebarProps) {
   const [tab, setTab] =
     useState<Tab>("entries")
@@ -3146,6 +3153,10 @@ export default function Sidebar({
         open={customizeWheelOpen}
         wheelNumber={activeWheelNumber}
         onClose={() => setCustomizeWheelOpen(false)}
+        animateWinner={animateWinningEntryByWheel[activeWheelId] ?? false}
+        onAnimateWinnerChange={(enabled) =>
+          onAnimateWinningEntryChange(activeWheelId, enabled)
+        }
       />
 
       <input
