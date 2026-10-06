@@ -30,6 +30,8 @@ import NoPermission from "@/pages/NoPermission"
 import ErrorPage from "@/pages/Error"
 import Events from "@/pages/Events"
 import Gallery from "@/pages/Gallery"
+import SpinWheel from "@/pages/SpinWheel"
+import Download from "@/pages/Download"
 
 import MainRoster from "@/pages/documents/MainRoster"
 import SWATRoster from "@/pages/documents/SWATRoster"
@@ -55,7 +57,6 @@ import ActivityLogs from "@/pages/dashboard/activity/ActivityLogs"
 
 import PromotionRoster from "@/pages/dashboard/promotion/PromotionRoster"
 import PromotionLogs from "@/pages/dashboard/promotion/PromotionLogs"
-import SpinWheel from "@/pages/SpinWheel"
 
 import ActivityImportDepartment from "@/pages/dashboard/activity/imports/Department"
 import ActivityImportMCD from "@/pages/dashboard/activity/imports/MCD"
@@ -384,6 +385,11 @@ export default function App() {
           <Route
             path="/spin-wheel"
             element={<SpinWheel />}
+          />
+
+          <Route
+            path="/download"
+            element={<Download />}
           />
 
           {/* ===================================================
