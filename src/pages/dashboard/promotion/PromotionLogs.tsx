@@ -16,7 +16,6 @@ import {
   Settings2,
   Shield,
   Trash2,
-  UserRound,
   X,
 } from "lucide-react"
 import {
@@ -31,6 +30,13 @@ import { toast } from "sonner"
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type Category =
   | "roster"
@@ -415,210 +421,169 @@ function IdentityCard({
   avatar?: string | null
   compact?: boolean
 }) {
-  const [open, setOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null
-      if (target && !menuRef.current?.contains(target)) {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown)
-    return () => document.removeEventListener("pointerdown", handlePointerDown)
-  }, [open])
-
-  const copy = async (value: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(value)
-      toast.success(`${label} copied`, {
-        description: value,
-      })
-      setOpen(false)
-    } catch {
-      toast.error("Copy failed")
-      setOpen(false)
-    }
-  }
-
   const avatarUrl = userId
     ? getAvatarUrl(userId, avatar)
     : undefined
 
+  const copyValue = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success(`${label} copied`, { description: value })
+    } catch {
+      toast.error("Copy failed")
+    }
+  }
+
+  const copy = (type: string) => {
+    const safeName = name || "Unknown User"
+    const values: Record<string, string> = {
+      discord: userId || "",
+      "discord-mention": userId ? `<@${userId}>` : "",
+      name: safeName,
+      callsign: callsign || "",
+      badge: badgeNumber || "",
+      rank: rank || "",
+      "name-discord": userId ? `${safeName} (${userId})` : safeName,
+      "callsign-discord": callsign && userId ? `${callsign} | ${userId}` : "",
+      "callsign-name": callsign && safeName ? `${callsign} | ${safeName}` : "",
+      "callsign-badge": callsign && badgeNumber ? `${callsign} | ${badgeNumber}` : "",
+      "badge-name": badgeNumber && safeName ? `${badgeNumber} | ${safeName}` : "",
+      "badge-discord": badgeNumber && userId ? `${badgeNumber} | ${userId}` : "",
+      "callsign-name-discord": callsign && safeName && userId ? `${callsign} | ${safeName} | ${userId}` : "",
+      "callsign-badge-discord": callsign && badgeNumber && userId ? `${callsign} | ${badgeNumber} | ${userId}` : "",
+      "name-badge-discord": safeName && badgeNumber && userId ? `${safeName} | ${badgeNumber} | ${userId}` : "",
+      "callsign-badge-name": callsign && badgeNumber && safeName ? `${callsign} | ${badgeNumber} | ${safeName}` : "",
+      "callsign-badge-name-discord": callsign && badgeNumber && safeName && userId ? `${callsign} | ${badgeNumber} | ${safeName} | ${userId}` : "",
+      "name-rank-discord": safeName && rank && userId ? `${safeName} | ${rank} | ${userId}` : "",
+      full: [
+        callsign && `Callsign: ${callsign}`,
+        badgeNumber && `Badge: ${badgeNumber}`,
+        safeName && `Name: ${safeName}`,
+        rank && `Rank: ${rank}`,
+        userId && `Discord: ${userId}`,
+      ].filter(Boolean).join(" | "),
+    }
+
+    const labels: Record<string, string> = {
+      discord: "Discord ID",
+      "discord-mention": "Discord Mention",
+      name: "Name",
+      callsign: "Callsign",
+      badge: "Badge Number",
+      rank: "Rank",
+      "name-discord": "Name + Discord",
+      "callsign-discord": "Callsign + Discord",
+      "callsign-name": "Callsign + Name",
+      "callsign-badge": "Callsign + Badge",
+      "badge-name": "Badge + Name",
+      "badge-discord": "Badge + Discord",
+      "callsign-name-discord": "Callsign + Name + Discord",
+      "callsign-badge-discord": "Callsign + Badge + Discord",
+      "name-badge-discord": "Name + Badge + Discord",
+      "callsign-badge-name": "Callsign + Badge + Name",
+      "callsign-badge-name-discord": "Callsign + Badge + Name + Discord",
+      "name-rank-discord": "Name + Rank + Discord",
+      full: "Full Details",
+    }
+
+    const value = values[type]
+    if (!value) return
+    void copyValue(value, labels[type] || "Details")
+  }
+
+  const item = (type: string, label: string, disabled = false) => (
+    <DropdownMenuItem
+      disabled={disabled}
+      onSelect={(event) => {
+        event.preventDefault()
+        copy(type)
+      }}
+      className="gap-2 text-sm"
+    >
+      <Clipboard className="h-4 w-4 text-blue-400" />
+      {label}
+    </DropdownMenuItem>
+  )
+
   return (
-    <div ref={menuRef} className="relative min-w-0">
-      <button
-        type="button"
-        className={`group flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:bg-blue-500/5 ${
-          compact ? "px-1.5 py-1" : "px-2 py-1.5"
-        }`}
-        onClick={(event) => {
-          event.stopPropagation()
-          setOpen((current) => !current)
-        }}
-      >
-        <div
-          className={`shrink-0 overflow-hidden rounded-full border border-border bg-muted ${
-            compact ? "h-7 w-7" : "h-8 w-8"
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={`group flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-blue-500/5 ${
+            compact ? "px-1 py-0.5" : "px-1.5 py-1"
           }`}
+          onClick={(event) => event.stopPropagation()}
         >
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold">
-              {getInitials(name)}
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0 leading-tight">
-          <div className="truncate text-sm font-medium text-foreground transition-colors group-hover:text-blue-400">
-            {name || "Unknown User"}
+          <div
+            className={`shrink-0 overflow-hidden rounded-full border border-border bg-muted ${
+              compact ? "h-7 w-7" : "h-8 w-8"
+            }`}
+          >
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={`${name || "Discord user"} profile picture`}
+                className="h-full w-full object-cover"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold">
+                {getInitials(name)}
+              </div>
+            )}
           </div>
 
-          {username ? (
-            <div className="truncate text-[10px] text-muted-foreground">
-              @{username}
-            </div>
-          ) : null}
-        </div>
-      </button>
-
-      {open ? (
-        <div
-          className="absolute left-0 top-full z-[200] mt-1 w-64 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-2xl"
-        >
-          <div className="border-b border-border px-3 py-2.5">
-            <p className="truncate text-sm font-semibold">
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-[11px] font-medium text-foreground transition-colors group-hover:text-blue-400">
               {name || "Unknown User"}
-            </p>
-
+            </div>
             {username ? (
-              <p className="truncate text-xs text-muted-foreground">
+              <div className="truncate text-[9px] text-muted-foreground">
                 @{username}
-              </p>
-            ) : null}
-
-            {rank ? (
-              <p className="mt-1 text-[10px] text-blue-400">
-                {rank}
-              </p>
+              </div>
             ) : null}
           </div>
+        </button>
+      </DropdownMenuTrigger>
 
-          <div className="grid gap-0.5 p-1">
-            {userId ? (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
-                onClick={() => void copy(userId, "Discord ID")}
-              >
-                <Clipboard className="h-3.5 w-3.5 text-blue-400" />
-                Copy Discord ID
-              </button>
-            ) : null}
-
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
-              onClick={() => void copy(name, "Name")}
-            >
-              <UserRound className="h-3.5 w-3.5 text-blue-400" />
-              Copy Name
-            </button>
-
-            {callsign ? (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
-                onClick={() => void copy(callsign, "Callsign")}
-              >
-                <Shield className="h-3.5 w-3.5 text-blue-400" />
-                Copy Callsign
-              </button>
-            ) : null}
-
-            {badgeNumber ? (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
-                onClick={() => void copy(badgeNumber, "Badge number")}
-              >
-                <ClipboardCheck className="h-3.5 w-3.5 text-blue-400" />
-                Copy Badge Number
-              </button>
-            ) : null}
-
-            {rank ? (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
-                onClick={() => void copy(rank, "Rank")}
-              >
-                <Shield className="h-3.5 w-3.5 text-blue-400" />
-                Copy Rank
-              </button>
-            ) : null}
-
-            {name && userId ? (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
-                onClick={() =>
-                  void copy(
-                    `${name} (${userId})`,
-                    "Name + Discord ID",
-                  )
-                }
-              >
-                <Clipboard className="h-3.5 w-3.5 text-blue-400" />
-                Name + Discord ID
-              </button>
-            ) : null}
-
-            {callsign && name ? (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
-                onClick={() =>
-                  void copy(
-                    `${callsign} | ${name}`,
-                    "Callsign + Name",
-                  )
-                }
-              >
-                <Clipboard className="h-3.5 w-3.5 text-blue-400" />
-                Callsign + Name
-              </button>
-            ) : null}
-
-            {badgeNumber && name ? (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
-                onClick={() =>
-                  void copy(
-                    `${badgeNumber} | ${name}`,
-                    "Badge number + Name",
-                  )
-                }
-              >
-                <Clipboard className="h-3.5 w-3.5 text-blue-400" />
-                Badge Number + Name
-              </button>
-            ) : null}
-          </div>
+      <DropdownMenuContent
+        align="start"
+        sideOffset={4}
+        className="z-[300] w-64"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="px-2 py-1.5">
+          <p className="truncate text-sm font-semibold">{name || "Unknown User"}</p>
+          {username ? <p className="truncate text-xs text-muted-foreground">@{username}</p> : null}
+          {rank ? <p className="mt-0.5 text-[10px] text-blue-400">{rank}</p> : null}
         </div>
-      ) : null}
-    </div>
+
+        <DropdownMenuSeparator />
+        {item("discord", "Discord ID", !userId)}
+        {item("discord-mention", "Discord Mention", !userId)}
+        {item("name", "Name")}
+        {item("callsign", "Callsign", !callsign)}
+        {item("badge", "Badge Number", !badgeNumber)}
+        {item("rank", "Rank", !rank)}
+        <DropdownMenuSeparator />
+        {item("name-discord", "Name + Discord", !userId)}
+        {item("callsign-discord", "Callsign + Discord", !callsign || !userId)}
+        {item("callsign-name", "Callsign + Name", !callsign)}
+        {item("callsign-badge", "Callsign + Badge", !callsign || !badgeNumber)}
+        {item("badge-name", "Badge + Name", !badgeNumber)}
+        {item("badge-discord", "Badge + Discord", !badgeNumber || !userId)}
+        {item("callsign-name-discord", "Callsign + Name + Discord", !callsign || !userId)}
+        {item("callsign-badge-discord", "Callsign + Badge + Discord", !callsign || !badgeNumber || !userId)}
+        {item("name-badge-discord", "Name + Badge + Discord", !badgeNumber || !userId)}
+        {item("callsign-badge-name", "Callsign + Badge + Name", !callsign || !badgeNumber)}
+        {item("callsign-badge-name-discord", "Callsign + Badge + Name + Discord", !callsign || !badgeNumber || !userId)}
+        {item("name-rank-discord", "Name + Rank + Discord", !rank || !userId)}
+        <DropdownMenuSeparator />
+        {item("full", "Copy Full Details")}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -1166,18 +1131,6 @@ export default function PromotionLogs() {
                 width="w-full"
               />
 
-              <FilterDropdown
-                value={String(pageSize)}
-                placeholder="50 per page"
-                options={[
-                  { value: "10", label: "10 per page" },
-                  { value: "25", label: "25 per page" },
-                  { value: "50", label: "50 per page" },
-                  { value: "100", label: "100 per page" },
-                ]}
-                onChange={(value) => changePageSize(Number(value))}
-                width="w-full md:w-[150px]"
-              />
             </div>
 
             <div className="mt-2 flex min-h-5 items-center justify-end gap-2">
@@ -1347,12 +1300,16 @@ export default function PromotionLogs() {
                                 </div>
 
                                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
-                                  <span className="inline-flex min-w-0 items-center gap-1">
-                                    <UserRound className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">
-                                      {actorName}
-                                    </span>
-                                  </span>
+                                  <IdentityCard
+                                    name={actorName}
+                                    username={log.username}
+                                    userId={log.userId}
+                                    rank={log.rank}
+                                    callsign={log.callsign}
+                                    badgeNumber={log.badgeNumber}
+                                    avatar={log.avatar}
+                                    compact
+                                  />
 
                                   <span>·</span>
 
@@ -1578,7 +1535,23 @@ export default function PromotionLogs() {
 
         {/* Pagination */}
         {!loading && logs.length > 0 ? (
-          <div className="mx-auto flex w-full max-w-[1100px] items-center justify-between gap-3 px-0 py-1">
+          <div className="mx-auto flex w-full max-w-[1100px] flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-muted-foreground">Entries per page</span>
+              <FilterDropdown
+                value={String(pageSize)}
+                placeholder="50"
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "25", label: "25" },
+                  { value: "50", label: "50" },
+                  { value: "100", label: "100" },
+                ]}
+                onChange={(value) => changePageSize(Number(value))}
+                width="w-[92px]"
+              />
+            </div>
+
             <div className="text-[11px] text-muted-foreground">
               Page {pagination.page} of {pagination.pages} · {pagination.total.toLocaleString()} logs
             </div>
