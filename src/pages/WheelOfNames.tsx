@@ -54,7 +54,7 @@ function getNamesFromText(text: string) {
     .filter(Boolean)
 }
 
-export default function WheelOfNames(): JSX.Element {
+export default function WheelOfNames(): React.ReactElement {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wheelFrameRef = useRef<HTMLDivElement | null>(null)
   const animationRef = useRef<number | null>(null)
@@ -68,7 +68,6 @@ export default function WheelOfNames(): JSX.Element {
   const [rotation, setRotation] = useState(0)
   const [winner, setWinner] = useState<string | null>(null)
   const [showWinner, setShowWinner] = useState(false)
-  const [editorHeight, setEditorHeight] = useState(300)
 
   const names = useMemo(() => entries.map((entry) => entry.name), [entries])
 
