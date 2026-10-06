@@ -26,7 +26,12 @@ export type WheelConfig = {
   title: string;
 };
 
-const DEFAULT_COLORS = ["#5DADE2", "#82E0AA", "#F7DC6F", "#AF7AC5"];
+const DEFAULT_COLORS = [
+  "#5DADE2",
+  "#82E0AA",
+  "#F7DC6F",
+  "#AF7AC5",
+];
 
 const createEntry = (text: string, index: number): WheelEntry => ({
   id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
@@ -35,88 +40,193 @@ const createEntry = (text: string, index: number): WheelEntry => ({
 });
 
 const createDefaultConfig = (): WheelConfig => ({
-  entries: ["Ali", "Beatriz", "Charles", "Diya", "Eric", "Fatima", "Gabriel", "Hanna"].map((text, index) => createEntry(text, index)),
+  entries: [
+    "Ali",
+    "Beatriz",
+    "Charles",
+    "Diya",
+    "Eric",
+    "Fatima",
+    "Gabriel",
+    "Hanna",
+  ].map((text, index) => createEntry(text, index)),
+
   spinTime: 10,
+
   duringSpinSound: true,
   duringSpinSoundVolume: 50,
+
   afterSpinSound: "applause-sound-soft",
   afterSpinSoundVolume: 50,
+
   drawShadow: true,
   drawOutlines: false,
   pointerChangesColor: true,
+
   allowDuplicates: true,
   autoRemoveWinner: false,
+
   showTitle: true,
   title: "",
 });
 
 export default function SpinWheel() {
-  const [wheels, setWheels] = useState<WheelConfig[]>([createDefaultConfig()]);
+  const [wheels, setWheels] = useState<WheelConfig[]>([
+    createDefaultConfig(),
+  ]);
+
   const [activeWheel, setActiveWheel] = useState(0);
+
   const [tab, setTab] = useState<"entries" | "results">("entries");
+
   const [results, setResults] = useState<string[]>([]);
+
   const [winner, setWinner] = useState<string | null>(null);
+
   const [muted, setMuted] = useState(false);
 
-  const config = wheels[activeWheel];
+  const config = wheels[activeWheel] ?? createDefaultConfig();
 
-  const updateConfig = useCallback((patch: Partial<WheelConfig>) => {
-    setWheels((current) =>
-      current.map((wheel, index) => index === activeWheel ? { ...wheel, ...patch } : wheel),
-    );
-  }, [activeWheel]);
+  const updateConfig = useCallback(
+    (patch: Partial<WheelConfig>) => {
+      setWheels((current) =>
+        current.map((wheel, index) =>
+          index === activeWheel
+            ? {
+                ...wheel,
+                ...patch,
+              }
+            : wheel,
+        ),
+      );
+    },
+    [activeWheel],
+  );
 
-  const updateEntries = useCallback((value: string) => {
-    const lines = value.split(/\r?\n/);
-    const entries = lines
-      .map((text, index) => text.trim())
-      .filter(Boolean)
-      .slice(0, 1000)
-      .map((text, index) => createEntry(text, index));
+  const updateEntries = useCallback(
+    (value: string) => {
+      const entries = value
+        .split(/\r?\n/)
+        .map((text, index) => createEntry(text.trim(), index))
+        .filter((entry) => entry.text.length > 0)
+        .slice(0, 1000);
 
-    updateConfig({ entries });
-  }, [updateConfig]);
+      updateConfig({
+        entries,
+      });
+    },
+    [updateConfig],
+  );
 
   const addWheel = useCallback(() => {
-    setWheels((current) => [...current, {
-      ...createDefaultConfig(),
-      entries: [createEntry(" ", 0)],
-      title: `Wheel ${current.length + 1}`,
-    }]);
-    setActiveWheel(wheels.length);
-  }, [wheels.length]);
+    setWheels((current) => {
+      const newWheel: WheelConfig = {
+        ...createDefaultConfig(),
 
-  const removeWheel = useCallback((index: number) => {
-    if (wheels.length === 1) return;
-    setWheels((current) => current.filter((_, i) => i !== index));
-    setActiveWheel((current) => Math.min(current, wheels.length - 2));
-  }, [wheels.length]);
+        entries: [
+          createEntry(" ", 0),
+        ],
+
+        title: `Wheel ${current.length + 1}`,
+      };
+
+      return [...current, newWheel];
+    });
+
+    setActiveWheel((current) => current + 1);
+  }, []);
+
+  const removeWheel = useCallback(
+    (index: number) => {
+      if (wheels.length <= 1) {
+        return;
+      }
+
+      setWheels((current) =>
+        current.filter((_, wheelIndex) => wheelIndex !== index),
+      );
+
+      setActiveWheel((current) =>
+        Math.max(
+          0,
+          Math.min(
+            current,
+            wheels.length - 2,
+          ),
+        ),
+      );
+    },
+    [wheels.length],
+  );
 
   const shuffle = useCallback(() => {
-    updateConfig({ entries: [...config.entries].sort(() => Math.random() - 0.5) });
+    const shuffledEntries = [...config.entries].sort(
+      () => Math.random() - 0.5,
+    );
+
+    updateConfig({
+      entries: shuffledEntries,
+    });
   }, [config.entries, updateConfig]);
 
   const sortEntries = useCallback(() => {
-    updateConfig({ entries: [...config.entries].sort((a, b) => a.text.localeCompare(b.text)) });
+    const sortedEntries = [...config.entries].sort(
+      (a, b) => a.text.localeCompare(b.text),
+    );
+
+    updateConfig({
+      entries: sortedEntries,
+    });
   }, [config.entries, updateConfig]);
 
-  const handleWinner = useCallback((entry: WheelEntry) => {
-    setResults((current) => [entry.text, ...current]);
-    setWinner(entry.text);
+  const handleWinner = useCallback(
+    (entry: WheelEntry) => {
+      setResults((current) => [
+        entry.text,
+        ...current,
+      ]);
 
-    if (config.autoRemoveWinner) {
-      updateConfig({ entries: config.entries.filter((item) => item.id !== entry.id) });
-    }
-  }, [config, updateConfig]);
+      setWinner(entry.text);
 
-  const entriesText = useMemo(() => config.entries.map((entry) => entry.text).join("\n"), [config.entries]);
+      if (config.autoRemoveWinner) {
+        updateConfig({
+          entries: config.entries.filter(
+            (item) => item.id !== entry.id,
+          ),
+        });
+      }
+    },
+    [config, updateConfig],
+  );
+
+  const entriesText = useMemo(
+    () =>
+      config.entries
+        .map((entry) => entry.text)
+        .join("\n"),
+    [config.entries],
+  );
+
+  const handleMute = useCallback(() => {
+    setMuted((current) => !current);
+  }, []);
+
+  const handleCloseWinner = useCallback(() => {
+    setWinner(null);
+  }, []);
+
+  const handleClearResults = useCallback(() => {
+    setResults([]);
+  }, []);
 
   return (
     <div className="spin-wheel-page">
       <main className="spin-wheel-layout">
         <section className="spin-wheel-stage">
           {config.showTitle && config.title && (
-            <h1 className="spin-wheel-title">{config.title}</h1>
+            <h1 className="spin-wheel-title">
+              {config.title}
+            </h1>
           )}
 
           <div className="spin-wheel-canvas-wrap">
@@ -124,7 +234,7 @@ export default function SpinWheel() {
               config={config}
               muted={muted}
               onWinner={handleWinner}
-              onMute={() => setMuted((value) => !value)}
+              onMute={handleMute}
             />
           </div>
 
@@ -132,10 +242,20 @@ export default function SpinWheel() {
             <div className="spin-wheel-bottom-controls">
               {wheels.map((_, index) => (
                 <button
-                  key={index}
-                  className={index === activeWheel ? "wheel-dot active" : "wheel-dot"}
+                  key={`wheel-${index}`}
+                  type="button"
+                  className={
+                    index === activeWheel
+                      ? "wheel-dot active"
+                      : "wheel-dot"
+                  }
                   onClick={() => setActiveWheel(index)}
-                  aria-label={`Wheel ${index + 1}`}
+                  aria-label={`Select wheel ${index + 1}`}
+                  aria-current={
+                    index === activeWheel
+                      ? "true"
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -151,17 +271,22 @@ export default function SpinWheel() {
           onShuffle={shuffle}
           onSort={sortEntries}
           onAddWheel={addWheel}
-          onRemoveWheel={() => removeWheel(activeWheel)}
+          onRemoveWheel={() =>
+            removeWheel(activeWheel)
+          }
           wheelCount={wheels.length}
           activeWheel={activeWheel}
           setActiveWheel={setActiveWheel}
           config={config}
           updateConfig={updateConfig}
-          onClearResults={() => setResults([])}
+          onClearResults={handleClearResults}
         />
       </main>
 
-      <WinnerDialog winner={winner} onClose={() => setWinner(null)} />
+      <WinnerDialog
+        winner={winner}
+        onClose={handleCloseWinner}
+      />
     </div>
   );
 }
