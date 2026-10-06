@@ -395,56 +395,6 @@ function ReleaseModal({
   )
 }
 
-function ReleaseCard({
-  release,
-  onOpen,
-}: {
-  release: GitHubRelease
-  onOpen: (release: GitHubRelease) => void
-}) {
-  const title = release.name?.trim() || `MPD Desktop ${release.tag_name}`
-
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(release)}
-      className="group block w-full text-left"
-      aria-label={`Open ${title} release details`}
-    >
-      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur transition-colors hover:border-blue-500/30 hover:bg-card">
-        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-sm font-semibold sm:text-base">
-                {title}
-              </h3>
-
-              <span className="rounded-full border border-border/70 bg-muted/30 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                {release.tag_name}
-              </span>
-            </div>
-
-            <p className="mt-1 text-xs text-muted-foreground">
-              Released {formatDate(release.published_at)}
-              {" • "}
-              {release.assets.length} asset
-              {release.assets.length === 1 ? "" : "s"}
-            </p>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="hidden text-xs text-muted-foreground transition-colors group-hover:text-blue-400 sm:inline">
-              View release details
-            </span>
-
-            <ExternalLink className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-blue-400" />
-          </div>
-        </div>
-      </div>
-    </button>
-  )
-}
-
 export default function Download() {
   const [releases, setReleases] = useState<GitHubRelease[]>([])
   const [loading, setLoading] = useState(true)
