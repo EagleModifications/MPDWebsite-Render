@@ -347,7 +347,7 @@ export default function WheelOfNames() {
       {
         items: createWheelItems(entries),
         radius: 0.92,
-        pointerAngle: 0,
+        pointerAngle: 270,
         lineWidth: 1,
         lineColor: "rgba(255,255,255,0.28)",
         itemLabelFont: "Geist Variable, sans-serif",
