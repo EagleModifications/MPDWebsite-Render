@@ -137,6 +137,7 @@
       "releaseType": "release"
     }
   },
+  "main": "desktop/main.cjs",
   "description": "Metro Police Department desktop application",
   "author": "Metro Police Department"
 }
