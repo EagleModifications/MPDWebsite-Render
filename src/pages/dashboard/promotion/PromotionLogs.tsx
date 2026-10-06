@@ -665,21 +665,6 @@ function TargetIdentity({ log }: { log: ActionLog }) {
   )
 }
 
-function ActionIcon({ log }: { log: ActionLog }) {
-  const Icon = getActionIcon(log)
-
-  return (
-    <div
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${getActionIconStyle(
-        log,
-      )}`}
-      title={actionLabel(log.action)}
-    >
-      <Icon className="h-4 w-4" />
-    </div>
-  )
-}
-
 function DetailItem({
   label,
   children,
