@@ -661,6 +661,20 @@ export default function Gallery() {
   const [mediaFilter, setMediaFilter] =
     useState<GalleryMediaFilter>("All")
 
+  const [galleryLayout, setGalleryLayout] =
+    useState<"cards" | "home">(() => {
+      try {
+        return window.localStorage.getItem("mpd-gallery-layout") === "home"
+          ? "home"
+          : "cards"
+      } catch {
+        return "cards"
+      }
+    })
+
+  const [layoutSettingsOpen, setLayoutSettingsOpen] =
+    useState(false)
+
   const [showModal, setShowModal] =
     useState(false)
 
@@ -1763,7 +1777,7 @@ export default function Gallery() {
               </div>
             ) : (
               <div className="h-auto p-3 sm:p-4">
-                <div className="columns-1 gap-3 sm:columns-2 lg:columns-3">
+                <div className={galleryLayout === "home" ? "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"}>
                   {filteredItems.map(
                     (item) => {
                       const mediaList =
@@ -1774,8 +1788,58 @@ export default function Gallery() {
                       return (
                         <article
                           key={item.id}
-                          className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"
+                          className={galleryLayout === "home"
+                            ? "group overflow-hidden rounded-xl border border-border/50 bg-background/40 transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/30 hover:bg-blue-500/[0.025]"
+                            : "overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"}
                         >
+                          {galleryLayout === "home" ? (
+                            <>
+                              <button
+                                type="button"
+                                className="relative block aspect-[16/10] w-full overflow-hidden bg-black/30 text-left"
+                                onClick={() => openViewer(item, mediaList[0])}
+                                aria-label={`View ${item.title}`}
+                              >
+                                {mediaList[0] && (
+                                  <GalleryImage
+                                    src={getGalleryMediaUrl(mediaList[0])}
+                                    fallbackSrc={mediaList[0].fallbackUrl}
+                                    alt={item.title}
+                                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                  />
+                                )}
+                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+                                {item.category && (
+                                  <span className={`absolute left-4 top-4 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${item.category === "Fleet" ? "border-amber-400/50 bg-amber-500/20 text-amber-300" : "border-blue-400/50 bg-blue-500/20 text-blue-300"}`}>
+                                    {item.category}
+                                  </span>
+                                )}
+                                {(item.tags ?? []).length > 0 && (
+                                  <div className="absolute left-4 top-[3.15rem] flex max-w-[calc(100%-2rem)] flex-wrap gap-1.5">
+                                    {(item.tags ?? []).map((tag) => (
+                                      <span key={`${item.id}-home-${tag}`} className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${GALLERY_TAG_CLASSES[tag]}`}>
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </button>
+                              <button type="button" onClick={() => openInfo(item)} className="w-full p-5 text-left">
+                                <h3 className="font-bold tracking-tight">{item.title}</h3>
+                                {(item.tags ?? []).length > 0 && (
+                                  <div className="mt-3 flex flex-wrap gap-1.5">
+                                    {(item.tags ?? []).map((tag) => (
+                                      <span key={`${item.id}-card-${tag}`} className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${GALLERY_TAG_CLASSES[tag]}`}>{tag}</span>
+                                    ))}
+                                  </div>
+                                )}
+                                {item.description && (
+                                  <p className="mt-3 line-clamp-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">{item.description}</p>
+                                )}
+                              </button>
+                            </>
+                          ) : (
+                          <>
                           <GalleryMediaCollage
                             media={mediaList}
                             title={item.title}
@@ -1903,6 +1967,8 @@ export default function Gallery() {
                               )}
                             </div>
                           </div>
+                          </>
+                          )}
                         </article>
                       )
                     },
@@ -1950,6 +2016,42 @@ export default function Gallery() {
               </span>
             </div>
           </section>
+
+          <button
+            type="button"
+            onClick={() => setLayoutSettingsOpen(true)}
+            className="fixed bottom-5 right-5 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-lg backdrop-blur transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Gallery settings"
+            title="Gallery settings"
+          >
+            <Settings2 className="h-5 w-5" />
+          </button>
+
+          {layoutSettingsOpen && (
+            <div className="fixed inset-0 z-[80]" onMouseDown={(event) => { if (event.target === event.currentTarget) setLayoutSettingsOpen(false) }}>
+              <div className="absolute inset-y-0 right-0 flex w-full max-w-sm flex-col border-l border-border/70 bg-background shadow-2xl">
+                <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
+                  <div>
+                    <h2 className="text-sm font-semibold">Gallery Settings</h2>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Choose how gallery posts are displayed.</p>
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => setLayoutSettingsOpen(false)} aria-label="Close settings">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="space-y-2 p-4">
+                  <button type="button" onClick={() => { setGalleryLayout("cards"); window.localStorage.setItem("mpd-gallery-layout", "cards") }} className={`w-full rounded-xl border p-4 text-left transition-colors ${galleryLayout === "cards" ? "border-blue-500/40 bg-blue-500/10" : "border-border/70 hover:bg-muted/60"}`}>
+                    <div className="flex items-center justify-between"><span className="text-sm font-semibold">4-column cards</span>{galleryLayout === "cards" && <Check className="h-4 w-4 text-blue-500" />}</div>
+                    <p className="mt-1 text-xs text-muted-foreground">Current gallery layout with the media boxes and 4 columns.</p>
+                  </button>
+                  <button type="button" onClick={() => { setGalleryLayout("home"); window.localStorage.setItem("mpd-gallery-layout", "home") }} className={`w-full rounded-xl border p-4 text-left transition-colors ${galleryLayout === "home" ? "border-blue-500/40 bg-blue-500/10" : "border-border/70 hover:bg-muted/60"}`}>
+                    <div className="flex items-center justify-between"><span className="text-sm font-semibold">Home-style images</span>{galleryLayout === "home" && <Check className="h-4 w-4 text-blue-500" />}</div>
+                    <p className="mt-1 text-xs text-muted-foreground">Large image previews with the same card style used on Home.</p>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {canManageGallery && (
             <section className="mt-6 overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
