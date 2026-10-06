@@ -4,6 +4,7 @@ import {
   ChevronUp,
   Clipboard,
   ClipboardCheck,
+  Copy,
   Check,
   FileInput,
   FileText,
@@ -549,39 +550,129 @@ function IdentityCard({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
+        side="bottom"
         align="start"
         sideOffset={4}
-        className="z-[300] w-64"
+        avoidCollisions={false}
+        className="z-[300] w-[285px] max-h-80 overflow-y-auto p-1"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="px-2 py-1.5">
-          <p className="truncate text-sm font-semibold">{name || "Unknown User"}</p>
-          {username ? <p className="truncate text-xs text-muted-foreground">@{username}</p> : null}
-          {rank ? <p className="mt-0.5 text-[10px] text-blue-400">{rank}</p> : null}
-        </div>
+        {([
+          ["discord", "Copy Discord ID"],
+          ["discord-mention", "Copy Discord Mention"],
+          ["name", "Copy Name"],
+          ["callsign", "Copy Callsign"],
+          ["badge", "Copy Badge Number"],
+          ["rank", "Copy Rank"],
+        ] as [string, string][]).map(([type, label]) => (
+          <DropdownMenuItem
+            key={type}
+            disabled={
+              (type === "discord" || type === "discord-mention") && !userId
+                ? true
+                : type === "callsign" && !callsign
+                  ? true
+                  : type === "badge" && !badgeNumber
+                    ? true
+                    : type === "rank" && !rank
+                      ? true
+                      : false
+            }
+            onSelect={(event) => {
+              event.preventDefault()
+              copy(type)
+            }}
+            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+          >
+            <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+            <span>{label}</span>
+          </DropdownMenuItem>
+        ))}
 
-        <DropdownMenuSeparator />
-        {item("discord", "Discord ID", !userId)}
-        {item("discord-mention", "Discord Mention", !userId)}
-        {item("name", "Name")}
-        {item("callsign", "Callsign", !callsign)}
-        {item("badge", "Badge Number", !badgeNumber)}
-        {item("rank", "Rank", !rank)}
-        <DropdownMenuSeparator />
-        {item("name-discord", "Name + Discord", !userId)}
-        {item("callsign-discord", "Callsign + Discord", !callsign || !userId)}
-        {item("callsign-name", "Callsign + Name", !callsign)}
-        {item("callsign-badge", "Callsign + Badge", !callsign || !badgeNumber)}
-        {item("badge-name", "Badge + Name", !badgeNumber)}
-        {item("badge-discord", "Badge + Discord", !badgeNumber || !userId)}
-        {item("callsign-name-discord", "Callsign + Name + Discord", !callsign || !userId)}
-        {item("callsign-badge-discord", "Callsign + Badge + Discord", !callsign || !badgeNumber || !userId)}
-        {item("name-badge-discord", "Name + Badge + Discord", !badgeNumber || !userId)}
-        {item("callsign-badge-name", "Callsign + Badge + Name", !callsign || !badgeNumber)}
-        {item("callsign-badge-name-discord", "Callsign + Badge + Name + Discord", !callsign || !badgeNumber || !userId)}
-        {item("name-rank-discord", "Name + Rank + Discord", !rank || !userId)}
-        <DropdownMenuSeparator />
-        {item("full", "Copy Full Details")}
+        <div className="my-0.5 h-px bg-border" />
+
+        {([
+          ["name-discord", "Name + Discord ID"],
+          ["callsign-discord", "Callsign + Discord ID"],
+          ["callsign-name", "Callsign + Name"],
+          ["callsign-badge", "Callsign + Badge Number"],
+          ["badge-name", "Badge Number + Name"],
+          ["badge-discord", "Badge Number + Discord ID"],
+        ] as [string, string][]).map(([type, label]) => (
+          <DropdownMenuItem
+            key={type}
+            disabled={
+              type === "name-discord"
+                ? !userId
+                : type === "callsign-discord"
+                  ? !callsign || !userId
+                  : type === "callsign-name"
+                    ? !callsign
+                    : type === "callsign-badge"
+                      ? !callsign || !badgeNumber
+                      : type === "badge-name"
+                        ? !badgeNumber
+                        : !badgeNumber || !userId
+            }
+            onSelect={(event) => {
+              event.preventDefault()
+              copy(type)
+            }}
+            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+          >
+            <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+            <span>{label}</span>
+          </DropdownMenuItem>
+        ))}
+
+        <div className="my-0.5 h-px bg-border" />
+
+        {([
+          ["callsign-name-discord", "Callsign + Name + Discord"],
+          ["callsign-badge-discord", "Callsign + Badge + Discord"],
+          ["name-badge-discord", "Name + Badge + Discord"],
+          ["callsign-badge-name", "Callsign + Badge + Name"],
+          ["callsign-badge-name-discord", "Callsign + Badge + Name + Discord"],
+          ["name-rank-discord", "Name + Rank + Discord"],
+        ] as [string, string][]).map(([type, label]) => (
+          <DropdownMenuItem
+            key={type}
+            disabled={
+              type === "callsign-name-discord"
+                ? !callsign || !userId
+                : type === "callsign-badge-discord"
+                  ? !callsign || !badgeNumber || !userId
+                  : type === "name-badge-discord"
+                    ? !badgeNumber || !userId
+                    : type === "callsign-badge-name"
+                      ? !callsign || !badgeNumber
+                      : type === "callsign-badge-name-discord"
+                        ? !callsign || !badgeNumber || !userId
+                        : !rank || !userId
+            }
+            onSelect={(event) => {
+              event.preventDefault()
+              copy(type)
+            }}
+            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+          >
+            <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+            <span>{label}</span>
+          </DropdownMenuItem>
+        ))}
+
+        <div className="my-0.5 h-px bg-border" />
+
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault()
+            copy("full")
+          }}
+          className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
+        >
+          <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+          <span>Copy Full Details</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -1364,14 +1455,6 @@ export default function PromotionLogs() {
                               </div>
                             </div>
 
-                            {/* Summary */}
-                            {log.summary ? (
-                              <div className="border-t border-border/60 px-3 pb-3 pt-2 sm:pl-[68px] sm:pr-3">
-                                <p className="line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                                  {log.summary}
-                                </p>
-                              </div>
-                            ) : null}
                           </div>
 
                           {/* Expanded details */}
@@ -1392,129 +1475,221 @@ export default function PromotionLogs() {
                                 </span>
                               </div>
 
-                              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                                <DetailItem label="Changed By">
-                                  <IdentityCard
-                                    name={actorName}
-                                    username={log.username}
-                                    userId={log.userId}
-                                    rank={log.rank}
-                                    callsign={
-                                      log.callsign
-                                    }
-                                    badgeNumber={
-                                      log.badgeNumber
-                                    }
-                                    avatar={log.avatar}
-                                  />
-                                </DetailItem>
+                              <div className="divide-y divide-border border-y border-border">
+                                <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
+                                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                                    Summary
+                                  </span>
+                                  <p className="text-xs leading-5">
+                                    {log.summary || "No summary available."}
+                                  </p>
+                                </div>
 
-                                <DetailItem label="Action">
+                                <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
+                                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                                    Action
+                                  </span>
                                   <div className="grid gap-1 text-xs">
                                     <span>
                                       <b>Action:</b>{" "}
-                                      {actionLabel(
-                                        log.action,
-                                      )}
+                                      {actionLabel(log.action)}
                                     </span>
                                     <span>
                                       <b>Category:</b>{" "}
-                                      {categoryLabel(
-                                        log.category,
-                                      )}
+                                      {categoryLabel(log.category)}
                                     </span>
                                     <span>
                                       <b>Division:</b>{" "}
-                                      {divisionLabel(
-                                        log.division,
-                                      )}
+                                      {divisionLabel(log.division)}
                                     </span>
                                     <span className="truncate">
                                       <b>Page:</b>{" "}
                                       {log.path || "—"}
                                     </span>
                                   </div>
-                                </DetailItem>
+                                </div>
 
-                                <DetailItem label="Changed">
-                                  <TargetIdentity log={log} />
+                                {log.targetName || log.targetUserId ? (
+                                  <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                                      Changed
+                                    </span>
+                                    <div className="min-w-0">
+                                      <TargetIdentity log={log} />
 
-                                  {log.targetRank ? (
-                                    <p className="mt-1 text-[10px] text-muted-foreground">
-                                      Rank:{" "}
-                                      <span className="text-foreground">
-                                        {log.targetRank}
-                                      </span>
-                                    </p>
-                                  ) : null}
+                                      {log.targetRank ? (
+                                        <p className="mt-1 text-[10px] text-muted-foreground">
+                                          Rank:{" "}
+                                          <span className="text-foreground">
+                                            {log.targetRank}
+                                          </span>
+                                        </p>
+                                      ) : null}
 
-                                  {log.targetUserId ? (
-                                    <p className="mt-1 truncate font-mono text-[9px] text-blue-400/70">
-                                      {log.targetUserId}
-                                    </p>
-                                  ) : null}
-                                </DetailItem>
+                                      {log.targetUserId ? (
+                                        <p className="mt-1 truncate font-mono text-[9px] text-blue-400/70">
+                                          {log.targetUserId}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                ) : null}
 
-                                <DetailItem label="Recorded">
-                                  <p className="font-medium">
-                                    {formatDateTime(
-                                      log.createdAt,
+                                {log.details &&
+                                Object.keys(log.details).length > 0 ? (
+                                  <>
+                                    {Object.entries(log.details).map(
+                                      ([key, value]) => {
+                                        const normalized = key
+                                          .toLowerCase()
+                                          .replace(/[^a-z0-9]/g, "")
+
+                                        const isCode =
+                                          normalized === "code" ||
+                                          normalized === "oldcode" ||
+                                          normalized === "newcode"
+
+                                        if (
+                                          normalized === "oldcode" ||
+                                          normalized === "newcode"
+                                        ) {
+                                          return null
+                                        }
+
+                                        const oldCode = Object.entries(
+                                          log.details ?? {},
+                                        ).find(
+                                          ([detailKey]) =>
+                                            detailKey
+                                              .toLowerCase()
+                                              .replace(/[^a-z0-9]/g, "") ===
+                                            "oldcode",
+                                        )?.[1]
+
+                                        const newCode = Object.entries(
+                                          log.details ?? {},
+                                        ).find(
+                                          ([detailKey]) =>
+                                            detailKey
+                                              .toLowerCase()
+                                              .replace(/[^a-z0-9]/g, "") ===
+                                            "newcode",
+                                        )?.[1]
+
+                                        return (
+                                          <div
+                                            key={key}
+                                            className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]"
+                                          >
+                                            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                                              {actionLabel(key)}
+                                            </span>
+                                            <div className="min-w-0 text-xs">
+                                              {isCode &&
+                                              (oldCode !== undefined ||
+                                                newCode !== undefined) ? (
+                                                <div className="flex flex-wrap items-center gap-2 font-mono">
+                                                  <span className="text-red-400 line-through">
+                                                    {formatDetailValue(oldCode)}
+                                                  </span>
+                                                  <span className="text-muted-foreground">
+                                                    →
+                                                  </span>
+                                                  <span className="text-emerald-400">
+                                                    {formatDetailValue(newCode)}
+                                                  </span>
+                                                </div>
+                                              ) : (
+                                                <pre className="whitespace-pre-wrap break-words font-mono text-[10px] leading-4">
+                                                  {formatDetailValue(value)}
+                                                </pre>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )
+                                      },
                                     )}
-                                  </p>
 
-                                  {log.entryNumber ? (
-                                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                                      Entry #{log.entryNumber}
-                                    </p>
-                                  ) : null}
-                                </DetailItem>
-                              </div>
-
-                              <div className="mt-2 rounded-lg border border-border bg-background/60 px-3 py-2.5">
-                                <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                  Summary
-                                </p>
-
-                                <p className="text-xs leading-5">
-                                  {log.summary ||
-                                    "No summary available."}
-                                </p>
-                              </div>
-
-                              {log.details &&
-                              Object.keys(log.details)
-                                .length > 0 ? (
-                                <div className="mt-2 rounded-lg border border-border bg-background/60 px-3 py-2.5">
-                                  <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                    Additional Details
-                                  </p>
-
-                                  <div className="grid max-h-64 gap-2 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
-                                    {Object.entries(
-                                      log.details,
-                                    ).map(
-                                      ([key, value]) => (
-                                        <div
-                                          key={key}
-                                          className="min-w-0 rounded-md border border-border bg-muted/10 px-2.5 py-2"
-                                        >
-                                          <p className="truncate text-[10px] font-medium text-muted-foreground">
-                                            {actionLabel(
-                                              key,
-                                            )}
-                                          </p>
-
-                                          <pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4">
+                                    {(Object.keys(log.details).some(
+                                      (key) =>
+                                        key
+                                          .toLowerCase()
+                                          .replace(/[^a-z0-9]/g, "") ===
+                                        "oldcode",
+                                    ) ||
+                                      Object.keys(log.details).some(
+                                        (key) =>
+                                          key
+                                            .toLowerCase()
+                                            .replace(/[^a-z0-9]/g, "") ===
+                                          "newcode",
+                                      )) ? (
+                                      <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
+                                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                                          Code
+                                        </span>
+                                        <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                                          <span className="text-red-400 line-through">
                                             {formatDetailValue(
-                                              value,
+                                              Object.entries(log.details).find(
+                                                ([key]) =>
+                                                  key
+                                                    .toLowerCase()
+                                                    .replace(/[^a-z0-9]/g, "") ===
+                                                  "oldcode",
+                                              )?.[1],
                                             )}
-                                          </pre>
+                                          </span>
+                                          <span className="text-muted-foreground">
+                                            →
+                                          </span>
+                                          <span className="text-emerald-400">
+                                            {formatDetailValue(
+                                              Object.entries(log.details).find(
+                                                ([key]) =>
+                                                  key
+                                                    .toLowerCase()
+                                                    .replace(/[^a-z0-9]/g, "") ===
+                                                  "newcode",
+                                              )?.[1],
+                                            )}
+                                          </span>
                                         </div>
-                                      ),
-                                    )}
+                                      </div>
+                                    ) : null}
+                                  </>
+                                ) : null}
+
+                                <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
+                                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                                    Changed By
+                                  </span>
+                                  <IdentityCard
+                                    name={actorName}
+                                    username={log.username}
+                                    userId={log.userId}
+                                    rank={log.rank}
+                                    callsign={log.callsign}
+                                    badgeNumber={log.badgeNumber}
+                                    avatar={log.avatar}
+                                    compact
+                                  />
+                                </div>
+
+                                <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
+                                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                                    Recorded
+                                  </span>
+                                  <div>
+                                    <p className="text-xs font-medium">
+                                      {formatDateTime(log.createdAt)}
+                                    </p>
+                                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                                      Entry #{entryNumber}
+                                    </p>
                                   </div>
                                 </div>
-                              ) : null}
+                              </div>
 
                               {log.path ? (
                                 <p className="mt-2 break-all border-t border-border pt-2 text-[10px] text-muted-foreground">
