@@ -30,7 +30,6 @@ import NoPermission from "@/pages/NoPermission"
 import ErrorPage from "@/pages/Error"
 import Events from "@/pages/Events"
 import Gallery from "@/pages/Gallery"
-import SpinWheel from "@/pages/SpinWheel"
 import Download from "@/pages/Download"
 
 import MainRoster from "@/pages/documents/MainRoster"
@@ -380,11 +379,6 @@ export default function App() {
           <Route
             path="/gallery"
             element={<Gallery />}
-          />
-
-          <Route
-            path="/spin-wheel"
-            element={<SpinWheel />}
           />
 
           <Route
