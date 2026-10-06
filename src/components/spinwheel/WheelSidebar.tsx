@@ -1,203 +1,121 @@
-import { useRef } from "react";
+import { Shuffle, ArrowDownAZ, Trash2, Plus, Minus, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, RotateCw, Shuffle, ArrowDownAZ, MoreVertical, Download, Trash2 } from "lucide-react";
-import type { WheelConfig } from "@/pages/SpinWheel";
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
-type Props = {
-  tab: "entries" | "results";
-  setTab: (tab: "entries" | "results") => void;
+type WheelSidebarProps = {
   entriesText: string;
   results: string[];
+  spinning: boolean;
   onEntriesChange: (value: string) => void;
   onShuffle: () => void;
   onSort: () => void;
-  onAddWheel: () => void;
-  onRemoveWheel: () => void;
-  wheelCount: number;
-  activeWheel: number;
-  setActiveWheel: (index: number) => void;
-  config: WheelConfig;
-  updateConfig: (patch: Partial<WheelConfig>) => void;
-  onClearResults: () => void;
+  onClear: () => void;
+  onSpin: () => void;
 };
 
 export function WheelSidebar({
-  tab, setTab, entriesText, results, onEntriesChange, onShuffle, onSort,
-  onAddWheel, onRemoveWheel, wheelCount, activeWheel, setActiveWheel,
-  config, updateConfig, onClearResults,
-}: Props) {
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const exportResults = () => {
-    const blob = new Blob([results.join("\n")], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "wheel-results.txt";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
+  entriesText,
+  results,
+  spinning,
+  onEntriesChange,
+  onShuffle,
+  onSort,
+  onClear,
+  onSpin,
+}: WheelSidebarProps) {
   return (
-    <aside className="wheel-sidebar">
-      <div className="wheel-tabs-row">
-        <Tabs value={tab} onValueChange={(value) => setTab(value as "entries" | "results")} className="flex-1">
-          <TabsList className="w-full">
-            <TabsTrigger value="entries" className="flex-1">Entries</TabsTrigger>
-            <TabsTrigger value="results" className="flex-1">Results</TabsTrigger>
+    <aside className="flex h-full min-h-0 w-full flex-col border-l bg-background lg:w-[420px] xl:w-[468px]">
+      <Tabs defaultValue="entries" className="flex min-h-0 flex-1 flex-col">
+        <div className="border-b px-3 pt-3">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="entries">
+              Entries
+              <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs">
+                {entriesText.split("\n").filter(Boolean).length}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="results">
+              Results
+              <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs">
+                {results.length}
+              </span>
+            </TabsTrigger>
           </TabsList>
-        </Tabs>
+        </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="More options">
-              <MoreVertical className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => fileRef.current?.click()}>
-              Import entries
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={exportResults}>
-              <Download className="mr-2 size-4" /> Export results
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onClearResults}>Clear results</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".txt,.csv"
-          hidden
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-            file.text().then(onEntriesChange);
-            event.target.value = "";
-          }}
-        />
-      </div>
-
-      {tab === "entries" ? (
-        <>
+        <TabsContent value="entries" className="m-0 flex min-h-0 flex-1 flex-col gap-3 p-3">
           <Textarea
             value={entriesText}
             onChange={(event) => onEntriesChange(event.target.value)}
-            className="wheel-entry-editor"
-            placeholder={"Enter one entry per line..."}
+            placeholder={"Alice\nBob\nCharlie\nDavid"}
+            className="min-h-0 flex-1 resize-none font-mono text-sm leading-6"
             spellCheck={false}
           />
 
-          <div className="wheel-editor-actions">
-            <Button variant="outline" size="sm" onClick={onShuffle}>
-              <Shuffle className="mr-2 size-4" /> Shuffle
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={onShuffle}>
+              <Shuffle className="mr-2 h-4 w-4" />
+              Shuffle
             </Button>
-            <Button variant="outline" size="sm" onClick={onSort}>
-              <ArrowDownAZ className="mr-2 size-4" /> Sort
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-              Add image
+            <Button variant="outline" onClick={onSort}>
+              <ArrowDownAZ className="mr-2 h-4 w-4" />
+              Sort
             </Button>
           </div>
-        </>
-      ) : (
-        <div className="wheel-results">
-          {results.length ? results.map((result, index) => (
-            <div className="wheel-result-row" key={`${result}-${index}`}>
-              <span>{results.length - index}.</span>
-              <strong>{result}</strong>
-            </div>
-          )) : (
-            <div className="wheel-empty">No results yet.</div>
-          )}
-        </div>
-      )}
 
-      <div className="wheel-sidebar-divider" />
-
-      <div className="wheel-control-row">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            for (let i = 0; i < wheelCount; i += 1) {
-              setActiveWheel(i);
-            }
-          }}
-        >
-          <RotateCw className="mr-2 size-4" /> Spin all wheels
-        </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm">
-              <Plus className="mr-2 size-4" /> Add wheel
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={onClear}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onAddWheel}>New blank wheel</DropdownMenuItem>
-            <DropdownMenuItem onClick={onAddWheel}>Open wheel</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+            <Button
+              onClick={onSpin}
+              disabled={spinning || !entriesText.trim()}
+              className="bg-[#5dade2] text-white hover:bg-[#4b9bd1]"
+            >
+              <Play className="mr-2 h-4 w-4 fill-current" />
+              {spinning ? "Spinning…" : "Spin"}
+            </Button>
+          </div>
 
-      {wheelCount > 1 && (
-        <div className="wheel-list">
-          {Array.from({ length: wheelCount }, (_, index) => (
-            <div key={index} className={`wheel-list-item ${activeWheel === index ? "active" : ""}`}>
-              <button onClick={() => setActiveWheel(index)}>Wheel {index + 1}</button>
-              <button
-                className="wheel-list-delete"
-                onClick={onRemoveWheel}
-                aria-label={`Remove wheel ${index + 1}`}
-              >
-                <Trash2 className="size-4" />
-              </button>
+          <div className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
+            <div className="mb-1 flex items-center gap-2 font-semibold text-foreground">
+              <Plus className="h-3.5 w-3.5" />
+              One entry per line
             </div>
-          ))}
-        </div>
-      )}
+            Empty lines are ignored. Use Ctrl + Enter to spin.
+          </div>
+        </TabsContent>
 
-      <div className="wheel-advanced">
-        <div className="wheel-advanced-title">Advanced</div>
-
-        <label className="wheel-setting">
-          <span>Allow duplicates</span>
-          <Switch checked={config.allowDuplicates} onCheckedChange={(checked) => updateConfig({ allowDuplicates: checked })} />
-        </label>
-
-        <label className="wheel-setting">
-          <span>Auto-remove winner after 5 seconds</span>
-          <Switch checked={config.autoRemoveWinner} onCheckedChange={(checked) => updateConfig({ autoRemoveWinner: checked })} />
-        </label>
-
-        <label className="wheel-setting">
-          <span>Pointer changes color</span>
-          <Switch checked={config.pointerChangesColor} onCheckedChange={(checked) => updateConfig({ pointerChangesColor: checked })} />
-        </label>
-
-        <div className="wheel-setting-input">
-          <span>Spin time</span>
-          <Input
-            type="number"
-            min={1}
-            max={60}
-            value={config.spinTime}
-            onChange={(event) => updateConfig({ spinTime: Math.max(1, Math.min(60, Number(event.target.value) || 1)) })}
-            className="w-20"
-          />
-          <span>sec</span>
-        </div>
-      </div>
+        <TabsContent value="results" className="m-0 min-h-0 flex-1 overflow-auto p-3">
+          {results.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Winners will appear here.
+            </div>
+          ) : (
+            <ol className="space-y-2">
+              {results.map((result, index) => (
+                <li
+                  key={`${result}-${index}`}
+                  className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2"
+                >
+                  <span className="w-7 text-center text-xs text-muted-foreground">
+                    {index + 1}
+                  </span>
+                  <span className="flex-1 truncate">{result}</span>
+                  <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+                </li>
+              ))}
+            </ol>
+          )}
+        </TabsContent>
+      </Tabs>
     </aside>
   );
 }
