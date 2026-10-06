@@ -46,6 +46,13 @@ const navItems: NavItem[] = [
     name: "Spin Wheel",
     href: "/spin-wheel",
     public: true,
+    permission: "spinwheel",
+  },
+  {
+    name: "Download",
+    href: "/download",
+    public: true,
+    permission: "download",
   },
   {
     name: "Dashboard",
