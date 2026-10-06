@@ -31,7 +31,7 @@ import {
 import confetti from "canvas-confetti"
 import { Wheel } from "spin-wheel"
 import { toast } from "sonner"
-import Navbar from "@/components/Navbar"
+import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
 
 interface Entry {
