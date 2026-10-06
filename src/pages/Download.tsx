@@ -864,7 +864,7 @@ export default function Download() {
                               <p className="mt-1 text-xs text-muted-foreground">
                                 Released {formatDate(release.published_at)}
                               </p>
-                            </button>
+                            </div>
 
                           </div>
 
