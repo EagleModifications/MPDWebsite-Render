@@ -1,4 +1,4 @@
-name: Build MPD Desktop
+name: MPD Desktop Release
 
 on:
   release:
@@ -10,14 +10,12 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build Windows Installer
+    name: Build Windows
     runs-on: windows-latest
 
     steps:
-      - name: Checkout release
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.tag_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -26,36 +24,64 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Build web application
+        run: npm run build
 
       - name: Build Windows installer
-        run: npm run desktop:build
-
-      - name: Show build output
-        shell: pwsh
-        run: |
-          Write-Host "Files generated in release/:"
-          Get-ChildItem -Path "release" -Recurse | Select-Object FullName, Length
-
-      - name: Upload installer to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
-        run: |
-          $tag = "${{ github.event.release.tag_name }}"
+        run: npx electron-builder --win nsis --publish always
 
-          $files = Get-ChildItem -Path "release" -File |
-            Where-Object {
-              $_.Extension -in @(".exe", ".yml", ".blockmap")
-            }
 
-          if ($files.Count -eq 0) {
-            Write-Error "No Electron release files were found in release/"
-            Get-ChildItem -Path "release" -Recurse
-            exit 1
-          }
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
 
-          foreach ($file in $files) {
-            Write-Host "Uploading $($file.Name)..."
-            gh release upload $tag $file.FullName --clobber --repo "${{ github.repository }}"
-          }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Build macOS installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --mac dmg --publish always
+
+
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Build Linux installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --linux AppImage --publish always
