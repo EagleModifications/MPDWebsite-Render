@@ -1777,7 +1777,7 @@ export default function Gallery() {
               </div>
             ) : (
               <div className="h-auto p-3 sm:p-4">
-                <div className={galleryLayout === "home" ? "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"}>
+                <div className={galleryLayout === "home" ? "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4" : "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"}>
                   {filteredItems.map(
                     (item) => {
                       const mediaList =
@@ -1789,8 +1789,8 @@ export default function Gallery() {
                         <article
                           key={item.id}
                           className={galleryLayout === "home"
-                            ? "group overflow-hidden rounded-xl border border-border/50 bg-background/40 transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/30 hover:bg-blue-500/[0.025]"
-                            : "overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"}
+                            ? "group self-start overflow-hidden rounded-xl border border-border/50 bg-background/40 transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/30 hover:bg-blue-500/[0.025]"
+                            : "self-start overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"}
                         >
                           {galleryLayout === "home" ? (
                             <>
