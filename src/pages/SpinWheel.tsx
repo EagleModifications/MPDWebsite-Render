@@ -35,7 +35,7 @@ const createEntry = (text: string, index: number): WheelEntry => ({
 });
 
 const createDefaultConfig = (): WheelConfig => ({
-  entries: ["Ali", "Beatriz", "Charles", "Diya", "Eric", "Fatima", "Gabriel", "Hanna"].map(createEntry),
+  entries: ["Ali", "Beatriz", "Charles", "Diya", "Eric", "Fatima", "Gabriel", "Hanna"].map((text, index) => createEntry(text, index)),
   spinTime: 10,
   duringSpinSound: true,
   duringSpinSoundVolume: 50,
