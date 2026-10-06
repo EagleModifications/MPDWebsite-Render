@@ -383,6 +383,11 @@ export default function App() {
           />
 
           <Route
+            path="/wheel/"
+            element={<Navigate to="/wheel" replace />}
+          />
+
+          <Route
             path="/wheel"
             element={<WheelOfNames />}
           />
