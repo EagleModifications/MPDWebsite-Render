@@ -4,6 +4,7 @@ import {
   ChevronUp,
   Clipboard,
   ClipboardCheck,
+  Check,
   FileInput,
   FileText,
   History,
@@ -22,6 +23,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 import { toast } from "sonner"
@@ -412,6 +414,21 @@ function IdentityCard({
   compact?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (target && !menuRef.current?.contains(target)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    return () => document.removeEventListener("pointerdown", handlePointerDown)
+  }, [open])
 
   const copy = async (value: string, label: string) => {
     try {
@@ -419,8 +436,10 @@ function IdentityCard({
       toast.success(`${label} copied`, {
         description: value,
       })
+      setOpen(false)
     } catch {
       toast.error("Copy failed")
+      setOpen(false)
     }
   }
 
@@ -429,14 +448,13 @@ function IdentityCard({
     : undefined
 
   return (
-    <div className="relative min-w-0">
+    <div ref={menuRef} className="relative min-w-0">
       <button
         type="button"
         className={`group flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:bg-blue-500/5 ${
           compact ? "px-1.5 py-1" : "px-2 py-1.5"
         }`}
-        onClick={(event) => {
-          event.stopPropagation()
+        onClick={() => {
           setOpen((current) => !current)
         }}
       >
@@ -473,8 +491,7 @@ function IdentityCard({
 
       {open ? (
         <div
-          className="absolute left-0 top-full z-[80] mt-1 w-64 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-2xl"
-          onClick={(event) => event.stopPropagation()}
+          className="absolute left-0 top-full z-[200] mt-1 w-64 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-2xl"
         >
           <div className="border-b border-border px-3 py-2.5">
             <p className="truncate text-sm font-semibold">
@@ -696,24 +713,30 @@ function FilterDropdown({
   width?: string
 }) {
   const [open, setOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
 
-    const close = () => setOpen(false)
-    window.addEventListener("click", close)
-    return () => window.removeEventListener("click", close)
+    const close = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (target && !dropdownRef.current?.contains(target)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener("pointerdown", close)
+    return () => document.removeEventListener("pointerdown", close)
   }, [open])
 
   const selected = options.find((option) => option.value === value)
 
   return (
-    <div className={`relative ${width}`}>
+    <div ref={dropdownRef} className={`relative ${width}`}>
       <button
         type="button"
         aria-expanded={open}
-        onClick={(event) => {
-          event.stopPropagation()
+        onClick={() => {
           setOpen((current) => !current)
         }}
         className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-card px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/60"
@@ -725,7 +748,6 @@ function FilterDropdown({
       {open ? (
         <div
           className="absolute left-0 top-[calc(100%+4px)] z-[100] max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl"
-          onClick={(event) => event.stopPropagation()}
         >
           {options.map((option) => {
             const active = option.value === value
@@ -740,7 +762,7 @@ function FilterDropdown({
                 }}
               >
                 <span className="truncate">{option.label}</span>
-                {active ? <span className="ml-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" /> : null}
+                {active ? <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-blue-400" /> : null}
               </button>
             )
           })}
@@ -760,9 +782,6 @@ export default function PromotionLogs() {
   const [userId, setUserId] = useState("")
   const [action, setAction] = useState("")
   const [search, setSearch] = useState("")
-  const [from, setFrom] = useState("")
-  const [to, setTo] = useState("")
-  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false)
 
   const [expanded, setExpanded] = useState<string | null>(null)
   const [page, setPage] = useState(1)
@@ -782,9 +801,7 @@ export default function PromotionLogs() {
       category ||
       division ||
       userId ||
-      action ||
-      from ||
-      to,
+      action,
   )
 
   const loadLogs = useCallback(async () => {
@@ -816,14 +833,6 @@ export default function PromotionLogs() {
 
       if (action) {
         params.set("action", action)
-      }
-
-      if (from) {
-        params.set("from", `${from}T00:00:00.000Z`)
-      }
-
-      if (to) {
-        params.set("to", `${to}T23:59:59.999Z`)
       }
 
       const response = await fetch(
@@ -920,8 +929,6 @@ export default function PromotionLogs() {
     division,
     userId,
     action,
-    from,
-    to,
   ])
 
   useEffect(() => {
@@ -970,11 +977,8 @@ export default function PromotionLogs() {
     setDivision("")
     setUserId("")
     setAction("")
-    setFrom("")
-    setTo("")
     setPage(1)
     setExpanded(null)
-    setAdvancedFiltersOpen(false)
   }
 
   const changeFilter = <T,>(
@@ -1021,35 +1025,47 @@ export default function PromotionLogs() {
     <DashboardLayout>
       <div className="flex min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
         {/* Compact reference-style controls */}
-        <div className="mx-auto w-full max-w-[760px]">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button type="button" className="rounded-lg border border-blue-500/60 bg-blue-500/10 px-3 py-1.5 text-[12px] font-medium text-blue-400 shadow-sm">
-              Promotion Logs
-            </button>
+        <div className="w-full">
+          <div className="flex items-center justify-between gap-3">
+            <div className="mx-auto flex w-full max-w-[760px] items-center gap-1.5 lg:mx-0">
+              <button
+                type="button"
+                className="rounded-lg border border-blue-500/60 bg-blue-500/10 px-3 py-1.5 text-[12px] font-medium text-blue-400 shadow-sm"
+              >
+                Promotion Logs
+              </button>
+            </div>
+
             <button
               type="button"
-              aria-expanded={advancedFiltersOpen}
-              onClick={() => setAdvancedFiltersOpen((current) => !current)}
-              className={`rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors ${
-                advancedFiltersOpen
-                  ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              }`}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-[12px] font-medium text-foreground transition-colors hover:border-blue-500/40 hover:text-blue-400"
+              onClick={() => void loadLogs()}
+              disabled={loading}
             >
-              <span className="inline-flex items-center gap-1.5">
-                More filters
-                <ChevronDown className={`h-3 w-3 transition-transform ${advancedFiltersOpen ? "rotate-180" : ""}`} />
-              </span>
-            </button>
-            <button type="button" className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground" onClick={() => void loadLogs()} disabled={loading}>
-              <span className="inline-flex items-center gap-1.5">
-                <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-                Refresh
-              </span>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              Refresh
             </button>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mx-auto mt-3 grid w-full max-w-[760px] grid-cols-1 gap-2 sm:grid-cols-[minmax(220px,1fr)_170px_170px_170px]">
+            <div className="relative min-w-0">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(event) => changeFilter(setSearch, event.target.value)}
+                placeholder="Search users, actions, IDs, targets..."
+                className="h-9 w-full border-border bg-card pl-9 text-[12px]"
+              />
+            </div>
+
+            <FilterDropdown
+              value={category}
+              placeholder="All Categories"
+              options={categoryOptions}
+              onChange={(value) => changeFilter(setCategory, value as Category)}
+              width="w-full"
+            />
+
             <FilterDropdown
               value={userId}
               placeholder="Anyone"
@@ -1070,6 +1086,7 @@ export default function PromotionLogs() {
                 ),
               ]}
               onChange={(value) => changeFilter(setUserId, value)}
+              width="w-full"
             />
 
             <FilterDropdown
@@ -1083,40 +1100,25 @@ export default function PromotionLogs() {
                 })),
               ]}
               onChange={(value) => changeFilter(setAction, value)}
+              width="w-full"
             />
+          </div>
 
-            <span className="ml-auto text-[11px] text-muted-foreground">
+          <div className="mt-2 flex min-h-5 items-center justify-end gap-2">
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+                Clear filters
+              </button>
+            ) : null}
+            <span className="text-[11px] text-muted-foreground">
               {pagination.total.toLocaleString()} changes
             </span>
           </div>
-
-          {(advancedFiltersOpen || hasFilters) && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/60 pt-2">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input value={search} onChange={(event) => changeFilter(setSearch, event.target.value)} placeholder="Search..." className="h-8 w-[220px] border-border bg-card pl-8 text-[11px]" />
-              </div>
-              <FilterDropdown
-                value={category}
-                placeholder="All Categories"
-                options={categoryOptions}
-                onChange={(value) => changeFilter(setCategory, value as Category)}
-                width="w-[150px]"
-              />
-              <FilterDropdown
-                value={division}
-                placeholder="All Divisions"
-                options={divisionOptions}
-                onChange={(value) => changeFilter(setDivision, value as Division)}
-                width="w-[150px]"
-              />
-              <Input type="date" value={from} onChange={(event) => changeFilter(setFrom, event.target.value)} className="h-8 w-[130px] text-[11px]" />
-              <Input type="date" value={to} onChange={(event) => changeFilter(setTo, event.target.value)} className="h-8 w-[130px] text-[11px]" />
-              <button type="button" onClick={clearFilters} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-card px-2.5 text-[11px] text-muted-foreground hover:text-foreground">
-                <X className="h-3 w-3" /> Clear
-              </button>
-            </div>
-          )}
         </div>
 
         {error ? (
@@ -1214,8 +1216,8 @@ export default function PromotionLogs() {
                           >
                             <div className="flex min-w-0 items-center gap-2.5 px-3 py-2.5">
                               {/* Entry */}
-                              <div className="hidden w-8 shrink-0 items-center gap-1 sm:flex">
-                                <span className="font-mono text-[10px] font-medium text-muted-foreground">
+                              <div className="flex w-9 shrink-0 items-center justify-center">
+                                <span className="font-mono text-[10px] font-medium text-muted-foreground/80">
                                   #{entryNumber}
                                 </span>
                               </div>
@@ -1315,7 +1317,7 @@ export default function PromotionLogs() {
 
                             {/* Summary */}
                             {log.summary ? (
-                              <div className="border-t border-border/60 px-3 pb-3 pt-2 sm:px-[68px]">
+                              <div className="border-t border-border/60 px-3 pb-3 pt-2 sm:pl-[68px] sm:pr-3">
                                 <p className="line-clamp-2 text-[11px] leading-4 text-muted-foreground">
                                   {log.summary}
                                 </p>
