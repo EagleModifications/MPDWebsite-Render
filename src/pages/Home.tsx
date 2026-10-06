@@ -949,8 +949,6 @@ export default function Home() {
                       a.createdAt,
                     ).getTime(),
                 )
-                // Keep enough recent items loaded so the Home tabs can
-                // still show the latest six for either category.
                 .slice(0, 30),
             )
           } catch {
@@ -1039,13 +1037,15 @@ export default function Home() {
     [],
   )
 
-  const filteredGallery = useMemo(() => {
-    return gallery
-      .filter((item) =>
-        galleryCategory === "All" ||
-        (item.category ?? "Community") === galleryCategory,
-      )
-      .slice(0, 6)
+  const visibleGallery = useMemo(() => {
+    const filtered =
+      galleryCategory === "All"
+        ? gallery
+        : gallery.filter(
+            (item) => item.category === galleryCategory,
+          )
+
+    return filtered.slice(0, 6)
   }, [gallery, galleryCategory])
 
   return (
@@ -1261,6 +1261,23 @@ export default function Home() {
               </p>
             </div>
 
+            <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border/60 bg-background/50 p-1">
+              {(["All", "Community", "Fleet"] as const).map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setGalleryCategory(category)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    galleryCategory === category
+                      ? "bg-blue-500/10 text-blue-500"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+
             <Link
               to="/gallery"
               className="group hidden shrink-0 items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-blue-500 sm:flex"
@@ -1271,40 +1288,18 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="mb-6 flex flex-wrap items-center gap-1.5 border-b border-border/50 pb-3">
-            <span className="mr-2 text-xs font-medium text-muted-foreground">
-              Category:
-            </span>
-
-            {(["All", "Community", "Fleet"] as const).map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setGalleryCategory(category)}
-                className={[
-                  "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
-                  galleryCategory === category
-                    ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                    : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                ].join(" ")}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-
           {contentLoading ? (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map((item) => (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {[1, 2, 3, 4].map((item) => (
                 <div
                   key={item}
                   className="h-64 animate-pulse rounded-xl border border-border/40 bg-white/[0.02]"
                 />
               ))}
             </div>
-          ) : filteredGallery.length > 0 ? (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredGallery.map((item) => {
+          ) : gallery.length > 0 ? (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {visibleGallery.map((item) => {
                 const preview =
                   getGalleryPreview(item)
 
@@ -1396,7 +1391,6 @@ export default function Home() {
                           <p className="line-clamp-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
                             {item.description}
                           </p>
-
                           {(item.description.length > 120 ||
                             item.description.split(/\r?\n/).length > 2) && (
                             <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
@@ -1415,7 +1409,7 @@ export default function Home() {
               <ImageIcon className="mx-auto h-8 w-8 text-muted-foreground/40" />
 
               <p className="mt-4 text-sm text-muted-foreground">
-                No gallery posts are available for this category yet.
+                No gallery posts are available yet.
               </p>
             </div>
           )}
