@@ -9,7 +9,10 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "tsx server/index.ts"
+    "start": "tsx server/index.ts",
+    "desktop:dev": "electron desktop/main.cjs",
+    "desktop:build": "electron-builder --win nsis",
+    "desktop:release": "electron-builder --win nsis --publish always"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.6",
@@ -42,7 +45,8 @@
     "tailwind-merge": "^3.3.1",
     "tw-animate-css": "^1.3.0",
     "xlsx": "^0.18.5",
-    "youtube-dl-exec": "^3.1.17"
+    "youtube-dl-exec": "^3.1.17",
+    "electron-updater": "^6.6.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
@@ -63,6 +67,47 @@
     "tsx": "^4.19.2",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.44.0",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "electron": "^38.2.2",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.metropd.desktop",
+    "productName": "Metro Police Department",
+    "artifactName": "MPD-Police-Department-Setup-${version}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/main.cjs",
+      "desktop/preload.cjs",
+      "desktop/icon.png"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "desktop/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Metro Police Department",
+      "runAfterFinish": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "EagleModifications",
+      "repo": "MPDWebsite-Render",
+      "releaseType": "release"
+    }
   }
 }
