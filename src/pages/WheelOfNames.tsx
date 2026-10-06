@@ -4,22 +4,22 @@ import {
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
 } from "react"
 import {
-  Check,
   ChevronDown,
+  ChevronUp,
   Copy,
+  Expand,
   FilePlus2,
   FolderOpen,
-  HelpCircle,
   History,
   MoreHorizontal,
   Palette,
   Plus,
   RotateCcw,
   Save,
-  Settings2,
+  Scissors,
+  Share2,
   Shuffle,
   Sparkles,
   Trash2,
@@ -28,16 +28,37 @@ import {
   VolumeX,
   X,
 } from "lucide-react"
+import confetti from "canvas-confetti"
 import { Wheel } from "spin-wheel"
 import { toast } from "sonner"
-
+import Navbar from "@/components/Navbar"
 import Footer from "@/components/Footer"
-import Navbar from "@/components/home/Navbar"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 
-const STORAGE_KEY = "mpd-wheel-of-names"
-const MAX_HISTORY = 25
+interface Entry {
+  text: string
+  color?: string
+}
+
+type SavedWheel = {
+  title: string
+  description: string
+  entries: Entry[]
+  colors: string[]
+  spinTime: number
+  removeWinner: boolean
+  sound: boolean
+  confetti: boolean
+}
+
+const STORAGE_KEY = "mpd-wheel-of-names-v4"
+const DEFAULT_COLORS = [
+  "#2563eb",
+  "#0f172a",
+  "#3b82f6",
+  "#1e293b",
+  "#60a5fa",
+  "#334155",
+]
 
 const DEFAULT_ENTRIES = [
   "Option 1",
@@ -50,752 +71,617 @@ const DEFAULT_ENTRIES = [
   "Option 8",
 ]
 
-const MPD_COLORS = [
-  "#2563eb",
-  "#0f172a",
-  "#3b82f6",
-  "#1e293b",
-  "#60a5fa",
-  "#334155",
-  "#1d4ed8",
-  "#475569",
-  "#2563eb",
-  "#111827",
-]
-
-type WheelSettings = {
-  duration: number
-  removeWinner: boolean
-  sound: boolean
-  confetti: boolean
-  showWinnerDialog: boolean
-}
-
-type StoredState = {
-  entries?: string[]
-  history?: string[]
-  title?: string
-  description?: string
-  settings?: Partial<WheelSettings>
-}
-
-type WheelItem = {
-  label: string
-  backgroundColor: string
-  labelColor: string
-}
-
-function loadState(): StoredState {
+function randomInt(max: number) {
+  if (max <= 1) return 0
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as StoredState
-    return parsed && typeof parsed === "object" ? parsed : {}
+    const array = new Uint32Array(1)
+    crypto.getRandomValues(array)
+    return Math.floor((array[0] / 4294967296) * max)
   } catch {
-    return {}
+    return Math.floor(Math.random() * max)
   }
 }
 
-function randomIndex(length: number) {
-  if (length <= 1) return 0
-
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    const value = new Uint32Array(1)
-    crypto.getRandomValues(value)
-    return value[0] % length
-  }
-
-  return Math.floor(Math.random() * length)
+function downloadText(filename: string, contents: string) {
+  const blob = new Blob([contents], { type: "application/json" })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
 }
 
-function shuffleList<T>(list: T[]) {
-  const result = [...list]
-  for (let i = result.length - 1; i > 0; i -= 1) {
-    const j = randomIndex(i + 1)
-    ;[result[i], result[j]] = [result[j], result[i]]
-  }
-  return result
-}
-
-function createItems(entries: string[]): WheelItem[] {
-  return entries.map((label, index) => ({
-    label,
-    backgroundColor: MPD_COLORS[index % MPD_COLORS.length],
-    labelColor: "#ffffff",
-  }))
-}
-
-function playTone(type: "tick" | "winner", enabled: boolean) {
-  if (!enabled || typeof window === "undefined") return
-
+function playTone(kind: "tick" | "winner") {
   try {
     const AudioContextClass =
       window.AudioContext ||
       (window as typeof window & { webkitAudioContext?: typeof AudioContext })
         .webkitAudioContext
-
     if (!AudioContextClass) return
-
     const context = new AudioContextClass()
     const oscillator = context.createOscillator()
     const gain = context.createGain()
-    const now = context.currentTime
-
-    oscillator.type = type === "winner" ? "sine" : "triangle"
-    oscillator.frequency.setValueAtTime(type === "winner" ? 600 : 150, now)
-    if (type === "winner") {
-      oscillator.frequency.exponentialRampToValueAtTime(900, now + 0.18)
-    }
-
-    gain.gain.setValueAtTime(0.0001, now)
+    oscillator.type = kind === "winner" ? "sine" : "square"
+    oscillator.frequency.value = kind === "winner" ? 660 : 130
+    gain.gain.setValueAtTime(0.0001, context.currentTime)
     gain.gain.exponentialRampToValueAtTime(
-      type === "winner" ? 0.08 : 0.025,
-      now + 0.01,
+      kind === "winner" ? 0.08 : 0.025,
+      context.currentTime + 0.01,
     )
-    gain.gain.exponentialRampToValueAtTime(
-      0.0001,
-      now + (type === "winner" ? 0.28 : 0.07),
-    )
-
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.12)
     oscillator.connect(gain)
     gain.connect(context.destination)
-    oscillator.start(now)
-    oscillator.stop(now + (type === "winner" ? 0.3 : 0.08))
-
-    window.setTimeout(() => void context.close(), 350)
+    oscillator.start()
+    oscillator.stop(context.currentTime + 0.13)
+    window.setTimeout(() => void context.close(), 250)
   } catch {
-    // Audio is optional.
+    // Audio is optional; silently ignore browsers that block it.
   }
 }
 
-function downloadWheel(state: StoredState) {
-  const blob = new Blob([JSON.stringify(state, null, 2)], {
-    type: "application/json",
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement("a")
-  anchor.href = url
-  anchor.download = "mpd-wheel.wheel"
-  anchor.click()
-  URL.revokeObjectURL(url)
-}
-
 export default function WheelOfNames() {
-  const stored = useMemo(() => loadState(), [])
-
-  const initialEntries = stored.entries?.filter(Boolean).length
-    ? stored.entries!.filter(Boolean)
-    : DEFAULT_ENTRIES
-
-  const [entries, setEntries] = useState<string[]>(initialEntries)
-  const [listText, setListText] = useState(initialEntries.join("\n"))
-  const [history, setHistory] = useState<string[]>(stored.history ?? [])
-  const [title, setTitle] = useState(stored.title ?? "Wheel of Names")
-  const [description, setDescription] = useState(
-    stored.description ?? "Enter names below and spin the wheel to pick a random winner.",
-  )
-  const [settings, setSettings] = useState<WheelSettings>({
-    duration: stored.settings?.duration ?? 5,
-    removeWinner: stored.settings?.removeWinner ?? false,
-    sound: stored.settings?.sound ?? true,
-    confetti: stored.settings?.confetti ?? true,
-    showWinnerDialog: stored.settings?.showWinnerDialog ?? true,
-  })
-
-  const [winner, setWinner] = useState<string | null>(null)
-  const [isSpinning, setIsSpinning] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [customizeOpen, setCustomizeOpen] = useState(false)
-  const [moreOpen, setMoreOpen] = useState(false)
-  const [advanced, setAdvanced] = useState(false)
-  const [showConfetti, setShowConfetti] = useState(false)
-
-  const wheelContainerRef = useRef<HTMLDivElement | null>(null)
+  const wheelHostRef = useRef<HTMLDivElement>(null)
   const wheelRef = useRef<Wheel | null>(null)
-  const entriesRef = useRef(entries)
-  const settingsRef = useRef(settings)
-  const spinningRef = useRef(false)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [title, setTitle] = useState("Wheel of Names")
+  const [description, setDescription] = useState("")
+  const [entries, setEntries] = useState<Entry[]>(
+    DEFAULT_ENTRIES.map((text) => ({ text })),
+  )
+  const [draftEntries, setDraftEntries] = useState(DEFAULT_ENTRIES.join("\n"))
+  const [colors, setColors] = useState(DEFAULT_COLORS)
+  const [spinTime, setSpinTime] = useState(5)
+  const [removeWinner, setRemoveWinner] = useState(false)
+  const [sound, setSound] = useState(true)
+  const [confettiEnabled, setConfettiEnabled] = useState(true)
+  const [winner, setWinner] = useState("")
+  const [history, setHistory] = useState<string[]>([])
+  const [spinning, setSpinning] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [showCustomize, setShowCustomize] = useState(false)
+  const [showMore, setShowMore] = useState(false)
+  const [showHistory, setShowHistory] = useState(true)
+  const [showSettings, setShowSettings] = useState(true)
+  const [showDescriptionEditor, setShowDescriptionEditor] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const settingsRef = useRef({
+    title,
+    description,
+    colors,
+    spinTime,
+    removeWinner,
+    sound,
+    confetti: confettiEnabled,
+  })
+  settingsRef.current = { title, description, colors, spinTime, removeWinner, sound, confetti: confettiEnabled }
+
+  const entryTexts = useMemo(
+    () => entries.map((entry) => entry.text).filter(Boolean),
+    [entries],
+  )
+
+  const saveLocal = useCallback(
+    (nextEntries = entries) => {
+      const payload: SavedWheel = {
+        title,
+        description,
+        entries: nextEntries,
+        colors,
+        spinTime,
+        removeWinner,
+        sound,
+        confetti: confettiEnabled,
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+    },
+    [colors],
+  )
+
+  const rebuildWheel = useCallback(
+    (nextEntries = entries) => {
+      if (!wheelHostRef.current) return
+      const host = wheelHostRef.current
+      host.innerHTML = ""
+      const wheel = new Wheel(host, {
+        items: nextEntries.map((entry, index) => ({
+          label: entry.text,
+          backgroundColor: entry.color || colors[index % colors.length],
+          textColor: "#ffffff",
+        })),
+        pointerAngle: 270,
+        radius: 0.9,
+        borderWidth: 2,
+        borderColor: "#0b1220",
+        lineWidth: 1,
+        lineColor: "rgba(255,255,255,.24)",
+        itemLabelFont: "Geist Variable, sans-serif",
+        itemLabelFontSizeMax: 22,
+        itemLabelRadius: 0.76,
+        itemLabelRadiusMax: 0.9,
+        itemLabelAlign: "right",
+        itemLabelColors: ["#ffffff"],
+        pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        isInteractive: false,
+      })
+      wheel.onCurrentIndexChange = () => {
+        if (settingsRef.current.sound) playTone("tick")
+      }
+      wheel.onRest = (event: { currentIndex: number }) => {
+        const index = event.currentIndex
+        const selected = nextEntries[index]?.text
+        if (!selected) return
+        setSpinning(false)
+        setWinner(selected)
+        setHistory((current) => [selected, ...current.filter((item) => item !== selected)].slice(0, 20))
+        if (settingsRef.current.sound) playTone("winner")
+        if (settingsRef.current.confetti) {
+          void confetti({ particleCount: 120, spread: 75, origin: { y: 0.62 } })
+        }
+        if (settingsRef.current.removeWinner) {
+          const remaining = nextEntries.filter((_, itemIndex) => itemIndex !== index)
+          setEntries(remaining)
+          setDraftEntries(remaining.map((item) => item.text).join("\n"))
+          const settings = settingsRef.current
+          const payload: SavedWheel = { title: settings.title, description: settings.description, entries: remaining, colors: settings.colors, spinTime: settings.spinTime, removeWinner: settings.removeWinner, sound: settings.sound, confetti: settings.confetti }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+          window.setTimeout(() => rebuildWheel(remaining), 0)
+        } else {
+          const settings = settingsRef.current
+          const payload: SavedWheel = { title: settings.title, description: settings.description, entries: nextEntries, colors: settings.colors, spinTime: settings.spinTime, removeWinner: settings.removeWinner, sound: settings.sound, confetti: settings.confetti }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+        }
+      }
+      wheelRef.current = wheel
+    },
+    [colors],
+  )
 
   useEffect(() => {
-    entriesRef.current = entries
-  }, [entries])
-
-  useEffect(() => {
-    settingsRef.current = settings
-  }, [settings])
-
-  useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ entries, history, title, description, settings }),
-    )
-  }, [entries, history, title, description, settings])
-
-  const updateEntries = useCallback((next: string[]) => {
-    setEntries(next)
-    setListText(next.join("\n"))
-    setWinner(null)
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const saved = JSON.parse(raw) as SavedWheel
+        if (Array.isArray(saved.entries) && saved.entries.length) {
+          setEntries(saved.entries)
+          setDraftEntries(saved.entries.map((entry) => entry.text).join("\n"))
+        }
+        if (typeof saved.title === "string") setTitle(saved.title)
+        if (typeof saved.description === "string") setDescription(saved.description)
+        if (Array.isArray(saved.colors) && saved.colors.length) setColors(saved.colors)
+        if (typeof saved.spinTime === "number") setSpinTime(saved.spinTime)
+        if (typeof saved.removeWinner === "boolean") setRemoveWinner(saved.removeWinner)
+        if (typeof saved.sound === "boolean") setSound(saved.sound)
+        if (typeof saved.confetti === "boolean") setConfettiEnabled(saved.confetti)
+      }
+    } catch {
+      // Ignore malformed local data.
+    } finally {
+      setLoaded(true)
+    }
   }, [])
 
-  const applyEntries = useCallback(() => {
-    const next = listText
-      .split(/\r?\n/)
-      .map((value) => value.trim())
-      .filter(Boolean)
+  useEffect(() => {
+    if (!loaded) return
+    rebuildWheel()
+    return () => {
+      wheelRef.current = null
+    }
+  }, [loaded, rebuildWheel])
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault()
+        if (!spinning) spin()
+      }
+      if (event.key === "Escape") {
+        setShowCustomize(false)
+        setShowMore(false)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  })
+
+  function updateWheel() {
+    const next = draftEntries
+      .split(/\r?\n/)
+      .map((text) => text.trim())
+      .filter(Boolean)
+      .map((text) => ({ text }))
     if (!next.length) {
-      toast.error("Enter at least one name or option.")
+      toast.error("Add at least one entry.")
       return
     }
+    setEntries(next)
+    setWinner("")
+    saveLocal(next)
+    rebuildWheel(next)
+    toast.success("Wheel updated")
+  }
 
-    updateEntries(next)
-    toast.success(`${next.length} entries loaded`)
-  }, [listText, updateEntries])
+  function spin() {
+    if (spinning || !wheelRef.current || !entryTexts.length) return
+    setSpinning(true)
+    setWinner("")
+    const index = randomInt(entryTexts.length)
+    wheelRef.current.spinToItem(index, spinTime * 1000, true, 5, 1)
+  }
 
-  const addEntry = useCallback(() => {
-    if (isSpinning) return
-    const next = [...entries, `Option ${entries.length + 1}`]
-    updateEntries(next)
-  }, [entries, isSpinning, updateEntries])
+  function newWheel() {
+    const next = DEFAULT_ENTRIES.map((text) => ({ text }))
+    setTitle("Wheel of Names")
+    setDescription("")
+    setEntries(next)
+    setDraftEntries(DEFAULT_ENTRIES.join("\n"))
+    setWinner("")
+    setHistory([])
+    setRemoveWinner(false)
+    setSpinTime(5)
+    setSound(true)
+    setConfettiEnabled(true)
+    setColors(DEFAULT_COLORS)
+    window.setTimeout(() => rebuildWheel(next), 0)
+    localStorage.removeItem(STORAGE_KEY)
+    toast.success("New wheel created")
+  }
 
-  const shuffle = useCallback(() => {
-    if (isSpinning) return
-    updateEntries(shuffleList(entries))
-    toast.success("Entries shuffled")
-  }, [entries, isSpinning, updateEntries])
+  function shuffleEntries() {
+    const next = [...entries]
+    for (let index = next.length - 1; index > 0; index -= 1) {
+      const target = randomInt(index + 1)
+      ;[next[index], next[target]] = [next[target], next[index]]
+    }
+    setEntries(next)
+    setDraftEntries(next.map((entry) => entry.text).join("\n"))
+    rebuildWheel(next)
+    saveLocal(next)
+  }
 
-  const sortEntries = useCallback(() => {
-    if (isSpinning) return
-    updateEntries([...entries].sort((a, b) => a.localeCompare(b)))
-  }, [entries, isSpinning, updateEntries])
-
-  const removeDuplicates = useCallback(() => {
-    if (isSpinning) return
+  function removeDuplicates() {
     const seen = new Set<string>()
     const next = entries.filter((entry) => {
-      const key = entry.toLowerCase()
+      const key = entry.text.trim().toLowerCase()
       if (seen.has(key)) return false
       seen.add(key)
       return true
     })
-    updateEntries(next)
+    setEntries(next)
+    setDraftEntries(next.map((entry) => entry.text).join("\n"))
+    rebuildWheel(next)
+    saveLocal(next)
     toast.success(`${entries.length - next.length} duplicates removed`)
-  }, [entries, isSpinning, updateEntries])
+  }
 
-  const clearEntries = useCallback(() => {
-    if (isSpinning) return
-    updateEntries([])
-  }, [isSpinning, updateEntries])
+  function clearEntries() {
+    setEntries([])
+    setDraftEntries("")
+    setWinner("")
+    if (wheelHostRef.current) wheelHostRef.current.innerHTML = ""
+    wheelRef.current = null
+    localStorage.removeItem(STORAGE_KEY)
+  }
 
-  const reset = useCallback(() => {
-    if (isSpinning) return
-    updateEntries(DEFAULT_ENTRIES)
-    setHistory([])
-    setTitle("Wheel of Names")
-    setDescription("Enter names below and spin the wheel to pick a random winner.")
-    setSettings({
-      duration: 5,
-      removeWinner: false,
-      sound: true,
-      confetti: true,
-      showWinnerDialog: true,
-    })
-    toast.success("Wheel reset")
-  }, [isSpinning, updateEntries])
-
-  const finishSpin = useCallback((index: number) => {
-    const currentEntries = entriesRef.current
-    const selected = currentEntries[index]
-    if (!selected || !spinningRef.current) return
-
-    setWinner(selected)
-    setHistory((current) => [selected, ...current].slice(0, MAX_HISTORY))
-    setIsSpinning(false)
-    spinningRef.current = false
-    playTone("winner", settingsRef.current.sound)
-
-    if (settingsRef.current.confetti) {
-      setShowConfetti(true)
-      window.setTimeout(() => setShowConfetti(false), 2400)
+  function saveFile() {
+    const payload: SavedWheel = {
+      title,
+      description,
+      entries,
+      colors,
+      spinTime,
+      removeWinner,
+      sound,
+      confetti: confettiEnabled,
     }
+    downloadText(`${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "wheel"}.wheel`, JSON.stringify(payload, null, 2))
+    toast.success("Wheel saved")
+  }
 
-    if (settingsRef.current.removeWinner) {
-      const next = currentEntries.filter((_, entryIndex) => entryIndex !== index)
-      setEntries(next)
-      setListText(next.join("\n"))
-    }
-  }, [])
-
-  const spin = useCallback(() => {
-    if (isSpinning || !wheelRef.current || entries.length === 0) return
-
-    if (entries.length === 1) {
-      setWinner(entries[0])
-      setHistory((current) => [entries[0], ...current].slice(0, MAX_HISTORY))
-      playTone("winner", settings.sound)
-      return
-    }
-
-    const index = randomIndex(entries.length)
-    setWinner(null)
-    setIsSpinning(true)
-    spinningRef.current = true
-
-    wheelRef.current.spinToItem(
-      index,
-      settings.duration * 1000,
-      true,
-      5,
-      1,
-    )
-  }, [entries, isSpinning, settings.duration, settings.sound])
-
-  useEffect(() => {
-    const element = wheelContainerRef.current
-    if (!element) return
-
-    const wheel = new Wheel(element, {
-      items: createItems(entriesRef.current),
-      radius: 0.94,
-      pointerAngle: 270,
-      lineWidth: 1,
-      lineColor: "rgba(255,255,255,0.28)",
-      itemLabelFont: "Geist Variable, sans-serif",
-      itemLabelFontSizeMax: 34,
-      itemLabelRadius: 0.68,
-      itemLabelRadiusMax: 0.82,
-      itemLabelAlign: "right",
-      itemLabelColors: ["#ffffff"],
-      borderWidth: 0,
-      pixelRatio: 2,
-      isInteractive: false,
-    })
-
-    wheelRef.current = wheel
-
-    wheel.onCurrentIndexChange = () => {
-      playTone("tick", settingsRef.current.sound)
-    }
-
-    wheel.onRest = (event) => finishSpin(event.currentIndex)
-
-    return () => {
-      wheel.remove()
-      wheelRef.current = null
-    }
-  }, [finishSpin])
-
-  useEffect(() => {
-    if (!wheelRef.current || isSpinning) return
-    wheelRef.current.items = createItems(entries)
-  }, [entries, isSpinning])
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault()
-        spin()
-      }
-    }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [spin])
-
-  const openFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
+  function openFile(file: File) {
     const reader = new FileReader()
     reader.onload = () => {
       try {
-        const data = JSON.parse(String(reader.result)) as StoredState
-        const next = data.entries?.filter(Boolean) ?? DEFAULT_ENTRIES
+        const saved = JSON.parse(String(reader.result)) as SavedWheel
+        const next = Array.isArray(saved.entries) ? saved.entries.filter((entry) => entry?.text) : []
+        if (!next.length) throw new Error("No entries")
+        setTitle(saved.title || "Wheel of Names")
+        setDescription(saved.description || "")
         setEntries(next)
-        setListText(next.join("\n"))
-        setHistory(data.history ?? [])
-        setTitle(data.title ?? "Wheel of Names")
-        setDescription(
-          data.description ?? "Enter names below and spin the wheel to pick a random winner.",
-        )
-        if (data.settings) {
-          setSettings((current) => ({ ...current, ...data.settings }))
-        }
+        setDraftEntries(next.map((entry) => entry.text).join("\n"))
+        setColors(saved.colors?.length ? saved.colors : DEFAULT_COLORS)
+        setSpinTime(saved.spinTime || 5)
+        setRemoveWinner(Boolean(saved.removeWinner))
+        setSound(saved.sound !== false)
+        setConfettiEnabled(saved.confetti !== false)
+        setWinner("")
+        window.setTimeout(() => rebuildWheel(next), 0)
         toast.success("Wheel opened")
       } catch {
-        toast.error("That file is not a valid MPD wheel file.")
+        toast.error("That file is not a valid wheel file.")
       }
     }
     reader.readAsText(file)
-    event.target.value = ""
-  }, [])
+  }
 
-  const save = useCallback(() => {
-    downloadWheel({ entries, history, title, description, settings })
-    toast.success("Wheel downloaded")
-  }, [description, entries, history, settings, title])
-
-  const share = useCallback(async () => {
-    const url = new URL(window.location.href)
-    url.searchParams.set("entries", entries.join(","))
-    url.searchParams.set("title", title)
-    url.searchParams.set("spinTime", String(settings.duration))
-
+  async function shareWheel() {
+    const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
+      title,
+      description,
+      entries,
+      colors,
+      spinTime,
+      removeWinner,
+      sound,
+      confetti: confettiEnabled,
+    }))))
+    const url = `${window.location.origin}${window.location.pathname}#wheel=${payload}`
     try {
-      await navigator.clipboard.writeText(url.toString())
+      await navigator.clipboard.writeText(url)
       toast.success("Wheel link copied to clipboard")
     } catch {
-      window.prompt("Copy this wheel link:", url.toString())
+      window.prompt("Copy this wheel link:", url)
     }
-  }, [entries, settings.duration, title])
+  }
 
-  const removeWinner = useCallback(() => {
-    if (!winner) return
-    const next = entries.filter((entry) => entry !== winner)
-    updateEntries(next)
-    setWinner(null)
-    toast.success("Winner removed")
-  }, [entries, updateEntries, winner])
+  useEffect(() => {
+    const hash = window.location.hash
+    if (!hash.startsWith("#wheel=")) return
+    try {
+      const encoded = hash.slice(7)
+      const saved = JSON.parse(decodeURIComponent(escape(atob(encoded)))) as SavedWheel
+      const next = saved.entries?.filter((entry) => entry?.text) || []
+      if (!next.length) return
+      setTitle(saved.title || "Wheel of Names")
+      setDescription(saved.description || "")
+      setEntries(next)
+      setDraftEntries(next.map((entry) => entry.text).join("\n"))
+      setColors(saved.colors?.length ? saved.colors : DEFAULT_COLORS)
+      setSpinTime(saved.spinTime || 5)
+      setRemoveWinner(Boolean(saved.removeWinner))
+      setSound(saved.sound !== false)
+      setConfettiEnabled(saved.confetti !== false)
+      window.history.replaceState(null, "", window.location.pathname)
+      window.setTimeout(() => rebuildWheel(next), 100)
+    } catch {
+      // Ignore malformed shared wheels.
+    }
+  }, [rebuildWheel])
+
+  async function copyEntries() {
+    try {
+      await navigator.clipboard.writeText(draftEntries)
+      toast.success("Entries copied")
+    } catch {
+      toast.error("Clipboard access is unavailable")
+    }
+  }
+
+  function toggleFullscreen() {
+    const element = document.documentElement
+    if (!document.fullscreenElement) {
+      void element.requestFullscreen?.()
+      setFullscreen(true)
+    } else {
+      void document.exitFullscreen?.()
+      setFullscreen(false)
+    }
+  }
+
+  const accent = colors[0] || DEFAULT_COLORS[0]
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
-
-      <main className="mx-auto max-w-[1700px] px-4 pb-20 pt-24 sm:px-6 lg:px-8">
-        {/* Wheel of Names style toolbar, recoloured for MPD */}
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card/80 p-2 shadow-sm backdrop-blur">
-          <Button variant="default" size="sm" onClick={reset} disabled={isSpinning}>
-            <FilePlus2 className="mr-2 h-4 w-4" />
-            New
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isSpinning}>
-            <FolderOpen className="mr-2 h-4 w-4" />
-            Open
-          </Button>
-          <Button variant="outline" size="sm" onClick={save} disabled={isSpinning}>
-            <Save className="mr-2 h-4 w-4" />
-            Save
-          </Button>
-          <Button variant="outline" size="sm" onClick={share} disabled={isSpinning}>
-            <Copy className="mr-2 h-4 w-4" />
-            Share
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setCustomizeOpen(true)} disabled={isSpinning}>
-            <Palette className="mr-2 h-4 w-4" />
-            Customize
-          </Button>
-
-          <div className="relative ml-auto">
-            <Button variant="outline" size="sm" onClick={() => setMoreOpen((value) => !value)}>
-              <MoreHorizontal className="mr-2 h-4 w-4" />
-              More
-              <ChevronDown className="ml-2 h-3.5 w-3.5" />
-            </Button>
-            {moreOpen && (
-              <div className="absolute right-0 top-11 z-40 w-56 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
-                <button className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { shuffle(); setMoreOpen(false) }}>
-                  <Shuffle className="mr-3 h-4 w-4" /> Shuffle entries
-                </button>
-                <button className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { sortEntries(); setMoreOpen(false) }}>
-                  <Sparkles className="mr-3 h-4 w-4" /> Sort alphabetically
-                </button>
-                <button className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { removeDuplicates(); setMoreOpen(false) }}>
-                  <Check className="mr-3 h-4 w-4" /> Remove duplicates
-                </button>
-                <button className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setAdvanced((value) => !value); setMoreOpen(false) }}>
-                  <Settings2 className="mr-3 h-4 w-4" /> Advanced mode {advanced ? "✓" : ""}
-                </button>
-              </div>
-            )}
-          </div>
-
-          <input ref={fileInputRef} type="file" accept=".wheel,.json,application/json" className="hidden" onChange={openFile} />
-        </div>
-
-        <div className="mb-5 flex flex-col gap-1 px-1">
-          <div className="flex items-center gap-2">
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              className="w-full max-w-3xl bg-transparent text-2xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground sm:text-3xl"
-              aria-label="Wheel title"
-            />
-          </div>
-          <input
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            className="w-full max-w-3xl bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground"
-            aria-label="Wheel description"
-          />
-        </div>
-
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(350px,0.9fr)]">
-          {/* Main wheel column */}
-          <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/80 to-transparent" />
-
-            <div className="flex min-h-[650px] flex-col items-center justify-center p-4 sm:p-7 lg:p-8">
-              <div className="relative w-full max-w-[780px]">
-                <div
-                  ref={wheelContainerRef}
-                  className="mx-auto aspect-square w-full max-w-[760px]"
-                  onClick={() => !isSpinning && spin()}
-                />
-
-                {/* Wheel of Names-style pointer */}
-                <div className="pointer-events-none absolute left-1/2 top-[-3px] z-10 -translate-x-1/2">
-                  <div className="h-0 w-0 border-l-[17px] border-r-[17px] border-t-[30px] border-l-transparent border-r-transparent border-t-blue-500 drop-shadow-lg" />
-                </div>
-
-                <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-[5px] border-slate-950 bg-white p-2 shadow-2xl dark:border-slate-950">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold uppercase tracking-[0.18em] text-white shadow-inner sm:h-20 sm:w-20">
-                    {isSpinning ? "" : "SPIN"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-2 text-center text-xs text-muted-foreground">
-                {isSpinning ? "Spinning…" : "Click the wheel or press Ctrl + Enter to spin"}
-              </div>
-
-              <div className="mt-5 flex flex-wrap justify-center gap-2">
-                <Button className="min-w-[150px]" size="lg" onClick={spin} disabled={isSpinning || entries.length === 0}>
-                  <Trophy className="mr-2 h-4 w-4" />
-                  {isSpinning ? "Spinning…" : "Spin"}
-                </Button>
-                <Button variant="outline" size="lg" onClick={shuffle} disabled={isSpinning || entries.length < 2}>
-                  <Shuffle className="mr-2 h-4 w-4" />
-                  Shuffle
-                </Button>
-              </div>
-
-              {winner && !settings.showWinnerDialog && (
-                <div className="mt-5 flex items-center gap-3 rounded-xl border border-blue-500/30 bg-blue-500/10 px-5 py-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500 text-white">
-                    <Check className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-500">Winner</div>
-                    <div className="font-semibold">{winner}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Editor column */}
-          <aside className="flex min-h-[650px] flex-col gap-3">
-            <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
-              <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
-                <div>
-                  <div className="font-semibold">Entries</div>
-                  <div className="text-xs text-muted-foreground">One name or option per line.</div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" onClick={addEntry} disabled={isSpinning} aria-label="Add entry">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={clearEntries} disabled={isSpinning} aria-label="Clear entries">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="p-3">
-                <Textarea
-                  value={listText}
-                  onChange={(event) => setListText(event.target.value)}
-                  className="min-h-[230px] resize-none border-border/70 bg-muted/20 font-medium leading-6"
-                  placeholder="Enter names..."
-                  disabled={isSpinning}
-                />
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">{entries.length} {entries.length === 1 ? "entry" : "entries"}</span>
-                  <Button size="sm" onClick={applyEntries} disabled={isSpinning}>
-                    <Check className="mr-2 h-4 w-4" />
-                    Update wheel
-                  </Button>
-                </div>
-              </div>
-
-              <div className="border-t border-border/70 px-3 py-2">
-                <div className="flex flex-wrap gap-1">
-                  <Button variant="ghost" size="sm" onClick={shuffle} disabled={isSpinning}>
-                    <Shuffle className="mr-2 h-3.5 w-3.5" /> Shuffle
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={sortEntries} disabled={isSpinning}>
-                    Sort
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={removeDuplicates} disabled={isSpinning}>
-                    Remove duplicates
-                  </Button>
-                </div>
-              </div>
-
-              {advanced && (
-                <div className="border-t border-border/70 bg-muted/10 px-4 py-3 text-xs text-muted-foreground">
-                  Advanced mode is enabled. Entry weights can be added in a future server-backed version; the wheel remains equally weighted here so every listed entry has the same chance.
-                </div>
-              )}
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
-              <button className="flex w-full items-center justify-between px-4 py-4 text-left" onClick={() => setSettingsOpen((value) => !value)}>
-                <div className="flex items-center gap-3">
-                  <Settings2 className="h-4 w-4 text-blue-500" />
-                  <div>
-                    <div className="font-semibold">Wheel settings</div>
-                    <div className="text-xs text-muted-foreground">Spin time, winners and sound</div>
-                  </div>
-                </div>
-                <ChevronDown className={`h-4 w-4 transition-transform ${settingsOpen ? "rotate-180" : ""}`} />
+      <main className={`mx-auto w-full max-w-[1600px] px-4 pb-12 pt-24 sm:px-6 lg:px-8 ${fullscreen ? "hidden" : ""}`}>
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-2xl shadow-black/20 backdrop-blur">
+          <header className="border-b border-border/70 px-4 py-3 sm:px-5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button onClick={() => setShowCustomize(true)} className="wheel-toolbar-button">
+                <Palette className="size-4" /> Customize
               </button>
+              <button onClick={newWheel} className="wheel-toolbar-button"><FilePlus2 className="size-4" /> New</button>
+              <button onClick={() => fileInputRef.current?.click()} className="wheel-toolbar-button"><FolderOpen className="size-4" /> Open</button>
+              <button onClick={saveFile} className="wheel-toolbar-button"><Save className="size-4" /> Save</button>
+              <button onClick={() => void shareWheel()} className="wheel-toolbar-button"><Share2 className="size-4" /> Share</button>
+              <button onClick={() => toast.info("Gallery is not required for this MPD build.")} className="wheel-toolbar-button"><Sparkles className="size-4" /> Gallery</button>
+              <button onClick={toggleFullscreen} className="wheel-toolbar-button"><Expand className="size-4" /> {fullscreen ? "Exit fullscreen" : "Fullscreen"}</button>
+              <div className="relative ml-auto">
+                <button onClick={() => setShowMore((value) => !value)} className="wheel-toolbar-button" aria-label="More">
+                  <MoreHorizontal className="size-4" /> More
+                </button>
+                {showMore && (
+                  <div className="absolute right-0 top-11 z-40 w-52 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
+                    <button onClick={shuffleEntries} className="wheel-menu-item"><Shuffle className="size-4" /> Shuffle entries</button>
+                    <button onClick={removeDuplicates} className="wheel-menu-item"><Scissors className="size-4" /> Remove duplicates</button>
+                    <button onClick={copyEntries} className="wheel-menu-item"><Copy className="size-4" /> Copy entries</button>
+                    <button onClick={clearEntries} className="wheel-menu-item text-red-500"><Trash2 className="size-4" /> Clear entries</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
 
-              {settingsOpen && (
-                <div className="space-y-4 border-t border-border/70 px-4 py-4">
-                  <label className="block">
-                    <div className="mb-2 flex items-center justify-between text-sm font-medium">
-                      <span>Spin time</span>
-                      <span className="text-muted-foreground">{settings.duration}s</span>
+          <section className="px-4 py-4 sm:px-6">
+            <div className="mb-4 flex flex-wrap items-end gap-2">
+              <div className="min-w-0 flex-1">
+                <input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  onBlur={() => saveLocal()}
+                  className="w-full bg-transparent text-2xl font-bold tracking-tight outline-none placeholder:text-muted-foreground sm:text-3xl"
+                  placeholder="Wheel of Names"
+                  aria-label="Wheel title"
+                />
+                {showDescriptionEditor ? (
+                  <input
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    onBlur={() => { saveLocal(); setShowDescriptionEditor(false) }}
+                    autoFocus
+                    className="mt-1 w-full bg-transparent text-sm text-muted-foreground outline-none"
+                    placeholder="Add a description"
+                  />
+                ) : (
+                  <button onClick={() => setShowDescriptionEditor(true)} className="mt-1 text-left text-sm text-muted-foreground hover:text-foreground">
+                    {description || "Add a description"}
+                  </button>
+                )}
+              </div>
+              <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">{entries.length} entries</span>
+              <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">{removeWinner ? "Remove winners" : "Keep winners"}</span>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_440px]">
+              <section className="relative flex min-h-[700px] flex-col rounded-2xl border border-border/70 bg-background/40 p-3 sm:p-5">
+                <div className="relative flex min-h-[570px] flex-1 items-center justify-center overflow-hidden rounded-xl">
+                  <div
+                    className="absolute left-1/2 top-1 z-20 -translate-x-1/2"
+                    style={{ width: 0, height: 0, borderLeft: "14px solid transparent", borderRight: "14px solid transparent", borderTop: `26px solid ${accent}`, filter: "drop-shadow(0 2px 4px rgba(0,0,0,.45))" }}
+                  />
+                  <div
+                    ref={wheelHostRef}
+                    onClick={spin}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") spin() }}
+                    className="aspect-square w-[min(76vw,620px)] max-w-full cursor-pointer"
+                    aria-label="Spin the wheel"
+                  />
+                  <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-foreground bg-background shadow-xl">
+                    <div className="size-3 rounded-full" style={{ backgroundColor: accent }} />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-2 pb-2 pt-3">
+                  <button
+                    disabled={spinning || !entries.length}
+                    onClick={spin}
+                    className="inline-flex h-11 items-center gap-2 rounded-lg px-7 font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{ backgroundColor: accent }}
+                  >
+                    <Trophy className="size-4" /> {spinning ? "Spinning..." : "Spin the wheel"}
+                  </button>
+                  <button disabled={spinning || entries.length < 2} onClick={shuffleEntries} className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-background px-4 font-medium transition hover:bg-muted disabled:opacity-50">
+                    <Shuffle className="size-4" /> Shuffle
+                  </button>
+                </div>
+
+                {winner && (
+                  <div className="mx-auto mt-2 flex w-fit items-center gap-3 rounded-xl border border-blue-500/30 bg-blue-500/10 px-5 py-3 shadow-sm">
+                    <div className="flex size-8 items-center justify-center rounded-full text-white" style={{ backgroundColor: accent }}><Trophy className="size-4" /></div>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">Winner</div>
+                      <div className="font-bold">{winner}</div>
                     </div>
-                    <input
-                      type="range"
-                      min="2"
-                      max="15"
-                      step="1"
-                      value={settings.duration}
-                      onChange={(event) => setSettings((current) => ({ ...current, duration: Number(event.target.value) }))}
-                      className="w-full accent-blue-500"
+                  </div>
+                )}
+              </section>
+
+              <aside className="space-y-5">
+                <section className="overflow-hidden rounded-2xl border border-border/70 bg-background/40">
+                  <div className="flex items-center justify-between px-4 py-4">
+                    <div>
+                      <h2 className="font-bold">Entries</h2>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Type one name or option per line.</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setDraftEntries((value) => `${value}${value ? "\n" : ""}New entry`)} className="rounded-md p-2 hover:bg-muted" aria-label="Add entry"><Plus className="size-4" /></button>
+                      <button onClick={clearEntries} className="rounded-md p-2 hover:bg-muted" aria-label="Clear entries"><Trash2 className="size-4" /></button>
+                    </div>
+                  </div>
+                  <div className="px-4">
+                    <textarea
+                      value={draftEntries}
+                      onChange={(event) => setDraftEntries(event.target.value)}
+                      className="h-56 w-full resize-none rounded-xl border border-border bg-muted/20 p-3 text-sm leading-6 outline-none transition focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/10"
+                      aria-label="Wheel entries"
                     />
-                  </label>
-
-                  <label className="flex items-center justify-between gap-4 text-sm">
-                    <span>Remove winner after spin</span>
-                    <input type="checkbox" checked={settings.removeWinner} onChange={(event) => setSettings((current) => ({ ...current, removeWinner: event.target.checked }))} className="h-4 w-4 accent-blue-500" />
-                  </label>
-                  <label className="flex items-center justify-between gap-4 text-sm">
-                    <span>Winner popup</span>
-                    <input type="checkbox" checked={settings.showWinnerDialog} onChange={(event) => setSettings((current) => ({ ...current, showWinnerDialog: event.target.checked }))} className="h-4 w-4 accent-blue-500" />
-                  </label>
-                  <label className="flex items-center justify-between gap-4 text-sm">
-                    <span>Confetti</span>
-                    <input type="checkbox" checked={settings.confetti} onChange={(event) => setSettings((current) => ({ ...current, confetti: event.target.checked }))} className="h-4 w-4 accent-blue-500" />
-                  </label>
-                  <label className="flex items-center justify-between gap-4 text-sm">
-                    <span className="flex items-center gap-2">Sound effects {settings.sound ? <Volume2 className="h-4 w-4 text-blue-500" /> : <VolumeX className="h-4 w-4" />}</span>
-                    <input type="checkbox" checked={settings.sound} onChange={(event) => setSettings((current) => ({ ...current, sound: event.target.checked }))} className="h-4 w-4 accent-blue-500" />
-                  </label>
-                </div>
-              )}
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
-              <button className="flex w-full items-center justify-between px-4 py-4 text-left" onClick={() => setHistoryOpen((value) => !value)}>
-                <div className="flex items-center gap-3">
-                  <History className="h-4 w-4 text-blue-500" />
-                  <div>
-                    <div className="font-semibold">Recent winners</div>
-                    <div className="text-xs text-muted-foreground">{history.length} recorded {history.length === 1 ? "result" : "results"}</div>
-                  </div>
-                </div>
-                <ChevronDown className={`h-4 w-4 transition-transform ${historyOpen ? "rotate-180" : ""}`} />
-              </button>
-
-              {historyOpen && (
-                <div className="border-t border-border/70 p-3">
-                  {history.length ? (
-                    <div className="max-h-52 space-y-1 overflow-auto pr-1">
-                      {history.map((item, index) => (
-                        <div key={`${item}-${index}`} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-muted/50">
-                          <span className="truncate">{item}</span>
-                          <span className="ml-3 text-xs text-muted-foreground">#{index + 1}</span>
-                        </div>
-                      ))}
+                    <div className="flex items-center justify-between py-3">
+                      <span className="text-xs text-muted-foreground">{draftEntries ? draftEntries.split(/\r?\n/).filter(Boolean).length : 0} lines</span>
+                      <button onClick={updateWheel} className="inline-flex items-center gap-2 rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background transition hover:opacity-90">
+                        <RotateCcw className="size-3.5" /> Update wheel
+                      </button>
                     </div>
-                  ) : (
-                    <div className="py-4 text-center text-sm text-muted-foreground">No spins yet.</div>
-                  )}
-                  {!!history.length && (
-                    <Button variant="ghost" size="sm" className="mt-2 w-full" onClick={() => setHistory([])}>
-                      Clear history
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto border-t border-border/70">
+                    {entries.map((entry, index) => (
+                      <div key={`${entry.text}-${index}`} className="group flex items-center gap-3 px-4 py-2 text-sm hover:bg-muted/30">
+                        <span className="size-2 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} />
+                        <span className="min-w-0 flex-1 truncate">{entry.text}</span>
+                        <button
+                          onClick={() => {
+                            const next = entries.filter((_, itemIndex) => itemIndex !== index)
+                            setEntries(next)
+                            setDraftEntries(next.map((item) => item.text).join("\n"))
+                            rebuildWheel(next)
+                            saveLocal(next)
+                          }}
+                          className="invisible rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground group-hover:visible"
+                          aria-label={`Remove ${entry.text}`}
+                        ><X className="size-3.5" /></button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
 
-            <div className="mt-auto flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-              <span className="flex items-center gap-2"><HelpCircle className="h-3.5 w-3.5" /> Your wheel is saved locally in this browser.</span>
-              <Button variant="ghost" size="sm" onClick={reset} disabled={isSpinning}>
-                <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset
-              </Button>
+                <section className="overflow-hidden rounded-2xl border border-border/70 bg-background/40">
+                  <button onClick={() => setShowSettings((value) => !value)} className="flex w-full items-center justify-between px-4 py-4 text-left">
+                    <div><h2 className="font-bold">Wheel settings</h2><p className="mt-0.5 text-xs text-muted-foreground">Spin time, winners and sound</p></div>
+                    {showSettings ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                  </button>
+                  {showSettings && (
+                    <div className="space-y-4 border-t border-border/70 px-4 py-4 text-sm">
+                      <label className="flex items-center justify-between gap-4"><span>Spin time <b>{spinTime}s</b></span><input type="range" min="1" max="20" step="1" value={spinTime} onChange={(event) => setSpinTime(Number(event.target.value))} onMouseUp={() => saveLocal()} className="w-40" /></label>
+                      <label className="flex cursor-pointer items-center justify-between"><span>Remove winner after spin</span><input type="checkbox" checked={removeWinner} onChange={(event) => { setRemoveWinner(event.target.checked); window.setTimeout(() => saveLocal(), 0) }} /></label>
+                      <label className="flex cursor-pointer items-center justify-between"><span className="flex items-center gap-2">{sound ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} Sound</span><input type="checkbox" checked={sound} onChange={(event) => { setSound(event.target.checked); window.setTimeout(() => saveLocal(), 0) }} /></label>
+                      <label className="flex cursor-pointer items-center justify-between"><span>Confetti</span><input type="checkbox" checked={confettiEnabled} onChange={(event) => { setConfettiEnabled(event.target.checked); window.setTimeout(() => saveLocal(), 0) }} /></label>
+                    </div>
+                  )}
+                </section>
+
+                <section className="overflow-hidden rounded-2xl border border-border/70 bg-background/40">
+                  <button onClick={() => setShowHistory((value) => !value)} className="flex w-full items-center justify-between px-4 py-4 text-left">
+                    <div><h2 className="flex items-center gap-2 font-bold"><History className="size-4" /> Recent winners</h2><p className="mt-0.5 text-xs text-muted-foreground">{history.length} recorded results</p></div>
+                    {showHistory ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                  </button>
+                  {showHistory && history.length > 0 && <div className="border-t border-border/70">{history.map((item, index) => <div key={`${item}-${index}`} className="flex items-center justify-between px-4 py-2.5 text-sm"><span>{item}</span><span className="text-xs text-muted-foreground">#{index + 1}</span></div>)}</div>}
+                </section>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <button onClick={newWheel} className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 hover:bg-muted"><RotateCcw className="size-3.5" /> Reset</button>
+                  <span className="rounded-md border border-border px-3 py-1.5">Your list is saved locally in this browser.</span>
+                </div>
+              </aside>
             </div>
-          </aside>
-        </section>
+          </section>
+        </div>
       </main>
 
-      {customizeOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setCustomizeOpen(false)}>
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-lg font-semibold">Customize wheel</div>
-                <p className="mt-1 text-sm text-muted-foreground">The wheel uses the MPD blue/slate colour system.</p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setCustomizeOpen(false)}><X className="h-4 w-4" /></Button>
-            </div>
-            <div className="mt-5 grid grid-cols-4 gap-3">
-              {MPD_COLORS.slice(0, 8).map((color) => (
-                <div key={color} className="h-12 rounded-lg border border-white/10" style={{ backgroundColor: color }} />
-              ))}
-            </div>
-            <div className="mt-5 rounded-xl border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
-              MPD branding is intentionally locked into the wheel so it matches the rest of your website instead of exposing the original Wheel of Names colour editor.
-            </div>
-            <Button className="mt-5 w-full" onClick={() => setCustomizeOpen(false)}>Done</Button>
-          </div>
-        </div>
-      )}
-
-      {winner && settings.showWinnerDialog && !isSpinning && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onMouseDown={() => setWinner(null)}>
-          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-blue-500/30 bg-card shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-700 via-blue-400 to-blue-700" />
-            <div className="p-7 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/15 text-blue-500">
-                <Trophy className="h-8 w-8" />
-              </div>
-              <div className="mt-4 text-xs font-semibold uppercase tracking-[0.25em] text-blue-500">Winner</div>
-              <div className="mt-2 break-words text-3xl font-bold tracking-tight">{winner}</div>
-              <div className="mt-2 text-sm text-muted-foreground">Congratulations!</div>
-              <div className="mt-6 flex justify-center gap-2">
-                <Button variant="outline" onClick={() => setWinner(null)}>Close</Button>
-                {!settings.removeWinner && <Button onClick={removeWinner}><Trash2 className="mr-2 h-4 w-4" /> Remove</Button>}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showConfetti && (
-        <div className="pointer-events-none fixed inset-0 z-[110] overflow-hidden">
-          {Array.from({ length: 26 }).map((_, index) => (
-            <span
-              key={index}
-              className="absolute h-2 w-1.5 animate-bounce rounded-sm bg-blue-500"
-              style={{
-                left: `${(index * 37) % 100}%`,
-                top: `${(index * 17) % 55}%`,
-                transform: `rotate(${index * 27}deg)`,
-                animationDelay: `${(index % 7) * 80}ms`,
-              }}
-            />
-          ))}
-        </div>
-      )}
-
       <Footer />
+
+      <input ref={fileInputRef} type="file" accept=".wheel,.json,application/json" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) openFile(file); event.currentTarget.value = "" }} />
+
+      {showCustomize && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onMouseDown={() => setShowCustomize(false)}>
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-background p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-bold">Customize wheel</h2><p className="text-sm text-muted-foreground">Make the Wheel of Names match MPD.</p></div><button onClick={() => setShowCustomize(false)} className="rounded-lg p-2 hover:bg-muted"><X className="size-4" /></button></div>
+            <div className="space-y-5">
+              <div><label className="mb-2 block text-sm font-medium">Wheel colors</label><div className="grid grid-cols-3 gap-2">{colors.map((color, index) => <label key={index} className="flex items-center gap-2 rounded-lg border border-border p-2"><input type="color" value={color} onChange={(event) => { const next = [...colors]; next[index] = event.target.value; setColors(next); window.setTimeout(() => { rebuildWheel(entries); saveLocal() }, 0) }} className="h-8 w-10 cursor-pointer border-0 bg-transparent p-0" /><input value={color} onChange={(event) => { const next = [...colors]; next[index] = event.target.value; setColors(next) }} onBlur={() => { rebuildWheel(entries); saveLocal() }} className="min-w-0 flex-1 bg-transparent text-xs uppercase outline-none" /></label>)}</div></div>
+              <div><label className="mb-2 block text-sm font-medium">Quick palette</label><div className="flex flex-wrap gap-2">{[["#2563eb","#0f172a","#3b82f6","#1e293b","#60a5fa","#334155"],["#1d4ed8","#172554","#2563eb","#1e3a8a","#60a5fa","#0f172a"],["#dc2626","#7f1d1d","#f97316","#431407","#f59e0b","#451a03"]].map((palette, index) => <button key={index} onClick={() => { setColors(palette); window.setTimeout(() => rebuildWheel(entries), 0) }} className="flex overflow-hidden rounded-lg border border-border">{palette.map((color) => <span key={color} className="h-7 w-7" style={{ backgroundColor: color }} />)}</button>)}</div></div>
+              <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">The wheel is rendered directly by React. No external Wheel of Names page, image pack, wheel folder, icon pack or asset bundle is required.</div>
+            </div>
+            <div className="mt-5 flex justify-end"><button onClick={() => { saveLocal(); setShowCustomize(false) }} className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>Done</button></div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        .wheel-toolbar-button{display:inline-flex;align-items:center;gap:.45rem;border-radius:.55rem;padding:.55rem .72rem;font-size:.78rem;font-weight:600;color:var(--foreground);transition:background-color .15s,opacity .15s}
+        .wheel-toolbar-button:hover{background:color-mix(in srgb,var(--foreground) 7%,transparent)}
+        .wheel-menu-item{display:flex;width:100%;align-items:center;gap:.6rem;border-radius:.5rem;padding:.6rem .7rem;text-align:left;font-size:.8rem}
+        .wheel-menu-item:hover{background:color-mix(in srgb,var(--foreground) 7%,transparent)}
+      `}</style>
     </div>
   )
 }
