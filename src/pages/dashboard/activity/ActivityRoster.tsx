@@ -14,6 +14,7 @@ import {
   Clock3,
   Copy,
   Filter,
+  ListPlus,
   Search,
   RotateCcw,
   Shield,
@@ -24,6 +25,7 @@ import {
 import { toast } from "sonner"
 
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
+import RosterListDialog from "@/components/dashboard/RosterListDialog"
 import GoogleRosterRefresh from "@/components/dashboard/GoogleRosterRefresh"
 import { logAction } from "@/lib/actionLog"
 import { Button } from "@/components/ui/button"
@@ -253,6 +255,9 @@ export default function ActivityRoster() {
     useState<string[]>([])
 
   const [selectedCopied, setSelectedCopied] =
+    useState(false)
+
+  const [rosterListOpen, setRosterListOpen] =
     useState(false)
 
   /*
@@ -1370,7 +1375,7 @@ export default function ActivityRoster() {
                       onClick={
                         clearStatuses
                       }
-                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:bg-transparent hover:text-blue-300 focus:bg-transparent focus:ring-0 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-[highlighted]:bg-transparent"
+                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:text-blue-300 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                     >
                       <X className="h-4 w-4" />
 
@@ -1510,7 +1515,7 @@ export default function ActivityRoster() {
                       onClick={
                         clearRanks
                       }
-                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:bg-transparent hover:text-blue-300 focus:bg-transparent focus:ring-0 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-[highlighted]:bg-transparent"
+                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:text-blue-300 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                     >
                       <X className="h-4 w-4" />
 
@@ -1520,6 +1525,21 @@ export default function ActivityRoster() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Activity List */}
+
+            {selectedIds.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => setRosterListOpen(true)}
+              >
+                <ListPlus className="h-4 w-4 text-blue-500" />
+                Activity List
+              </Button>
+            )}
 
             {/* Selected Copy Actions */}
 
@@ -1865,25 +1885,29 @@ export default function ActivityRoster() {
             {(hasFilterSelection || hasFilterChanges) && (
               <div className="flex items-center gap-2">
                 {hasFilterSelection && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={clearFilters}
-                    className="inline-flex h-7 items-center gap-1.5 rounded-md bg-transparent px-2 text-xs font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:outline-none focus:ring-0 focus-visible:bg-transparent focus-visible:outline-none focus-visible:ring-0 active:bg-transparent"
+                    className="h-7 gap-1.5 bg-transparent px-2 text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                   >
                     <X className="h-3.5 w-3.5" />
                     Clear Filters
-                  </button>
+                  </Button>
                 )}
 
                 {hasFilterChanges && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={resetFilters}
-                    className="inline-flex h-7 items-center gap-1.5 rounded-md bg-transparent px-2 text-xs font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:outline-none focus:ring-0 focus-visible:bg-transparent focus-visible:outline-none focus-visible:ring-0 active:bg-transparent"
+                    className="h-7 gap-1.5 bg-transparent px-2 text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                     Reset Filters
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
@@ -2274,6 +2298,15 @@ export default function ActivityRoster() {
           )}
         </div>
       </div>
+      <RosterListDialog
+        open={rosterListOpen}
+        onClose={() => setRosterListOpen(false)}
+        module="activity"
+        division={division}
+        members={members}
+        initialSelectedIds={selectedIds}
+      />
+
     </DashboardLayout>
   )
 }
