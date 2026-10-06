@@ -1,8 +1,9 @@
 {
   "name": "mpd-dashboard",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
+  "main": "desktop/main.cjs",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"node --env-file=.env --import tsx server/index.ts\"",
     "dev:web": "vite",
@@ -11,7 +12,7 @@
     "preview": "vite preview",
     "start": "tsx server/index.ts",
     "desktop:dev": "electron desktop/main.cjs",
-    "desktop:build": "electron-builder --win nsis",
+    "desktop:build": "electron-builder --win nsis --publish never",
     "desktop:release": "electron-builder --win nsis --publish always"
   },
   "dependencies": {
@@ -43,6 +44,7 @@
     "sonner": "^2.0.8",
     "spin-wheel": "^5.0.2",
     "tailwind-merge": "^3.3.1",
+    "tw-animate-css": "^1.3.0",
     "tw-animate-css": "^1.3.0",
     "xlsx": "^0.18.5",
     "youtube-dl-exec": "^3.1.17",
