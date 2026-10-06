@@ -35,6 +35,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
@@ -56,7 +57,7 @@ type Division =
   | "sar"
   | ""
 
-type LogModule = "promotion" | "activity"
+type LogModule = "all" | "promotion" | "activity"
 
 type ActionLog = {
   id: string
@@ -70,7 +71,7 @@ type ActionLog = {
   badgeNumber: string
   avatar?: string | null
   action: string
-  module?: "promotion" | "activity" | string
+  module?: "all" | "promotion" | "activity" | string
   category: Exclude<Category, ""> | string
   division?: Exclude<Division, ""> | null
   targetUserId?: string | null
@@ -240,22 +241,35 @@ const getAvatarUrl = (
   discordId: string,
   avatar?: string | null,
 ) => {
-  if (!avatar) {
-    return getDefaultAvatar(discordId)
+  if (!avatar) return getDefaultAvatar(discordId)
+
+  const value = String(avatar).trim()
+  if (!value) return getDefaultAvatar(discordId)
+
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return value
   }
 
-  if (
-    avatar.startsWith("http://") ||
-    avatar.startsWith("https://")
-  ) {
-    return avatar
-  }
+  // Discord avatar hashes may arrive with a file extension already attached.
+  const hash = value.replace(/\.(gif|png|webp)$/i, "")
+  const extension = hash.startsWith("a_") ? "gif" : "png"
+  return `https://cdn.discordapp.com/avatars/${discordId}/${hash}.${extension}?size=128`
+}
 
-  if (avatar.startsWith("a_")) {
-    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.gif?size=128`
-  }
+const getLogAvatar = (log: ActionLog) => {
+  const details = log.details ?? {}
+  const candidate =
+    log.avatar ??
+    details.avatar ??
+    details.avatarUrl ??
+    details.avatarURL ??
+    details.avatarHash ??
+    details.userAvatar ??
+    details.userAvatarUrl ??
+    details.authorAvatar ??
+    details.authorAvatarUrl
 
-  return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png?size=128`
+  return candidate == null ? null : String(candidate)
 }
 
 const getActionIcon = (log: ActionLog) => {
@@ -491,12 +505,26 @@ function IdentityCard({
     void copyValue(value, labels[type] || "Details")
   }
 
+  const item = (type: string, label: string, disabled = false) => (
+    <DropdownMenuItem
+      disabled={disabled}
+      onSelect={(event) => {
+        event.preventDefault()
+        copy(type)
+      }}
+      className="gap-2 text-sm"
+    >
+      <Clipboard className="h-4 w-4 text-blue-400" />
+      {label}
+    </DropdownMenuItem>
+  )
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={`group flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-blue-500/5 ${
+          className={`group flex min-w-0 items-center gap-2 rounded-md text-left transition-colors ${
             compact ? "px-1 py-0.5" : "px-1.5 py-1"
           }`}
           onClick={(event) => event.stopPropagation()}
@@ -511,8 +539,17 @@ function IdentityCard({
                 src={avatarUrl}
                 alt={`${name || "Discord user"} profile picture`}
                 className="h-full w-full object-cover"
-                loading="lazy"
+                loading="eager"
                 referrerPolicy="no-referrer"
+                onError={(event) => {
+                  const image = event.currentTarget
+                  const fallback = userId ? getDefaultAvatar(userId) : undefined
+                  if (fallback && image.src !== fallback) {
+                    image.src = fallback
+                    return
+                  }
+                  image.style.display = "none"
+                }}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold">
@@ -724,6 +761,25 @@ function TargetIdentity({ log }: { log: ActionLog }) {
     />
   )
 }
+
+function DetailItem({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+      <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </p>
+      <div className="min-w-0 text-xs">{children}</div>
+    </div>
+  )
+}
+
+
 function FilterDropdown({
   value,
   placeholder,
@@ -1069,12 +1125,14 @@ export default function PromotionLogs() {
 
               <div className="min-w-0">
                 <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                  {module === "promotion" ? "Promotion Logs" : "Activity Logs"}
+                  {module === "all" ? "All Logs" : module === "promotion" ? "Promotion Logs" : "Activity Logs"}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  {module === "promotion"
-                    ? "View promotion management audit history and changes."
-                    : "View activity management audit history and changes."}
+                  {module === "all"
+                    ? "View promotion and activity management audit history and changes."
+                    : module === "promotion"
+                      ? "View promotion management audit history and changes."
+                      : "View activity management audit history and changes."}
                 </p>
               </div>
             </div>
@@ -1093,53 +1151,50 @@ export default function PromotionLogs() {
           </div>
 
           {/* Log module tabs */}
-          <div className="flex w-fit items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1">
-            <button
-              type="button"
-              onClick={() => {
-                if (module === "promotion") return
-                setModule("promotion")
-                setPage(1)
-                setExpanded(null)
-                setSearch("")
-                setCategory("")
-                setDivision("")
-                setUserId("")
-                setAction("")
-              }}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${module === "promotion" ? "bg-blue-500/10 text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Promotion Logs
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (module === "activity") return
-                setModule("activity")
-                setPage(1)
-                setExpanded(null)
-                setSearch("")
-                setCategory("")
-                setDivision("")
-                setUserId("")
-                setAction("")
-              }}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${module === "activity" ? "bg-blue-500/10 text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Activity Logs
-            </button>
+          <div className="mx-auto flex w-full max-w-[1100px] flex-wrap items-center gap-2">
+            {([
+              ["all", "All"],
+              ["promotion", "Promotion Logs"],
+              ["activity", "Activity Logs"],
+            ] as const).map(([value, label]) => {
+              const active = module === value
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    if (module === value) return
+                    setModule(value)
+                    setPage(1)
+                    setExpanded(null)
+                    setSearch("")
+                    setCategory("")
+                    setDivision("")
+                    setUserId("")
+                    setAction("")
+                  }}
+                  className={`inline-flex h-9 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
+                    active
+                      ? "border-blue-500/60 bg-blue-500/10 text-blue-400"
+                      : "border-border bg-card text-muted-foreground hover:border-blue-500/30 hover:bg-blue-500/5 hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
 
           {/* Filters */}
-          <div className="w-full">
-            <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-[minmax(280px,1fr)_190px_190px_190px_auto]">
+          <div className="mx-auto w-full max-w-[1100px]">
+            <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_190px_190px_190px]">
               <div className="relative min-w-0">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(event) => changeFilter(setSearch, event.target.value)}
                   placeholder="Search users, actions, IDs, targets..."
-                  className="h-9 w-full border-border bg-card pl-9 text-[12px]"
+                  className="h-10 w-full border-border bg-card pl-9 text-[12px]"
                 />
               </div>
 
@@ -1232,7 +1287,7 @@ export default function PromotionLogs() {
               </div>
 
               <p className="text-sm font-medium">
-                No {module === "promotion" ? "promotion" : "activity"} action logs found
+                No {module === "all" ? "" : module === "promotion" ? "promotion" : "activity"} action logs found
               </p>
 
               <p className="mt-1 text-xs text-muted-foreground">
@@ -1364,7 +1419,7 @@ export default function PromotionLogs() {
                                     rank={log.rank}
                                     callsign={log.callsign}
                                     badgeNumber={log.badgeNumber}
-                                    avatar={log.avatar}
+                                    avatar={getLogAvatar(log)}
                                     compact
                                   />
 
@@ -1637,7 +1692,7 @@ export default function PromotionLogs() {
                                     rank={log.rank}
                                     callsign={log.callsign}
                                     badgeNumber={log.badgeNumber}
-                                    avatar={log.avatar}
+                                    avatar={getLogAvatar(log)}
                                     compact
                                   />
                                 </div>
