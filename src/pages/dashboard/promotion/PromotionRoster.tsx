@@ -1086,13 +1086,54 @@ export default function PromotionRoster() {
     setSelectedCopied(false)
 
     logAction({
-        module: "promotion",
+      module: "promotion",
       action: "clear-filters",
       category: "roster",
       division,
       summary: `Cleared all filters on the ${displayDivision} promotion roster.`,
     })
   }
+
+  const resetFilters = () => {
+    setSearch("")
+    setStatusFilters(
+      statusOptions.map((status) => status.id),
+    )
+    setRankFilters([...rankOptions])
+    setSelectedCopied(false)
+
+    logAction({
+      module: "promotion",
+      action: "reset-filters",
+      category: "roster",
+      division,
+      summary: `Reset all filters on the ${displayDivision} promotion roster.`,
+      details: {
+        statuses: statusOptions.map(
+          (status) => status.id,
+        ),
+        ranks: rankOptions,
+      },
+    })
+  }
+
+  const filtersAreDefault =
+    !search.trim() &&
+    statusFilters.length === statusOptions.length &&
+    statusOptions.every((status) =>
+      statusFilters.includes(status.id),
+    ) &&
+    rankFilters.length === rankOptions.length &&
+    rankOptions.every((rank) =>
+      rankFilters.some(
+        (selectedRank) =>
+          normalizeRank(selectedRank) ===
+          normalizeRank(rank),
+      ),
+    )
+
+  const hasFilterChanges =
+    !filtersAreDefault
 
   const allVisibleSelected =
     filteredMembers.length > 0 &&
@@ -1426,8 +1467,10 @@ export default function PromotionRoster() {
             {search.trim() && (
               <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={clearSearch}
-                className="shrink-0 inline-flex h-9 items-center justify-center gap-2 rounded-md border-0 bg-transparent px-3 text-sm font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0 active:bg-transparent"
+                className="shrink-0 gap-2 bg-transparent text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
               >
                 <X className="h-4 w-4" />
                 Clear Search
@@ -1537,7 +1580,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={clearStatuses}
-                      className="gap-2 bg-transparent text-muted-foreground hover:bg-transparent focus:bg-transparent data-[highlighted]:bg-transparent"
+                      className="gap-2 text-muted-foreground"
                     >
                       <X className="h-4 w-4" />
                       Clear Statuses
@@ -1657,7 +1700,7 @@ export default function PromotionRoster() {
 
                     <DropdownMenuItem
                       onClick={clearRanks}
-                      className="gap-2 bg-transparent text-muted-foreground hover:bg-transparent focus:bg-transparent data-[highlighted]:bg-transparent"
+                      className="gap-2 text-muted-foreground"
                     >
                       <X className="h-4 w-4" />
                       Clear Ranks
@@ -1966,15 +2009,25 @@ export default function PromotionRoster() {
               </>
             )}
 
-            {hasFilters && (
-              <Button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-sm font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0 active:bg-transparent"
-              >
-                <X className="h-3.5 w-3.5" />
-                Clear Filters
-              </Button>
+            {hasFilterChanges && (
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-sm font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0 active:bg-transparent"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Clear Filters
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-sm font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0 active:bg-transparent"
+                >
+                  Reset Filters
+                </Button>
+              </div>
             )}
           </div>
         </div>
