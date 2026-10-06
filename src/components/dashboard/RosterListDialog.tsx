@@ -86,6 +86,37 @@ const PROMOTION_INTRO =
 const PROMOTION_NOTES =
   "**🏆 PROMOTION NOTES 🏆**\nPromotions are based on activity, performance, professionalism, leadership, and compliance with Metro PD SOP/GSOP and Cali RP rules. If you believe a you was missed for a promotion feel free to make a ticket in <#1183194105455579207>."
 
+const PROMOTION_RANK_ORDER = [
+  "Officer",
+  "Officer II",
+  "Officer III",
+  "Lance Corporal",
+  "Corporal",
+  "Sergeant",
+  "Staff Sergeant",
+  "Master Sergeant",
+  "2nd Lieutenant",
+  "1st Lieutenant",
+  "Captain",
+  "Major",
+  "Lieutenant Colonel",
+  "Colonel",
+  "Chief Of Staff",
+  "Assistant Chief",
+  "Deputy Chief",
+  "Chief",
+]
+
+const normalizePromotionRank = (rank: string) =>
+  clean(rank).replace(/\s+/g, " ").trim().toLowerCase()
+
+const getNextPromotionRank = (rank: string) => {
+  const index = PROMOTION_RANK_ORDER.findIndex(
+    (item) => normalizePromotionRank(item) === normalizePromotionRank(rank),
+  )
+  return index >= 0 ? PROMOTION_RANK_ORDER[index + 1] ?? null : null
+}
+
 const strikeLabel = (strike: number) => {
   if (strike === 1) return "Activity Strike 1 (Warning):"
   if (strike === 2) return "Activity Strike 2 (1 Rank Demotion):"
@@ -114,7 +145,7 @@ export default function RosterListDialog({
   const [search, setSearch] = useState("")
   const [selectionFilter, setSelectionFilter] = useState<SelectionFilter>("all")
   const [strikeFilter, setStrikeFilter] = useState<StrikeFilter>("all")
-  const [hideSelected, setHideSelected] = useState(false)
+  const [hideSection, setHideSection] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(true)
 
   const title = module === "activity" ? "Activity List" : "Promotion List"
@@ -141,16 +172,22 @@ export default function RosterListDialog({
       setWeek(clean(data.week))
       setCurrent(Array.isArray(data.current) ? data.current : [])
       setHistory(Array.isArray(data.history) ? data.history : [])
-      setPreview(Array.isArray(data.preview) ? data.preview : [])
+      setPreview(module === "activity" && Array.isArray(data.preview) ? data.preview : [])
       setEffectiveCurrent(data.effectiveCurrent ?? null)
-      setEffectivePrevious(data.effectivePrevious ?? null)
-      setPreviewScope(data.previewScope === "user" ? "user" : "global")
+      setEffectivePrevious(module === "activity" ? data.effectivePrevious ?? null : null)
+      setPreviewScope(module === "activity" && data.previewScope === "user" ? "user" : "global")
 
-      const own = (Array.isArray(data.current) ? data.current : []).find(
-        (item: SavedList) => item.scope === scope,
-      )
-      if (own?.selectedUserIds?.length) {
-        setSelected(own.selectedUserIds)
+      if (module === "activity") {
+        const own = (Array.isArray(data.current) ? data.current : []).find(
+          (item: SavedList) => item.scope === scope,
+        )
+        if (own?.selectedUserIds?.length) {
+          setSelected(own.selectedUserIds)
+        }
+      } else {
+        // Promotion lists are independent each week and must never inherit
+        // selections from a previous week's activity/promotion list.
+        setSelected(initialSelectedIds)
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load list.")
@@ -179,7 +216,7 @@ export default function RosterListDialog({
       setSearch("")
       setSelectionFilter("all")
       setStrikeFilter("all")
-      setHideSelected(false)
+      setHideSection(false)
       void load()
     }
     // initialSelectedIds is intentionally only applied when the dialog opens.
@@ -195,6 +232,12 @@ export default function RosterListDialog({
 
   useEffect(() => {
     if (!open) return
+
+    if (module === "promotion") {
+      setSelected(initialSelectedIds)
+      return
+    }
+
     const own = current.find((item) => item.scope === scope)
     const fallback = scope === "user" ? current.find((item) => item.scope === "global") : null
     setSelected(
@@ -204,7 +247,7 @@ export default function RosterListDialog({
           ? fallback.selectedUserIds
           : initialSelectedIds,
     )
-  }, [scope, open, current, initialSelectedIds])
+  }, [scope, open, current, initialSelectedIds, module])
 
   const savedStrikeMap = useMemo(
     () => new Map((effectiveCurrent?.selectedUsers ?? []).map((item) => [item.userId, item.strike])),
@@ -228,7 +271,6 @@ export default function RosterListDialog({
       const checked = selected.includes(member.discordId)
       const strike = getStrike(member)
 
-      if (hideSelected && checked) return false
       if (selectionFilter === "selected" && !checked) return false
       if (selectionFilter === "unselected" && checked) return false
       if (strikeMode && strikeFilter !== "all" && String(strike) !== strikeFilter) return false
@@ -246,7 +288,7 @@ export default function RosterListDialog({
 
       return true
     })
-  }, [members, selected, hideSelected, selectionFilter, strikeFilter, search, strikeMode, savedStrikeMap, previewMap])
+  }, [members, selected, selectionFilter, strikeFilter, search, strikeMode, savedStrikeMap, previewMap])
 
   const selectedMembers = useMemo(
     () => selected.map((id) => memberMap.get(id)).filter(Boolean) as RosterListMember[],
@@ -264,16 +306,40 @@ export default function RosterListDialog({
     const now = Math.floor(Date.now() / 1000)
 
     if (!strikeMode) {
+      const grouped = new Map<string, RosterListMember[]>()
+
+      for (const member of selectedMembers) {
+        const nextRank = getNextPromotionRank(member.rank)
+        if (!nextRank) continue
+
+        const key = `${member.rank}|||${nextRank}`
+        const group = grouped.get(key) ?? []
+        group.push(member)
+        grouped.set(key, group)
+      }
+
+      const promotionSections: string[] = []
+      for (const [key, group] of grouped) {
+        const [fromRank, toRank] = key.split("|||")
+        promotionSections.push(`**${fromRank.toUpperCase()} → ${toRank.toUpperCase()}**`)
+        promotionSections.push("**Personnel:**")
+        promotionSections.push(
+          group.map((member) => `• <@${member.discordId}>`).join("\n"),
+        )
+        promotionSections.push("")
+        promotionSections.push(DIVIDER)
+      }
+
       return [
         DISCORD_HEADER,
         PROMOTION_TITLE,
         PROMOTION_INTRO,
         DIVIDER,
-        ...selectedMembers.map((member) => `• <@${member.discordId}>`),
-        "",
-        DIVIDER,
+        ...(promotionSections.length
+          ? promotionSections
+          : ["**Personnel:**", "• N/A", "", DIVIDER]),
         PROMOTION_NOTES,
-        `**Promotion Date:** <t:${now}:F> (<t:${now}:t>)`,
+        `**Promotion Date:** <t:${now}:F>`,
       ].join("\n")
     }
 
@@ -460,9 +526,9 @@ export default function RosterListDialog({
                         Filters
                         <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
                       </Button>
-                      <Button type="button" variant={hideSelected ? "default" : "outline"} onClick={() => setHideSelected((value) => !value)}>
+                      <Button type="button" variant={hideSection ? "default" : "outline"} onClick={() => setHideSection((value) => !value)}>
                         <EyeOff className="mr-2 h-4 w-4" />
-                        {hideSelected ? "Showing Unselected" : "Hide Selected"}
+                        {hideSection ? "Show Section" : "Hide Section"}
                       </Button>
                     </div>
 
@@ -496,8 +562,9 @@ export default function RosterListDialog({
                     )}
                   </div>
 
-                  <div className="divide-y">
-                    {filteredMembers.map((member) => {
+                  {!hideSection && (
+                    <div className="divide-y">
+                      {filteredMembers.map((member) => {
                       const checked = selected.includes(member.discordId)
                       const strike = getStrike(member)
                       return (
@@ -514,9 +581,10 @@ export default function RosterListDialog({
                           </div>
                         </label>
                       )
-                    })}
-                    {!filteredMembers.length && <div className="p-8 text-center text-sm text-muted-foreground">No members match the current search and filters.</div>}
-                  </div>
+                      })}
+                      {!filteredMembers.length && <div className="p-8 text-center text-sm text-muted-foreground">No members match the current search and filters.</div>}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -618,9 +686,36 @@ export default function RosterListDialog({
                     <p className="font-semibold">📋 WEEKLY PROMOTIONS 📋</p>
                     <p className="mt-3">{PROMOTION_INTRO}</p>
                     <p>{DIVIDER}</p>
-                    {selectedMembers.length
-                      ? selectedMembers.map((member) => <p key={member.discordId}>• {member.name || "Unknown"}</p>)
-                      : <p className="text-muted-foreground">Select members to preview the message.</p>}
+                    {selectedMembers.length ? (
+                      (() => {
+                        const groups = new Map<string, RosterListMember[]>()
+                        selectedMembers.forEach((member) => {
+                          const nextRank = getNextPromotionRank(member.rank)
+                          if (!nextRank) return
+                          const key = `${member.rank}|||${nextRank}`
+                          groups.set(key, [...(groups.get(key) ?? []), member])
+                        })
+
+                        return groups.size ? (
+                          Array.from(groups.entries()).map(([key, group]) => {
+                            const [fromRank, toRank] = key.split("|||")
+                            return (
+                              <div key={key} className="mt-3">
+                                <p className="font-semibold">{fromRank.toUpperCase()} → {toRank.toUpperCase()}</p>
+                                <p className="font-semibold">Personnel:</p>
+                                {group.map((member) => (
+                                  <p key={member.discordId}>• {member.name || "Unknown"}</p>
+                                ))}
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <p className="text-muted-foreground">Selected members have no defined next promotion rank.</p>
+                        )
+                      })()
+                    ) : (
+                      <p className="text-muted-foreground">Select members to preview the message.</p>
+                    )}
                     <p className="h-5" aria-hidden="true" />
                     <p>{DIVIDER}</p>
                     <p className="font-semibold">🏆 PROMOTION NOTES 🏆</p>
