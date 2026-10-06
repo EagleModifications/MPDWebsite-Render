@@ -681,6 +681,75 @@ function DetailItem({
   )
 }
 
+
+function FilterDropdown({
+  value,
+  placeholder,
+  options,
+  onChange,
+  width = "w-[180px]",
+}: {
+  value: string
+  placeholder: string
+  options: Option[]
+  onChange: (value: string) => void
+  width?: string
+}) {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+
+    const close = () => setOpen(false)
+    window.addEventListener("click", close)
+    return () => window.removeEventListener("click", close)
+  }, [open])
+
+  const selected = options.find((option) => option.value === value)
+
+  return (
+    <div className={`relative ${width}`}>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.stopPropagation()
+          setOpen((current) => !current)
+        }}
+        className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-card px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/60"
+      >
+        <span className="truncate">{selected?.label ?? placeholder}</span>
+        <ChevronDown className={`ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open ? (
+        <div
+          className="absolute left-0 top-[calc(100%+4px)] z-[100] max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {options.map((option) => {
+            const active = option.value === value
+            return (
+              <button
+                key={`${option.value}-${option.label}`}
+                type="button"
+                className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${active ? "bg-blue-500/10 text-blue-400" : "text-foreground hover:bg-accent"}`}
+                onClick={() => {
+                  onChange(option.value)
+                  setOpen(false)
+                }}
+              >
+                <span className="truncate">{option.label}</span>
+                {active ? <span className="ml-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" /> : null}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function PromotionLogs() {
   const [logs, setLogs] = useState<ActionLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -688,10 +757,12 @@ export default function PromotionLogs() {
 
   const [category, setCategory] = useState<Category>("")
   const [division, setDivision] = useState<Division>("")
+  const [userId, setUserId] = useState("")
   const [action, setAction] = useState("")
   const [search, setSearch] = useState("")
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false)
 
   const [expanded, setExpanded] = useState<string | null>(null)
   const [page, setPage] = useState(1)
@@ -710,6 +781,7 @@ export default function PromotionLogs() {
     search.trim() ||
       category ||
       division ||
+      userId ||
       action ||
       from ||
       to,
@@ -736,6 +808,10 @@ export default function PromotionLogs() {
 
       if (division) {
         params.set("division", division)
+      }
+
+      if (userId) {
+        params.set("userId", userId)
       }
 
       if (action) {
@@ -842,6 +918,7 @@ export default function PromotionLogs() {
     search,
     category,
     division,
+    userId,
     action,
     from,
     to,
@@ -891,11 +968,13 @@ export default function PromotionLogs() {
     setSearch("")
     setCategory("")
     setDivision("")
+    setUserId("")
     setAction("")
     setFrom("")
     setTo("")
     setPage(1)
     setExpanded(null)
+    setAdvancedFiltersOpen(false)
   }
 
   const changeFilter = <T,>(
@@ -947,8 +1026,20 @@ export default function PromotionLogs() {
             <button type="button" className="rounded-lg border border-blue-500/60 bg-blue-500/10 px-3 py-1.5 text-[12px] font-medium text-blue-400 shadow-sm">
               Promotion Logs
             </button>
-            <button type="button" className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground">
-              All Modules
+            <button
+              type="button"
+              aria-expanded={advancedFiltersOpen}
+              onClick={() => setAdvancedFiltersOpen((current) => !current)}
+              className={`rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                advancedFiltersOpen
+                  ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                More filters
+                <ChevronDown className={`h-3 w-3 transition-transform ${advancedFiltersOpen ? "rotate-180" : ""}`} />
+              </span>
             </button>
             <button type="button" className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground" onClick={() => void loadLogs()} disabled={loading}>
               <span className="inline-flex items-center gap-1.5">
@@ -959,36 +1050,66 @@ export default function PromotionLogs() {
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <select value={category} onChange={(event) => changeFilter(setCategory, event.target.value as Category)} className="h-9 w-[180px] rounded-lg border border-border bg-card px-3 text-[12px] text-foreground outline-none transition-colors focus:border-blue-500/60">
-              <option value="">Anyone</option>
-              {categoryOptions.filter((item) => item.value).map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+            <FilterDropdown
+              value={userId}
+              placeholder="Anyone"
+              options={[
+                { value: "", label: "Anyone" },
+                ...Array.from(
+                  new Map(
+                    logs
+                      .filter((log) => log.userId)
+                      .map((log) => [
+                        log.userId,
+                        {
+                          value: log.userId,
+                          label: log.userName || log.username || log.userId,
+                        },
+                      ]),
+                  ).values(),
+                ),
+              ]}
+              onChange={(value) => changeFilter(setUserId, value)}
+            />
 
-            <select value={action} onChange={(event) => changeFilter(setAction, event.target.value)} className="h-9 w-[180px] rounded-lg border border-border bg-card px-3 text-[12px] text-foreground outline-none transition-colors focus:border-blue-500/60">
-              <option value="">All actions</option>
-              {actionOptions.map((item) => (
-                <option key={item} value={item}>{actionLabel(item)}</option>
-              ))}
-            </select>
+            <FilterDropdown
+              value={action}
+              placeholder="All actions"
+              options={[
+                { value: "", label: "All actions" },
+                ...actionOptions.map((item) => ({
+                  value: item,
+                  label: actionLabel(item),
+                })),
+              ]}
+              onChange={(value) => changeFilter(setAction, value)}
+            />
 
             <span className="ml-auto text-[11px] text-muted-foreground">
               {pagination.total.toLocaleString()} changes
             </span>
           </div>
 
-          {hasFilters && (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+          {(advancedFiltersOpen || hasFilters) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/60 pt-2">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input value={search} onChange={(event) => changeFilter(setSearch, event.target.value)} placeholder="Search..." className="h-8 w-[220px] border-border bg-card pl-8 text-[11px]" />
               </div>
-              <select value={division} onChange={(event) => changeFilter(setDivision, event.target.value as Division)} className="h-8 rounded-lg border border-border bg-card px-2.5 text-[11px] outline-none">
-                {divisionOptions.map((item) => (
-                  <option key={item.value || "all"} value={item.value}>{item.label}</option>
-                ))}
-              </select>
+              <FilterDropdown
+                value={category}
+                placeholder="All Categories"
+                options={categoryOptions}
+                onChange={(value) => changeFilter(setCategory, value as Category)}
+                width="w-[150px]"
+              />
+              <FilterDropdown
+                value={division}
+                placeholder="All Divisions"
+                options={divisionOptions}
+                onChange={(value) => changeFilter(setDivision, value as Division)}
+                width="w-[150px]"
+              />
               <Input type="date" value={from} onChange={(event) => changeFilter(setFrom, event.target.value)} className="h-8 w-[130px] text-[11px]" />
               <Input type="date" value={to} onChange={(event) => changeFilter(setTo, event.target.value)} className="h-8 w-[130px] text-[11px]" />
               <button type="button" onClick={clearFilters} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-card px-2.5 text-[11px] text-muted-foreground hover:text-foreground">
