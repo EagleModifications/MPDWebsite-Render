@@ -43,8 +43,8 @@ const navItems: NavItem[] = [
     permission: "gallery",
   },
   {
-    name: "Spin Wheel",
-    href: "/spin-wheel",
+    name: "Wheel",
+    href: "/wheel",
     public: true,
   },
   {
