@@ -3,7 +3,6 @@
   "private": true,
   "version": "1.0.1",
   "type": "module",
-  "main": "desktop/main.cjs",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"node --env-file=.env --import tsx server/index.ts\"",
     "dev:web": "vite",
@@ -12,8 +11,8 @@
     "preview": "vite preview",
     "start": "tsx server/index.ts",
     "desktop:dev": "electron desktop/main.cjs",
-    "desktop:build": "electron-builder --win nsis --publish never",
-    "desktop:release": "electron-builder --win nsis --publish always"
+    "desktop:build": "electron-builder",
+    "desktop:release": "electron-builder --publish always"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.6",
@@ -29,6 +28,7 @@
     "cn": "^0.4.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^18.0.5",
+    "electron-updater": "^6.6.2",
     "express": "^5.1.0",
     "googleapis": "^182.0.0",
     "jose": "^6.1.0",
@@ -45,10 +45,8 @@
     "spin-wheel": "^5.0.2",
     "tailwind-merge": "^3.3.1",
     "tw-animate-css": "^1.3.0",
-    "tw-animate-css": "^1.3.0",
     "xlsx": "^0.18.5",
-    "youtube-dl-exec": "^3.1.17",
-    "electron-updater": "^6.6.2"
+    "youtube-dl-exec": "^3.1.17"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
@@ -61,6 +59,8 @@
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.4",
     "concurrently": "^9.2.1",
+    "electron": "^38.2.2",
+    "electron-builder": "^26.0.12",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.16",
@@ -69,22 +69,22 @@
     "tsx": "^4.19.2",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.44.0",
-    "vite": "^7.1.7",
-    "electron": "^38.2.2",
-    "electron-builder": "^26.0.12"
+    "vite": "^7.1.7"
   },
   "build": {
     "appId": "com.metropd.desktop",
     "productName": "Metro Police Department",
-    "artifactName": "MPD-Police-Department-Setup-${version}.${ext}",
+    "artifactName": "MPD-Police-Department-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
     "files": [
       "desktop/main.cjs",
       "desktop/preload.cjs",
-      "desktop/icon.png"
+      "desktop/icon.png",
+      "desktop/icon.ico"
     ],
+    "asar": true,
     "win": {
       "target": [
         {
@@ -94,7 +94,8 @@
           ]
         }
       ],
-      "icon": "desktop/icon.png"
+      "icon": "desktop/icon.ico",
+      "publisherName": "Metro Police Department"
     },
     "nsis": {
       "oneClick": false,
@@ -104,6 +105,31 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Metro Police Department",
       "runAfterFinish": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "desktop/icon.png",
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "desktop/icon.png",
+      "category": "Office"
     },
     "publish": {
       "provider": "github",
