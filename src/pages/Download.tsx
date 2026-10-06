@@ -698,11 +698,11 @@ export default function Download() {
                 <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1.05fr] lg:p-6">
                   <div className="min-w-0">
                     <div className="flex items-start gap-4 text-left">
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center">
                         <img
                           src="/logo.png"
                           alt="Metro Police Department"
-                          className="h-11 w-11 object-contain"
+                          className="h-16 w-16 object-contain"
                         />
                       </div>
 
@@ -868,7 +868,7 @@ export default function Download() {
 
                           </div>
 
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          <div className="flex flex-wrap items-center gap-2">
                             <div
                               onClick={(event) => event.stopPropagation()}
                               onKeyDown={(event) => event.stopPropagation()}
