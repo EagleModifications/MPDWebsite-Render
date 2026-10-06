@@ -17,14 +17,13 @@ const initialEntries: WheelEntry[] = [
 ];
 
 export default function WheelOfNames(): JSX.Element {
-  const [entries, setEntries] = useState<WheelEntry[]>(initialEntries);
-  const [results, setResults] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"entries" | "results">(
-    "entries",
-  );
+  const [entries, setEntries] =
+    useState<WheelEntry[]>(initialEntries);
 
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [results, setResults] = useState<string[]>([]);
+
+  const [activeTab, setActiveTab] =
+    useState<"entries" | "results">("entries");
 
   const shuffleEntries = (): void => {
     setEntries((current) => {
@@ -32,7 +31,11 @@ export default function WheelOfNames(): JSX.Element {
 
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+
+        [shuffled[i], shuffled[j]] = [
+          shuffled[j],
+          shuffled[i],
+        ];
       }
 
       return shuffled;
@@ -41,17 +44,26 @@ export default function WheelOfNames(): JSX.Element {
 
   const sortEntries = (): void => {
     setEntries((current) =>
-      [...current].sort((a, b) => a.name.localeCompare(b.name)),
+      [...current].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
     );
   };
 
   const spinWheel = (): void => {
     if (entries.length === 0) return;
 
-    const index = Math.floor(Math.random() * entries.length);
+    const index = Math.floor(
+      Math.random() * entries.length,
+    );
+
     const winner = entries[index];
 
-    setResults((current) => [...current, winner.name]);
+    setResults((current) => [
+      ...current,
+      winner.name,
+    ]);
+
     setActiveTab("results");
   };
 
@@ -61,110 +73,14 @@ export default function WheelOfNames(): JSX.Element {
     setActiveTab("entries");
   };
 
-  const toggleFullscreen = async (): Promise<void> => {
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-        setIsFullscreen(true);
-      } else {
-        await document.exitFullscreen();
-        setIsFullscreen(false);
-      }
-    } catch {
-      setIsFullscreen(false);
-    }
-  };
-
   return (
     <div className="wheel-page">
-      <header className="header">
-        <div className="toolbar">
-          <a className="logo-link" href="/">
-            <div className="toolbar-title">
-              <img
-                src="/images/logo-blue.png"
-                alt="logo"
-                width={38}
-                height={38}
-              />
 
-              <h1>Wheel of Names</h1>
-            </div>
-          </a>
-
-          <div className="toolbar-spacer" />
-
-          <div className="toolbar-actions">
-            <button type="button" aria-label="Customize">
-              <i className="fas fa-palette" />
-              <span>Customize</span>
-            </button>
-
-            <button type="button" aria-label="New" onClick={newWheel}>
-              <i className="fas fa-file" />
-              <span>New</span>
-            </button>
-
-            <button type="button" aria-label="Open">
-              <i className="fas fa-folder-open" />
-              <span>Open</span>
-            </button>
-
-            <button type="button" aria-label="Save">
-              <i className="fas fa-save" />
-              <span>Save</span>
-            </button>
-
-            <button type="button" aria-label="Share">
-              <i className="fas fa-share-alt" />
-              <span>Share</span>
-            </button>
-
-            <a
-              className="toolbar-button"
-              href="/gallery"
-              aria-label="Gallery"
-            >
-              <i className="fas fa-search" />
-              <span>Gallery</span>
-            </a>
-
-            <button
-              type="button"
-              aria-label="Fullscreen"
-              onClick={toggleFullscreen}
-            >
-              <i className="fas fa-expand" />
-            </button>
-
-            <button
-              type="button"
-              aria-label="More"
-              onClick={() => setIsMenuOpen((value) => !value)}
-            >
-              <span>More</span>
-              <i className="fas fa-caret-down" />
-            </button>
-
-            <button type="button" aria-label="Language">
-              <i className="fas fa-globe" />
-              <span>English</span>
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="hamburger"
-            aria-expanded={isMenuOpen}
-            onClick={() => setIsMenuOpen((value) => !value)}
-          >
-            <i className="fas fa-bars" />
-          </button>
-        </div>
-      </header>
-
+      {/* MAIN CONTENT */}
       <main className="page-content">
         <div className="content-grid">
+
+          {/* LEFT SIDE */}
           <aside className="left-column">
             <button
               type="button"
@@ -175,16 +91,20 @@ export default function WheelOfNames(): JSX.Element {
             </button>
           </aside>
 
+          {/* WHEEL */}
           <section className="center-column">
             <div className="wheel-container">
               <div
                 className="wheel"
                 role="button"
                 tabIndex={0}
-                aria-label="wheel"
+                aria-label="Wheel"
                 onClick={spinWheel}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
+                  if (
+                    event.key === "Enter" ||
+                    event.key === " "
+                  ) {
                     spinWheel();
                   }
                 }}
@@ -220,13 +140,7 @@ export default function WheelOfNames(): JSX.Element {
                       xlinkHref="#curve-top"
                       startOffset="50%"
                     >
-                      <tspan className="tap-to-spin">
-                        Tap to spin
-                      </tspan>
-
-                      <tspan className="click-to-spin">
-                        Click to spin
-                      </tspan>
+                      Click to spin
                     </textPath>
                   </text>
 
@@ -246,9 +160,63 @@ export default function WheelOfNames(): JSX.Element {
             </div>
           </section>
 
+          {/* RIGHT SIDE */}
           <aside className="right-column">
+
+            {/* BUTTONS ABOVE SIDE MENU */}
+            <div className="side-toolbar">
+
+              <button
+                type="button"
+                aria-label="Customize"
+              >
+                <i className="fas fa-palette" />
+                <span>Customize</span>
+              </button>
+
+              <button
+                type="button"
+                aria-label="New"
+                onClick={newWheel}
+              >
+                <i className="fas fa-file" />
+                <span>New</span>
+              </button>
+
+              <button
+                type="button"
+                aria-label="Open"
+              >
+                <i className="fas fa-folder-open" />
+                <span>Open</span>
+              </button>
+
+              <button
+                type="button"
+                aria-label="Save"
+              >
+                <i className="fas fa-save" />
+                <span>Save</span>
+              </button>
+
+              <button
+                type="button"
+                aria-label="Share"
+              >
+                <i className="fas fa-share-alt" />
+                <span>Share</span>
+              </button>
+
+            </div>
+
+            {/* SIDE MENU / EDITOR */}
             <div className="editor-card">
-              <div className="tabs" role="tablist">
+
+              {/* TABS */}
+              <div
+                className="tabs"
+                role="tablist"
+              >
                 <button
                   type="button"
                   className={
@@ -256,10 +224,15 @@ export default function WheelOfNames(): JSX.Element {
                       ? "tab active"
                       : "tab"
                   }
-                  onClick={() => setActiveTab("entries")}
+                  onClick={() =>
+                    setActiveTab("entries")
+                  }
                 >
                   <span>Entries</span>
-                  <span className="badge">{entries.length}</span>
+
+                  <span className="badge">
+                    {entries.length}
+                  </span>
                 </button>
 
                 <button
@@ -269,16 +242,24 @@ export default function WheelOfNames(): JSX.Element {
                       ? "tab active"
                       : "tab"
                   }
-                  onClick={() => setActiveTab("results")}
+                  onClick={() =>
+                    setActiveTab("results")
+                  }
                 >
                   <span>Results</span>
-                  <span className="badge">{results.length}</span>
+
+                  <span className="badge">
+                    {results.length}
+                  </span>
                 </button>
               </div>
 
+              {/* ENTRIES */}
               {activeTab === "entries" && (
                 <div className="tab-panel">
+
                   <div className="editor-actions">
+
                     <button
                       type="button"
                       onClick={shuffleEntries}
@@ -305,8 +286,10 @@ export default function WheelOfNames(): JSX.Element {
                       <input type="checkbox" />
                       <span>Advanced</span>
                     </label>
+
                   </div>
 
+                  {/* ENTRY LIST */}
                   <div
                     className="basic-editor"
                     contentEditable
@@ -321,7 +304,9 @@ export default function WheelOfNames(): JSX.Element {
                     ))}
                   </div>
 
+                  {/* ADD WHEEL */}
                   <div className="add-wheel-container">
+
                     <button
                       type="button"
                       onClick={() =>
@@ -329,7 +314,9 @@ export default function WheelOfNames(): JSX.Element {
                           ...current,
                           {
                             id: Date.now(),
-                            name: `Entry ${current.length + 1}`,
+                            name: `Entry ${
+                              current.length + 1
+                            }`,
                           },
                         ])
                       }
@@ -344,12 +331,15 @@ export default function WheelOfNames(): JSX.Element {
                     >
                       <i className="fas fa-caret-down" />
                     </button>
+
                   </div>
                 </div>
               )}
 
+              {/* RESULTS */}
               {activeTab === "results" && (
                 <div className="tab-panel results-panel">
+
                   {results.length === 0 ? (
                     <p>No results yet.</p>
                   ) : (
@@ -362,9 +352,11 @@ export default function WheelOfNames(): JSX.Element {
                       </div>
                     ))
                   )}
+
                 </div>
               )}
 
+              {/* FOOTER */}
               <div className="editor-footer">
                 <span>Version 432</span>
 
@@ -372,8 +364,10 @@ export default function WheelOfNames(): JSX.Element {
                   Changelog
                 </a>
               </div>
+
             </div>
 
+            {/* HIDE EDITOR BUTTON */}
             <button
               type="button"
               className="hide-editor"
@@ -381,13 +375,17 @@ export default function WheelOfNames(): JSX.Element {
             >
               <i className="fas fa-chevron-right" />
             </button>
+
           </aside>
         </div>
 
+        {/* ABOUT SECTION */}
         <hr />
 
         <section className="about-card-row">
+
           <div className="about-card-column">
+
             <article className="about-card">
               <h2>
                 <img
@@ -400,43 +398,37 @@ export default function WheelOfNames(): JSX.Element {
               </h2>
 
               <p>
-                Every day we hear from people who use our
-                website in new ways:
+                Every day we hear from people who use
+                our website in new ways:
               </p>
 
               <ul>
                 <li>
-                  Random name picker in the classroom: pick
-                  which student will answer the next question.
+                  Random name picker in the classroom.
                 </li>
 
                 <li>
-                  Retailers can spin the wheel to pick which
-                  loyal customer will get the monthly giveaway.
+                  Pick a lucky customer for giveaways.
                 </li>
 
                 <li>
-                  Use the wheel during presentations to pick a
-                  lucky winner.
+                  Pick a random winner during presentations.
                 </li>
 
                 <li>
-                  Randomize who speaks first during a daily
-                  standup meeting.
+                  Randomize who speaks first at work.
                 </li>
 
                 <li>
-                  Put your to-do items on a wheel and spin to
-                  find which one to start with.
+                  Pick which task to start with.
                 </li>
 
                 <li>
-                  Pick who goes first in a game at a party.
+                  Pick who goes first in a game.
                 </li>
 
                 <li>
-                  Put dinner alternatives on the wheel when you
-                  cannot agree what to have.
+                  Decide what to have for dinner.
                 </li>
               </ul>
             </article>
@@ -453,15 +445,14 @@ export default function WheelOfNames(): JSX.Element {
               </h2>
 
               <p>
-                It's easy: type in your entries in the textbox
-                to the right of the wheel, then click the wheel
-                to spin it and get a random winner.
+                Type your entries into the textbox,
+                then click the wheel to spin it and
+                get a random winner.
               </p>
 
               <p>
-                To customize the colors, sounds, and spin time,
-                click <strong>Customize</strong> at the top of
-                the page.
+                Use Customize to change the wheel's
+                appearance, sounds and spin settings.
               </p>
             </article>
 
@@ -486,9 +477,11 @@ export default function WheelOfNames(): JSX.Element {
                 <strong>0</strong>
               </div>
             </article>
+
           </div>
 
           <div className="about-card-column">
+
             <article className="about-card">
               <h2>
                 <img
@@ -500,60 +493,45 @@ export default function WheelOfNames(): JSX.Element {
                 Wheel features
               </h2>
 
-              <p>
-                We aim to provide a flexible and easy-to-use
-                wheel spinner.
-              </p>
-
               <ul>
                 <li>
-                  <strong>Rich audio library:</strong> Choose
-                  from music tracks and sound effects.
+                  <strong>Rich audio library</strong>
                 </li>
 
                 <li>
-                  <strong>Multi-wheel management:</strong>
-                  Manage multiple wheels on the same page.
+                  <strong>Multi-wheel management</strong>
                 </li>
 
                 <li>
-                  <strong>Weighted wheels:</strong> Set
-                  different weights for entries.
+                  <strong>Weighted wheels</strong>
                 </li>
 
                 <li>
-                  <strong>Instant sharing:</strong> Generate
-                  short links to share wheels.
+                  <strong>Instant sharing</strong>
                 </li>
 
                 <li>
-                  <strong>Your own visuals:</strong> Customize
-                  backgrounds, logos, and colors.
+                  <strong>Custom visuals</strong>
                 </li>
 
                 <li>
-                  <strong>Millions of images:</strong> Add
-                  custom images to your wheel.
+                  <strong>Image support</strong>
                 </li>
 
                 <li>
-                  <strong>Privacy-first storage:</strong> Save
-                  wheels locally or in the cloud.
+                  <strong>Privacy-first storage</strong>
                 </li>
 
                 <li>
-                  <strong>Authentic physics:</strong> Simulate
-                  the feel of a physical spinning wheel.
+                  <strong>Authentic physics</strong>
                 </li>
 
                 <li>
-                  <strong>Built for large groups:</strong>
-                  Handle very large lists of names.
+                  <strong>Large groups</strong>
                 </li>
 
                 <li>
-                  <strong>Global localization:</strong>
-                  Support multiple languages.
+                  <strong>Multiple languages</strong>
                 </li>
               </ul>
             </article>
@@ -570,13 +548,8 @@ export default function WheelOfNames(): JSX.Element {
               </h2>
 
               <p>
-                We are committed to protecting and respecting
-                your privacy and the security of your data.
-              </p>
-
-              <p>
-                We follow industry best practices for data
-                encryption and backups.
+                We are committed to protecting your
+                privacy and the security of your data.
               </p>
             </article>
 
@@ -592,13 +565,14 @@ export default function WheelOfNames(): JSX.Element {
               </h2>
 
               <p>
-                Ads help keep the website free. Users can close
-                ads for the duration of their session.
+                Ads help keep the website free.
               </p>
             </article>
+
           </div>
 
           <div className="about-card-column">
+
             <article className="about-card">
               <h2>
                 <img
@@ -611,15 +585,9 @@ export default function WheelOfNames(): JSX.Element {
               </h2>
 
               <p>
-                Yes. The wheel can be added as a browser source
-                in streaming software.
+                Yes. The wheel can be used as a browser
+                source in streaming software.
               </p>
-
-              <ul>
-                <li>In-game challenges.</li>
-                <li>Character builds.</li>
-                <li>Viewer giveaways.</li>
-              </ul>
             </article>
 
             <article className="about-card">
@@ -634,21 +602,7 @@ export default function WheelOfNames(): JSX.Element {
               </h2>
 
               <p>
-                Each spin is independent and produces a random
-                result.
-              </p>
-
-              <p>
-                <strong>How We Guarantee Randomness</strong>:
-                the wheel can use cryptographically secure
-                browser randomness rather than relying solely
-                on standard pseudo-random values.
-              </p>
-
-              <p>
-                If you want to prevent a winner from being
-                selected again, remove the winner after each
-                spin.
+                Each spin is an independent random event.
               </p>
 
               <a
@@ -658,16 +612,21 @@ export default function WheelOfNames(): JSX.Element {
                 Run 10,000 Spins
               </a>
             </article>
+
           </div>
+
         </section>
 
         <hr />
 
         <footer className="footer">
+
           <div>
             <span>
               <i className="fas fa-balance-scale" />
-              <a href="/terms">Terms &amp; conditions</a>
+              <a href="/terms">
+                Terms &amp; conditions
+              </a>
             </span>
 
             <span>
@@ -681,7 +640,9 @@ export default function WheelOfNames(): JSX.Element {
           <div>
             <span>
               <i className="fas fa-question-circle" />
-              <a href="/faq">FAQ</a>
+              <a href="/faq">
+                FAQ
+              </a>
             </span>
 
             <span>
@@ -699,7 +660,9 @@ export default function WheelOfNames(): JSX.Element {
           <div>
             <span>
               <i className="fas fa-code" />
-              <a href="/api-doc">API</a>
+              <a href="/api-doc">
+                API
+              </a>
             </span>
 
             <span>
@@ -717,11 +680,16 @@ export default function WheelOfNames(): JSX.Element {
           <div>
             <span>
               <i className="fas fa-video" />
-              <a href="/streaming">Streaming</a>
+              <a href="/streaming">
+                Streaming
+              </a>
             </span>
           </div>
 
-          <span className="build">7a6d / ?</span>
+          <span className="build">
+            7a6d / ?
+          </span>
+
         </footer>
       </main>
     </div>
