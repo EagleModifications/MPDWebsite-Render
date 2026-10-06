@@ -30,6 +30,7 @@ import NoPermission from "@/pages/NoPermission"
 import ErrorPage from "@/pages/Error"
 import Events from "@/pages/Events"
 import Gallery from "@/pages/Gallery"
+import WheelOfNames from "@/pages/WheelOfNames"
 import Download from "@/pages/Download"
 
 import MainRoster from "@/pages/documents/MainRoster"
@@ -379,6 +380,11 @@ export default function App() {
           <Route
             path="/gallery"
             element={<Gallery />}
+          />
+
+          <Route
+            path="/wheel"
+            element={<WheelOfNames />}
           />
 
           <Route
