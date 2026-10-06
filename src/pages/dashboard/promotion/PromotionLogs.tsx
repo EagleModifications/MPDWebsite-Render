@@ -50,6 +50,8 @@ type Division =
   | "sar"
   | ""
 
+type LogModule = "promotion" | "activity"
+
 type ActionLog = {
   id: string
   entryNumber?: number
@@ -774,6 +776,8 @@ function FilterDropdown({
 }
 
 export default function PromotionLogs() {
+  const [module, setModule] = useState<LogModule>("promotion")
+
   const [logs, setLogs] = useState<ActionLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -786,6 +790,7 @@ export default function PromotionLogs() {
 
   const [expanded, setExpanded] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
 
   const [pagination, setPagination] = useState({
     page: 1,
@@ -812,8 +817,8 @@ export default function PromotionLogs() {
     try {
       const params = new URLSearchParams({
         page: String(page),
-        limit: "50",
-        module: "promotion",
+        limit: String(pageSize),
+        module,
       })
 
       if (search.trim()) {
@@ -852,7 +857,7 @@ export default function PromotionLogs() {
       if (!response.ok || data.success !== true) {
         throw new Error(
           data.error ||
-            `Failed to load promotion action logs (${response.status}).`,
+            `Failed to load ${module} action logs (${response.status}).`,
         )
       }
 
@@ -891,7 +896,7 @@ export default function PromotionLogs() {
       setPagination(
         data.pagination ?? {
           page,
-          limit: 50,
+          limit: pageSize,
           total: nextLogs.length,
           pages: 1,
         },
@@ -910,7 +915,7 @@ export default function PromotionLogs() {
       setLogs([])
       setPagination({
         page: 1,
-        limit: 50,
+        limit: pageSize,
         total: 0,
         pages: 1,
       })
@@ -918,13 +923,15 @@ export default function PromotionLogs() {
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to load promotion action logs.",
+          : `Failed to load ${module} action logs.`,
       )
     } finally {
       setLoading(false)
     }
   }, [
     page,
+    pageSize,
+    module,
     search,
     category,
     division,
@@ -986,6 +993,12 @@ export default function PromotionLogs() {
     setExpanded(null)
   }
 
+  const changePageSize = (value: number) => {
+    setPageSize(value)
+    setPage(1)
+    setExpanded(null)
+  }
+
   const groupedLogs = useMemo(() => {
     const groups: Array<{
       key: string
@@ -1020,100 +1033,168 @@ export default function PromotionLogs() {
   return (
     <DashboardLayout>
       <div className="flex min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
-        {/* Compact reference-style controls */}
-        <div className="w-full">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex w-full max-w-[1100px] items-center gap-1.5">
-              <button
-                type="button"
-                className="rounded-lg border border-blue-500/60 bg-blue-500/10 px-3 py-1.5 text-[12px] font-medium text-blue-400 shadow-sm"
-              >
-                Promotion Logs
-              </button>
+        {/* Header */}
+        <div className="flex shrink-0 flex-col gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
+                {module === "promotion" ? (
+                  <Shield className="h-5 w-5 text-blue-500" />
+                ) : (
+                  <Activity className="h-5 w-5 text-blue-500" />
+                )}
+              </div>
+
+              <div className="min-w-0">
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  {module === "promotion" ? "Promotion Logs" : "Activity Logs"}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {module === "promotion"
+                    ? "View promotion management audit history and changes."
+                    : "View activity management audit history and changes."}
+                </p>
+              </div>
             </div>
 
-            <button
+            <Button
               type="button"
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-[12px] font-medium text-foreground transition-colors hover:border-blue-500/40 hover:text-blue-400"
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0 gap-2 self-start lg:self-center"
               onClick={() => void loadLogs()}
               disabled={loading}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Refresh
+            </Button>
+          </div>
+
+          {/* Log module tabs */}
+          <div className="flex w-fit items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (module === "promotion") return
+                setModule("promotion")
+                setPage(1)
+                setExpanded(null)
+                setSearch("")
+                setCategory("")
+                setDivision("")
+                setUserId("")
+                setAction("")
+              }}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${module === "promotion" ? "bg-blue-500/10 text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Promotion Logs
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (module === "activity") return
+                setModule("activity")
+                setPage(1)
+                setExpanded(null)
+                setSearch("")
+                setCategory("")
+                setDivision("")
+                setUserId("")
+                setAction("")
+              }}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${module === "activity" ? "bg-blue-500/10 text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Activity Logs
             </button>
           </div>
 
-          <div className="mx-auto mt-3 grid w-full max-w-[1100px] grid-cols-1 gap-2 sm:grid-cols-[minmax(280px,1fr)_190px_190px_190px]">
-            <div className="relative min-w-0">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => changeFilter(setSearch, event.target.value)}
-                placeholder="Search users, actions, IDs, targets..."
-                className="h-9 w-full border-border bg-card pl-9 text-[12px]"
+          {/* Filters */}
+          <div className="w-full">
+            <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-[minmax(280px,1fr)_190px_190px_190px_auto]">
+              <div className="relative min-w-0">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(event) => changeFilter(setSearch, event.target.value)}
+                  placeholder="Search users, actions, IDs, targets..."
+                  className="h-9 w-full border-border bg-card pl-9 text-[12px]"
+                />
+              </div>
+
+              <FilterDropdown
+                value={category}
+                placeholder="All Categories"
+                options={categoryOptions}
+                onChange={(value) => changeFilter(setCategory, value as Category)}
+                width="w-full"
+              />
+
+              <FilterDropdown
+                value={userId}
+                placeholder="Anyone"
+                options={[
+                  { value: "", label: "Anyone" },
+                  ...Array.from(
+                    new Map(
+                      logs
+                        .filter((log) => log.userId)
+                        .map((log) => [
+                          log.userId,
+                          {
+                            value: log.userId,
+                            label: log.userName || log.username || log.userId,
+                          },
+                        ]),
+                    ).values(),
+                  ),
+                ]}
+                onChange={(value) => changeFilter(setUserId, value)}
+                width="w-full"
+              />
+
+              <FilterDropdown
+                value={action}
+                placeholder="All actions"
+                options={[
+                  { value: "", label: "All actions" },
+                  ...actionOptions.map((item) => ({
+                    value: item,
+                    label: actionLabel(item),
+                  })),
+                ]}
+                onChange={(value) => changeFilter(setAction, value)}
+                width="w-full"
+              />
+
+              <FilterDropdown
+                value={String(pageSize)}
+                placeholder="50 per page"
+                options={[
+                  { value: "10", label: "10 per page" },
+                  { value: "25", label: "25 per page" },
+                  { value: "50", label: "50 per page" },
+                  { value: "100", label: "100 per page" },
+                ]}
+                onChange={(value) => changePageSize(Number(value))}
+                width="w-full md:w-[150px]"
               />
             </div>
 
-            <FilterDropdown
-              value={category}
-              placeholder="All Categories"
-              options={categoryOptions}
-              onChange={(value) => changeFilter(setCategory, value as Category)}
-              width="w-full"
-            />
-
-            <FilterDropdown
-              value={userId}
-              placeholder="Anyone"
-              options={[
-                { value: "", label: "Anyone" },
-                ...Array.from(
-                  new Map(
-                    logs
-                      .filter((log) => log.userId)
-                      .map((log) => [
-                        log.userId,
-                        {
-                          value: log.userId,
-                          label: log.userName || log.username || log.userId,
-                        },
-                      ]),
-                  ).values(),
-                ),
-              ]}
-              onChange={(value) => changeFilter(setUserId, value)}
-              width="w-full"
-            />
-
-            <FilterDropdown
-              value={action}
-              placeholder="All actions"
-              options={[
-                { value: "", label: "All actions" },
-                ...actionOptions.map((item) => ({
-                  value: item,
-                  label: actionLabel(item),
-                })),
-              ]}
-              onChange={(value) => changeFilter(setAction, value)}
-              width="w-full"
-            />
-          </div>
-
-          <div className="mx-auto mt-2 flex min-h-5 w-full max-w-[1100px] items-center justify-end gap-2">
-            {hasFilters ? (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <X className="h-3 w-3" />
-                Clear filters
-              </button>
-            ) : null}
-            <span className="text-[11px] text-muted-foreground">
-              {pagination.total.toLocaleString()} changes
-            </span>
+            <div className="mt-2 flex min-h-5 items-center justify-end gap-2">
+              {hasFilters ? (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                  Clear filters
+                </button>
+              ) : null}
+              <span className="text-[11px] text-muted-foreground">
+                {pagination.total.toLocaleString()} changes
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1141,7 +1222,7 @@ export default function PromotionLogs() {
               </div>
 
               <p className="text-sm font-medium">
-                No promotion action logs found
+                No {module === "promotion" ? "promotion" : "activity"} action logs found
               </p>
 
               <p className="mt-1 text-xs text-muted-foreground">
@@ -1167,7 +1248,7 @@ export default function PromotionLogs() {
                     </span>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {group.logs.map((log, index) => {
                       const isExpanded =
                         expanded === log.id
@@ -1226,9 +1307,9 @@ export default function PromotionLogs() {
                             }}
                           >
                             <div className="flex min-w-0 items-center gap-2.5 px-3 py-2.5">
-                              {/* Entry */}
-                              <div className="flex w-9 shrink-0 items-center justify-center">
-                                <span className="font-mono text-[10px] font-medium text-muted-foreground/80">
+                              {/* Entry + action icon */}
+                              <div className="flex w-8 shrink-0 items-center justify-center">
+                                <span className="font-mono text-[9px] text-muted-foreground/70">
                                   #{entryNumber}
                                 </span>
                               </div>
@@ -1497,25 +1578,19 @@ export default function PromotionLogs() {
 
         {/* Pagination */}
         {!loading && logs.length > 0 ? (
-          <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-[11px] text-muted-foreground">
-              Page {pagination.page} of{" "}
-              {pagination.pages} ·{" "}
-              {pagination.total.toLocaleString()} logs
-            </span>
+          <div className="mx-auto flex w-full max-w-[1100px] items-center justify-between gap-3 px-0 py-1">
+            <div className="text-[11px] text-muted-foreground">
+              Page {pagination.page} of {pagination.pages} · {pagination.total.toLocaleString()} logs
+            </div>
 
-            <div className="flex gap-1.5">
+            <div className="flex items-center gap-1.5">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="h-8 px-3 text-xs"
                 disabled={page <= 1 || loading}
-                onClick={() =>
-                  setPage((current) =>
-                    Math.max(1, current - 1),
-                  )
-                }
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
               >
                 Previous
               </Button>
@@ -1525,17 +1600,8 @@ export default function PromotionLogs() {
                 variant="outline"
                 size="sm"
                 className="h-8 px-3 text-xs"
-                disabled={
-                  page >= pagination.pages || loading
-                }
-                onClick={() =>
-                  setPage((current) =>
-                    Math.min(
-                      pagination.pages,
-                      current + 1,
-                    ),
-                  )
-                }
+                disabled={page >= pagination.pages || loading}
+                onClick={() => setPage((current) => Math.min(pagination.pages, current + 1))}
               >
                 Next
               </Button>
