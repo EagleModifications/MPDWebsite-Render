@@ -4,7 +4,6 @@ import {
   ChevronUp,
   Clipboard,
   ClipboardCheck,
-  Copy,
   FileInput,
   FileText,
   Filter,
@@ -144,7 +143,8 @@ const actionLabel = (value: string) =>
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
 
 const categoryLabel = (value: string) =>
-  categoryOptions.find((item) => item.value === value)?.label ?? actionLabel(value)
+  categoryOptions.find((item) => item.value === value)?.label ??
+  actionLabel(value)
 
 const divisionLabel = (value?: string | null) =>
   divisionOptions.find((item) => item.value === value)?.label ??
@@ -161,6 +161,36 @@ const formatDateTime = (value: string) => {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date)
+}
+
+const formatTime = (value: string) => {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown time"
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date)
+}
+
+const formatDateHeading = (value: string) => {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "UNKNOWN DATE"
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  })
+    .format(date)
+    .toUpperCase()
 }
 
 const formatDetailValue = (value: unknown) => {
@@ -191,7 +221,6 @@ const getInitials = (value: string) =>
 const getDefaultAvatar = (discordId: string) => {
   try {
     const index = Number(BigInt(discordId) % 6n)
-
     return `https://cdn.discordapp.com/embed/avatars/${index}.png?size=128`
   } catch {
     return undefined
@@ -223,23 +252,15 @@ const getAvatarUrl = (
 const getActionIcon = (log: ActionLog) => {
   const value = `${log.action} ${log.category}`.toLowerCase()
 
-  if (
-    value.includes("copy") ||
-    value.includes("clipboard")
-  ) {
-    return Copy
+  if (value.includes("copy") || value.includes("clipboard")) {
+    return Clipboard
   }
 
-  if (
-    value.includes("select") ||
-    value.includes("selected")
-  ) {
+  if (value.includes("select") || value.includes("selected")) {
     return MousePointerClick
   }
 
-  if (
-    value.includes("import")
-  ) {
+  if (value.includes("import")) {
     return FileInput
   }
 
@@ -269,22 +290,15 @@ const getActionIcon = (log: ActionLog) => {
     return Pencil
   }
 
-  if (
-    value.includes("requirement")
-  ) {
+  if (value.includes("requirement")) {
     return ClipboardCheck
   }
 
-  if (
-    value.includes("management")
-  ) {
+  if (value.includes("management")) {
     return Settings2
   }
 
-  if (
-    value.includes("navigation") ||
-    value.includes("page")
-  ) {
+  if (value.includes("navigation") || value.includes("page")) {
     return History
   }
 
@@ -299,7 +313,7 @@ const getActionIconStyle = (log: ActionLog) => {
     value.includes("remove") ||
     value.includes("reset")
   ) {
-    return "border-red-500/20 bg-red-500/10 text-red-400"
+    return "border-red-500/25 bg-red-500/10 text-red-400"
   }
 
   if (
@@ -308,22 +322,49 @@ const getActionIconStyle = (log: ActionLog) => {
     value.includes("submit") ||
     value.includes("promote")
   ) {
-    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
+  }
+
+  if (value.includes("copy")) {
+    return "border-violet-500/25 bg-violet-500/10 text-violet-400"
+  }
+
+  if (value.includes("import")) {
+    return "border-amber-500/25 bg-amber-500/10 text-amber-400"
+  }
+
+  return "border-blue-500/25 bg-blue-500/10 text-blue-400"
+}
+
+const getActionBadgeStyle = (log: ActionLog) => {
+  const value = `${log.action} ${log.category}`.toLowerCase()
+
+  if (
+    value.includes("delete") ||
+    value.includes("remove") ||
+    value.includes("reset")
+  ) {
+    return "border-red-500/25 bg-red-500/10 text-red-400"
   }
 
   if (
-    value.includes("copy")
+    value.includes("create") ||
+    value.includes("add") ||
+    value.includes("submit") ||
+    value.includes("promote")
   ) {
-    return "border-violet-500/20 bg-violet-500/10 text-violet-400"
+    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
   }
 
-  if (
-    value.includes("import")
-  ) {
-    return "border-amber-500/20 bg-amber-500/10 text-amber-400"
+  if (value.includes("copy")) {
+    return "border-violet-500/25 bg-violet-500/10 text-violet-400"
   }
 
-  return "border-blue-500/20 bg-blue-500/10 text-blue-400"
+  if (value.includes("import")) {
+    return "border-amber-500/25 bg-amber-500/10 text-amber-400"
+  }
+
+  return "border-blue-500/25 bg-blue-500/10 text-blue-400"
 }
 
 async function readApiResponse(
@@ -373,10 +414,7 @@ function IdentityCard({
 }) {
   const [open, setOpen] = useState(false)
 
-  const copy = async (
-    value: string,
-    label: string,
-  ) => {
+  const copy = async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value)
       toast.success(`${label} copied`, {
@@ -395,8 +433,8 @@ function IdentityCard({
     <div className="relative min-w-0">
       <button
         type="button"
-        className={`flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-muted/50 ${
-          compact ? "px-1 py-0.5" : "px-1.5 py-1"
+        className={`group flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:bg-blue-500/5 ${
+          compact ? "px-1.5 py-1" : "px-2 py-1.5"
         }`}
         onClick={(event) => {
           event.stopPropagation()
@@ -404,7 +442,7 @@ function IdentityCard({
         }}
       >
         <div
-          className={`shrink-0 overflow-hidden rounded-full border bg-muted ${
+          className={`shrink-0 overflow-hidden rounded-full border border-border bg-muted ${
             compact ? "h-7 w-7" : "h-8 w-8"
           }`}
         >
@@ -422,7 +460,7 @@ function IdentityCard({
         </div>
 
         <div className="min-w-0 leading-tight">
-          <div className="truncate text-sm font-medium text-blue-400">
+          <div className="truncate text-sm font-medium text-foreground transition-colors group-hover:text-blue-400">
             {name || "Unknown User"}
           </div>
 
@@ -436,10 +474,10 @@ function IdentityCard({
 
       {open ? (
         <div
-          className="absolute left-0 top-full z-[70] mt-1 w-60 rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl"
+          className="absolute left-0 top-full z-[80] mt-1 w-64 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-2xl"
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="border-b px-3 py-2">
+          <div className="border-b border-border px-3 py-2.5">
             <p className="truncate text-sm font-semibold">
               {name || "Unknown User"}
             </p>
@@ -449,13 +487,19 @@ function IdentityCard({
                 @{username}
               </p>
             ) : null}
+
+            {rank ? (
+              <p className="mt-1 text-[10px] text-blue-400">
+                {rank}
+              </p>
+            ) : null}
           </div>
 
           <div className="grid gap-0.5 p-1">
             {userId ? (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
                 onClick={() => void copy(userId, "Discord ID")}
               >
                 <Clipboard className="h-3.5 w-3.5 text-blue-400" />
@@ -465,7 +509,7 @@ function IdentityCard({
 
             <button
               type="button"
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
               onClick={() => void copy(name, "Name")}
             >
               <UserRound className="h-3.5 w-3.5 text-blue-400" />
@@ -475,7 +519,7 @@ function IdentityCard({
             {callsign ? (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
                 onClick={() => void copy(callsign, "Callsign")}
               >
                 <Shield className="h-3.5 w-3.5 text-blue-400" />
@@ -486,7 +530,7 @@ function IdentityCard({
             {badgeNumber ? (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
                 onClick={() => void copy(badgeNumber, "Badge number")}
               >
                 <ClipboardCheck className="h-3.5 w-3.5 text-blue-400" />
@@ -497,7 +541,7 @@ function IdentityCard({
             {rank ? (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
                 onClick={() => void copy(rank, "Rank")}
               >
                 <Shield className="h-3.5 w-3.5 text-blue-400" />
@@ -508,7 +552,7 @@ function IdentityCard({
             {name && userId ? (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
                 onClick={() =>
                   void copy(
                     `${name} (${userId})`,
@@ -516,7 +560,7 @@ function IdentityCard({
                   )
                 }
               >
-                <Copy className="h-3.5 w-3.5 text-blue-400" />
+                <Clipboard className="h-3.5 w-3.5 text-blue-400" />
                 Name + Discord ID
               </button>
             ) : null}
@@ -524,7 +568,7 @@ function IdentityCard({
             {callsign && name ? (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
                 onClick={() =>
                   void copy(
                     `${callsign} | ${name}`,
@@ -532,7 +576,7 @@ function IdentityCard({
                   )
                 }
               >
-                <Copy className="h-3.5 w-3.5 text-blue-400" />
+                <Clipboard className="h-3.5 w-3.5 text-blue-400" />
                 Callsign + Name
               </button>
             ) : null}
@@ -540,7 +584,7 @@ function IdentityCard({
             {badgeNumber && name ? (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
                 onClick={() =>
                   void copy(
                     `${badgeNumber} | ${name}`,
@@ -548,7 +592,7 @@ function IdentityCard({
                   )
                 }
               >
-                <Copy className="h-3.5 w-3.5 text-blue-400" />
+                <Clipboard className="h-3.5 w-3.5 text-blue-400" />
                 Badge Number + Name
               </button>
             ) : null}
@@ -559,11 +603,7 @@ function IdentityCard({
   )
 }
 
-function TargetIdentity({
-  log,
-}: {
-  log: ActionLog
-}) {
+function TargetIdentity({ log }: { log: ActionLog }) {
   const details = log.details ?? {}
 
   const targetName =
@@ -625,16 +665,12 @@ function TargetIdentity({
   )
 }
 
-function ActionIcon({
-  log,
-}: {
-  log: ActionLog
-}) {
+function ActionIcon({ log }: { log: ActionLog }) {
   const Icon = getActionIcon(log)
 
   return (
     <div
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${getActionIconStyle(
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${getActionIconStyle(
         log,
       )}`}
       title={actionLabel(log.action)}
@@ -644,7 +680,24 @@ function ActionIcon({
   )
 }
 
-export default function ActionLogs() {
+function DetailItem({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+      <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </p>
+      <div className="min-w-0 text-xs">{children}</div>
+    </div>
+  )
+}
+
+export default function PromotionLogs() {
   const [logs, setLogs] = useState<ActionLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -686,10 +739,6 @@ export default function ActionLogs() {
       const params = new URLSearchParams({
         page: String(page),
         limit: "50",
-
-        // IMPORTANT:
-        // The working endpoint is /api/action-logs.
-        // Promotion logs are selected through the module query.
         module: "promotion",
       })
 
@@ -710,17 +759,11 @@ export default function ActionLogs() {
       }
 
       if (from) {
-        params.set(
-          "from",
-          `${from}T00:00:00.000Z`,
-        )
+        params.set("from", `${from}T00:00:00.000Z`)
       }
 
       if (to) {
-        params.set(
-          "to",
-          `${to}T23:59:59.999Z`,
-        )
+        params.set("to", `${to}T23:59:59.999Z`)
       }
 
       const response = await fetch(
@@ -764,9 +807,7 @@ export default function ActionLogs() {
           previous.targetName === log.targetName &&
           previous.summary === log.summary &&
           Math.abs(
-            new Date(
-              previous.createdAt,
-            ).getTime() -
+            new Date(previous.createdAt).getTime() -
               new Date(log.createdAt).getTime(),
           ) <= 3000
 
@@ -791,9 +832,7 @@ export default function ActionLogs() {
           new Set([
             ...fallbackActions,
             ...current,
-            ...nextLogs.map(
-              (log) => log.action,
-            ),
+            ...nextLogs.map((log) => log.action),
           ]),
         ).sort(),
       )
@@ -839,15 +878,10 @@ export default function ActionLogs() {
 
   useEffect(() => {
     const closeMenus = () => {
-      // Identity menus are self-contained and close when
-      // their parent is clicked again.
+      // Identity menus are self-contained.
     }
 
-    window.addEventListener(
-      "scroll",
-      closeMenus,
-      true,
-    )
+    window.addEventListener("scroll", closeMenus, true)
 
     return () => {
       window.removeEventListener(
@@ -889,32 +923,62 @@ export default function ActionLogs() {
     setExpanded(null)
   }
 
+  const groupedLogs = useMemo(() => {
+    const groups: Array<{
+      key: string
+      label: string
+      logs: ActionLog[]
+    }> = []
+
+    for (const log of logs) {
+      const date = new Date(log.createdAt)
+      const key = Number.isNaN(date.getTime())
+        ? "unknown"
+        : date.toISOString().slice(0, 10)
+
+      const existing = groups.find(
+        (group) => group.key === key,
+      )
+
+      if (existing) {
+        existing.logs.push(log)
+      } else {
+        groups.push({
+          key,
+          label: formatDateHeading(log.createdAt),
+          logs: [log],
+        })
+      }
+    }
+
+    return groups
+  }, [logs])
+
   return (
     <DashboardLayout>
       <div className="flex min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
         {/* Header */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-              <FileText className="h-5 w-5 text-blue-500" />
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+              Promotion Management
             </div>
 
-            <div className="min-w-0">
-              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-                Promotion Action Logs
-              </h1>
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+              Action Logs
+            </h1>
 
-              <p className="truncate text-xs text-muted-foreground sm:text-sm">
-                Promotion Management audit history.
-              </p>
-            </div>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+              Complete promotion management audit history.
+            </p>
           </div>
 
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="gap-2 self-start"
+            className="h-9 gap-2 self-start border-border bg-card"
             onClick={() => void loadLogs()}
             disabled={loading}
           >
@@ -927,31 +991,48 @@ export default function ActionLogs() {
           </Button>
         </div>
 
+        {/* Module-style tabs, matching the reference layout while keeping the page's existing promotion scope. */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="rounded-md border border-blue-500/50 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-400 shadow-sm"
+          >
+            Promotion
+          </button>
+
+          <div className="rounded-md border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
+            Action history
+          </div>
+        </div>
+
         {/* Filters */}
-        <div className="rounded-lg border bg-card p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <Filter className="h-3.5 w-3.5 text-blue-500" />
+        <div className="rounded-xl border border-border bg-card/80 p-3 shadow-sm sm:p-4">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-xs font-semibold">
+              <Filter className="h-3.5 w-3.5 text-blue-400" />
               Filters
             </div>
 
-            <span className="text-[11px] text-muted-foreground">
-              {hasFilters
-                ? `${[
-                    search.trim(),
-                    category,
-                    division,
-                    action,
-                    from,
-                    to,
-                  ].filter(Boolean).length} active`
-                : "None"}
-            </span>
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span>
+                {pagination.total.toLocaleString()} changes
+              </span>
+
+              {hasFilters ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-blue-400 transition-colors hover:text-blue-300"
+                  onClick={clearFilters}
+                >
+                  <X className="h-3 w-3" />
+                  Clear
+                </button>
+              ) : null}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Search */}
-            <div className="relative min-w-[220px] flex-1 md:min-w-[280px]">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="relative min-w-0 lg:col-span-2">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
 
               <Input
@@ -963,11 +1044,10 @@ export default function ActionLogs() {
                   )
                 }
                 placeholder="Search users, actions, IDs, targets..."
-                className="h-8 pl-8 text-xs"
+                className="h-9 border-border bg-background pl-8 text-xs"
               />
             </div>
 
-            {/* Category */}
             <select
               value={category}
               onChange={(event) =>
@@ -976,7 +1056,7 @@ export default function ActionLogs() {
                   event.target.value as Category,
                 )
               }
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              className="h-9 min-w-0 rounded-md border border-border bg-background px-2.5 text-xs outline-none transition-colors focus:border-blue-500/60"
             >
               {categoryOptions.map((item) => (
                 <option
@@ -988,7 +1068,6 @@ export default function ActionLogs() {
               ))}
             </select>
 
-            {/* Division */}
             <select
               value={division}
               onChange={(event) =>
@@ -997,7 +1076,7 @@ export default function ActionLogs() {
                   event.target.value as Division,
                 )
               }
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              className="h-9 min-w-0 rounded-md border border-border bg-background px-2.5 text-xs outline-none transition-colors focus:border-blue-500/60"
             >
               {divisionOptions.map((item) => (
                 <option
@@ -1009,7 +1088,6 @@ export default function ActionLogs() {
               ))}
             </select>
 
-            {/* Action */}
             <select
               value={action}
               onChange={(event) =>
@@ -1018,511 +1096,455 @@ export default function ActionLogs() {
                   event.target.value,
                 )
               }
-              className="h-8 max-w-[190px] rounded-md border border-input bg-background px-2 text-xs"
+              className="h-9 min-w-0 rounded-md border border-border bg-background px-2.5 text-xs outline-none transition-colors focus:border-blue-500/60"
             >
-              <option value="">
-                All Actions
-              </option>
+              <option value="">All Actions</option>
 
               {actionOptions.map((item) => (
-                <option
-                  key={item}
-                  value={item}
-                >
+                <option key={item} value={item}>
                   {actionLabel(item)}
                 </option>
               ))}
             </select>
 
-            {/* From */}
-            <Input
-              type="date"
-              value={from}
-              onChange={(event) =>
-                changeFilter(
-                  setFrom,
-                  event.target.value,
-                )
-              }
-              className="h-8 w-[130px] text-xs"
-            />
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                type="date"
+                value={from}
+                onChange={(event) =>
+                  changeFilter(
+                    setFrom,
+                    event.target.value,
+                  )
+                }
+                className="h-9 min-w-0 text-xs"
+              />
 
-            {/* To */}
-            <Input
-              type="date"
-              value={to}
-              onChange={(event) =>
-                changeFilter(
-                  setTo,
-                  event.target.value,
-                )
-              }
-              className="h-8 w-[130px] text-xs"
-            />
-
-            {/* Clear is on the right of all filters */}
-            {hasFilters ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
-                onClick={clearFilters}
-              >
-                <X className="h-3.5 w-3.5" />
-                Clear
-              </Button>
-            ) : null}
-          </div>
-
-          <div className="mt-2 text-[11px] text-muted-foreground">
-            {pagination.total.toLocaleString()} total
-            logs
+              <Input
+                type="date"
+                value={to}
+                onChange={(event) =>
+                  changeFilter(
+                    setTo,
+                    event.target.value,
+                  )
+                }
+                className="h-9 min-w-0 text-xs"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Error */}
         {error ? (
-          <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-sm text-red-400">
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-sm text-red-400">
             {error}
           </div>
         ) : null}
 
-        {/* Logs */}
-        <div className="overflow-visible rounded-lg border bg-card">
-          {/* Desktop headings */}
-          <div className="hidden border-b bg-muted/20 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground lg:grid lg:grid-cols-[55px_1.45fr_50px_1fr_.75fr_.75fr_1.5fr_125px] lg:items-center lg:gap-3">
-            <span>Entry</span>
-            <span />
-            <span>Icon</span>
-            <span>Changed By</span>
-            <span>Action</span>
-            <span>Division</span>
-            <span>Target</span>
-            <span>Time</span>
-          </div>
-
-          {/* Loading */}
+        {/* Log timeline */}
+        <div className="min-w-0">
           {loading ? (
-            <div className="divide-y">
-              {Array.from({ length: 7 }).map(
-                (_, index) => (
-                  <div
-                    key={index}
-                    className="h-16 animate-pulse bg-muted/10"
-                  />
-                ),
-              )}
+            <div className="space-y-2">
+              {Array.from({ length: 7 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="h-[76px] animate-pulse rounded-xl border border-border bg-card/70"
+                />
+              ))}
             </div>
           ) : logs.length === 0 ? (
-            <div className="flex min-h-48 flex-col items-center justify-center gap-1 px-4 text-center">
-              <FileText className="h-8 w-8 text-muted-foreground/40" />
+            <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-border bg-card px-4 text-center">
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10">
+                <FileText className="h-5 w-5 text-blue-400" />
+              </div>
 
               <p className="text-sm font-medium">
                 No promotion action logs found
               </p>
 
-              <p className="text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Try changing your search or filters.
               </p>
             </div>
           ) : (
-            <div className="divide-y">
-              {logs.map((log, index) => {
-                const isExpanded =
-                  expanded === log.id
+            <div className="space-y-5">
+              {groupedLogs.map((group) => (
+                <section key={group.key}>
+                  <div className="mb-2 flex items-center gap-3 px-1">
+                    <span className="text-[10px] font-semibold tracking-[0.16em] text-muted-foreground">
+                      {group.label}
+                    </span>
 
-                const actorName =
-                  log.userName ||
-                  log.username ||
-                  log.userId ||
-                  "Unknown User"
+                    <div className="h-px flex-1 bg-border" />
 
-                return (
-                  <div
-                    key={
-                      log.id ||
-                      `${log.createdAt}-${log.userId}-${index}`
-                    }
-                    className="relative"
-                  >
-                    <button
-                      type="button"
-                      className="w-full text-left transition-colors hover:bg-muted/20"
-                      onClick={() =>
-                        setExpanded(
-                          isExpanded
-                            ? null
-                            : log.id,
-                        )
-                      }
-                    >
-                      <div className="grid gap-2 px-3 py-2.5 lg:grid-cols-[55px_1.45fr_50px_1fr_.75fr_.75fr_1.5fr_125px] lg:items-center lg:gap-3">
-                        {/* Entry */}
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-xs font-semibold text-muted-foreground">
-                            {log.entryNumber ??
-                              (pagination.page -
-                                1) *
-                                pagination.limit +
-                                index +
-                                1}
-                          </span>
-
-                          {isExpanded ? (
-                            <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                        </div>
-
-                        {/* Mobile / desktop actor */}
-                        <div
-                          className="min-w-0"
-                          onClick={(event) =>
-                            event.stopPropagation()
-                          }
-                        >
-                          <IdentityCard
-                            name={actorName}
-                            username={
-                              log.username
-                            }
-                            userId={log.userId}
-                            rank={log.rank}
-                            callsign={
-                              log.callsign
-                            }
-                            badgeNumber={
-                              log.badgeNumber
-                            }
-                            avatar={log.avatar}
-                            compact
-                          />
-                        </div>
-
-                        {/* Action icon */}
-                        <div className="flex">
-                          <ActionIcon log={log} />
-                        </div>
-
-                        {/* Changed by */}
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-medium sm:text-sm">
-                            {actorName}
-                          </p>
-
-                          <p className="truncate text-[10px] text-muted-foreground">
-                            {log.rank ||
-                              "Rank unavailable"}
-                          </p>
-                        </div>
-
-                        {/* Action */}
-                        <div className="min-w-0">
-                          <span className="truncate text-xs font-semibold sm:text-sm">
-                            {actionLabel(
-                              log.action,
-                            )}
-                          </span>
-                        </div>
-
-                        {/* Division */}
-                        <span className="w-fit truncate rounded-full border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">
-                          {divisionLabel(
-                            log.division,
-                          )}
-                        </span>
-
-                        {/* Target */}
-                        <div
-                          className="min-w-0"
-                          onClick={(event) =>
-                            event.stopPropagation()
-                          }
-                        >
-                          <div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            Changed
-                          </div>
-
-                          <TargetIdentity
-                            log={log}
-                          />
-                        </div>
-
-                        {/* Time */}
-                        <span className="text-[10px] text-muted-foreground lg:text-right">
-                          {formatDateTime(
-                            log.createdAt,
-                          )}
-                        </span>
-                      </div>
-
-                      {/* Summary row */}
-                      <div className="px-3 pb-2 lg:pl-[108px] lg:pr-4">
-                        <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                          {log.summary}
-                        </p>
-                      </div>
-                    </button>
-
-                    {/* Expanded */}
-                    {isExpanded ? (
-                      <div className="border-t bg-muted/5 px-3 py-3">
-                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                          {/* Actor */}
-                          <div className="rounded-md border bg-background/70 px-3 py-2.5">
-                            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              <UserRound className="h-3 w-3" />
-                              Changed By
-                            </div>
-
-                            <IdentityCard
-                              name={actorName}
-                              username={
-                                log.username
-                              }
-                              userId={
-                                log.userId
-                              }
-                              rank={
-                                log.rank
-                              }
-                              callsign={
-                                log.callsign
-                              }
-                              badgeNumber={
-                                log.badgeNumber
-                              }
-                              avatar={
-                                log.avatar
-                              }
-                            />
-                          </div>
-
-                          {/* Action */}
-                          <div className="rounded-md border bg-background/70 px-3 py-2.5">
-                            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              <Activity className="h-3 w-3" />
-                              Action
-                            </div>
-
-                            <div className="grid gap-1 text-xs">
-                              <span>
-                                <b>
-                                  Action:
-                                </b>{" "}
-                                {actionLabel(
-                                  log.action,
-                                )}
-                              </span>
-
-                              <span>
-                                <b>
-                                  Category:
-                                </b>{" "}
-                                {categoryLabel(
-                                  log.category,
-                                )}
-                              </span>
-
-                              <span>
-                                <b>
-                                  Division:
-                                </b>{" "}
-                                {divisionLabel(
-                                  log.division,
-                                )}
-                              </span>
-
-                              <span className="truncate">
-                                <b>
-                                  Page:
-                                </b>{" "}
-                                {log.path ||
-                                  "—"}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Target */}
-                          <div className="rounded-md border bg-background/70 px-3 py-2.5">
-                            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              <Shield className="h-3 w-3" />
-                              Changed
-                            </div>
-
-                            <TargetIdentity
-                              log={log}
-                            />
-
-                            {log.targetRank ? (
-                              <p className="mt-1 text-[10px] text-muted-foreground">
-                                Rank:{" "}
-                                <span className="text-foreground">
-                                  {
-                                    log.targetRank
-                                  }
-                                </span>
-                              </p>
-                            ) : null}
-
-                            {log.targetUserId ? (
-                              <p className="mt-1 truncate font-mono text-[9px] text-blue-400/70">
-                                {
-                                  log.targetUserId
-                                }
-                              </p>
-                            ) : null}
-                          </div>
-
-                          {/* Recorded */}
-                          <div className="rounded-md border bg-background/70 px-3 py-2.5">
-                            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              <History className="h-3 w-3" />
-                              Recorded
-                            </div>
-
-                            <p className="text-xs font-medium">
-                              {formatDateTime(
-                                log.createdAt,
-                              )}
-                            </p>
-
-                            {log.entryNumber ? (
-                              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                                Entry #
-                                {
-                                  log.entryNumber
-                                }
-                              </p>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {/* Summary */}
-                        <div className="mt-2 rounded-md border bg-background/70 px-3 py-2.5">
-                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Summary
-                          </p>
-
-                          <p className="text-xs leading-5">
-                            {log.summary ||
-                              "No summary available."}
-                          </p>
-                        </div>
-
-                        {/* Details */}
-                        {log.details &&
-                        Object.keys(
-                          log.details,
-                        ).length > 0 ? (
-                          <div className="mt-2 rounded-md border bg-background/70 px-3 py-2.5">
-                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              Additional Details
-                            </p>
-
-                            <div className="grid max-h-56 gap-1.5 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
-                              {Object.entries(
-                                log.details,
-                              ).map(
-                                ([
-                                  key,
-                                  value,
-                                ]) => (
-                                  <div
-                                    key={key}
-                                    className="min-w-0 rounded border bg-muted/10 px-2 py-1.5"
-                                  >
-                                    <p className="truncate text-[10px] font-medium text-muted-foreground">
-                                      {actionLabel(
-                                        key,
-                                      )}
-                                    </p>
-
-                                    <pre className="mt-0.5 max-h-24 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4">
-                                      {formatDetailValue(
-                                        value,
-                                      )}
-                                    </pre>
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {log.path ? (
-                          <p className="mt-2 break-all border-t border-border pt-2 text-[10px] text-muted-foreground">
-                            {log.path}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
+                    <span className="text-[10px] text-muted-foreground">
+                      {group.logs.length}{" "}
+                      {group.logs.length === 1
+                        ? "change"
+                        : "changes"}
+                    </span>
                   </div>
-                )
-              })}
+
+                  <div className="space-y-1.5">
+                    {group.logs.map((log, index) => {
+                      const isExpanded =
+                        expanded === log.id
+
+                      const actorName =
+                        log.userName ||
+                        log.username ||
+                        log.userId ||
+                        "Unknown User"
+
+                      const Action = getActionIcon(log)
+
+                      const entryNumber =
+                        log.entryNumber ??
+                        (pagination.page - 1) *
+                          pagination.limit +
+                          index +
+                          1
+
+                      return (
+                        <div
+                          key={
+                            log.id ||
+                            `${log.createdAt}-${log.userId}-${index}`
+                          }
+                          className={`overflow-visible rounded-xl border bg-card transition-all ${
+                            isExpanded
+                              ? "border-blue-500/30 shadow-sm shadow-blue-950/20"
+                              : "border-border hover:border-blue-500/20"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            className="w-full text-left"
+                            onClick={() =>
+                              setExpanded(
+                                isExpanded
+                                  ? null
+                                  : log.id,
+                              )
+                            }
+                          >
+                            <div className="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
+                              {/* Entry */}
+                              <div className="hidden w-8 shrink-0 items-center gap-1 sm:flex">
+                                <span className="font-mono text-[10px] font-medium text-muted-foreground">
+                                  #{entryNumber}
+                                </span>
+                              </div>
+
+                              {/* Action icon */}
+                              <div
+                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${getActionIconStyle(
+                                  log,
+                                )}`}
+                              >
+                                <Action className="h-4 w-4" />
+                              </div>
+
+                              {/* Main event */}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                  <span className="truncate text-xs font-semibold sm:text-sm">
+                                    {actionLabel(
+                                      log.action,
+                                    )}
+                                  </span>
+
+                                  {log.targetName ||
+                                  log.targetUserId ? (
+                                    <>
+                                      <span className="text-muted-foreground">
+                                        ·
+                                      </span>
+                                      <span className="truncate text-xs text-foreground/80 sm:text-sm">
+                                        {log.targetName ||
+                                          log.targetUserId}
+                                      </span>
+                                    </>
+                                  ) : null}
+                                </div>
+
+                                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
+                                  <span className="inline-flex min-w-0 items-center gap-1">
+                                    <UserRound className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">
+                                      {actorName}
+                                    </span>
+                                  </span>
+
+                                  <span>·</span>
+
+                                  <span>
+                                    {formatTime(
+                                      log.createdAt,
+                                    )}
+                                  </span>
+
+                                  <span>·</span>
+
+                                  <span className="truncate">
+                                    {categoryLabel(
+                                      log.category,
+                                    )}
+                                  </span>
+
+                                  {log.division ? (
+                                    <>
+                                      <span>·</span>
+                                      <span className="text-blue-400">
+                                        {divisionLabel(
+                                          log.division,
+                                        )}
+                                      </span>
+                                    </>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              {/* Status/action badge */}
+                              <span
+                                className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:inline-flex ${getActionBadgeStyle(
+                                  log,
+                                )}`}
+                              >
+                                {actionLabel(log.action)}
+                              </span>
+
+                              <div className="flex shrink-0 items-center gap-2">
+                                <span className="hidden text-[10px] text-muted-foreground md:block">
+                                  {formatDateTime(
+                                    log.createdAt,
+                                  )}
+                                </span>
+
+                                {isExpanded ? (
+                                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Summary */}
+                            {log.summary ? (
+                              <div className="border-t border-border/60 px-3 pb-3 pt-2 sm:px-[68px]">
+                                <p className="line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+                                  {log.summary}
+                                </p>
+                              </div>
+                            ) : null}
+                          </button>
+
+                          {/* Expanded details */}
+                          {isExpanded ? (
+                            <div className="border-t border-border bg-muted/[0.035] px-3 py-3 sm:px-4 sm:py-4">
+                              <div className="mb-3 flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-xs font-semibold">
+                                    Change details
+                                  </p>
+                                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                    Full audit information for this entry.
+                                  </p>
+                                </div>
+
+                                <span className="font-mono text-[10px] text-muted-foreground">
+                                  Entry #{entryNumber}
+                                </span>
+                              </div>
+
+                              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                <DetailItem label="Changed By">
+                                  <IdentityCard
+                                    name={actorName}
+                                    username={log.username}
+                                    userId={log.userId}
+                                    rank={log.rank}
+                                    callsign={
+                                      log.callsign
+                                    }
+                                    badgeNumber={
+                                      log.badgeNumber
+                                    }
+                                    avatar={log.avatar}
+                                  />
+                                </DetailItem>
+
+                                <DetailItem label="Action">
+                                  <div className="grid gap-1 text-xs">
+                                    <span>
+                                      <b>Action:</b>{" "}
+                                      {actionLabel(
+                                        log.action,
+                                      )}
+                                    </span>
+                                    <span>
+                                      <b>Category:</b>{" "}
+                                      {categoryLabel(
+                                        log.category,
+                                      )}
+                                    </span>
+                                    <span>
+                                      <b>Division:</b>{" "}
+                                      {divisionLabel(
+                                        log.division,
+                                      )}
+                                    </span>
+                                    <span className="truncate">
+                                      <b>Page:</b>{" "}
+                                      {log.path || "—"}
+                                    </span>
+                                  </div>
+                                </DetailItem>
+
+                                <DetailItem label="Changed">
+                                  <TargetIdentity log={log} />
+
+                                  {log.targetRank ? (
+                                    <p className="mt-1 text-[10px] text-muted-foreground">
+                                      Rank:{" "}
+                                      <span className="text-foreground">
+                                        {log.targetRank}
+                                      </span>
+                                    </p>
+                                  ) : null}
+
+                                  {log.targetUserId ? (
+                                    <p className="mt-1 truncate font-mono text-[9px] text-blue-400/70">
+                                      {log.targetUserId}
+                                    </p>
+                                  ) : null}
+                                </DetailItem>
+
+                                <DetailItem label="Recorded">
+                                  <p className="font-medium">
+                                    {formatDateTime(
+                                      log.createdAt,
+                                    )}
+                                  </p>
+
+                                  {log.entryNumber ? (
+                                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                                      Entry #{log.entryNumber}
+                                    </p>
+                                  ) : null}
+                                </DetailItem>
+                              </div>
+
+                              <div className="mt-2 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+                                <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                  Summary
+                                </p>
+
+                                <p className="text-xs leading-5">
+                                  {log.summary ||
+                                    "No summary available."}
+                                </p>
+                              </div>
+
+                              {log.details &&
+                              Object.keys(log.details)
+                                .length > 0 ? (
+                                <div className="mt-2 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+                                  <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                    Additional Details
+                                  </p>
+
+                                  <div className="grid max-h-64 gap-2 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
+                                    {Object.entries(
+                                      log.details,
+                                    ).map(
+                                      ([key, value]) => (
+                                        <div
+                                          key={key}
+                                          className="min-w-0 rounded-md border border-border bg-muted/10 px-2.5 py-2"
+                                        >
+                                          <p className="truncate text-[10px] font-medium text-muted-foreground">
+                                            {actionLabel(
+                                              key,
+                                            )}
+                                          </p>
+
+                                          <pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4">
+                                            {formatDetailValue(
+                                              value,
+                                            )}
+                                          </pre>
+                                        </div>
+                                      ),
+                                    )}
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {log.path ? (
+                                <p className="mt-2 break-all border-t border-border pt-2 text-[10px] text-muted-foreground">
+                                  {log.path}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
-
-          {/* Pagination */}
-          {!loading &&
-          logs.length > 0 ? (
-            <div className="flex flex-col gap-2 border-t bg-muted/10 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-[11px] text-muted-foreground">
-                Page{" "}
-                {pagination.page} of{" "}
-                {pagination.pages} ·{" "}
-                {pagination.total.toLocaleString()}{" "}
-                logs
-              </span>
-
-              <div className="flex gap-1.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  disabled={
-                    page <= 1 || loading
-                  }
-                  onClick={() =>
-                    setPage((current) =>
-                      Math.max(
-                        1,
-                        current - 1,
-                      ),
-                    )
-                  }
-                >
-                  Previous
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  disabled={
-                    page >=
-                      pagination.pages ||
-                    loading
-                  }
-                  onClick={() =>
-                    setPage((current) =>
-                      Math.min(
-                        pagination.pages,
-                        current + 1,
-                      ),
-                    )
-                  }
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
         </div>
+
+        {/* Pagination */}
+        {!loading && logs.length > 0 ? (
+          <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-[11px] text-muted-foreground">
+              Page {pagination.page} of{" "}
+              {pagination.pages} ·{" "}
+              {pagination.total.toLocaleString()} logs
+            </span>
+
+            <div className="flex gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                disabled={page <= 1 || loading}
+                onClick={() =>
+                  setPage((current) =>
+                    Math.max(1, current - 1),
+                  )
+                }
+              >
+                Previous
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                disabled={
+                  page >= pagination.pages || loading
+                }
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(
+                      pagination.pages,
+                      current + 1,
+                    ),
+                  )
+                }
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </DashboardLayout>
   )
