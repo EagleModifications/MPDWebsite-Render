@@ -7,7 +7,6 @@ import {
   useState,
   type DragEvent,
   type ReactNode,
-  type SyntheticEvent,
 } from "react"
 import {
   Check,
@@ -99,7 +98,6 @@ type GalleryMedia = {
   thumbnailUrl: string
   source: "upload" | "url"
   storageId?: string
-  fallbackUrl?: string
 }
 
 type GalleryCategory = "Community" | "Fleet"
@@ -134,12 +132,12 @@ const GALLERY_TAGS: readonly GalleryTag[] = [
 ]
 
 const GALLERY_TAG_CLASSES: Record<GalleryTag, string> = {
-  Dept: "!border-blue-500/50 !bg-blue-500/15 !text-blue-700 dark:!border-blue-400/50 dark:!bg-blue-500/25 dark:!text-blue-300",
-  SWAT: "!border-slate-500/60 !bg-slate-900/10 !text-slate-900 dark:!border-slate-400/50 dark:!bg-slate-800 dark:!text-white",
-  "MTF-7": "!border-blue-600/45 !bg-blue-700/10 !text-blue-800 dark:!border-blue-500/50 dark:!bg-blue-900/60 dark:!text-blue-200",
-  MCD: "!border-blue-950/60 !bg-blue-950/15 !text-blue-950 dark:!border-blue-800/70 dark:!bg-blue-950/90 dark:!text-blue-100",
-  TRU: "!border-yellow-500/50 !bg-yellow-500/15 !text-yellow-700 dark:!border-yellow-400/50 dark:!bg-yellow-500/20 dark:!text-yellow-300",
-  SAR: "!border-red-500/50 !bg-red-500/15 !text-red-700 dark:!border-red-400/50 dark:!bg-red-500/20 dark:!text-red-300",
+  Dept: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  SWAT: "border-slate-500/40 bg-slate-800/80 text-slate-100 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-100",
+  "MTF-7": "border-sky-500/30 bg-sky-500/10 text-sky-800 dark:text-sky-300",
+  MCD: "border-blue-950/40 bg-blue-950/15 text-blue-950 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200",
+  TRU: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
+  SAR: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
 }
 type GalleryMediaFilter = "All" | "Images" | "Videos"
 
@@ -205,10 +203,7 @@ function CustomSelect({
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.stopPropagation()
-        setOpenDropdown(null)
-      }
+      if (event.key === "Escape") setOpenDropdown(null)
     }
 
     document.addEventListener("mousedown", handlePointerDown)
@@ -327,10 +322,7 @@ function CustomMultiSelect({
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.stopPropagation()
-        setOpenDropdown(null)
-      }
+      if (event.key === "Escape") setOpenDropdown(null)
     }
 
     document.addEventListener("mousedown", handlePointerDown)
@@ -437,42 +429,7 @@ function CustomMultiSelect({
 }
 
 function getGalleryMediaUrl(media: GalleryMedia) {
-  const storageId = media.storageId?.trim()
-
-  if (storageId && /^[a-f0-9]{24}$/i.test(storageId)) {
-    return `/api/gallery/file/${storageId}`
-  }
-
   return media.url
-}
-
-function normalizeGalleryItems(items: GalleryItem[]) {
-  return items.map((item) => ({
-    ...item,
-    media: item.media.map((media) => {
-      const storageId = media.storageId?.trim()
-
-      if (
-        storageId &&
-        /^[a-f0-9]{24}$/i.test(storageId)
-      ) {
-        const currentUrl =
-          `/api/gallery/file/${storageId}`
-
-        return {
-          ...media,
-          url: currentUrl,
-          fallbackUrl:
-            media.url &&
-            media.url !== currentUrl
-              ? media.url
-              : media.fallbackUrl,
-        }
-      }
-
-      return media
-    }),
-  }))
 }
 
 function getYouTubeVideoId(value: string) {
@@ -661,20 +618,6 @@ export default function Gallery() {
   const [mediaFilter, setMediaFilter] =
     useState<GalleryMediaFilter>("All")
 
-  const [galleryLayout, setGalleryLayout] =
-    useState<"cards" | "home">(() => {
-      try {
-        return window.localStorage.getItem("mpd-gallery-layout") === "home"
-          ? "home"
-          : "cards"
-      } catch {
-        return "cards"
-      }
-    })
-
-  const [layoutSettingsOpen, setLayoutSettingsOpen] =
-    useState(false)
-
   const [showModal, setShowModal] =
     useState(false)
 
@@ -809,9 +752,7 @@ export default function Gallery() {
 
         setItems(
           Array.isArray(data.items)
-            ? normalizeGalleryItems(
-                data.items as GalleryItem[],
-              )
+            ? data.items
             : [],
         )
 
@@ -1412,9 +1353,7 @@ export default function Gallery() {
         )
       } else {
         setItems((current) => [
-          normalizeGalleryItems([
-            data.item as GalleryItem,
-          ])[0],
+          data.item,
           ...current,
         ])
 
@@ -1578,43 +1517,20 @@ export default function Gallery() {
   }
 
   useEffect(() => {
-    const overlayOpen =
-      showModal ||
-      Boolean(viewer) ||
-      Boolean(infoItem) ||
-      Boolean(deleteTarget)
-
-    if (!overlayOpen) {
+    if (!viewer) {
       return
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
+    function handleKeyDown(
+      event: KeyboardEvent,
+    ) {
       if (event.key === "Escape") {
-        // Let the custom dropdown handlers close their own menus first.
-        // They stop propagation so ESC does not also close the parent modal.
-        if (deleteTarget) {
-          closeDeleteDialog()
-          return
-        }
-
-        if (showModal) {
-          closeModal()
-          return
-        }
-
         if (infoItem) {
           closeInfo()
           return
         }
 
-        if (viewer) {
-          closeViewer()
-          return
-        }
-      }
-
-      if (!viewer) {
-        return
+        closeViewer()
       }
 
       if (event.key === "ArrowLeft") {
@@ -1626,12 +1542,18 @@ export default function Gallery() {
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown)
+    window.addEventListener(
+      "keydown",
+      handleKeyDown,
+    )
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      )
     }
-  }, [deleteTarget, infoItem, showModal, viewer, saving, deletingId])
+  }, [infoItem, viewer])
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
@@ -1777,7 +1699,7 @@ export default function Gallery() {
               </div>
             ) : (
               <div className="h-auto p-3 sm:p-4">
-                <div className={galleryLayout === "home" ? "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4" : "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"}>
+                <div className="columns-1 gap-3 sm:columns-2 lg:columns-4">
                   {filteredItems.map(
                     (item) => {
                       const mediaList =
@@ -1788,58 +1710,8 @@ export default function Gallery() {
                       return (
                         <article
                           key={item.id}
-                          className={galleryLayout === "home"
-                            ? "group self-start overflow-hidden rounded-xl border border-border/50 bg-background/40 transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/30 hover:bg-blue-500/[0.025]"
-                            : "self-start overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"}
+                          className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border/70 bg-background/60 shadow-sm transition-all hover:border-blue-500/40 hover:shadow-md"
                         >
-                          {galleryLayout === "home" ? (
-                            <>
-                              <button
-                                type="button"
-                                className="relative block aspect-[16/10] w-full overflow-hidden bg-black/30 text-left"
-                                onClick={() => openViewer(item, mediaList[0])}
-                                aria-label={`View ${item.title}`}
-                              >
-                                {mediaList[0] && (
-                                  <GalleryImage
-                                    src={getGalleryMediaUrl(mediaList[0])}
-                                    fallbackSrc={mediaList[0].fallbackUrl}
-                                    alt={item.title}
-                                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                  />
-                                )}
-                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
-                                {item.category && (
-                                  <span className={`absolute left-4 top-4 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${item.category === "Fleet" ? "border-amber-400/50 bg-amber-500/20 text-amber-300" : "border-blue-400/50 bg-blue-500/20 text-blue-300"}`}>
-                                    {item.category}
-                                  </span>
-                                )}
-                                {(item.tags ?? []).length > 0 && (
-                                  <div className="absolute left-4 top-[3.15rem] flex max-w-[calc(100%-2rem)] flex-wrap gap-1.5">
-                                    {(item.tags ?? []).map((tag) => (
-                                      <span key={`${item.id}-home-${tag}`} className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${GALLERY_TAG_CLASSES[tag]}`}>
-                                        {tag}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </button>
-                              <button type="button" onClick={() => openInfo(item)} className="w-full p-5 text-left">
-                                <h3 className="font-bold tracking-tight">{item.title}</h3>
-                                {(item.tags ?? []).length > 0 && (
-                                  <div className="mt-3 flex flex-wrap gap-1.5">
-                                    {(item.tags ?? []).map((tag) => (
-                                      <span key={`${item.id}-card-${tag}`} className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${GALLERY_TAG_CLASSES[tag]}`}>{tag}</span>
-                                    ))}
-                                  </div>
-                                )}
-                                {item.description && (
-                                  <p className="mt-3 line-clamp-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">{item.description}</p>
-                                )}
-                              </button>
-                            </>
-                          ) : (
-                          <>
                           <GalleryMediaCollage
                             media={mediaList}
                             title={item.title}
@@ -1967,8 +1839,6 @@ export default function Gallery() {
                               )}
                             </div>
                           </div>
-                          </>
-                          )}
                         </article>
                       )
                     },
@@ -2016,42 +1886,6 @@ export default function Gallery() {
               </span>
             </div>
           </section>
-
-          <button
-            type="button"
-            onClick={() => setLayoutSettingsOpen(true)}
-            className="fixed bottom-5 right-5 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-lg backdrop-blur transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Gallery settings"
-            title="Gallery settings"
-          >
-            <Settings2 className="h-5 w-5" />
-          </button>
-
-          {layoutSettingsOpen && (
-            <div className="fixed inset-0 z-[80]" onMouseDown={(event) => { if (event.target === event.currentTarget) setLayoutSettingsOpen(false) }}>
-              <div className="absolute inset-y-0 right-0 flex w-full max-w-sm flex-col border-l border-border/70 bg-background shadow-2xl">
-                <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
-                  <div>
-                    <h2 className="text-sm font-semibold">Gallery Settings</h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Choose how gallery posts are displayed.</p>
-                  </div>
-                  <Button type="button" variant="ghost" size="icon" onClick={() => setLayoutSettingsOpen(false)} aria-label="Close settings">
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-2 p-4">
-                  <button type="button" onClick={() => { setGalleryLayout("cards"); window.localStorage.setItem("mpd-gallery-layout", "cards") }} className={`w-full rounded-xl border p-4 text-left transition-colors ${galleryLayout === "cards" ? "border-blue-500/40 bg-blue-500/10" : "border-border/70 hover:bg-muted/60"}`}>
-                    <div className="flex items-center justify-between"><span className="text-sm font-semibold">4-column cards</span>{galleryLayout === "cards" && <Check className="h-4 w-4 text-blue-500" />}</div>
-                    <p className="mt-1 text-xs text-muted-foreground">Current gallery layout with the media boxes and 4 columns.</p>
-                  </button>
-                  <button type="button" onClick={() => { setGalleryLayout("home"); window.localStorage.setItem("mpd-gallery-layout", "home") }} className={`w-full rounded-xl border p-4 text-left transition-colors ${galleryLayout === "home" ? "border-blue-500/40 bg-blue-500/10" : "border-border/70 hover:bg-muted/60"}`}>
-                    <div className="flex items-center justify-between"><span className="text-sm font-semibold">Home-style images</span>{galleryLayout === "home" && <Check className="h-4 w-4 text-blue-500" />}</div>
-                    <p className="mt-1 text-xs text-muted-foreground">Large image previews with the same card style used on Home.</p>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {canManageGallery && (
             <section className="mt-6 overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
@@ -2923,9 +2757,8 @@ export default function Gallery() {
 
                   if (currentMedia.type === "image") {
                     return (
-                      <GalleryImage
+                      <img
                         src={currentMedia.url}
-                        fallbackSrc={currentMedia.fallbackUrl}
                         alt={viewer.item.title}
                         className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
                       />
@@ -3590,58 +3423,6 @@ function YouTubeGalleryPreview({
   )
 }
 
-function GalleryImage({
-  src,
-  fallbackSrc,
-  alt,
-  className,
-  onLoad,
-}: {
-  src: string
-  fallbackSrc?: string
-  alt: string
-  className?: string
-  onLoad?: (event: SyntheticEvent<HTMLImageElement>) => void
-}) {
-  const [currentSrc, setCurrentSrc] = useState(src)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    setCurrentSrc(src)
-    setFailed(false)
-  }, [src])
-
-  function handleError() {
-    if (fallbackSrc && currentSrc !== fallbackSrc) {
-      setCurrentSrc(fallbackSrc)
-      return
-    }
-
-    setFailed(true)
-  }
-
-  if (failed || !currentSrc) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-muted/30">
-        <div className="text-center text-muted-foreground">
-          <ImageIcon className="mx-auto h-6 w-6 opacity-50" />
-          <span className="mt-1 block text-[10px]">Image unavailable</span>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <img
-      src={currentSrc}
-      alt={alt}
-      className={className}
-      onLoad={onLoad}
-      onError={handleError}
-    />
-  )
-}
-
 function GalleryMediaCard({
   media,
   title,
@@ -3670,9 +3451,8 @@ function GalleryMediaCard({
           title={title}
         />
       ) : media.type === "image" ? (
-        <GalleryImage
+        <img
           src={media.url}
-          fallbackSrc={media.fallbackUrl}
           alt={title}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           onLoad={(event) => {
