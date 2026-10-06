@@ -1,9 +1,10 @@
 name: MPD Desktop Release
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,7 +13,6 @@ jobs:
   build-windows:
     name: Build Windows
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,21 +24,33 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
-      - name: Build web application
+      - name: Set package version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $version = "${env:GITHUB_REF_NAME}".TrimStart('v')
+          npm version $version --no-git-tag-version --allow-same-version
+
+      - name: Build website
         run: npm run build
 
       - name: Build Windows installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win nsis --publish always
+        run: npx electron-builder --win nsis --publish never
 
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpd-windows
+          path: release/*
+          if-no-files-found: error
 
   build-macos:
     name: Build macOS
     runs-on: macos-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,21 +62,33 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
-      - name: Build web application
+      - name: Set package version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Build website
         run: npm run build
 
       - name: Build macOS installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --mac dmg --publish always
+        run: npx electron-builder --mac dmg --publish never
 
+      - name: Upload macOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpd-macos
+          path: release/*
+          if-no-files-found: error
 
   build-linux:
     name: Build Linux
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,12 +100,66 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
-      - name: Build web application
+      - name: Set package version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Build website
         run: npm run build
 
-      - name: Build Linux installer
+      - name: Build Linux AppImage
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --linux AppImage --publish always
+        run: npx electron-builder --linux AppImage --publish never
+
+      - name: Upload Linux build
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpd-linux
+          path: release/*
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release Assets
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: mpd-windows
+          path: release/windows
+
+      - name: Download macOS build
+        uses: actions/download-artifact@v4
+        with:
+          name: mpd-macos
+          path: release/macos
+
+      - name: Download Linux build
+        uses: actions/download-artifact@v4
+        with:
+          name: mpd-linux
+          path: release/linux
+
+      - name: Publish assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            release/windows/*.exe
+            release/windows/*.blockmap
+            release/windows/latest.yml
+            release/macos/*.dmg
+            release/macos/*.blockmap
+            release/macos/latest-mac.yml
+            release/linux/*.AppImage
+            release/linux/*.blockmap
+            release/linux/latest-linux.yml
+          generate_release_notes: true
