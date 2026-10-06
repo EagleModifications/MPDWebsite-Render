@@ -2,14 +2,15 @@ name: Build MPD Desktop
 
 on:
   release:
-    types: [published]
+    types:
+      - published
 
 permissions:
   contents: write
 
 jobs:
   build-windows:
-    name: Build Windows Desktop App
+    name: Build Windows Installer
     runs-on: windows-latest
 
     steps:
@@ -30,6 +31,12 @@ jobs:
       - name: Build Windows installer
         run: npm run desktop:build
 
+      - name: Show build output
+        shell: pwsh
+        run: |
+          Write-Host "Files generated in release/:"
+          Get-ChildItem -Path "release" -Recurse | Select-Object FullName, Length
+
       - name: Upload installer to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -37,17 +44,18 @@ jobs:
         run: |
           $tag = "${{ github.event.release.tag_name }}"
 
-          $files = Get-ChildItem -Path "dist" -File |
+          $files = Get-ChildItem -Path "release" -File |
             Where-Object {
-              $_.Name -match '\.(exe|yml|blockmap)$'
+              $_.Extension -in @(".exe", ".yml", ".blockmap")
             }
 
           if ($files.Count -eq 0) {
-            Write-Error "No Electron release files were found in dist/"
-            Get-ChildItem -Path "dist" -Recurse
+            Write-Error "No Electron release files were found in release/"
+            Get-ChildItem -Path "release" -Recurse
             exit 1
           }
 
           foreach ($file in $files) {
+            Write-Host "Uploading $($file.Name)..."
             gh release upload $tag $file.FullName --clobber --repo "${{ github.repository }}"
           }
