@@ -1,1 +1,0 @@
-import{c as e}from"./runtime-core.esm-bundler-v432.js";var t={ratio:[String,Number]};function n(t,n){return e(()=>{let e=t.ratio||n?.value;if(typeof e==`string`&&e.trim()===``)return null;let r=Number(e);return Number.isFinite(r)&&r>0?{aspectRatio:r}:null})}export{t as n,n as t};
