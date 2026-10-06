@@ -339,7 +339,7 @@ export default function RosterListDialog({
           ? promotionSections
           : ["**Personnel:**", "• N/A", "", DIVIDER]),
         PROMOTION_NOTES,
-        `**Promotion Date:** <t:${now}:F>`,
+        `**Promotion Date:** <t:${now}:F> (<t:${now}:t>)`,
       ].join("\n")
     }
 
@@ -361,7 +361,7 @@ export default function RosterListDialog({
     }
 
     sections.push(ACTIVITY_NOTES)
-    sections.push(`**Promotion Date:** <t:${now}:F> (<t:${now}:t>)`)
+    sections.push(`**Activity Date:** <t:${now}:F>`)
     return sections.join("\n")
   }, [strikeMode, selectedMembers, previewMembers])
 
@@ -678,7 +678,7 @@ export default function RosterListDialog({
                     })}
                     <p className="font-semibold">🏆 ACTIVITY NOTES 🏆</p>
                     <p>Activity lists are made based off hours and if you feel like this was wrong feel free to make a ticket in &lt;#1183194105455579207&gt;.</p>
-                    <p className="mt-2"><strong>Promotion Date:</strong> {new Date().toLocaleString()}</p>
+                    <p className="mt-2"><strong>Activity Date:</strong> {new Date().toLocaleString()}</p>
                   </div>
                 ) : (
                   <div className="rounded-lg border bg-muted/10 p-4 text-sm leading-6">
