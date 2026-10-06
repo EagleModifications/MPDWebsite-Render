@@ -1,1 +1,0 @@
-import{x as e}from"./runtime-core.esm-bundler-v432.js";import{Rt as t}from"./use-router-link-v432.js";var n=t({name:`QSpace`,setup(){let t=e(`div`,{class:`q-space`});return()=>t}});export{n as t};
