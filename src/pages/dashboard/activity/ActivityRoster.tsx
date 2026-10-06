@@ -1240,7 +1240,7 @@ export default function ActivityRoster() {
                 variant="ghost"
                 size="sm"
                 onClick={clearSearch}
-                className="shrink-0 gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:bg-transparent hover:text-blue-300 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                className="shrink-0 gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:text-blue-300 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
               >
                 <X className="h-4 w-4" />
 
@@ -1370,7 +1370,7 @@ export default function ActivityRoster() {
                       onClick={
                         clearStatuses
                       }
-                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:bg-transparent hover:text-blue-300 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:text-blue-300 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                     >
                       <X className="h-4 w-4" />
 
@@ -1510,7 +1510,7 @@ export default function ActivityRoster() {
                       onClick={
                         clearRanks
                       }
-                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:bg-transparent hover:text-blue-300 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:text-blue-300 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                     >
                       <X className="h-4 w-4" />
 
