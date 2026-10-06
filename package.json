@@ -74,6 +74,8 @@
   "build": {
     "appId": "com.metropd.desktop",
     "productName": "Metro Police Department",
+    "description": "Metro Police Department desktop application",
+    "author": "Metro Police Department",
     "artifactName": "MPD-Police-Department-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
@@ -94,8 +96,7 @@
           ]
         }
       ],
-      "icon": "desktop/icon.ico",
-      "publisherName": "Metro Police Department"
+      "icon": "desktop/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -137,5 +138,7 @@
       "repo": "MPDWebsite-Render",
       "releaseType": "release"
     }
-  }
+  },
+  "description": "Metro Police Department desktop application",
+  "author": "Metro Police Department"
 }
