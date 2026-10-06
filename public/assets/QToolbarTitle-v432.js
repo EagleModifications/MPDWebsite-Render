@@ -1,0 +1,1 @@
+import{x as e}from"./runtime-core.esm-bundler-v432.js";import{Rt as t,g as n}from"./use-router-link-v432.js";var r=t({name:`QToolbarTitle`,props:{shrink:Boolean},setup(t,{slots:r}){return()=>e(`div`,{class:`q-toolbar__title ellipsis`+(t.shrink?` col-shrink`:``)},n(r.default))}});export{r as t};

@@ -1,0 +1,1 @@
+import{t as e}from"./wrappers-v432.js";import{lt as t}from"./index-v432.js";import{t as n}from"./en-US-v432.js";var r={en:n},i=e(({app:e})=>{e.use(t({locale:`en`,fallbackLocale:`en`,messages:r}))});export{i as default};
