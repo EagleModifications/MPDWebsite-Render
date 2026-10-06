@@ -383,7 +383,7 @@ export default function App() {
           />
 
           <Route
-            path="/spinwheel"
+            path="/spin-wheel"
             element={<SpinWheel />}
           />
 
