@@ -14,6 +14,7 @@ import {
   Copy,
   Filter,
   ListPlus,
+  RotateCcw,
   Search,
   Shield,
   Users,
@@ -280,7 +281,7 @@ export default function PromotionRoster() {
   ───────────────────────────────────────────── */
 
   const loadRoster = useCallback(
-    async (showLoadingState = false) => {
+    async (showLoadingState = false, resetFilters = false) => {
       try {
         if (showLoadingState) {
           setLoading(true)
@@ -401,6 +402,24 @@ export default function PromotionRoster() {
             : []
 
         setMembers(roster)
+
+        if (resetFilters) {
+          const defaultRanks = Array.from(
+            new Map(
+              roster.map((member) => [
+                normalizeRank(member.rank),
+                cleanValue(member.rank),
+              ] as const),
+            ).values(),
+          ).filter(Boolean)
+
+          setStatusFilters(
+            statusOptions.map((status) => status.id),
+          )
+          setRankFilters(defaultRanks)
+          setSearch("")
+        }
+
         setSelectedIds([])
         setSelectedCopied(false)
       } catch (err) {
@@ -426,7 +445,7 @@ export default function PromotionRoster() {
   )
 
   useEffect(() => {
-    void loadRoster()
+    void loadRoster(false, true)
   }, [loadRoster])
 
   /* ─────────────────────────────────────────────
@@ -1080,7 +1099,6 @@ export default function PromotionRoster() {
   ───────────────────────────────────────────── */
 
   const clearFilters = () => {
-    setSearch("")
     setStatusFilters([])
     setRankFilters([])
     setSelectedCopied(false)
@@ -1090,12 +1108,11 @@ export default function PromotionRoster() {
       action: "clear-filters",
       category: "roster",
       division,
-      summary: `Cleared all filters on the ${displayDivision} promotion roster.`,
+      summary: `Cleared all status and rank filters on the ${displayDivision} promotion roster.`,
     })
   }
 
   const resetFilters = () => {
-    setSearch("")
     setStatusFilters(
       statusOptions.map((status) => status.id),
     )
@@ -1118,7 +1135,6 @@ export default function PromotionRoster() {
   }
 
   const filtersAreDefault =
-    !search.trim() &&
     statusFilters.length === statusOptions.length &&
     statusOptions.every((status) =>
       statusFilters.includes(status.id),
@@ -1131,6 +1147,10 @@ export default function PromotionRoster() {
           normalizeRank(rank),
       ),
     )
+
+  const hasFilterSelection =
+    statusFilters.length > 0 ||
+    rankFilters.length > 0
 
   const hasFilterChanges =
     !filtersAreDefault
@@ -1149,8 +1169,11 @@ export default function PromotionRoster() {
 
   const hasFilters =
     Boolean(search.trim()) ||
-    statusFilters.length > 0 ||
-    rankFilters.length > 0
+    (statusFilters.length > 0 &&
+      statusFilters.length < statusOptions.length) ||
+    (rankOptions.length > 0 &&
+      rankFilters.length > 0 &&
+      rankFilters.length < rankOptions.length)
 
   const selectedStatusCount =
     statusFilters.length
@@ -1361,7 +1384,7 @@ export default function PromotionRoster() {
 
                       setDivision(item.id)
                       setSearch("")
-                      setStatusFilters([])
+                      setStatusFilters(statusOptions.map((status) => status.id))
                       setRankFilters([])
                       setSelectedIds([])
                       setSelectedCopied(false)
@@ -1978,12 +2001,8 @@ export default function PromotionRoster() {
                     <button
                       key={`status-${status}`}
                       type="button"
-                      onClick={() =>
-                        toggleStatusFilter(status)
-                      }
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80 ${getStatusClasses(
-                        status,
-                      )}`}
+                      onClick={() => toggleStatusFilter(status)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80 ${getStatusClasses(status)}`}
                     >
                       <Icon className="h-3 w-3" />
                       {getStatusLabel(status)}
@@ -1996,9 +2015,7 @@ export default function PromotionRoster() {
                   <button
                     key={`rank-${rank}`}
                     type="button"
-                    onClick={() =>
-                      toggleRankFilter(rank)
-                    }
+                    onClick={() => toggleRankFilter(rank)}
                     className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
                   >
                     <Shield className="h-3 w-3" />
@@ -2009,24 +2026,29 @@ export default function PromotionRoster() {
               </>
             )}
 
-            {hasFilterChanges && (
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-sm font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0 active:bg-transparent"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Clear Filters
-                </Button>
+            {(hasFilterSelection || hasFilterChanges) && (
+              <div className="flex items-center gap-2">
+                {hasFilterSelection && (
+                  <Button
+                    type="button"
+                    onClick={clearFilters}
+                    className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-sm font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0 active:bg-transparent"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Clear Filters
+                  </Button>
+                )}
 
-                <Button
-                  type="button"
-                  onClick={resetFilters}
-                  className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-sm font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0 active:bg-transparent"
-                >
-                  Reset Filters
-                </Button>
+                {hasFilterChanges && (
+                  <Button
+                    type="button"
+                    onClick={resetFilters}
+                    className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-sm font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0 active:bg-transparent"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset Filters
+                  </Button>
+                )}
               </div>
             )}
           </div>
