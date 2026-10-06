@@ -1,50 +1,74 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   Apple,
-  CheckCircle2,
+  CalendarDays,
   Download as DownloadIcon,
   ExternalLink,
-  Loader2,
+  FileDown,
+  Monitor,
+  Package,
   RefreshCw,
-  ShieldCheck,
   Terminal,
-  TriangleAlert,
-  Laptop,
-} from 'lucide-react'
+  Tag,
+  X,
+} from "lucide-react"
 
-import Navbar from '@/components/home/Navbar'
-import Footer from '@/components/Footer'
+import Navbar from "@/components/home/Navbar"
+import Footer from "@/components/Footer"
 
 const GITHUB_RELEASES_API =
-  'https://api.github.com/repos/EagleModifications/MPDWebsite-Render/releases?per_page=20'
+  "https://api.github.com/repos/EagleModifications/MPDWebsite-Render/releases"
 
-const GITHUB_RELEASES_URL =
-  'https://github.com/EagleModifications/MPDWebsite-Render/releases'
+const GITHUB_RELEASE =
+  "https://github.com/EagleModifications/MPDWebsite-Render/releases"
 
 type ReleaseAsset = {
+  id: number
   name: string
-  size: number
   browser_download_url: string
+  size: number
+  content_type: string
 }
 
-type Release = {
+type GitHubRelease = {
   id: number
-  tag_name: string
   name: string | null
+  tag_name: string
   body: string | null
+  html_url: string
+  published_at: string | null
+  created_at: string
   draft: boolean
   prerelease: boolean
-  published_at: string | null
-  html_url: string
   assets: ReleaseAsset[]
 }
 
-type Platform = 'windows' | 'macos' | 'linux'
+type Platform = "windows" | "macos" | "linux"
 
-function formatBytes(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '—'
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Unknown date"
+  }
 
-  const units = ['B', 'KB', 'MB', 'GB']
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date"
+  }
+
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+}
+
+function formatSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return ""
+  }
+
+  const units = ["B", "KB", "MB", "GB"]
   let value = bytes
   let unit = 0
 
@@ -53,197 +77,461 @@ function formatBytes(bytes: number) {
     unit += 1
   }
 
-  return `${value.toFixed(value >= 100 || unit === 0 ? 0 : 1)} ${units[unit]}`
+  return `${value >= 100 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`
 }
 
-function formatDate(value: string | null) {
-  if (!value) return 'Unknown date'
+function getPlatform(assetName: string): Platform | null {
+  const name = assetName.toLowerCase()
 
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return 'Unknown date'
+  if (name.endsWith(".exe")) {
+    return "windows"
   }
 
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(date)
-}
-
-function versionNumber(release: Release) {
-  return release.tag_name.replace(/^v/i, '')
-}
-
-function findAsset(release: Release, platform: Platform) {
-  const assets = release.assets ?? []
-
-  if (platform === 'windows') {
-    return assets.find((asset) => /\.exe$/i.test(asset.name)) ?? null
+  if (name.endsWith(".dmg")) {
+    return "macos"
   }
 
-  if (platform === 'macos') {
-    return assets.find((asset) => /\.dmg$/i.test(asset.name)) ?? null
+  if (name.endsWith(".appimage")) {
+    return "linux"
   }
 
-  return assets.find((asset) => /\.AppImage$/i.test(asset.name)) ?? null
+  return null
 }
 
-function platformLabel(platform: Platform) {
-  if (platform === 'windows') return 'Windows'
-  if (platform === 'macos') return 'macOS'
-  return 'Linux'
+function getAssets(release: GitHubRelease, platform: Platform) {
+  return release.assets.filter(
+    (asset) => getPlatform(asset.name) === platform,
+  )
 }
 
-function PlatformIcon({ platform }: { platform: Platform }) {
-  if (platform === 'windows') {
-    return <Laptop className="h-5 w-5" />
+function getPrimaryAsset(
+  release: GitHubRelease,
+  platform: Platform,
+) {
+  const assets = getAssets(release, platform)
+
+  if (assets.length === 0) {
+    return null
   }
 
-  if (platform === 'macos') {
-    return <Apple className="h-5 w-5" />
+  if (platform !== "macos") {
+    return assets[0]
   }
 
-  return <Terminal className="h-5 w-5" />
+  const isAppleSilicon =
+    typeof navigator !== "undefined" &&
+    /arm|aarch/i.test(navigator.userAgent)
+
+  return (
+    assets.find((asset) =>
+      isAppleSilicon
+        ? /arm64|aarch64/i.test(asset.name)
+        : /x64|amd64/i.test(asset.name),
+    ) ?? assets[0]
+  )
 }
 
-function DownloadButton({
+function getPlatformLabel(platform: Platform) {
+  switch (platform) {
+    case "windows":
+      return "Windows"
+    case "macos":
+      return "macOS"
+    case "linux":
+      return "Linux"
+  }
+}
+
+function PlatformIcon({
   platform,
-  asset,
-  primary = false,
+  className = "h-4 w-4",
 }: {
   platform: Platform
-  asset: ReleaseAsset | null
-  primary?: boolean
+  className?: string
 }) {
-  const label = platformLabel(platform)
+  if (platform === "windows") {
+    return <Monitor className={className} />
+  }
 
-  if (!asset) {
+  if (platform === "macos") {
+    return <Apple className={className} />
+  }
+
+  return <Terminal className={className} />
+}
+
+function ReleaseAssetButton({
+  release,
+  platform,
+  compact = false,
+}: {
+  release: GitHubRelease
+  platform: Platform
+  compact?: boolean
+}) {
+  const asset = getPrimaryAsset(release, platform)
+  const available = Boolean(asset)
+
+  if (!available) {
     return (
-      <div className="flex min-h-12 items-center justify-between rounded-xl border border-border/60 bg-background/40 px-4 text-sm text-muted-foreground">
-        <span className="flex items-center gap-3">
-          <PlatformIcon platform={platform} />
-          {label}
-        </span>
-
-        <span>Not available</span>
-      </div>
+      <button
+        type="button"
+        disabled
+        className={[
+          "inline-flex items-center justify-center gap-2 rounded-lg border border-border/70 bg-muted/20 text-xs font-semibold text-muted-foreground/45",
+          compact
+            ? "h-9 min-w-[118px] px-3"
+            : "h-10 flex-1 px-3 sm:px-4",
+        ].join(" ")}
+      >
+        <PlatformIcon platform={platform} className="h-3.5 w-3.5" />
+        {getPlatformLabel(platform)}
+        <span className="text-[10px]">Not available</span>
+      </button>
     )
   }
 
   return (
     <a
       href={asset.browser_download_url}
-      target="_blank"
-      rel="noreferrer"
       className={[
-        'flex min-h-12 items-center justify-between rounded-xl border px-4 text-sm font-medium transition-all',
-        primary
-          ? 'border-blue-500/60 bg-blue-500 text-white shadow-lg shadow-blue-500/10 hover:bg-blue-400'
-          : 'border-border/70 bg-background/50 text-foreground hover:border-blue-500/40 hover:bg-foreground/[0.04]',
-      ].join(' ')}
+        "inline-flex items-center justify-center gap-2 rounded-lg border border-border/70 bg-background text-xs font-semibold text-foreground transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-blue-400",
+        compact
+          ? "h-9 min-w-[118px] px-3"
+          : "h-10 flex-1 px-3 sm:px-4",
+      ].join(" ")}
+      download
     >
-      <span className="flex items-center gap-3">
-        <PlatformIcon platform={platform} />
-        Download for {label}
-      </span>
-
-      <DownloadIcon className="h-4 w-4" />
+      <PlatformIcon platform={platform} className="h-3.5 w-3.5" />
+      {compact
+        ? getPlatformLabel(platform)
+        : `Download for ${getPlatformLabel(platform)}`}
+      <DownloadIcon className="ml-auto h-3.5 w-3.5" />
     </a>
   )
 }
 
-export default function Download() {
-  const [releases, setReleases] = useState<Release[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
+function ReleaseModal({
+  release,
+  onClose,
+}: {
+  release: GitHubRelease
+  onClose: () => void
+}) {
+  const platformAssets = useMemo(
+    () =>
+      (["windows", "macos", "linux"] as Platform[]).flatMap((platform) =>
+        getAssets(release, platform).map((asset) => ({
+          platform,
+          asset,
+        })),
+      ),
+    [release],
+  )
 
-  async function loadReleases(showRefresh = false) {
-    if (showRefresh) {
-      setRefreshing(true)
-    } else {
-      setLoading(true)
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose()
+      }
     }
 
+    document.addEventListener("keydown", onKeyDown)
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown)
+      document.body.style.overflow = ""
+    }
+  }, [onClose])
+
+  const title = release.name?.trim() || `MPD Desktop ${release.tag_name}`
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${title} release details`}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose()
+        }
+      }}
+    >
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-4 sm:px-6">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
+                <Tag className="h-3 w-3" />
+                {release.tag_name}
+              </span>
+
+              {release.prerelease && (
+                <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                  Pre-release
+                </span>
+              )}
+            </div>
+
+            <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
+              {title}
+            </h2>
+
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5" />
+                Released {formatDate(release.published_at)}
+              </span>
+
+              <span className="inline-flex items-center gap-1.5">
+                <Package className="h-3.5 w-3.5" />
+                {release.assets.length} asset
+                {release.assets.length === 1 ? "" : "s"}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+            aria-label="Close release details"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 overflow-y-auto px-5 py-5 sm:px-6">
+          <section>
+            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-blue-500">
+              Release notes
+            </div>
+
+            <div className="rounded-xl border border-border/70 bg-background/60 p-4 text-sm leading-6 text-muted-foreground">
+              {release.body?.trim() ? (
+                <div className="whitespace-pre-wrap break-words">
+                  {release.body.trim()}
+                </div>
+              ) : (
+                <p>No release description was provided for this release.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="mt-5">
+            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-blue-500">
+              Assets
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-border/70">
+              {platformAssets.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  No downloadable assets were attached to this release.
+                </div>
+              ) : (
+                <div className="divide-y divide-border/70">
+                  {platformAssets.map(({ platform, asset }) => (
+                    <div
+                      key={asset.id}
+                      className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/30 text-muted-foreground">
+                          <PlatformIcon
+                            platform={platform}
+                            className="h-4 w-4"
+                          />
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {asset.name}
+                          </p>
+
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {getPlatformLabel(platform)}
+                            {asset.size > 0
+                              ? ` • ${formatSize(asset.size)}`
+                              : ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      <a
+                        href={asset.browser_download_url}
+                        download
+                        className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-500/15"
+                      >
+                        <DownloadIcon className="h-3.5 w-3.5" />
+                        Download
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-border/70 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <span className="text-xs text-muted-foreground">
+            {release.tag_name} • Metro Police Department Desktop
+          </span>
+
+          <a
+            href={release.html_url || GITHUB_RELEASE}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border/70 px-3 text-xs font-semibold transition-colors hover:bg-muted/50"
+          >
+            Open on GitHub
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReleaseCard({
+  release,
+  onOpen,
+}: {
+  release: GitHubRelease
+  onOpen: (release: GitHubRelease) => void
+}) {
+  const title = release.name?.trim() || `MPD Desktop ${release.tag_name}`
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(release)}
+      className="group block w-full text-left"
+      aria-label={`Open ${title} release details`}
+    >
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur transition-colors hover:border-blue-500/30 hover:bg-card">
+        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-sm font-semibold sm:text-base">
+                {title}
+              </h3>
+
+              <span className="rounded-full border border-border/70 bg-muted/30 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                {release.tag_name}
+              </span>
+            </div>
+
+            <p className="mt-1 text-xs text-muted-foreground">
+              Released {formatDate(release.published_at)}
+              {" • "}
+              {release.assets.length} asset
+              {release.assets.length === 1 ? "" : "s"}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="hidden text-xs text-muted-foreground transition-colors group-hover:text-blue-400 sm:inline">
+              View release details
+            </span>
+
+            <ExternalLink className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-blue-400" />
+          </div>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+export default function Download() {
+  const [releases, setReleases] = useState<GitHubRelease[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState("")
+  const [selectedRelease, setSelectedRelease] =
+    useState<GitHubRelease | null>(null)
+
+  const loadReleases = useCallback(async (showRefresh = false) => {
     try {
-      setError(null)
-
-      const response = await fetch(GITHUB_RELEASES_API, {
-        headers: {
-          Accept: 'application/vnd.github+json',
-        },
-        cache: 'no-store',
-      })
-
-      if (!response.ok) {
-        throw new Error(`GitHub returned ${response.status}`)
+      if (showRefresh) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
       }
 
-      const data = (await response.json()) as Release[]
+      setError("")
 
-      const visible = data
-        .filter(
-          (release) =>
-            !release.draft && !release.prerelease,
-        )
-        .sort((a, b) => {
-          const aDate = a.published_at
-            ? Date.parse(a.published_at)
-            : 0
-
-          const bDate = b.published_at
-            ? Date.parse(b.published_at)
-            : 0
-
-          return bDate - aDate
-        })
-
-      setReleases(visible)
-    } catch (loadError) {
-      console.error(
-        'Failed to load desktop releases:',
-        loadError,
+      const response = await fetch(
+        `${GITHUB_RELEASES_API}?per_page=20`,
+        {
+          headers: {
+            Accept: "application/vnd.github+json",
+          },
+        },
       )
 
+      if (!response.ok) {
+        throw new Error(
+          `GitHub returned HTTP ${response.status}.`,
+        )
+      }
+
+      const data = (await response.json()) as GitHubRelease[]
+
+      const validReleases = data
+        .filter((release) => !release.draft)
+        .sort(
+          (a, b) =>
+            new Date(
+              b.published_at ?? b.created_at,
+            ).getTime() -
+            new Date(
+              a.published_at ?? a.created_at,
+            ).getTime(),
+        )
+
+      setReleases(validReleases)
+    } catch (loadError) {
+      console.error(loadError)
+
       setError(
-        'GitHub releases could not be loaded right now.',
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load GitHub releases.",
       )
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     void loadReleases()
-  }, [])
+  }, [loadReleases])
 
-  const latest = releases[0] ?? null
-
-  const previous = useMemo(
-    () => releases.slice(1),
-    [releases],
-  )
+  const latestRelease = releases[0]
+  const previousReleases = releases.slice(1)
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
       <Navbar />
 
-      <main className="mx-auto max-w-[1600px] px-6 pb-24 pt-32 lg:px-8">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <main className="relative min-h-screen pt-20">
+        <div className="relative mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-7">
+          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="mb-3 text-sm font-medium uppercase tracking-[0.18em] text-blue-500">
-                Desktop application
-              </p>
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-500">
+                <DownloadIcon className="h-4 w-4" />
+                DESKTOP APPLICATION
+              </div>
 
-              <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
                 Download
               </h1>
 
-              <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Download the Metro Police Department desktop
                 application for your computer.
               </p>
@@ -253,308 +541,272 @@ export default function Download() {
               type="button"
               onClick={() => void loadReleases(true)}
               disabled={loading || refreshing}
-              className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg border border-border/70 bg-background/50 px-4 text-sm font-medium transition hover:bg-foreground/[0.04] disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border/70 px-3 text-xs font-semibold transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {refreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-
-              Refresh releases
+              <RefreshCw
+                className={[
+                  "h-3.5 w-3.5",
+                  refreshing ? "animate-spin" : "",
+                ].join(" ")}
+              />
+              {refreshing ? "Refreshing..." : "Refresh releases"}
             </button>
           </div>
 
+          {error && (
+            <div className="mb-5 rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-4">
+              <p className="text-sm font-semibold text-red-400">
+                Failed to load releases
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {error}
+              </p>
+            </div>
+          )}
+
           {loading ? (
-            <div className="rounded-2xl border border-border/60 bg-card/40 p-10 text-center">
-              <Loader2 className="mx-auto h-7 w-7 animate-spin text-blue-500" />
-
-              <p className="mt-4 text-sm text-muted-foreground">
-                Loading releases...
-              </p>
-            </div>
-          ) : error ? (
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-8">
-              <div className="flex items-start gap-4">
-                <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-
-                <div>
-                  <h2 className="font-semibold">
-                    Unable to load releases
-                  </h2>
-
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {error}
-                  </p>
-
-                  <a
-                    href={GITHUB_RELEASES_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-500 hover:text-blue-400"
-                  >
-                    Open GitHub releases
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                </div>
+            <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
+              <div className="px-4 py-12 text-center">
+                <Package className="mx-auto h-8 w-8 animate-pulse text-muted-foreground" />
+                <p className="mt-3 text-sm font-medium">
+                  Loading releases...
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Checking GitHub Releases for the latest desktop builds.
+                </p>
               </div>
-            </div>
-          ) : !latest ? (
-            <div className="rounded-2xl border border-border/60 bg-card/40 p-10 text-center">
-              <p className="font-medium">
-                No desktop releases are available yet.
-              </p>
-
-              <p className="mt-2 text-sm text-muted-foreground">
-                Once a GitHub release is published, its
-                downloads will appear here automatically.
-              </p>
-            </div>
+            </section>
+          ) : !latestRelease ? (
+            <section className="overflow-hidden rounded-2xl border border-dashed border-border bg-card/80 shadow-sm backdrop-blur">
+              <div className="px-4 py-12 text-center">
+                <Package className="mx-auto h-8 w-8 text-muted-foreground" />
+                <p className="mt-3 text-sm font-medium">
+                  No desktop releases available
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  There are currently no published desktop releases.
+                </p>
+              </div>
+            </section>
           ) : (
             <>
-              <section className="overflow-hidden rounded-3xl border border-border/60 bg-card/40 shadow-2xl shadow-black/10">
-                <div className="border-b border-border/60 px-6 py-5 sm:px-8">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                        Latest release
-                      </p>
+              <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
+                <div className="flex items-center justify-between border-b border-border/70 px-4 py-3 sm:px-5">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                    Latest release
+                  </span>
 
-                      <h2 className="mt-1 text-xl font-semibold">
-                        Metro Police Department Desktop
-                      </h2>
-                    </div>
-
-                    <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-500">
-                      v{versionNumber(latest)}
-                    </span>
-                  </div>
+                  <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
+                    {latestRelease.tag_name}
+                  </span>
                 </div>
 
-                <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.05fr_0.95fr]">
-                  <div>
-                    <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-background/70 shadow-lg">
-                      <img
-                        src="/desktop-icon.png"
-                        alt="Metro Police Department"
-                        className="h-full w-full object-contain p-3"
-                      />
-                    </div>
+                <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1.05fr] lg:p-6">
+                  <div className="min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRelease(latestRelease)}
+                      className="group flex items-start gap-4 text-left"
+                    >
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background">
+                        <img
+                          src="/logo.png"
+                          alt="Metro Police Department"
+                          className="h-11 w-11 object-contain"
+                        />
+                      </div>
 
-                    <h3 className="mt-6 text-2xl font-semibold tracking-tight">
-                      Get the MPD desktop app
-                    </h3>
+                      <div className="min-w-0">
+                        <h2 className="text-lg font-bold tracking-tight group-hover:text-blue-400">
+                          {latestRelease.name?.trim() ||
+                            `MPD Desktop ${latestRelease.tag_name}`}
+                        </h2>
 
-                    <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-                      The desktop application gives you the
-                      same Metro Police Department website in
-                      a dedicated app window, with desktop
-                      updates delivered through GitHub
-                      Releases.
-                    </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Released {formatDate(latestRelease.published_at)}
+                        </p>
+                      </div>
+                    </button>
 
-                    <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                      <DownloadButton
-                        platform="windows"
-                        asset={findAsset(
-                          latest,
-                          'windows',
-                        )}
-                        primary
-                      />
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRelease(latestRelease)}
+                      className="mt-4 block text-left"
+                    >
+                      <h3 className="text-base font-semibold hover:text-blue-400">
+                        Get the MPD desktop app
+                      </h3>
 
-                      <DownloadButton
-                        platform="macos"
-                        asset={findAsset(
-                          latest,
-                          'macos',
-                        )}
-                      />
+                      <p className="mt-1.5 max-w-xl text-sm leading-5 text-muted-foreground">
+                        The desktop application gives you the same Metro
+                        Police Department website in a dedicated app window,
+                        with desktop updates delivered through GitHub Releases.
+                      </p>
 
-                      <DownloadButton
-                        platform="linux"
-                        asset={findAsset(
-                          latest,
-                          'linux',
-                        )}
-                      />
-                    </div>
+                      <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400">
+                        View release details
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </span>
+                    </button>
                   </div>
 
-                  <div className="rounded-2xl border border-border/60 bg-background/40 p-5 sm:p-6">
-                    <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          Version
-                        </p>
+                  <div className="rounded-2xl border border-border/70 bg-background/40 p-4">
+                    <div className="mb-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Version
+                      </p>
+                      <p className="mt-1 text-sm font-bold">
+                        {latestRelease.tag_name}
+                      </p>
+                    </div>
 
-                        <p className="mt-1 font-semibold">
-                          v{versionNumber(latest)}
-                        </p>
-                      </div>
+                    <div className="mb-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Released
+                      </p>
+                      <p className="mt-1 text-sm font-semibold">
+                        {formatDate(latestRelease.published_at)}
+                      </p>
+                    </div>
 
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          Released
-                        </p>
+                    <div className="mb-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Downloads
+                      </p>
 
-                        <p className="mt-1 font-semibold">
-                          {formatDate(
-                            latest.published_at,
-                          )}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          Windows installer
-                        </p>
-
-                        <p className="mt-1 font-semibold">
-                          {findAsset(
-                            latest,
-                            'windows',
-                          )
-                            ? formatBytes(
-                                findAsset(
-                                  latest,
-                                  'windows',
-                                )!.size,
-                              )
-                            : '—'}
-                        </p>
+                      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                        <ReleaseAssetButton
+                          release={latestRelease}
+                          platform="windows"
+                        />
+                        <ReleaseAssetButton
+                          release={latestRelease}
+                          platform="macos"
+                        />
+                        <ReleaseAssetButton
+                          release={latestRelease}
+                          platform="linux"
+                        />
                       </div>
                     </div>
 
-                    <div className="mt-6 space-y-3 border-t border-border/60 pt-5">
-                      <div className="flex items-start gap-3 text-sm">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                    <div className="border-t border-border/70 pt-4">
+                      <div className="grid gap-2 text-xs text-muted-foreground">
+                        <div className="flex items-start gap-2">
+                          <FileDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-400" />
+                          <span>
+                            Download the installer and keep the app installed.
+                          </span>
+                        </div>
 
-                        <span className="text-muted-foreground">
-                          Download once and keep the app
-                          installed.
-                        </span>
-                      </div>
+                        <div className="flex items-start gap-2">
+                          <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-400" />
+                          <span>
+                            Desktop updates can install automatically from new
+                            releases.
+                          </span>
+                        </div>
 
-                      <div className="flex items-start gap-3 text-sm">
-                        <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-
-                        <span className="text-muted-foreground">
-                          Desktop shell updates can install
-                          automatically from new releases.
-                        </span>
-                      </div>
-
-                      <div className="flex items-start gap-3 text-sm">
-                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-
-                        <span className="text-muted-foreground">
-                          The app loads the live MPD website,
-                          so website changes appear without
-                          reinstalling the app.
-                        </span>
+                        <div className="flex items-start gap-2">
+                          <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-400" />
+                          <span>
+                            The app loads the live MPD website, so website
+                            changes appear without reinstalling the app.
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </section>
 
-              <section className="mt-12">
-                <div className="mb-5 flex items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl font-semibold tracking-tight">
+              {previousReleases.length > 0 && (
+                <section className="mt-6">
+                  <div className="mb-3">
+                    <h2 className="text-lg font-semibold">
                       Previous versions
                     </h2>
 
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Older desktop releases remain available
-                      from GitHub.
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      Older desktop releases from GitHub.
                     </p>
                   </div>
 
-                  <a
-                    href={GITHUB_RELEASES_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hidden items-center gap-2 text-sm font-medium text-blue-500 hover:text-blue-400 sm:flex"
-                  >
-                    View all releases
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                </div>
-
-                {previous.length === 0 ? (
-                  <div className="rounded-2xl border border-border/60 bg-card/30 p-6 text-sm text-muted-foreground">
-                    This is the first published desktop
-                    release.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {previous.map((release) => (
+                  <div className="space-y-2">
+                    {previousReleases.map((release) => (
                       <div
                         key={release.id}
-                        className="rounded-2xl border border-border/60 bg-card/30 p-5 transition hover:border-border"
+                        className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur"
                       >
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-3">
-                              <h3 className="font-semibold">
-                                {release.name ||
-                                  `Release v${versionNumber(
-                                    release,
-                                  )}`}
-                              </h3>
+                        <div className="flex flex-col gap-3 px-4 py-4 sm:px-5">
+                          <div className="flex min-w-0 items-start justify-between gap-4">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRelease(release)}
+                              className="min-w-0 text-left"
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="truncate text-sm font-semibold sm:text-base">
+                                  {release.name?.trim() ||
+                                    `MPD Desktop ${release.tag_name}`}
+                                </h3>
 
-                              <span className="rounded-full border border-border/70 px-2.5 py-1 text-xs text-muted-foreground">
-                                v{versionNumber(release)}
-                              </span>
-                            </div>
+                                <span className="rounded-full border border-border/70 bg-muted/30 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                  {release.tag_name}
+                                </span>
+                              </div>
 
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              Released{' '}
-                              {formatDate(
-                                release.published_at,
-                              )}
-                            </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Released {formatDate(release.published_at)}
+                              </p>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRelease(release)}
+                              className="hidden shrink-0 items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-blue-400 sm:inline-flex"
+                            >
+                              Release details
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </button>
                           </div>
 
-                          <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[520px]">
-                            <DownloadButton
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <ReleaseAssetButton
+                              release={release}
                               platform="windows"
-                              asset={findAsset(
-                                release,
-                                'windows',
-                              )}
+                              compact
                             />
-
-                            <DownloadButton
+                            <ReleaseAssetButton
+                              release={release}
                               platform="macos"
-                              asset={findAsset(
-                                release,
-                                'macos',
-                              )}
+                              compact
                             />
-
-                            <DownloadButton
+                            <ReleaseAssetButton
+                              release={release}
                               platform="linux"
-                              asset={findAsset(
-                                release,
-                                'linux',
-                              )}
+                              compact
                             />
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </section>
+                </section>
+              )}
             </>
           )}
         </div>
       </main>
 
       <Footer />
+
+      {selectedRelease && (
+        <ReleaseModal
+          release={selectedRelease}
+          onClose={() => setSelectedRelease(null)}
+        />
+      )}
     </div>
   )
 }
