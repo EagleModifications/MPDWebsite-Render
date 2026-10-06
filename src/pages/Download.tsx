@@ -5,12 +5,11 @@ import {
   Download as DownloadIcon,
   ExternalLink,
   Loader2,
-  Monitor,
   RefreshCw,
   ShieldCheck,
   Terminal,
   TriangleAlert,
-  Windows,
+  Laptop,
 } from 'lucide-react'
 
 import Navbar from '@/components/home/Navbar'
@@ -60,11 +59,17 @@ function formatBytes(bytes: number) {
 function formatDate(value: string | null) {
   if (!value) return 'Unknown date'
 
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown date'
+  }
+
   return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  }).format(new Date(value))
+  }).format(date)
 }
 
 function versionNumber(release: Release) {
@@ -92,8 +97,14 @@ function platformLabel(platform: Platform) {
 }
 
 function PlatformIcon({ platform }: { platform: Platform }) {
-  if (platform === 'windows') return <Windows className="h-5 w-5" />
-  if (platform === 'macos') return <Apple className="h-5 w-5" />
+  if (platform === 'windows') {
+    return <Laptop className="h-5 w-5" />
+  }
+
+  if (platform === 'macos') {
+    return <Apple className="h-5 w-5" />
+  }
+
   return <Terminal className="h-5 w-5" />
 }
 
@@ -115,6 +126,7 @@ function DownloadButton({
           <PlatformIcon platform={platform} />
           {label}
         </span>
+
         <span>Not available</span>
       </div>
     )
@@ -136,6 +148,7 @@ function DownloadButton({
         <PlatformIcon platform={platform} />
         Download for {label}
       </span>
+
       <DownloadIcon className="h-4 w-4" />
     </a>
   )
@@ -148,14 +161,19 @@ export default function Download() {
   const [refreshing, setRefreshing] = useState(false)
 
   async function loadReleases(showRefresh = false) {
-    if (showRefresh) setRefreshing(true)
-    else setLoading(true)
+    if (showRefresh) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+    }
 
     try {
       setError(null)
 
       const response = await fetch(GITHUB_RELEASES_API, {
-        headers: { Accept: 'application/vnd.github+json' },
+        headers: {
+          Accept: 'application/vnd.github+json',
+        },
         cache: 'no-store',
       })
 
@@ -166,17 +184,32 @@ export default function Download() {
       const data = (await response.json()) as Release[]
 
       const visible = data
-        .filter((release) => !release.draft && !release.prerelease)
+        .filter(
+          (release) =>
+            !release.draft && !release.prerelease,
+        )
         .sort((a, b) => {
-          const aDate = a.published_at ? Date.parse(a.published_at) : 0
-          const bDate = b.published_at ? Date.parse(b.published_at) : 0
+          const aDate = a.published_at
+            ? Date.parse(a.published_at)
+            : 0
+
+          const bDate = b.published_at
+            ? Date.parse(b.published_at)
+            : 0
+
           return bDate - aDate
         })
 
       setReleases(visible)
     } catch (loadError) {
-      console.error('Failed to load desktop releases:', loadError)
-      setError('GitHub releases could not be loaded right now.')
+      console.error(
+        'Failed to load desktop releases:',
+        loadError,
+      )
+
+      setError(
+        'GitHub releases could not be loaded right now.',
+      )
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -188,7 +221,11 @@ export default function Download() {
   }, [])
 
   const latest = releases[0] ?? null
-  const previous = useMemo(() => releases.slice(1), [releases])
+
+  const previous = useMemo(
+    () => releases.slice(1),
+    [releases],
+  )
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -201,11 +238,14 @@ export default function Download() {
               <p className="mb-3 text-sm font-medium uppercase tracking-[0.18em] text-blue-500">
                 Desktop application
               </p>
+
               <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
                 Download
               </h1>
+
               <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-                Download the Metro Police Department desktop application for your computer.
+                Download the Metro Police Department desktop
+                application for your computer.
               </p>
             </div>
 
@@ -220,6 +260,7 @@ export default function Download() {
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
+
               Refresh releases
             </button>
           </div>
@@ -227,15 +268,25 @@ export default function Download() {
           {loading ? (
             <div className="rounded-2xl border border-border/60 bg-card/40 p-10 text-center">
               <Loader2 className="mx-auto h-7 w-7 animate-spin text-blue-500" />
-              <p className="mt-4 text-sm text-muted-foreground">Loading releases...</p>
+
+              <p className="mt-4 text-sm text-muted-foreground">
+                Loading releases...
+              </p>
             </div>
           ) : error ? (
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-8">
               <div className="flex items-start gap-4">
                 <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+
                 <div>
-                  <h2 className="font-semibold">Unable to load releases</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+                  <h2 className="font-semibold">
+                    Unable to load releases
+                  </h2>
+
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {error}
+                  </p>
+
                   <a
                     href={GITHUB_RELEASES_URL}
                     target="_blank"
@@ -250,9 +301,13 @@ export default function Download() {
             </div>
           ) : !latest ? (
             <div className="rounded-2xl border border-border/60 bg-card/40 p-10 text-center">
-              <p className="font-medium">No desktop releases are available yet.</p>
+              <p className="font-medium">
+                No desktop releases are available yet.
+              </p>
+
               <p className="mt-2 text-sm text-muted-foreground">
-                Once a GitHub release is published, its downloads will appear here automatically.
+                Once a GitHub release is published, its
+                downloads will appear here automatically.
               </p>
             </div>
           ) : (
@@ -264,10 +319,12 @@ export default function Download() {
                       <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
                         Latest release
                       </p>
+
                       <h2 className="mt-1 text-xl font-semibold">
                         Metro Police Department Desktop
                       </h2>
                     </div>
+
                     <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-500">
                       v{versionNumber(latest)}
                     </span>
@@ -287,35 +344,84 @@ export default function Download() {
                     <h3 className="mt-6 text-2xl font-semibold tracking-tight">
                       Get the MPD desktop app
                     </h3>
+
                     <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-                      The desktop application gives you the same Metro Police Department website in a dedicated app window, with desktop updates delivered through GitHub Releases.
+                      The desktop application gives you the
+                      same Metro Police Department website in
+                      a dedicated app window, with desktop
+                      updates delivered through GitHub
+                      Releases.
                     </p>
 
                     <div className="mt-6 grid gap-3 sm:grid-cols-2">
                       <DownloadButton
                         platform="windows"
-                        asset={findAsset(latest, 'windows')}
+                        asset={findAsset(
+                          latest,
+                          'windows',
+                        )}
                         primary
                       />
-                      <DownloadButton platform="macos" asset={findAsset(latest, 'macos')} />
-                      <DownloadButton platform="linux" asset={findAsset(latest, 'linux')} />
+
+                      <DownloadButton
+                        platform="macos"
+                        asset={findAsset(
+                          latest,
+                          'macos',
+                        )}
+                      />
+
+                      <DownloadButton
+                        platform="linux"
+                        asset={findAsset(
+                          latest,
+                          'linux',
+                        )}
+                      />
                     </div>
                   </div>
 
                   <div className="rounded-2xl border border-border/60 bg-background/40 p-5 sm:p-6">
                     <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
                       <div>
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Version</p>
-                        <p className="mt-1 font-semibold">v{versionNumber(latest)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Released</p>
-                        <p className="mt-1 font-semibold">{formatDate(latest.published_at)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Windows installer</p>
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Version
+                        </p>
+
                         <p className="mt-1 font-semibold">
-                          {findAsset(latest, 'windows') ? formatBytes(findAsset(latest, 'windows')!.size) : '—'}
+                          v{versionNumber(latest)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Released
+                        </p>
+
+                        <p className="mt-1 font-semibold">
+                          {formatDate(
+                            latest.published_at,
+                          )}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Windows installer
+                        </p>
+
+                        <p className="mt-1 font-semibold">
+                          {findAsset(
+                            latest,
+                            'windows',
+                          )
+                            ? formatBytes(
+                                findAsset(
+                                  latest,
+                                  'windows',
+                                )!.size,
+                              )
+                            : '—'}
                         </p>
                       </div>
                     </div>
@@ -323,15 +429,30 @@ export default function Download() {
                     <div className="mt-6 space-y-3 border-t border-border/60 pt-5">
                       <div className="flex items-start gap-3 text-sm">
                         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-                        <span className="text-muted-foreground">Download once and keep the app installed.</span>
+
+                        <span className="text-muted-foreground">
+                          Download once and keep the app
+                          installed.
+                        </span>
                       </div>
+
                       <div className="flex items-start gap-3 text-sm">
                         <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-                        <span className="text-muted-foreground">Desktop shell updates can install automatically from new releases.</span>
+
+                        <span className="text-muted-foreground">
+                          Desktop shell updates can install
+                          automatically from new releases.
+                        </span>
                       </div>
+
                       <div className="flex items-start gap-3 text-sm">
                         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-                        <span className="text-muted-foreground">The app loads the live MPD website, so website changes appear without reinstalling the app.</span>
+
+                        <span className="text-muted-foreground">
+                          The app loads the live MPD website,
+                          so website changes appear without
+                          reinstalling the app.
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -341,11 +462,16 @@ export default function Download() {
               <section className="mt-12">
                 <div className="mb-5 flex items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-2xl font-semibold tracking-tight">Previous versions</h2>
+                    <h2 className="text-2xl font-semibold tracking-tight">
+                      Previous versions
+                    </h2>
+
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Older desktop releases remain available from GitHub.
+                      Older desktop releases remain available
+                      from GitHub.
                     </p>
                   </div>
+
                   <a
                     href={GITHUB_RELEASES_URL}
                     target="_blank"
@@ -359,7 +485,8 @@ export default function Download() {
 
                 {previous.length === 0 ? (
                   <div className="rounded-2xl border border-border/60 bg-card/30 p-6 text-sm text-muted-foreground">
-                    This is the first published desktop release.
+                    This is the first published desktop
+                    release.
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -371,20 +498,50 @@ export default function Download() {
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                           <div>
                             <div className="flex flex-wrap items-center gap-3">
-                              <h3 className="font-semibold">{release.name || `Release v${versionNumber(release)}`}</h3>
+                              <h3 className="font-semibold">
+                                {release.name ||
+                                  `Release v${versionNumber(
+                                    release,
+                                  )}`}
+                              </h3>
+
                               <span className="rounded-full border border-border/70 px-2.5 py-1 text-xs text-muted-foreground">
                                 v{versionNumber(release)}
                               </span>
                             </div>
+
                             <p className="mt-1 text-sm text-muted-foreground">
-                              Released {formatDate(release.published_at)}
+                              Released{' '}
+                              {formatDate(
+                                release.published_at,
+                              )}
                             </p>
                           </div>
 
                           <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[520px]">
-                            <DownloadButton platform="windows" asset={findAsset(release, 'windows')} />
-                            <DownloadButton platform="macos" asset={findAsset(release, 'macos')} />
-                            <DownloadButton platform="linux" asset={findAsset(release, 'linux')} />
+                            <DownloadButton
+                              platform="windows"
+                              asset={findAsset(
+                                release,
+                                'windows',
+                              )}
+                            />
+
+                            <DownloadButton
+                              platform="macos"
+                              asset={findAsset(
+                                release,
+                                'macos',
+                              )}
+                            />
+
+                            <DownloadButton
+                              platform="linux"
+                              asset={findAsset(
+                                release,
+                                'linux',
+                              )}
+                            />
                           </div>
                         </div>
                       </div>
