@@ -35,7 +35,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
@@ -505,20 +504,6 @@ function IdentityCard({
     void copyValue(value, labels[type] || "Details")
   }
 
-  const item = (type: string, label: string, disabled = false) => (
-    <DropdownMenuItem
-      disabled={disabled}
-      onSelect={(event) => {
-        event.preventDefault()
-        copy(type)
-      }}
-      className="gap-2 text-sm"
-    >
-      <Clipboard className="h-4 w-4 text-blue-400" />
-      {label}
-    </DropdownMenuItem>
-  )
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -761,24 +746,6 @@ function TargetIdentity({ log }: { log: ActionLog }) {
     />
   )
 }
-
-function DetailItem({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="min-w-0 rounded-lg border border-border bg-background/60 px-3 py-2.5">
-      <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        {label}
-      </p>
-      <div className="min-w-0 text-xs">{children}</div>
-    </div>
-  )
-}
-
 
 function FilterDropdown({
   value,
