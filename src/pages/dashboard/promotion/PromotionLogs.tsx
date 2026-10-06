@@ -4,7 +4,6 @@ import {
   ChevronUp,
   Clipboard,
   ClipboardCheck,
-  Copy,
   Check,
   FileInput,
   FileText,
@@ -35,6 +34,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
@@ -56,7 +56,7 @@ type Division =
   | "sar"
   | ""
 
-type LogModule = "all" | "promotion" | "activity"
+type LogModule = "promotion" | "activity"
 
 type ActionLog = {
   id: string
@@ -70,7 +70,7 @@ type ActionLog = {
   badgeNumber: string
   avatar?: string | null
   action: string
-  module?: "all" | "promotion" | "activity" | string
+  module?: "promotion" | "activity" | string
   category: Exclude<Category, ""> | string
   division?: Exclude<Division, ""> | null
   targetUserId?: string | null
@@ -240,35 +240,22 @@ const getAvatarUrl = (
   discordId: string,
   avatar?: string | null,
 ) => {
-  if (!avatar) return getDefaultAvatar(discordId)
-
-  const value = String(avatar).trim()
-  if (!value) return getDefaultAvatar(discordId)
-
-  if (value.startsWith("http://") || value.startsWith("https://")) {
-    return value
+  if (!avatar) {
+    return getDefaultAvatar(discordId)
   }
 
-  // Discord avatar hashes may arrive with a file extension already attached.
-  const hash = value.replace(/\.(gif|png|webp)$/i, "")
-  const extension = hash.startsWith("a_") ? "gif" : "png"
-  return `https://cdn.discordapp.com/avatars/${discordId}/${hash}.${extension}?size=128`
-}
+  if (
+    avatar.startsWith("http://") ||
+    avatar.startsWith("https://")
+  ) {
+    return avatar
+  }
 
-const getLogAvatar = (log: ActionLog) => {
-  const details = log.details ?? {}
-  const candidate =
-    log.avatar ??
-    details.avatar ??
-    details.avatarUrl ??
-    details.avatarURL ??
-    details.avatarHash ??
-    details.userAvatar ??
-    details.userAvatarUrl ??
-    details.authorAvatar ??
-    details.authorAvatarUrl
+  if (avatar.startsWith("a_")) {
+    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.gif?size=128`
+  }
 
-  return candidate == null ? null : String(candidate)
+  return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png?size=128`
 }
 
 const getActionIcon = (log: ActionLog) => {
@@ -504,12 +491,26 @@ function IdentityCard({
     void copyValue(value, labels[type] || "Details")
   }
 
+  const item = (type: string, label: string, disabled = false) => (
+    <DropdownMenuItem
+      disabled={disabled}
+      onSelect={(event) => {
+        event.preventDefault()
+        copy(type)
+      }}
+      className="gap-2 text-sm"
+    >
+      <Clipboard className="h-4 w-4 text-blue-400" />
+      {label}
+    </DropdownMenuItem>
+  )
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={`group flex min-w-0 items-center gap-2 rounded-md text-left transition-colors ${
+          className={`group flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-blue-500/5 ${
             compact ? "px-1 py-0.5" : "px-1.5 py-1"
           }`}
           onClick={(event) => event.stopPropagation()}
@@ -524,17 +525,8 @@ function IdentityCard({
                 src={avatarUrl}
                 alt={`${name || "Discord user"} profile picture`}
                 className="h-full w-full object-cover"
-                loading="eager"
+                loading="lazy"
                 referrerPolicy="no-referrer"
-                onError={(event) => {
-                  const image = event.currentTarget
-                  const fallback = userId ? getDefaultAvatar(userId) : undefined
-                  if (fallback && image.src !== fallback) {
-                    image.src = fallback
-                    return
-                  }
-                  image.style.display = "none"
-                }}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold">
@@ -557,129 +549,39 @@ function IdentityCard({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        side="bottom"
         align="start"
         sideOffset={4}
-        avoidCollisions={false}
-        className="z-[300] w-[285px] max-h-80 overflow-y-auto p-1"
+        className="z-[300] w-64"
         onClick={(event) => event.stopPropagation()}
       >
-        {([
-          ["discord", "Copy Discord ID"],
-          ["discord-mention", "Copy Discord Mention"],
-          ["name", "Copy Name"],
-          ["callsign", "Copy Callsign"],
-          ["badge", "Copy Badge Number"],
-          ["rank", "Copy Rank"],
-        ] as [string, string][]).map(([type, label]) => (
-          <DropdownMenuItem
-            key={type}
-            disabled={
-              (type === "discord" || type === "discord-mention") && !userId
-                ? true
-                : type === "callsign" && !callsign
-                  ? true
-                  : type === "badge" && !badgeNumber
-                    ? true
-                    : type === "rank" && !rank
-                      ? true
-                      : false
-            }
-            onSelect={(event) => {
-              event.preventDefault()
-              copy(type)
-            }}
-            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
-          >
-            <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-            <span>{label}</span>
-          </DropdownMenuItem>
-        ))}
+        <div className="px-2 py-1.5">
+          <p className="truncate text-sm font-semibold">{name || "Unknown User"}</p>
+          {username ? <p className="truncate text-xs text-muted-foreground">@{username}</p> : null}
+          {rank ? <p className="mt-0.5 text-[10px] text-blue-400">{rank}</p> : null}
+        </div>
 
-        <div className="my-0.5 h-px bg-border" />
-
-        {([
-          ["name-discord", "Name + Discord ID"],
-          ["callsign-discord", "Callsign + Discord ID"],
-          ["callsign-name", "Callsign + Name"],
-          ["callsign-badge", "Callsign + Badge Number"],
-          ["badge-name", "Badge Number + Name"],
-          ["badge-discord", "Badge Number + Discord ID"],
-        ] as [string, string][]).map(([type, label]) => (
-          <DropdownMenuItem
-            key={type}
-            disabled={
-              type === "name-discord"
-                ? !userId
-                : type === "callsign-discord"
-                  ? !callsign || !userId
-                  : type === "callsign-name"
-                    ? !callsign
-                    : type === "callsign-badge"
-                      ? !callsign || !badgeNumber
-                      : type === "badge-name"
-                        ? !badgeNumber
-                        : !badgeNumber || !userId
-            }
-            onSelect={(event) => {
-              event.preventDefault()
-              copy(type)
-            }}
-            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
-          >
-            <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-            <span>{label}</span>
-          </DropdownMenuItem>
-        ))}
-
-        <div className="my-0.5 h-px bg-border" />
-
-        {([
-          ["callsign-name-discord", "Callsign + Name + Discord"],
-          ["callsign-badge-discord", "Callsign + Badge + Discord"],
-          ["name-badge-discord", "Name + Badge + Discord"],
-          ["callsign-badge-name", "Callsign + Badge + Name"],
-          ["callsign-badge-name-discord", "Callsign + Badge + Name + Discord"],
-          ["name-rank-discord", "Name + Rank + Discord"],
-        ] as [string, string][]).map(([type, label]) => (
-          <DropdownMenuItem
-            key={type}
-            disabled={
-              type === "callsign-name-discord"
-                ? !callsign || !userId
-                : type === "callsign-badge-discord"
-                  ? !callsign || !badgeNumber || !userId
-                  : type === "name-badge-discord"
-                    ? !badgeNumber || !userId
-                    : type === "callsign-badge-name"
-                      ? !callsign || !badgeNumber
-                      : type === "callsign-badge-name-discord"
-                        ? !callsign || !badgeNumber || !userId
-                        : !rank || !userId
-            }
-            onSelect={(event) => {
-              event.preventDefault()
-              copy(type)
-            }}
-            className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
-          >
-            <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-            <span>{label}</span>
-          </DropdownMenuItem>
-        ))}
-
-        <div className="my-0.5 h-px bg-border" />
-
-        <DropdownMenuItem
-          onSelect={(event) => {
-            event.preventDefault()
-            copy("full")
-          }}
-          className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
-        >
-          <Copy className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-          <span>Copy Full Details</span>
-        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {item("discord", "Discord ID", !userId)}
+        {item("discord-mention", "Discord Mention", !userId)}
+        {item("name", "Name")}
+        {item("callsign", "Callsign", !callsign)}
+        {item("badge", "Badge Number", !badgeNumber)}
+        {item("rank", "Rank", !rank)}
+        <DropdownMenuSeparator />
+        {item("name-discord", "Name + Discord", !userId)}
+        {item("callsign-discord", "Callsign + Discord", !callsign || !userId)}
+        {item("callsign-name", "Callsign + Name", !callsign)}
+        {item("callsign-badge", "Callsign + Badge", !callsign || !badgeNumber)}
+        {item("badge-name", "Badge + Name", !badgeNumber)}
+        {item("badge-discord", "Badge + Discord", !badgeNumber || !userId)}
+        {item("callsign-name-discord", "Callsign + Name + Discord", !callsign || !userId)}
+        {item("callsign-badge-discord", "Callsign + Badge + Discord", !callsign || !badgeNumber || !userId)}
+        {item("name-badge-discord", "Name + Badge + Discord", !badgeNumber || !userId)}
+        {item("callsign-badge-name", "Callsign + Badge + Name", !callsign || !badgeNumber)}
+        {item("callsign-badge-name-discord", "Callsign + Badge + Name + Discord", !callsign || !badgeNumber || !userId)}
+        {item("name-rank-discord", "Name + Rank + Discord", !rank || !userId)}
+        <DropdownMenuSeparator />
+        {item("full", "Copy Full Details")}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -746,6 +648,24 @@ function TargetIdentity({ log }: { log: ActionLog }) {
     />
   )
 }
+
+function DetailItem({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+      <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </p>
+      <div className="min-w-0 text-xs">{children}</div>
+    </div>
+  )
+}
+
 
 function FilterDropdown({
   value,
@@ -1079,8 +999,8 @@ export default function PromotionLogs() {
     <DashboardLayout>
       <div className="flex min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
         {/* Header */}
-        <div className="flex shrink-0 flex-col gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mx-auto flex w-full max-w-[1360px] shrink-0 flex-col gap-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
                 {module === "promotion" ? (
@@ -1091,15 +1011,13 @@ export default function PromotionLogs() {
               </div>
 
               <div className="min-w-0">
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                  {module === "all" ? "All Logs" : module === "promotion" ? "Promotion Logs" : "Activity Logs"}
+                <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+                  {module === "promotion" ? "Promotion Logs" : "Activity Logs"}
                 </h1>
-                <p className="text-sm text-muted-foreground">
-                  {module === "all"
-                    ? "View promotion and activity management audit history and changes."
-                    : module === "promotion"
-                      ? "View promotion management audit history and changes."
-                      : "View activity management audit history and changes."}
+                <p className="mt-0.5 text-sm leading-5 text-muted-foreground">
+                  {module === "promotion"
+                    ? "View promotion management audit history and changes."
+                    : "View activity management audit history and changes."}
                 </p>
               </div>
             </div>
@@ -1113,55 +1031,58 @@ export default function PromotionLogs() {
               disabled={loading}
             >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Refresh
+              <span>Refresh</span>
             </Button>
           </div>
 
           {/* Log module tabs */}
-          <div className="mx-auto flex w-full max-w-[1100px] flex-wrap items-center gap-2">
-            {([
-              ["all", "All"],
-              ["promotion", "Promotion Logs"],
-              ["activity", "Activity Logs"],
-            ] as const).map(([value, label]) => {
-              const active = module === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => {
-                    if (module === value) return
-                    setModule(value)
-                    setPage(1)
-                    setExpanded(null)
-                    setSearch("")
-                    setCategory("")
-                    setDivision("")
-                    setUserId("")
-                    setAction("")
-                  }}
-                  className={`inline-flex h-9 items-center rounded-md border px-3 text-xs font-medium transition-colors ${
-                    active
-                      ? "border-blue-500/60 bg-blue-500/10 text-blue-400"
-                      : "border-border bg-card text-muted-foreground hover:border-blue-500/30 hover:bg-blue-500/5 hover:text-foreground"
-                  }`}
-                >
-                  {label}
-                </button>
-              )
-            })}
+          <div className="flex w-fit items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (module === "promotion") return
+                setModule("promotion")
+                setPage(1)
+                setExpanded(null)
+                setSearch("")
+                setCategory("")
+                setDivision("")
+                setUserId("")
+                setAction("")
+              }}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${module === "promotion" ? "bg-blue-500/10 text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Promotion Logs
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (module === "activity") return
+                setModule("activity")
+                setPage(1)
+                setExpanded(null)
+                setSearch("")
+                setCategory("")
+                setDivision("")
+                setUserId("")
+                setAction("")
+              }}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${module === "activity" ? "bg-blue-500/10 text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Activity Logs
+            </button>
           </div>
 
           {/* Filters */}
-          <div className="mx-auto w-full max-w-[1100px]">
-            <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_190px_190px_190px]">
+          <div className="w-full">
+            <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-[minmax(280px,1fr)_190px_190px_190px_auto]">
               <div className="relative min-w-0">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(event) => changeFilter(setSearch, event.target.value)}
                   placeholder="Search users, actions, IDs, targets..."
-                  className="h-10 w-full border-border bg-card pl-9 text-[12px]"
+                  className="h-9 w-full border-border bg-card pl-9 text-[12px]"
                 />
               </div>
 
@@ -1254,7 +1175,7 @@ export default function PromotionLogs() {
               </div>
 
               <p className="text-sm font-medium">
-                No {module === "all" ? "" : module === "promotion" ? "promotion" : "activity"} action logs found
+                No {module === "promotion" ? "promotion" : "activity"} action logs found
               </p>
 
               <p className="mt-1 text-xs text-muted-foreground">
@@ -1386,7 +1307,7 @@ export default function PromotionLogs() {
                                     rank={log.rank}
                                     callsign={log.callsign}
                                     badgeNumber={log.badgeNumber}
-                                    avatar={getLogAvatar(log)}
+                                    avatar={log.avatar}
                                     compact
                                   />
 
@@ -1443,6 +1364,14 @@ export default function PromotionLogs() {
                               </div>
                             </div>
 
+                            {/* Summary */}
+                            {log.summary ? (
+                              <div className="border-t border-border/60 px-3 pb-3 pt-2 sm:pl-[68px] sm:pr-3">
+                                <p className="line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+                                  {log.summary}
+                                </p>
+                              </div>
+                            ) : null}
                           </div>
 
                           {/* Expanded details */}
@@ -1463,221 +1392,129 @@ export default function PromotionLogs() {
                                 </span>
                               </div>
 
-                              <div className="divide-y divide-border border-y border-border">
-                                <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
-                                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                                    Summary
-                                  </span>
-                                  <p className="text-xs leading-5">
-                                    {log.summary || "No summary available."}
-                                  </p>
-                                </div>
+                              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                <DetailItem label="Changed By">
+                                  <IdentityCard
+                                    name={actorName}
+                                    username={log.username}
+                                    userId={log.userId}
+                                    rank={log.rank}
+                                    callsign={
+                                      log.callsign
+                                    }
+                                    badgeNumber={
+                                      log.badgeNumber
+                                    }
+                                    avatar={log.avatar}
+                                  />
+                                </DetailItem>
 
-                                <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
-                                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                                    Action
-                                  </span>
+                                <DetailItem label="Action">
                                   <div className="grid gap-1 text-xs">
                                     <span>
                                       <b>Action:</b>{" "}
-                                      {actionLabel(log.action)}
+                                      {actionLabel(
+                                        log.action,
+                                      )}
                                     </span>
                                     <span>
                                       <b>Category:</b>{" "}
-                                      {categoryLabel(log.category)}
+                                      {categoryLabel(
+                                        log.category,
+                                      )}
                                     </span>
                                     <span>
                                       <b>Division:</b>{" "}
-                                      {divisionLabel(log.division)}
+                                      {divisionLabel(
+                                        log.division,
+                                      )}
                                     </span>
                                     <span className="truncate">
                                       <b>Page:</b>{" "}
                                       {log.path || "—"}
                                     </span>
                                   </div>
-                                </div>
+                                </DetailItem>
 
-                                {log.targetName || log.targetUserId ? (
-                                  <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                                      Changed
-                                    </span>
-                                    <div className="min-w-0">
-                                      <TargetIdentity log={log} />
+                                <DetailItem label="Changed">
+                                  <TargetIdentity log={log} />
 
-                                      {log.targetRank ? (
-                                        <p className="mt-1 text-[10px] text-muted-foreground">
-                                          Rank:{" "}
-                                          <span className="text-foreground">
-                                            {log.targetRank}
-                                          </span>
-                                        </p>
-                                      ) : null}
+                                  {log.targetRank ? (
+                                    <p className="mt-1 text-[10px] text-muted-foreground">
+                                      Rank:{" "}
+                                      <span className="text-foreground">
+                                        {log.targetRank}
+                                      </span>
+                                    </p>
+                                  ) : null}
 
-                                      {log.targetUserId ? (
-                                        <p className="mt-1 truncate font-mono text-[9px] text-blue-400/70">
-                                          {log.targetUserId}
-                                        </p>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                ) : null}
+                                  {log.targetUserId ? (
+                                    <p className="mt-1 truncate font-mono text-[9px] text-blue-400/70">
+                                      {log.targetUserId}
+                                    </p>
+                                  ) : null}
+                                </DetailItem>
 
-                                {log.details &&
-                                Object.keys(log.details).length > 0 ? (
-                                  <>
-                                    {Object.entries(log.details).map(
-                                      ([key, value]) => {
-                                        const normalized = key
-                                          .toLowerCase()
-                                          .replace(/[^a-z0-9]/g, "")
-
-                                        const isCode =
-                                          normalized === "code" ||
-                                          normalized === "oldcode" ||
-                                          normalized === "newcode"
-
-                                        if (
-                                          normalized === "oldcode" ||
-                                          normalized === "newcode"
-                                        ) {
-                                          return null
-                                        }
-
-                                        const oldCode = Object.entries(
-                                          log.details ?? {},
-                                        ).find(
-                                          ([detailKey]) =>
-                                            detailKey
-                                              .toLowerCase()
-                                              .replace(/[^a-z0-9]/g, "") ===
-                                            "oldcode",
-                                        )?.[1]
-
-                                        const newCode = Object.entries(
-                                          log.details ?? {},
-                                        ).find(
-                                          ([detailKey]) =>
-                                            detailKey
-                                              .toLowerCase()
-                                              .replace(/[^a-z0-9]/g, "") ===
-                                            "newcode",
-                                        )?.[1]
-
-                                        return (
-                                          <div
-                                            key={key}
-                                            className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]"
-                                          >
-                                            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                                              {actionLabel(key)}
-                                            </span>
-                                            <div className="min-w-0 text-xs">
-                                              {isCode &&
-                                              (oldCode !== undefined ||
-                                                newCode !== undefined) ? (
-                                                <div className="flex flex-wrap items-center gap-2 font-mono">
-                                                  <span className="text-red-400 line-through">
-                                                    {formatDetailValue(oldCode)}
-                                                  </span>
-                                                  <span className="text-muted-foreground">
-                                                    →
-                                                  </span>
-                                                  <span className="text-emerald-400">
-                                                    {formatDetailValue(newCode)}
-                                                  </span>
-                                                </div>
-                                              ) : (
-                                                <pre className="whitespace-pre-wrap break-words font-mono text-[10px] leading-4">
-                                                  {formatDetailValue(value)}
-                                                </pre>
-                                              )}
-                                            </div>
-                                          </div>
-                                        )
-                                      },
+                                <DetailItem label="Recorded">
+                                  <p className="font-medium">
+                                    {formatDateTime(
+                                      log.createdAt,
                                     )}
+                                  </p>
 
-                                    {(Object.keys(log.details).some(
-                                      (key) =>
-                                        key
-                                          .toLowerCase()
-                                          .replace(/[^a-z0-9]/g, "") ===
-                                        "oldcode",
-                                    ) ||
-                                      Object.keys(log.details).some(
-                                        (key) =>
-                                          key
-                                            .toLowerCase()
-                                            .replace(/[^a-z0-9]/g, "") ===
-                                          "newcode",
-                                      )) ? (
-                                      <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
-                                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                                          Code
-                                        </span>
-                                        <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                                          <span className="text-red-400 line-through">
-                                            {formatDetailValue(
-                                              Object.entries(log.details).find(
-                                                ([key]) =>
-                                                  key
-                                                    .toLowerCase()
-                                                    .replace(/[^a-z0-9]/g, "") ===
-                                                  "oldcode",
-                                              )?.[1],
-                                            )}
-                                          </span>
-                                          <span className="text-muted-foreground">
-                                            →
-                                          </span>
-                                          <span className="text-emerald-400">
-                                            {formatDetailValue(
-                                              Object.entries(log.details).find(
-                                                ([key]) =>
-                                                  key
-                                                    .toLowerCase()
-                                                    .replace(/[^a-z0-9]/g, "") ===
-                                                  "newcode",
-                                              )?.[1],
-                                            )}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    ) : null}
-                                  </>
-                                ) : null}
-
-                                <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
-                                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                                    Changed By
-                                  </span>
-                                  <IdentityCard
-                                    name={actorName}
-                                    username={log.username}
-                                    userId={log.userId}
-                                    rank={log.rank}
-                                    callsign={log.callsign}
-                                    badgeNumber={log.badgeNumber}
-                                    avatar={getLogAvatar(log)}
-                                    compact
-                                  />
-                                </div>
-
-                                <div className="grid gap-1 px-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)]">
-                                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                                    Recorded
-                                  </span>
-                                  <div>
-                                    <p className="text-xs font-medium">
-                                      {formatDateTime(log.createdAt)}
-                                    </p>
+                                  {log.entryNumber ? (
                                     <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                                      Entry #{entryNumber}
+                                      Entry #{log.entryNumber}
                                     </p>
+                                  ) : null}
+                                </DetailItem>
+                              </div>
+
+                              <div className="mt-2 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+                                <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                  Summary
+                                </p>
+
+                                <p className="text-xs leading-5">
+                                  {log.summary ||
+                                    "No summary available."}
+                                </p>
+                              </div>
+
+                              {log.details &&
+                              Object.keys(log.details)
+                                .length > 0 ? (
+                                <div className="mt-2 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+                                  <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                    Additional Details
+                                  </p>
+
+                                  <div className="grid max-h-64 gap-2 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
+                                    {Object.entries(
+                                      log.details,
+                                    ).map(
+                                      ([key, value]) => (
+                                        <div
+                                          key={key}
+                                          className="min-w-0 rounded-md border border-border bg-muted/10 px-2.5 py-2"
+                                        >
+                                          <p className="truncate text-[10px] font-medium text-muted-foreground">
+                                            {actionLabel(
+                                              key,
+                                            )}
+                                          </p>
+
+                                          <pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4">
+                                            {formatDetailValue(
+                                              value,
+                                            )}
+                                          </pre>
+                                        </div>
+                                      ),
+                                    )}
                                   </div>
                                 </div>
-                              </div>
+                              ) : null}
 
                               {log.path ? (
                                 <p className="mt-2 break-all border-t border-border pt-2 text-[10px] text-muted-foreground">
