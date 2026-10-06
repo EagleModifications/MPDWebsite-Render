@@ -43,16 +43,6 @@ const navItems: NavItem[] = [
     permission: "gallery",
   },
   {
-    name: "Wheel",
-    href: "/wheel",
-    public: true,
-  },
-  {
-    name: "Download",
-    href: "/download",
-    public: true,
-  },
-  {
     name: "Dashboard",
     href: "/dashboard",
     permission: [
@@ -60,6 +50,11 @@ const navItems: NavItem[] = [
       "activitymanagement",
       "promotionmanagement",
     ],
+  },
+  {
+    name: "Download",
+    href: "/download",
+    public: true,
   },
 ]
 
@@ -276,6 +271,20 @@ export default function Navbar() {
     setRostersOpen(false)
   }
 
+  const mainNavItems = visibleItems.filter(
+    (item) =>
+      item.name !== "Dashboard" &&
+      item.name !== "Download",
+  )
+
+  const dashboardItem = visibleItems.find(
+    (item) => item.name === "Dashboard",
+  )
+
+  const downloadItem = visibleItems.find(
+    (item) => item.name === "Download",
+  )
+
   return (
     <header className="absolute left-0 top-0 z-50 w-full">
       <div className="mx-auto grid h-20 max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-6 lg:px-8">
@@ -301,24 +310,24 @@ export default function Navbar() {
 
         {/* Desktop Navigation */}
         <nav className="hidden items-center justify-center gap-1 md:flex">
-          {visibleItems
-            .filter((item) => item.name !== "Dashboard")
-            .map((item) => (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                className={({ isActive }) =>
-                  [
-                    "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  ].join(" ")
-                }
-              >
-                {item.name}
-              </NavLink>
-            ))}
+
+          {/* Main Navigation */}
+          {mainNavItems.map((item) => (
+            <NavLink
+              key={item.href}
+              to={item.href}
+              className={({ isActive }) =>
+                [
+                  "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")
+              }
+            >
+              {item.name}
+            </NavLink>
+          ))}
 
           {/* Documents */}
           {hasDocuments && (
@@ -480,24 +489,38 @@ export default function Navbar() {
           )}
 
           {/* Dashboard */}
-          {visibleItems
-            .filter((item) => item.name === "Dashboard")
-            .map((item) => (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                className={({ isActive }) =>
-                  [
-                    "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  ].join(" ")
-                }
-              >
-                {item.name}
-              </NavLink>
-            ))}
+          {dashboardItem && (
+            <NavLink
+              to={dashboardItem.href}
+              className={({ isActive }) =>
+                [
+                  "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")
+              }
+            >
+              {dashboardItem.name}
+            </NavLink>
+          )}
+
+          {/* Download */}
+          {downloadItem && (
+            <NavLink
+              to={downloadItem.href}
+              className={({ isActive }) =>
+                [
+                  "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")
+              }
+            >
+              {downloadItem.name}
+            </NavLink>
+          )}
         </nav>
 
         {/* Desktop Actions */}
@@ -559,7 +582,7 @@ export default function Navbar() {
           <nav className="mx-auto flex max-w-[1600px] flex-col gap-1">
 
             {/* Main Mobile Navigation */}
-            {visibleItems.map((item) => (
+            {mainNavItems.map((item) => (
               <NavLink
                 key={item.href}
                 to={item.href}
@@ -576,6 +599,42 @@ export default function Navbar() {
                 {item.name}
               </NavLink>
             ))}
+
+            {/* Mobile Dashboard */}
+            {dashboardItem && (
+              <NavLink
+                to={dashboardItem.href}
+                onClick={closeMobileMenu}
+                className={({ isActive }) =>
+                  [
+                    "rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                    isActive
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  ].join(" ")
+                }
+              >
+                {dashboardItem.name}
+              </NavLink>
+            )}
+
+            {/* Mobile Download */}
+            {downloadItem && (
+              <NavLink
+                to={downloadItem.href}
+                onClick={closeMobileMenu}
+                className={({ isActive }) =>
+                  [
+                    "rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                    isActive
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  ].join(" ")
+                }
+              >
+                {downloadItem.name}
+              </NavLink>
+            )}
 
             {/* Mobile Documents */}
             {hasDocuments && (
@@ -706,7 +765,7 @@ export default function Navbar() {
                           "block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
                           supervisorActive
                             ? "bg-foreground/10 text-foreground"
-                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                            : "text-muted-foreground hover:text-foreground",
                         ].join(" ")}
                       >
                         Supervisor
@@ -722,7 +781,7 @@ export default function Navbar() {
                           "block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
                           commandActive
                             ? "bg-foreground/10 text-foreground"
-                            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                            : "text-muted-foreground hover:text-foreground",
                         ].join(" ")}
                       >
                         Command
