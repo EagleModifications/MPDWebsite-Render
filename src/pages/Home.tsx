@@ -694,6 +694,27 @@ function formatEventDate(date: string) {
   })
 }
 
+function normalizeGalleryMediaUrl(url: string) {
+  const value = url.trim()
+
+  if (!value) return ""
+
+  // Gallery uploads are served by this app. If the API returned an
+  // absolute URL from another configured origin, keep the request on
+  // the current site so Home works on localhost, Render, and custom domains.
+  try {
+    const parsed = new URL(value, window.location.origin)
+
+    if (parsed.pathname.startsWith("/api/gallery/")) {
+      return `${parsed.pathname}${parsed.search}`
+    }
+
+    return parsed.href
+  } catch {
+    return value
+  }
+}
+
 function getGalleryPreview(item: GalleryItem) {
   const media = item.media?.[0]
 
@@ -701,11 +722,20 @@ function getGalleryPreview(item: GalleryItem) {
     return null
   }
 
-  if (media.type === "image") {
-    return media.url || media.thumbnailUrl || null
+  const candidates =
+    media.type === "image"
+      ? [media.url, media.thumbnailUrl]
+      : [media.thumbnailUrl, media.url]
+
+  for (const candidate of candidates) {
+    const normalized = candidate
+      ? normalizeGalleryMediaUrl(candidate)
+      : ""
+
+    if (normalized) return normalized
   }
 
-  return media.thumbnailUrl || media.url || null
+  return null
 }
 
 /**
@@ -1308,7 +1338,7 @@ export default function Home() {
                     galleryCategory === "All" ||
                     item.category === galleryCategory,
                 )
-                .slice(0, 6)
+                .slice(0, 8)
                 .map((item) => {
                 const preview =
                   getGalleryPreview(item)
@@ -1336,6 +1366,19 @@ export default function Home() {
                           <img
                             src={preview}
                             alt={item.title}
+                            onError={(event) => {
+                              const image = event.currentTarget
+                              const fallback = item.media?.[0]?.thumbnailUrl
+                                ? normalizeGalleryMediaUrl(item.media[0].thumbnailUrl)
+                                : ""
+
+                              if (fallback && image.src !== fallback) {
+                                image.src = fallback
+                                return
+                              }
+
+                              image.style.display = "none"
+                            }}
                             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
                         )
