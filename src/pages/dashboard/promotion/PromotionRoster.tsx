@@ -1493,7 +1493,7 @@ export default function PromotionRoster() {
                 variant="ghost"
                 size="sm"
                 onClick={clearSearch}
-                className="shrink-0 gap-2 bg-transparent text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                className="shrink-0 inline-flex h-7 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-sm font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0 active:bg-transparent"
               >
                 <X className="h-4 w-4" />
                 Clear Search
