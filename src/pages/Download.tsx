@@ -19,8 +19,6 @@ import Footer from "@/components/Footer"
 const GITHUB_RELEASES_API =
   "https://api.github.com/repos/EagleModifications/MPDWebsite-Render/releases"
 
-const GITHUB_RELEASE =
-  "https://github.com/EagleModifications/MPDWebsite-Render/releases"
 
 type ReleaseAsset = {
   id: number
@@ -211,6 +209,152 @@ function ReleaseAssetButton({
   )
 }
 
+
+function ReleaseNotes({ body }: { body: string | null }) {
+  const source = body?.trim()
+
+  if (!source) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No release description was provided for this release.
+      </p>
+    )
+  }
+
+  const lines = source.split(/\r?\n/)
+  const blocks: React.ReactNode[] = []
+  let listItems: string[] = []
+  let listType: "ul" | "ol" | null = null
+
+  const flushList = () => {
+    if (!listType || listItems.length === 0) return
+
+    const items = listItems.map((item, index) => (
+      <li key={`${item}-${index}`}>{renderInlineMarkdown(item)}</li>
+    ))
+
+    blocks.push(
+      listType === "ol" ? (
+        <ol key={`ol-${blocks.length}`} className="my-3 list-decimal space-y-1 pl-6">
+          {items}
+        </ol>
+      ) : (
+        <ul key={`ul-${blocks.length}`} className="my-3 list-disc space-y-1 pl-6">
+          {items}
+        </ul>
+      ),
+    )
+
+    listItems = []
+    listType = null
+  }
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim()
+
+    if (!trimmed) {
+      flushList()
+      return
+    }
+
+    const heading = trimmed.match(/^(#{1,6})\s+(.+)$/)
+    if (heading) {
+      flushList()
+      const level = heading[1].length
+      const className =
+        level === 1
+          ? "mt-6 border-b border-border/70 pb-2 text-2xl font-bold"
+          : level === 2
+            ? "mt-6 border-b border-border/70 pb-2 text-xl font-bold"
+            : level === 3
+              ? "mt-5 text-lg font-bold"
+              : "mt-4 text-base font-bold"
+
+      blocks.push(
+        <div key={`heading-${index}`} className={className}>
+          {renderInlineMarkdown(heading[2])}
+        </div>,
+      )
+      return
+    }
+
+    if (/^([-*_])(?:\s*\1){2,}$/.test(trimmed)) {
+      flushList()
+      blocks.push(<hr key={`hr-${index}`} className="my-5 border-border/70" />)
+      return
+    }
+
+    const unordered = trimmed.match(/^[-*+]\s+(.+)$/)
+    if (unordered) {
+      if (listType !== "ul") {
+        flushList()
+        listType = "ul"
+      }
+      listItems.push(unordered[1])
+      return
+    }
+
+    const ordered = trimmed.match(/^\d+\.\s+(.+)$/)
+    if (ordered) {
+      if (listType !== "ol") {
+        flushList()
+        listType = "ol"
+      }
+      listItems.push(ordered[1])
+      return
+    }
+
+    flushList()
+    blocks.push(
+      <p key={`paragraph-${index}`} className="my-3 leading-7">
+        {renderInlineMarkdown(trimmed)}
+      </p>,
+    )
+  })
+
+  flushList()
+  return <div className="text-sm text-foreground/85">{blocks}</div>
+}
+
+function renderInlineMarkdown(value: string): React.ReactNode {
+  const parts = value.split(/(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g)
+
+  return parts.map((part, index) => {
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code key={index} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em]">
+          {part.slice(1, -1)}
+        </code>
+      )
+    }
+
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={index} className="font-semibold text-foreground">
+          {part.slice(2, -2)}
+        </strong>
+      )
+    }
+
+    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+    if (link) {
+      return (
+        <a
+          key={index}
+          href={link[2]}
+          target="_blank"
+          rel="noreferrer"
+          className="text-blue-400 underline underline-offset-2 hover:text-blue-300"
+        >
+          {link[1]}
+        </a>
+      )
+    }
+
+    return <span key={index}>{part}</span>
+  })
+}
+
 function ReleaseModal({
   release,
   onClose,
@@ -232,6 +376,7 @@ function ReleaseModal({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault()
         onClose()
       }
     }
@@ -309,14 +454,8 @@ function ReleaseModal({
               Release notes
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-background/60 p-4 text-sm leading-6 text-muted-foreground">
-              {release.body?.trim() ? (
-                <div className="whitespace-pre-wrap break-words">
-                  {release.body.trim()}
-                </div>
-              ) : (
-                <p>No release description was provided for this release.</p>
-              )}
+            <div className="rounded-xl border border-border/70 bg-background/60 p-4 sm:p-5">
+              <ReleaseNotes body={release.body} />
             </div>
           </section>
 
@@ -375,20 +514,10 @@ function ReleaseModal({
           </section>
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-border/70 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="border-t border-border/70 px-5 py-3 sm:px-6">
           <span className="text-xs text-muted-foreground">
             {release.tag_name} • Metro Police Department Desktop
           </span>
-
-          <a
-            href={release.html_url || GITHUB_RELEASE}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border/70 px-3 text-xs font-semibold transition-colors hover:bg-muted/50"
-          >
-            Open on GitHub
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
         </div>
       </div>
     </div>
@@ -628,14 +757,17 @@ export default function Download() {
                         <ReleaseAssetButton
                           release={latestRelease}
                           platform="windows"
+                          compact
                         />
                         <ReleaseAssetButton
                           release={latestRelease}
                           platform="macos"
+                          compact
                         />
                         <ReleaseAssetButton
                           release={latestRelease}
                           platform="linux"
+                          compact
                         />
                       </div>
                     </div>
@@ -686,7 +818,16 @@ export default function Download() {
                     {previousReleases.map((release) => (
                       <div
                         key={release.id}
-                        className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedRelease(release)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault()
+                            setSelectedRelease(release)
+                          }
+                        }}
+                        className="group cursor-pointer overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur transition-colors hover:border-blue-500/30 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                       >
                         <div className="flex flex-col gap-3 px-4 py-4 sm:px-5">
                           <div className="flex min-w-0 items-start justify-between gap-4">
@@ -701,7 +842,7 @@ export default function Download() {
                                     `MPD Desktop ${release.tag_name}`}
                                 </h3>
 
-                                <span className="rounded-full border border-border/70 bg-muted/30 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400">
                                   {release.tag_name}
                                 </span>
                               </div>
@@ -722,21 +863,36 @@ export default function Download() {
                           </div>
 
                           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                            <ReleaseAssetButton
-                              release={release}
-                              platform="windows"
-                              compact
-                            />
-                            <ReleaseAssetButton
-                              release={release}
-                              platform="macos"
-                              compact
-                            />
-                            <ReleaseAssetButton
-                              release={release}
-                              platform="linux"
-                              compact
-                            />
+                            <div
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <ReleaseAssetButton
+                                release={release}
+                                platform="windows"
+                                compact
+                              />
+                            </div>
+                            <div
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <ReleaseAssetButton
+                                release={release}
+                                platform="macos"
+                                compact
+                              />
+                            </div>
+                            <div
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <ReleaseAssetButton
+                                release={release}
+                                platform="linux"
+                                compact
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
