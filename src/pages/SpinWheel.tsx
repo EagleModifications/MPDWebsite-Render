@@ -1,291 +1,177 @@
-import { useCallback, useMemo, useState } from "react";
-import { Wheel } from "@/components/spinwheel/Wheel";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Settings2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Wheel, type WheelHandle } from "@/components/spinwheel/Wheel";
 import { WheelSidebar } from "@/components/spinwheel/WheelSidebar";
 import { WinnerDialog } from "@/components/spinwheel/WinnerDialog";
-import "@/components/spinwheel/spinwheel.css";
+import type { WheelEntry } from "@/components/spinwheel/types";
 
-export type WheelEntry = {
-  id: string;
-  text: string;
-  color?: string;
-};
-
-export type WheelConfig = {
-  entries: WheelEntry[];
-  spinTime: number;
-  duringSpinSound: boolean;
-  duringSpinSoundVolume: number;
-  afterSpinSound: string;
-  afterSpinSoundVolume: number;
-  drawShadow: boolean;
-  drawOutlines: boolean;
-  pointerChangesColor: boolean;
-  allowDuplicates: boolean;
-  autoRemoveWinner: boolean;
-  showTitle: boolean;
-  title: string;
-};
-
-const DEFAULT_COLORS = [
-  "#5DADE2",
-  "#82E0AA",
-  "#F7DC6F",
-  "#AF7AC5",
+const COLORS = [
+  "#f44336",
+  "#ff9800",
+  "#ffca28",
+  "#66bb6a",
+  "#26a69a",
+  "#42a5f5",
+  "#5c6bc0",
+  "#ab47bc",
+  "#ec407a",
+  "#78909c",
 ];
 
-const createEntry = (text: string, index: number): WheelEntry => ({
-  id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
-  text,
-  color: DEFAULT_COLORS[index % DEFAULT_COLORS.length],
-});
+const DEFAULT_ENTRIES = [
+  "Alice",
+  "Bob",
+  "Charlie",
+  "David",
+  "Emma",
+  "Frank",
+  "Grace",
+  "Harry",
+];
 
-const createDefaultConfig = (): WheelConfig => ({
-  entries: [
-    "Ali",
-    "Beatriz",
-    "Charles",
-    "Diya",
-    "Eric",
-    "Fatima",
-    "Gabriel",
-    "Hanna",
-  ].map((text, index) => createEntry(text, index)),
-
-  spinTime: 10,
-
-  duringSpinSound: true,
-  duringSpinSoundVolume: 50,
-
-  afterSpinSound: "applause-sound-soft",
-  afterSpinSoundVolume: 50,
-
-  drawShadow: true,
-  drawOutlines: false,
-  pointerChangesColor: true,
-
-  allowDuplicates: true,
-  autoRemoveWinner: false,
-
-  showTitle: true,
-  title: "",
-});
+function makeEntries(text: string): WheelEntry[] {
+  return text
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((text, index) => ({
+      id: `${Date.now()}-${index}-${Math.random()}`,
+      text,
+      color: COLORS[index % COLORS.length],
+    }));
+}
 
 export default function SpinWheel() {
-  const [wheels, setWheels] = useState<WheelConfig[]>([
-    createDefaultConfig(),
-  ]);
-
-  const [activeWheel, setActiveWheel] = useState(0);
-
-  const [tab, setTab] = useState<"entries" | "results">("entries");
-
+  const [entriesText, setEntriesText] = useState(DEFAULT_ENTRIES.join("\n"));
   const [results, setResults] = useState<string[]>([]);
+  const [winner, setWinner] = useState("");
+  const [winnerOpen, setWinnerOpen] = useState(false);
+  const [spinning, setSpinning] = useState(false);
 
-  const [winner, setWinner] = useState<string | null>(null);
+  const wheelRef = useRef<WheelHandle>(null);
 
-  const [muted, setMuted] = useState(false);
-
-  const config = wheels[activeWheel] ?? createDefaultConfig();
-
-  const updateConfig = useCallback(
-    (patch: Partial<WheelConfig>) => {
-      setWheels((current) =>
-        current.map((wheel, index) =>
-          index === activeWheel
-            ? {
-                ...wheel,
-                ...patch,
-              }
-            : wheel,
-        ),
-      );
-    },
-    [activeWheel],
+  const entries = useMemo(
+    () => makeEntries(entriesText),
+    [entriesText],
   );
 
-  const updateEntries = useCallback(
-    (value: string) => {
-      const entries = value
-        .split(/\r?\n/)
-        .map((text, index) => createEntry(text.trim(), index))
-        .filter((entry) => entry.text.length > 0)
-        .slice(0, 1000);
+  const spin = useCallback(() => {
+    if (spinning || entries.length === 0) return;
+    setSpinning(true);
+    wheelRef.current?.spin();
+  }, [entries.length, spinning]);
 
-      updateConfig({
-        entries,
-      });
-    },
-    [updateConfig],
-  );
-
-  const addWheel = useCallback(() => {
-    setWheels((current) => {
-      const newWheel: WheelConfig = {
-        ...createDefaultConfig(),
-
-        entries: [
-          createEntry(" ", 0),
-        ],
-
-        title: `Wheel ${current.length + 1}`,
-      };
-
-      return [...current, newWheel];
-    });
-
-    setActiveWheel((current) => current + 1);
+  const handleWinner = useCallback((entry: WheelEntry) => {
+    setSpinning(false);
+    setWinner(entry.text);
+    setResults((current) => [entry.text, ...current]);
+    setWinnerOpen(true);
   }, []);
-
-  const removeWheel = useCallback(
-    (index: number) => {
-      if (wheels.length <= 1) {
-        return;
-      }
-
-      setWheels((current) =>
-        current.filter((_, wheelIndex) => wheelIndex !== index),
-      );
-
-      setActiveWheel((current) =>
-        Math.max(
-          0,
-          Math.min(
-            current,
-            wheels.length - 2,
-          ),
-        ),
-      );
-    },
-    [wheels.length],
-  );
 
   const shuffle = useCallback(() => {
-    const shuffledEntries = [...config.entries].sort(
-      () => Math.random() - 0.5,
-    );
+    const lines = entriesText.split(/\r?\n/).filter((line) => line.trim());
+    for (let i = lines.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [lines[i], lines[j]] = [lines[j], lines[i]];
+    }
+    setEntriesText(lines.join("\n"));
+  }, [entriesText]);
 
-    updateConfig({
-      entries: shuffledEntries,
-    });
-  }, [config.entries, updateConfig]);
+  const sort = useCallback(() => {
+    const lines = entriesText
+      .split(/\r?\n/)
+      .filter((line) => line.trim())
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 
-  const sortEntries = useCallback(() => {
-    const sortedEntries = [...config.entries].sort(
-      (a, b) => a.text.localeCompare(b.text),
-    );
+    setEntriesText(lines.join("\n"));
+  }, [entriesText]);
 
-    updateConfig({
-      entries: sortedEntries,
-    });
-  }, [config.entries, updateConfig]);
+  const clear = useCallback(() => {
+    setEntriesText("");
+  }, []);
 
-  const handleWinner = useCallback(
-    (entry: WheelEntry) => {
-      setResults((current) => [
-        entry.text,
-        ...current,
-      ]);
+  const removeWinner = useCallback(() => {
+    if (!winner) return;
 
-      setWinner(entry.text);
+    const lines = entriesText.split(/\r?\n/);
+    const index = lines.findIndex((line) => line.trim() === winner.trim());
 
-      if (config.autoRemoveWinner) {
-        updateConfig({
-          entries: config.entries.filter(
-            (item) => item.id !== entry.id,
-          ),
-        });
+    if (index !== -1) {
+      lines.splice(index, 1);
+      setEntriesText(lines.join("\n"));
+    }
+
+    setWinnerOpen(false);
+  }, [entriesText, winner]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.ctrlKey &&
+        event.key === "Enter" &&
+        !event.repeat &&
+        !spinning
+      ) {
+        event.preventDefault();
+        spin();
       }
-    },
-    [config, updateConfig],
-  );
+    };
 
-  const entriesText = useMemo(
-    () =>
-      config.entries
-        .map((entry) => entry.text)
-        .join("\n"),
-    [config.entries],
-  );
-
-  const handleMute = useCallback(() => {
-    setMuted((current) => !current);
-  }, []);
-
-  const handleCloseWinner = useCallback(() => {
-    setWinner(null);
-  }, []);
-
-  const handleClearResults = useCallback(() => {
-    setResults([]);
-  }, []);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [spin, spinning]);
 
   return (
-    <div className="spin-wheel-page">
-      <main className="spin-wheel-layout">
-        <section className="spin-wheel-stage">
-          {config.showTitle && config.title && (
-            <h1 className="spin-wheel-title">
-              {config.title}
-            </h1>
-          )}
+    <div className="flex h-screen min-h-[620px] w-full flex-col overflow-hidden bg-[#f5f5f5] text-[#333]">
+      <header className="flex min-h-14 shrink-0 items-center justify-between border-b bg-white px-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#5dade2] text-lg font-bold text-white">
+            W
+          </div>
+          <span className="text-lg font-semibold tracking-tight">
+            Wheel of Names
+          </span>
+        </div>
 
-          <div className="spin-wheel-canvas-wrap">
-            <Wheel
-              config={config}
-              muted={muted}
-              onWinner={handleWinner}
-              onMute={handleMute}
-            />
+        <Button variant="ghost" size="sm">
+          <Settings2 className="mr-2 h-4 w-4" />
+          Customize
+        </Button>
+      </header>
+
+      <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <section className="relative min-h-0 flex-1 overflow-hidden bg-[#f5f5f5]">
+          <div className="absolute left-4 top-4 z-20 hidden rounded-md bg-white/90 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur md:block">
+            Click SPIN or press Ctrl + Enter
           </div>
 
-          {wheels.length > 1 && (
-            <div className="spin-wheel-bottom-controls">
-              {wheels.map((_, index) => (
-                <button
-                  key={`wheel-${index}`}
-                  type="button"
-                  className={
-                    index === activeWheel
-                      ? "wheel-dot active"
-                      : "wheel-dot"
-                  }
-                  onClick={() => setActiveWheel(index)}
-                  aria-label={`Select wheel ${index + 1}`}
-                  aria-current={
-                    index === activeWheel
-                      ? "true"
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
-          )}
+          <Wheel
+            ref={wheelRef}
+            entries={entries}
+            spinning={spinning}
+            onSpinStart={() => setSpinning(true)}
+            onWinner={handleWinner}
+          />
         </section>
 
         <WheelSidebar
-          tab={tab}
-          setTab={setTab}
           entriesText={entriesText}
           results={results}
-          onEntriesChange={updateEntries}
+          spinning={spinning}
+          onEntriesChange={setEntriesText}
           onShuffle={shuffle}
-          onSort={sortEntries}
-          onAddWheel={addWheel}
-          onRemoveWheel={() =>
-            removeWheel(activeWheel)
-          }
-          wheelCount={wheels.length}
-          activeWheel={activeWheel}
-          setActiveWheel={setActiveWheel}
-          config={config}
-          updateConfig={updateConfig}
-          onClearResults={handleClearResults}
+          onSort={sort}
+          onClear={clear}
+          onSpin={spin}
         />
       </main>
 
       <WinnerDialog
+        open={winnerOpen}
         winner={winner}
-        onClose={handleCloseWinner}
+        onOpenChange={setWinnerOpen}
+        onRemove={removeWinner}
       />
     </div>
   );
