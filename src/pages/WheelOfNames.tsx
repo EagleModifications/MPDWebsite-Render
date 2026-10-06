@@ -24,7 +24,6 @@ import {
   Sparkles,
   Trash2,
   Trophy,
-  Upload,
   Volume2,
   VolumeX,
   X,
@@ -260,14 +259,6 @@ export default function WheelOfNames() {
     const next = [...entries, `Option ${entries.length + 1}`]
     updateEntries(next)
   }, [entries, isSpinning, updateEntries])
-
-  const removeEntry = useCallback(
-    (index: number) => {
-      if (isSpinning) return
-      updateEntries(entries.filter((_, entryIndex) => entryIndex !== index))
-    },
-    [entries, isSpinning, updateEntries],
-  )
 
   const shuffle = useCallback(() => {
     if (isSpinning) return
