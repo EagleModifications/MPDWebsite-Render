@@ -6,7 +6,6 @@ import {
   ClipboardCheck,
   FileInput,
   FileText,
-  Filter,
   History,
   MousePointerClick,
   Pencil,
@@ -942,182 +941,61 @@ export default function PromotionLogs() {
   return (
     <DashboardLayout>
       <div className="flex min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
-        {/* Header */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-              Promotion Management
-            </div>
-
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              Action Logs
-            </h1>
-
-            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              Complete promotion management audit history.
-            </p>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 gap-2 self-start border-border bg-card"
-            onClick={() => void loadLogs()}
-            disabled={loading}
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${
-                loading ? "animate-spin" : ""
-              }`}
-            />
-            Refresh
-          </Button>
-        </div>
-
-        {/* Module-style tabs, matching the reference layout while keeping the page's existing promotion scope. */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-blue-500/50 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-400 shadow-sm"
-          >
-            Promotion
-          </button>
-
-          <div className="rounded-md border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
-            Action history
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="rounded-xl border border-border bg-card/80 p-3 shadow-sm sm:p-4">
-          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold">
-              <Filter className="h-3.5 w-3.5 text-blue-400" />
-              Filters
-            </div>
-
-            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-              <span>
-                {pagination.total.toLocaleString()} changes
+        {/* Compact reference-style controls */}
+        <div className="mx-auto w-full max-w-[760px]">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button type="button" className="rounded-lg border border-blue-500/60 bg-blue-500/10 px-3 py-1.5 text-[12px] font-medium text-blue-400 shadow-sm">
+              Promotion Logs
+            </button>
+            <button type="button" className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground">
+              All Modules
+            </button>
+            <button type="button" className="rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground" onClick={() => void loadLogs()} disabled={loading}>
+              <span className="inline-flex items-center gap-1.5">
+                <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+                Refresh
               </span>
-
-              {hasFilters ? (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 text-blue-400 transition-colors hover:text-blue-300"
-                  onClick={clearFilters}
-                >
-                  <X className="h-3 w-3" />
-                  Clear
-                </button>
-              ) : null}
-            </div>
+            </button>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-            <div className="relative min-w-0 lg:col-span-2">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-
-              <Input
-                value={search}
-                onChange={(event) =>
-                  changeFilter(
-                    setSearch,
-                    event.target.value,
-                  )
-                }
-                placeholder="Search users, actions, IDs, targets..."
-                className="h-9 border-border bg-background pl-8 text-xs"
-              />
-            </div>
-
-            <select
-              value={category}
-              onChange={(event) =>
-                changeFilter(
-                  setCategory,
-                  event.target.value as Category,
-                )
-              }
-              className="h-9 min-w-0 rounded-md border border-border bg-background px-2.5 text-xs outline-none transition-colors focus:border-blue-500/60"
-            >
-              {categoryOptions.map((item) => (
-                <option
-                  key={item.value || "all"}
-                  value={item.value}
-                >
-                  {item.label}
-                </option>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <select value={category} onChange={(event) => changeFilter(setCategory, event.target.value as Category)} className="h-9 w-[180px] rounded-lg border border-border bg-card px-3 text-[12px] text-foreground outline-none transition-colors focus:border-blue-500/60">
+              <option value="">Anyone</option>
+              {categoryOptions.filter((item) => item.value).map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
               ))}
             </select>
 
-            <select
-              value={division}
-              onChange={(event) =>
-                changeFilter(
-                  setDivision,
-                  event.target.value as Division,
-                )
-              }
-              className="h-9 min-w-0 rounded-md border border-border bg-background px-2.5 text-xs outline-none transition-colors focus:border-blue-500/60"
-            >
-              {divisionOptions.map((item) => (
-                <option
-                  key={item.value || "all"}
-                  value={item.value}
-                >
-                  {item.label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={action}
-              onChange={(event) =>
-                changeFilter(
-                  setAction,
-                  event.target.value,
-                )
-              }
-              className="h-9 min-w-0 rounded-md border border-border bg-background px-2.5 text-xs outline-none transition-colors focus:border-blue-500/60"
-            >
-              <option value="">All Actions</option>
-
+            <select value={action} onChange={(event) => changeFilter(setAction, event.target.value)} className="h-9 w-[180px] rounded-lg border border-border bg-card px-3 text-[12px] text-foreground outline-none transition-colors focus:border-blue-500/60">
+              <option value="">All actions</option>
               {actionOptions.map((item) => (
-                <option key={item} value={item}>
-                  {actionLabel(item)}
-                </option>
+                <option key={item} value={item}>{actionLabel(item)}</option>
               ))}
             </select>
 
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="date"
-                value={from}
-                onChange={(event) =>
-                  changeFilter(
-                    setFrom,
-                    event.target.value,
-                  )
-                }
-                className="h-9 min-w-0 text-xs"
-              />
-
-              <Input
-                type="date"
-                value={to}
-                onChange={(event) =>
-                  changeFilter(
-                    setTo,
-                    event.target.value,
-                  )
-                }
-                className="h-9 min-w-0 text-xs"
-              />
-            </div>
+            <span className="ml-auto text-[11px] text-muted-foreground">
+              {pagination.total.toLocaleString()} changes
+            </span>
           </div>
+
+          {hasFilters && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input value={search} onChange={(event) => changeFilter(setSearch, event.target.value)} placeholder="Search..." className="h-8 w-[220px] border-border bg-card pl-8 text-[11px]" />
+              </div>
+              <select value={division} onChange={(event) => changeFilter(setDivision, event.target.value as Division)} className="h-8 rounded-lg border border-border bg-card px-2.5 text-[11px] outline-none">
+                {divisionOptions.map((item) => (
+                  <option key={item.value || "all"} value={item.value}>{item.label}</option>
+                ))}
+              </select>
+              <Input type="date" value={from} onChange={(event) => changeFilter(setFrom, event.target.value)} className="h-8 w-[130px] text-[11px]" />
+              <Input type="date" value={to} onChange={(event) => changeFilter(setTo, event.target.value)} className="h-8 w-[130px] text-[11px]" />
+              <button type="button" onClick={clearFilters} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-card px-2.5 text-[11px] text-muted-foreground hover:text-foreground">
+                <X className="h-3 w-3" /> Clear
+              </button>
+            </div>
+          )}
         </div>
 
         {error ? (
@@ -1127,7 +1005,7 @@ export default function PromotionLogs() {
         ) : null}
 
         {/* Log timeline */}
-        <div className="min-w-0">
+        <div className="mx-auto w-full max-w-[760px] min-w-0">
           {loading ? (
             <div className="space-y-2">
               {Array.from({ length: 7 }).map((_, index) => (
@@ -1155,7 +1033,7 @@ export default function PromotionLogs() {
             <div className="space-y-5">
               {groupedLogs.map((group) => (
                 <section key={group.key}>
-                  <div className="mb-2 flex items-center gap-3 px-1">
+                  <div className="mb-2 flex items-center gap-2 px-0">
                     <span className="text-[10px] font-semibold tracking-[0.16em] text-muted-foreground">
                       {group.label}
                     </span>
@@ -1196,7 +1074,7 @@ export default function PromotionLogs() {
                             log.id ||
                             `${log.createdAt}-${log.userId}-${index}`
                           }
-                          className={`overflow-visible rounded-xl border bg-card transition-all ${
+                          className={`overflow-visible rounded-lg border bg-card/70 transition-all ${
                             isExpanded
                               ? "border-blue-500/30 shadow-sm shadow-blue-950/20"
                               : "border-border hover:border-blue-500/20"
@@ -1213,7 +1091,7 @@ export default function PromotionLogs() {
                               )
                             }
                           >
-                            <div className="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
+                            <div className="flex min-w-0 items-center gap-2.5 px-3 py-2.5">
                               {/* Entry */}
                               <div className="hidden w-8 shrink-0 items-center gap-1 sm:flex">
                                 <span className="font-mono text-[10px] font-medium text-muted-foreground">
@@ -1223,7 +1101,7 @@ export default function PromotionLogs() {
 
                               {/* Action icon */}
                               <div
-                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${getActionIconStyle(
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${getActionIconStyle(
                                   log,
                                 )}`}
                               >
@@ -1326,7 +1204,7 @@ export default function PromotionLogs() {
 
                           {/* Expanded details */}
                           {isExpanded ? (
-                            <div className="border-t border-border bg-muted/[0.035] px-3 py-3 sm:px-4 sm:py-4">
+                            <div className="border-t border-border bg-muted/[0.035] px-3 py-3">
                               <div className="mb-3 flex items-center justify-between gap-3">
                                 <div>
                                   <p className="text-xs font-semibold">
@@ -1485,7 +1363,7 @@ export default function PromotionLogs() {
 
         {/* Pagination */}
         {!loading && logs.length > 0 ? (
-          <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mx-auto flex w-full max-w-[760px] flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-[11px] text-muted-foreground">
               Page {pagination.page} of{" "}
               {pagination.pages} ·{" "}
