@@ -454,7 +454,8 @@ function IdentityCard({
         className={`group flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:bg-blue-500/5 ${
           compact ? "px-1.5 py-1" : "px-2 py-1.5"
         }`}
-        onClick={() => {
+        onClick={(event) => {
+          event.stopPropagation()
           setOpen((current) => !current)
         }}
       >
@@ -945,19 +946,14 @@ export default function PromotionLogs() {
   }, [loadLogs, search])
 
   useEffect(() => {
-    const closeMenus = () => {
-      // Identity menus are self-contained.
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setExpanded(null)
+      }
     }
 
-    window.addEventListener("scroll", closeMenus, true)
-
-    return () => {
-      window.removeEventListener(
-        "scroll",
-        closeMenus,
-        true,
-      )
-    }
+    document.addEventListener("keydown", closeOnEscape)
+    return () => document.removeEventListener("keydown", closeOnEscape)
   }, [])
 
   const actionOptions = useMemo(
@@ -1027,7 +1023,7 @@ export default function PromotionLogs() {
         {/* Compact reference-style controls */}
         <div className="w-full">
           <div className="flex items-center justify-between gap-3">
-            <div className="mx-auto flex w-full max-w-[760px] items-center gap-1.5 lg:mx-0">
+            <div className="flex w-full max-w-[1100px] items-center gap-1.5">
               <button
                 type="button"
                 className="rounded-lg border border-blue-500/60 bg-blue-500/10 px-3 py-1.5 text-[12px] font-medium text-blue-400 shadow-sm"
@@ -1047,7 +1043,7 @@ export default function PromotionLogs() {
             </button>
           </div>
 
-          <div className="mx-auto mt-3 grid w-full max-w-[760px] grid-cols-1 gap-2 sm:grid-cols-[minmax(220px,1fr)_170px_170px_170px]">
+          <div className="mx-auto mt-3 grid w-full max-w-[1100px] grid-cols-1 gap-2 sm:grid-cols-[minmax(280px,1fr)_190px_190px_190px]">
             <div className="relative min-w-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -1104,7 +1100,7 @@ export default function PromotionLogs() {
             />
           </div>
 
-          <div className="mt-2 flex min-h-5 items-center justify-end gap-2">
+          <div className="mx-auto mt-2 flex min-h-5 w-full max-w-[1100px] items-center justify-end gap-2">
             {hasFilters ? (
               <button
                 type="button"
@@ -1128,7 +1124,7 @@ export default function PromotionLogs() {
         ) : null}
 
         {/* Log timeline */}
-        <div className="mx-auto w-full max-w-[760px] min-w-0">
+        <div className="mx-auto w-full max-w-[1100px] min-w-0">
           {loading ? (
             <div className="space-y-2">
               {Array.from({ length: 7 }).map((_, index) => (
@@ -1184,12 +1180,16 @@ export default function PromotionLogs() {
 
                       const Action = getActionIcon(log)
 
+                      const globalLogIndex = logs.findIndex(
+                        (item) => item.id === log.id,
+                      )
+
                       const entryNumber =
                         log.entryNumber ??
                         (pagination.page - 1) *
                           pagination.limit +
-                          index +
-                          1
+                        Math.max(globalLogIndex, 0) +
+                        1
 
                       return (
                         <div
@@ -1203,9 +1203,10 @@ export default function PromotionLogs() {
                               : "border-border hover:border-blue-500/20"
                           }`}
                         >
-                          <button
-                            type="button"
-                            className="w-full text-left"
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className="w-full cursor-pointer text-left outline-none"
                             onClick={() =>
                               setExpanded(
                                 isExpanded
@@ -1213,6 +1214,16 @@ export default function PromotionLogs() {
                                   : log.id,
                               )
                             }
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault()
+                                setExpanded(
+                                  isExpanded
+                                    ? null
+                                    : log.id,
+                                )
+                              }
+                            }}
                           >
                             <div className="flex min-w-0 items-center gap-2.5 px-3 py-2.5">
                               {/* Entry */}
@@ -1323,7 +1334,7 @@ export default function PromotionLogs() {
                                 </p>
                               </div>
                             ) : null}
-                          </button>
+                          </div>
 
                           {/* Expanded details */}
                           {isExpanded ? (
@@ -1486,7 +1497,7 @@ export default function PromotionLogs() {
 
         {/* Pagination */}
         {!loading && logs.length > 0 ? (
-          <div className="mx-auto flex w-full max-w-[760px] flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-[11px] text-muted-foreground">
               Page {pagination.page} of{" "}
               {pagination.pages} ·{" "}
