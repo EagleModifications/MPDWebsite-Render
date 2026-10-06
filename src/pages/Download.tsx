@@ -211,7 +211,11 @@ function ReleaseAssetButton({
 
 
 function ReleaseNotes({ body }: { body: string | null }) {
-  const source = body?.trim()
+  const source = body
+    ?.split(/\r?\n/)
+    .filter((line) => !/^\s*full changelog\s*:/i.test(line))
+    .join("\n")
+    .trim()
 
   if (!source) {
     return (
@@ -669,7 +673,18 @@ export default function Download() {
             </section>
           ) : (
             <>
-              <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
+              <section
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedRelease(latestRelease)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault()
+                    setSelectedRelease(latestRelease)
+                  }
+                }}
+                className="group cursor-pointer overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur transition-colors hover:border-blue-500/30 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+              >
                 <div className="flex items-center justify-between border-b border-border/70 px-4 py-3 sm:px-5">
                   <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                     Latest release
@@ -682,11 +697,7 @@ export default function Download() {
 
                 <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1.05fr] lg:p-6">
                   <div className="min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRelease(latestRelease)}
-                      className="group flex items-start gap-4 text-left"
-                    >
+                    <div className="flex items-start gap-4 text-left">
                       <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background">
                         <img
                           src="/logo.png"
@@ -705,14 +716,10 @@ export default function Download() {
                           Released {formatDate(latestRelease.published_at)}
                         </p>
                       </div>
-                    </button>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRelease(latestRelease)}
-                      className="mt-4 block text-left"
-                    >
-                      <h3 className="text-base font-semibold hover:text-blue-400">
+                    <div className="mt-4 block text-left">
+                      <h3 className="text-base font-semibold">
                         Get the MPD desktop app
                       </h3>
 
@@ -722,11 +729,7 @@ export default function Download() {
                         with desktop updates delivered through GitHub Releases.
                       </p>
 
-                      <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400">
-                        View release details
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </span>
-                    </button>
+                    </div>
                   </div>
 
                   <div className="rounded-2xl border border-border/70 bg-background/40 p-4">
@@ -754,21 +757,36 @@ export default function Download() {
                       </p>
 
                       <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                        <ReleaseAssetButton
-                          release={latestRelease}
-                          platform="windows"
-                          compact
-                        />
-                        <ReleaseAssetButton
-                          release={latestRelease}
-                          platform="macos"
-                          compact
-                        />
-                        <ReleaseAssetButton
-                          release={latestRelease}
-                          platform="linux"
-                          compact
-                        />
+                        <div
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <ReleaseAssetButton
+                            release={latestRelease}
+                            platform="windows"
+                            compact
+                          />
+                        </div>
+                        <div
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <ReleaseAssetButton
+                            release={latestRelease}
+                            platform="macos"
+                            compact
+                          />
+                        </div>
+                        <div
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <ReleaseAssetButton
+                            release={latestRelease}
+                            platform="linux"
+                            compact
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -831,11 +849,7 @@ export default function Download() {
                       >
                         <div className="flex flex-col gap-3 px-4 py-4 sm:px-5">
                           <div className="flex min-w-0 items-start justify-between gap-4">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedRelease(release)}
-                              className="min-w-0 text-left"
-                            >
+                            <div className="min-w-0 text-left">
                               <div className="flex flex-wrap items-center gap-2">
                                 <h3 className="truncate text-sm font-semibold sm:text-base">
                                   {release.name?.trim() ||
@@ -852,14 +866,6 @@ export default function Download() {
                               </p>
                             </button>
 
-                            <button
-                              type="button"
-                              onClick={() => setSelectedRelease(release)}
-                              className="hidden shrink-0 items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-blue-400 sm:inline-flex"
-                            >
-                              Release details
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </button>
                           </div>
 
                           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
