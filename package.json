@@ -74,8 +74,6 @@
   "build": {
     "appId": "com.metropd.desktop",
     "productName": "Metro Police Department",
-    "description": "Metro Police Department desktop application",
-    "author": "Metro Police Department",
     "artifactName": "MPD-Police-Department-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
