@@ -1370,7 +1370,7 @@ export default function ActivityRoster() {
                       onClick={
                         clearStatuses
                       }
-                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:text-blue-300 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:bg-transparent hover:text-blue-300 focus:bg-transparent focus:ring-0 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-[highlighted]:bg-transparent"
                     >
                       <X className="h-4 w-4" />
 
@@ -1510,7 +1510,7 @@ export default function ActivityRoster() {
                       onClick={
                         clearRanks
                       }
-                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:text-blue-300 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                      className="gap-2 bg-transparent text-blue-400 shadow-none transition-colors hover:bg-transparent hover:text-blue-300 focus:bg-transparent focus:ring-0 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-[highlighted]:bg-transparent"
                     >
                       <X className="h-4 w-4" />
 
@@ -1865,29 +1865,25 @@ export default function ActivityRoster() {
             {(hasFilterSelection || hasFilterChanges) && (
               <div className="flex items-center gap-2">
                 {hasFilterSelection && (
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={clearFilters}
-                    className="h-7 gap-1.5 bg-transparent px-2 text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-md bg-transparent px-2 text-xs font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:outline-none focus:ring-0 focus-visible:bg-transparent focus-visible:outline-none focus-visible:ring-0 active:bg-transparent"
                   >
                     <X className="h-3.5 w-3.5" />
                     Clear Filters
-                  </Button>
+                  </button>
                 )}
 
                 {hasFilterChanges && (
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={resetFilters}
-                    className="h-7 gap-1.5 bg-transparent px-2 text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-md bg-transparent px-2 text-xs font-medium text-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:outline-none focus:ring-0 focus-visible:bg-transparent focus-visible:outline-none focus-visible:ring-0 active:bg-transparent"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                     Reset Filters
-                  </Button>
+                  </button>
                 )}
               </div>
             )}
