@@ -1,1047 +1,488 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
-import { ChevronDown, FilePlus2, FolderOpen, Palette, Pencil, Save, X } from "lucide-react"
-import confetti from "canvas-confetti"
+import { useEffect, useMemo, useState } from "react"
+import {
+  ChevronDown,
+  CircleHelp,
+  Copy,
+  Dices,
+  Download,
+  Eraser,
+  List,
+  Minus,
+  Plus,
+  RotateCcw,
+  Settings2,
+  Shuffle,
+  Sparkles,
+  Trophy,
+  X,
+} from "lucide-react"
+import { toast } from "sonner"
 
 import Navbar from "@/components/home/Navbar"
-import Sidebar from "@/components/spinwheel/Sidebar"
-import Wheel, {
-  type SpinWheelItem,
-} from "@/components/spinwheel/Wheel"
+import Footer from "@/components/Footer"
+import Wheel, { type SpinWheelItem } from "@/components/spinwheel/Wheel"
 
-type WheelState = {
-  id: string
-  name: string
-  items: SpinWheelItem[]
-}
+const STORAGE_KEY = "mpd-spin-wheel-v2"
 
-const MAX_WHEELS = 10
+const DEFAULT_ENTRIES = ["1", "2", "3", "4", "5", "6"]
 
-type SpinResult = {
-  id: string
-  wheelId: string
-  wheelName: string
-  item: SpinWheelItem
-}
-
-const DEFAULT_ENTRIES = [
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
+const COLORS = [
+  "#3b82f6",
+  "#64748b",
+  "#0ea5e9",
+  "#334155",
+  "#60a5fa",
+  "#94a3b8",
+  "#2563eb",
+  "#475569",
+  "#0284c7",
+  "#1d4ed8",
 ]
 
-function createWheel(index: number): WheelState {
-  return {
+function makeItems(values: string[]): SpinWheelItem[] {
+  return values.map((label, index) => ({
     id: crypto.randomUUID(),
-    name: `Wheel ${index}`,
-    items: DEFAULT_ENTRIES.map((label, itemIndex) => ({
-      id: crypto.randomUUID(),
-      label,
-      color: [
-        "#3b82f6",
-        "#64748b",
-        "#0ea5e9",
-        "#334155",
-        "#60a5fa",
-        "#94a3b8",
-      ][itemIndex],
-      weight: 1,
-      hidden: false,
-    })),
-  }
+    label,
+    color: COLORS[index % COLORS.length],
+    weight: 1,
+    hidden: false,
+  }))
+}
+
+function parseEntries(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
 }
 
 export default function SpinWheel() {
-  const [wheels, setWheels] = useState<WheelState[]>(() => [
-    createWheel(1),
-  ])
-  const [activeWheelId, setActiveWheelId] = useState("")
-  const [results, setResults] = useState<SpinResult[]>([])
-  const [winners, setWinners] = useState<SpinResult[]>([])
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [items, setItems] = useState<SpinWheelItem[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (!stored) return makeItems(DEFAULT_ENTRIES)
 
-  /*
-   * This is deliberately stored per wheel because the Customize wheel
-   * dialog is also per wheel. Enabling "Animate winning entry" on Wheel 2
-   * must not automatically enable it on Wheel 1.
-   */
-  const [animateWinningEntryByWheel, setAnimateWinningEntryByWheel] =
-    useState<Record<string, boolean>>({})
-  const [launchConfettiByWheel, setLaunchConfettiByWheel] =
-    useState<Record<string, boolean>>({})
-  const [afterSoundByWheel, setAfterSoundByWheel] =
-    useState<Record<string, string>>({})
-  const [afterVolumeByWheel, setAfterVolumeByWheel] =
-    useState<Record<string, number>>({})
-  const [spinSlowlyByWheel, setSpinSlowlyByWheel] =
-    useState<Record<string, boolean>>({})
-  const [spinTimeByWheel, setSpinTimeByWheel] =
-    useState<Record<string, number>>({})
-  const [centerImageByWheel, setCenterImageByWheel] =
-    useState<Record<string, string | undefined>>({})
-  const [imageSizeByWheel, setImageSizeByWheel] =
-    useState<Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL">>({})
+      const parsed = JSON.parse(stored) as unknown
+      if (!Array.isArray(parsed)) return makeItems(DEFAULT_ENTRIES)
 
-  /*
-   * The large background winner animation is separate from the winner
-   * popup. The popup remains exactly as before; this state only controls
-   * the large winner name that grows and fades behind it.
-   */
-  const [animatedWinner, setAnimatedWinner] =
-    useState<SpinResult | null>(null)
+      const values = parsed
+        .filter((entry): entry is string => typeof entry === "string")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
 
-  const wheelAreaRef = useRef<HTMLDivElement | null>(null)
-  const winnerAnimationTimeoutRef =
-    useRef<ReturnType<typeof setTimeout> | null>(null)
-  const confettiEndRef = useRef(0)
-  const confettiFrameRef = useRef<number | null>(null)
-  const lastConfettiBurstRef = useRef(0)
-  const [customizeRequest, setCustomizeRequest] = useState(0)
-  const [saveMenuOpen, setSaveMenuOpen] = useState(false)
-  const openFileInputRef = useRef<HTMLInputElement | null>(null)
+      return makeItems(values.length ? values : DEFAULT_ENTRIES)
+    } catch {
+      return makeItems(DEFAULT_ENTRIES)
+    }
+  })
+
+  const [tab, setTab] = useState<"entries" | "results">("entries")
+  const [entriesText, setEntriesText] = useState(() =>
+    DEFAULT_ENTRIES.join("\n"),
+  )
+  const [results, setResults] = useState<string[]>([])
+  const [spinTrigger, setSpinTrigger] = useState(0)
+  const [spinning, setSpinning] = useState(false)
+  const [winner, setWinner] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [duration, setDuration] = useState(6)
+  const [removeAfterSpin, setRemoveAfterSpin] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
 
   useEffect(() => {
-    if (!activeWheelId && wheels[0]) {
-      setActiveWheelId(wheels[0].id)
-      return
-    }
-
-    if (
-      activeWheelId &&
-      !wheels.some((wheel) => wheel.id === activeWheelId)
-    ) {
-      setActiveWheelId(wheels[0]?.id ?? "")
-    }
-  }, [activeWheelId, wheels])
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(items.map((item) => item.label)),
+    )
+  }, [items])
 
   useEffect(() => {
-    return () => {
-      if (winnerAnimationTimeoutRef.current) {
-        clearTimeout(winnerAnimationTimeoutRef.current)
-      }
-      if (confettiFrameRef.current !== null) {
-        cancelAnimationFrame(confettiFrameRef.current)
-      }
-    }
-  }, [])
+    setEntriesText(items.map((item) => item.label).join("\n"))
+  }, [items])
 
-  const handleWheelChange = useCallback(
-    (wheelId: string, items: SpinWheelItem[]) => {
-      setWheels((current) =>
-        current.map((wheel) =>
-          wheel.id === wheelId
-            ? { ...wheel, items }
-            : wheel,
-        ),
+  useEffect(() => {
+    if (!spinning) return
+
+    const timeout = window.setTimeout(() => {
+      setSpinning(false)
+    }, Math.max(5500, duration * 1000 + 250))
+
+    return () => window.clearTimeout(timeout)
+  }, [spinning, duration])
+
+  const visibleItems = useMemo(
+    () => items.filter((item) => !item.hidden),
+    [items],
+  )
+
+  const syncEntries = (value: string) => {
+    setEntriesText(value)
+    const values = parseEntries(value)
+    setItems(makeItems(values.length ? values : ["Entry"]))
+  }
+
+  const spin = () => {
+    if (spinning || visibleItems.length < 1) return
+
+    setWinner(null)
+    setSpinning(true)
+    setSpinTrigger((value) => value + 1)
+  }
+
+  const handleResult = (item: SpinWheelItem) => {
+    setSpinning(false)
+    setWinner(item.label)
+    setResults((current) => [item.label, ...current])
+    setTab("results")
+
+    if (removeAfterSpin) {
+      setItems((current) =>
+        current.filter((entry) => entry.id !== item.id),
       )
-    },
-    [],
-  )
-
-  const launchWinnerCelebration = useCallback(() => {
-    /* One small fireworks burst every ~1/3 second for five seconds. */
-    const end = Date.now() + 5000
-
-    if (confettiFrameRef.current !== null) {
-      cancelAnimationFrame(confettiFrameRef.current)
-      confettiFrameRef.current = null
     }
+  }
 
-    confettiEndRef.current = end
-    lastConfettiBurstRef.current = 0
-
-    const fire = () => {
-      const now = Date.now()
-
-      if (now >= confettiEndRef.current) {
-        confettiFrameRef.current = null
-        return
+  const shuffleEntries = () => {
+    setItems((current) => {
+      const shuffled = [...current]
+      for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1))
+        ;[shuffled[index], shuffled[randomIndex]] = [
+          shuffled[randomIndex],
+          shuffled[index],
+        ]
       }
+      return shuffled
+    })
+    toast.success("Entries shuffled")
+  }
 
-      if (now - lastConfettiBurstRef.current >= 333) {
-        lastConfettiBurstRef.current = now
-
-        const x = 0.05 + Math.random() * 0.90
-        const y = 0.05 + Math.random() * 0.78
-
-        confetti({
-          particleCount: 34 + Math.floor(Math.random() * 10),
-          angle: 90,
-          spread: 360,
-          startVelocity: 27 + Math.random() * 8,
-          decay: 0.90 + Math.random() * 0.025,
-          gravity: 0.90 + Math.random() * 0.25,
-          drift: (Math.random() - 0.5) * 0.45,
-          scalar: 0.70 + Math.random() * 0.28,
-          ticks: 55 + Math.floor(Math.random() * 20),
-          origin: { x, y },
-          colors: [
-            '#3b82f6', '#60a5fa', '#0ea5e9', '#22c55e',
-            '#facc15', '#f97316', '#ef4444', '#a855f7',
-            '#f472b6',
-          ],
-          zIndex: 1000,
-        })
-      }
-
-      confettiFrameRef.current = requestAnimationFrame(fire)
-    }
-
-    fire()
-  }, [])
-
-  const handleResult = useCallback(
-    (wheelId: string, item: SpinWheelItem) => {
-      const wheel = wheels.find(
-        (entry) => entry.id === wheelId,
-      )
-
-      if (!wheel) {
-        return
-      }
-
-      const result: SpinResult = {
-        id: crypto.randomUUID(),
-        wheelId,
-        wheelName: wheel.name,
-        item,
-      }
-
-      setResults((existing) => [
-        ...existing,
-        result,
-      ])
-
-      setWinners((existing) => [
-        ...existing.filter(
-          (winner) => winner.wheelId !== wheelId,
-        ),
-        result,
-      ])
-
-      if (launchConfettiByWheel[wheelId]) {
-        launchWinnerCelebration()
-      }
-
-      /*
-       * "Animate winning entry" is the switch that controls this exact
-       * animation. When it is disabled, the normal winner popup still
-       * appears, but the large background winner text is not rendered.
-       */
-      if (animateWinningEntryByWheel[wheelId]) {
-        if (winnerAnimationTimeoutRef.current) {
-          clearTimeout(winnerAnimationTimeoutRef.current)
-        }
-
-        setAnimatedWinner(result)
-
-        winnerAnimationTimeoutRef.current = setTimeout(() => {
-          setAnimatedWinner(null)
-          winnerAnimationTimeoutRef.current = null
-        }, 1900)
-      } else {
-        setAnimatedWinner(null)
-
-        if (winnerAnimationTimeoutRef.current) {
-          clearTimeout(winnerAnimationTimeoutRef.current)
-          winnerAnimationTimeoutRef.current = null
-        }
-      }
-    },
-    [animateWinningEntryByWheel, launchConfettiByWheel, launchWinnerCelebration, wheels],
-  )
-
-  const handleAnimateWinningEntryChange = useCallback(
-    (wheelId: string, enabled: boolean) => {
-      setAnimateWinningEntryByWheel((current) => ({
-        ...current,
-        [wheelId]: enabled,
-      }))
-
-      /*
-       * If the user turns the option off while an animation is currently
-       * playing, stop the animation immediately.
-       */
-      if (!enabled && animatedWinner?.wheelId === wheelId) {
-        setAnimatedWinner(null)
-
-        if (winnerAnimationTimeoutRef.current) {
-          clearTimeout(winnerAnimationTimeoutRef.current)
-          winnerAnimationTimeoutRef.current = null
-        }
-      }
-    },
-    [animatedWinner],
-  )
-
-  const handleLaunchConfettiChange = useCallback(
-    (wheelId: string, enabled: boolean) => {
-      setLaunchConfettiByWheel((current) => ({
-        ...current,
-        [wheelId]: enabled,
-      }))
-    },
-    [],
-  )
-
-  const handleAfterSoundChange = useCallback(
-    (wheelId: string, sound: string) => {
-      setAfterSoundByWheel((current) => ({
-        ...current,
-        [wheelId]: sound,
-      }))
-    },
-    [],
-  )
-
-  const handleAfterVolumeChange = useCallback(
-    (wheelId: string, volume: number) => {
-      setAfterVolumeByWheel((current) => ({
-        ...current,
-        [wheelId]: volume,
-      }))
-    },
-    [],
-  )
-
-  const renameWheel = useCallback((wheelId: string, name: string) => {
-    const trimmed = name.trim()
-
-    if (!trimmed) {
-      return
-    }
-
-    setWheels((current) =>
-      current.map((wheel) =>
-        wheel.id === wheelId
-          ? { ...wheel, name: trimmed }
-          : wheel,
+  const sortEntries = () => {
+    setItems((current) =>
+      [...current].sort((a, b) =>
+        a.label.localeCompare(b.label, undefined, { numeric: true }),
       ),
     )
-  }, [])
+    toast.success("Entries sorted")
+  }
 
-  const removeWheel = useCallback((wheelId: string) => {
-    setWheels((current) => {
-      if (current.length <= 1) {
-        return current
-      }
-
-      const remaining = current.filter((wheel) => wheel.id !== wheelId)
-
-      // Keep the automatic wheel names sequential after a deletion.
-      // Custom names are left untouched.
-      return remaining.map((wheel, index) =>
-        /^Wheel \d+$/.test(wheel.name.trim())
-          ? { ...wheel, name: `Wheel ${index + 1}` }
-          : wheel,
-      )
-    })
-
-    setActiveWheelId((active) => {
-      if (active !== wheelId) {
-        return active
-      }
-
-      return wheels.find(
-        (wheel) => wheel.id !== wheelId,
-      )?.id ?? ""
-    })
-
-    setAnimateWinningEntryByWheel((current) => {
-      const next = { ...current }
-      delete next[wheelId]
-      return next
-    })
-
-    setLaunchConfettiByWheel((current) => {
-      const next = { ...current }
-      delete next[wheelId]
-      return next
-    })
-
-    setAfterSoundByWheel((current) => {
-      const next = { ...current }
-      delete next[wheelId]
-      return next
-    })
-
-    setAfterVolumeByWheel((current) => {
-      const next = { ...current }
-      delete next[wheelId]
-      return next
-    })
-
-    setSpinSlowlyByWheel((current) => { const next = { ...current }; delete next[wheelId]; return next })
-    setSpinTimeByWheel((current) => { const next = { ...current }; delete next[wheelId]; return next })
-    setCenterImageByWheel((current) => { const next = { ...current }; delete next[wheelId]; return next })
-    setImageSizeByWheel((current) => { const next = { ...current }; delete next[wheelId]; return next })
-
-    setWinners((current) =>
-      current.filter((winner) => winner.wheelId !== wheelId),
-    )
-
-    setResults((current) =>
-      current.filter((result) => result.wheelId !== wheelId),
-    )
-
-    if (animatedWinner?.wheelId === wheelId) {
-      setAnimatedWinner(null)
-
-      if (winnerAnimationTimeoutRef.current) {
-        clearTimeout(winnerAnimationTimeoutRef.current)
-        winnerAnimationTimeoutRef.current = null
-      }
+  const addEntry = () => {
+    const next = {
+      id: crypto.randomUUID(),
+      label: `Entry ${items.length + 1}`,
+      color: COLORS[items.length % COLORS.length],
+      weight: 1,
+      hidden: false,
     }
-  }, [animatedWinner, wheels])
+    setItems((current) => [...current, next])
+  }
 
-  const handleSpinSlowlyChange = useCallback((wheelId: string, enabled: boolean) => {
-    setSpinSlowlyByWheel((current) => ({ ...current, [wheelId]: enabled }))
-  }, [])
+  const removeEntry = (id: string) => {
+    setItems((current) => current.filter((item) => item.id !== id))
+  }
 
-  const handleSpinTimeChange = useCallback((wheelId: string, seconds: number) => {
-    setSpinTimeByWheel((current) => ({ ...current, [wheelId]: seconds }))
-  }, [])
+  const clearEntries = () => {
+    setItems([])
+    setEntriesText("")
+    toast.success("Entries cleared")
+  }
 
-  const handleCenterImageChange = useCallback((wheelId: string, image: string | undefined) => {
-    setCenterImageByWheel((current) => ({ ...current, [wheelId]: image }))
-  }, [])
-
-  const handleImageSizeChange = useCallback((wheelId: string, size: "XS" | "S" | "M" | "L" | "XL" | "XXL") => {
-    setImageSizeByWheel((current) => ({ ...current, [wheelId]: size }))
-  }, [])
-
-  const resetToNewWheel = useCallback(() => {
-    const nextWheel = createWheel(1)
-
-    setWheels([nextWheel])
-    setActiveWheelId(nextWheel.id)
+  const resetWheel = () => {
+    setItems(makeItems(DEFAULT_ENTRIES))
     setResults([])
-    setWinners([])
-    setAnimateWinningEntryByWheel({})
-    setLaunchConfettiByWheel({})
-    setAfterSoundByWheel({})
-    setAfterVolumeByWheel({})
-    setSpinSlowlyByWheel({})
-    setSpinTimeByWheel({})
-    setCenterImageByWheel({})
-    setImageSizeByWheel({})
-    setSidebarOpen(true)
-    setSaveMenuOpen(false)
-  }, [])
+    setWinner(null)
+    setEntriesText(DEFAULT_ENTRIES.join("\n"))
+    toast.success("Wheel reset")
+  }
 
-  const requestCustomize = useCallback(() => {
-    setCustomizeRequest((value) => value + 1)
-  }, [])
+  const copyResults = async () => {
+    if (!results.length) return
+    await navigator.clipboard.writeText(results.join("\n"))
+    toast.success("Results copied")
+  }
 
-  const openWheelFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.target.value = ""
-    if (!file) return
-
-    void file.text().then((raw) => {
-      try {
-        const parsed = JSON.parse(raw) as {
-          version?: number
-          wheels?: WheelState[]
-          settings?: {
-            animateWinningEntryByWheel?: Record<string, boolean>
-            launchConfettiByWheel?: Record<string, boolean>
-            afterSoundByWheel?: Record<string, string>
-            afterVolumeByWheel?: Record<string, number>
-            spinSlowlyByWheel?: Record<string, boolean>
-            spinTimeByWheel?: Record<string, number>
-            centerImageByWheel?: Record<string, string | undefined>
-            imageSizeByWheel?: Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL">
-          }
-        }
-
-        if (!Array.isArray(parsed.wheels) || parsed.wheels.length === 0 || parsed.wheels.length > MAX_WHEELS) {
-          throw new Error("Invalid wheel file")
-        }
-
-        const loaded = parsed.wheels.map((wheel, index) => ({
-          id: typeof wheel.id === "string" ? wheel.id : crypto.randomUUID(),
-          name: typeof wheel.name === "string" && wheel.name.trim() ? wheel.name : `Wheel ${index + 1}`,
-          items: Array.isArray(wheel.items)
-            ? wheel.items.map((item) => ({
-                id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
-                label: typeof item.label === "string" ? item.label : String(item.label ?? ""),
-                color: item.color,
-                weight: typeof item.weight === "number" ? item.weight : 1,
-                hidden: Boolean(item.hidden),
-              }))
-            : [],
-        }))
-
-        setWheels(loaded)
-        setActiveWheelId(loaded[0].id)
-        setResults([])
-        setWinners([])
-
-        const settings = parsed.settings ?? {}
-        setAnimateWinningEntryByWheel(settings.animateWinningEntryByWheel ?? {})
-        setLaunchConfettiByWheel(settings.launchConfettiByWheel ?? {})
-        setAfterSoundByWheel(settings.afterSoundByWheel ?? {})
-        setAfterVolumeByWheel(settings.afterVolumeByWheel ?? {})
-        setSpinSlowlyByWheel(settings.spinSlowlyByWheel ?? {})
-        setSpinTimeByWheel(settings.spinTimeByWheel ?? {})
-        setCenterImageByWheel(settings.centerImageByWheel ?? {})
-        setImageSizeByWheel(settings.imageSizeByWheel ?? {})
-        setSidebarOpen(true)
-      } catch {
-        window.alert("That file is not a valid wheel file.")
-      }
-    })
-  }, [])
-
-  const saveWheelFile = useCallback((extension: "wheel" | "json") => {
-    const payload = {
-      version: 1,
-      wheels,
-      settings: {
-        animateWinningEntryByWheel,
-        launchConfettiByWheel,
-        afterSoundByWheel,
-        afterVolumeByWheel,
-        spinSlowlyByWheel,
-        spinTimeByWheel,
-        centerImageByWheel,
-        imageSizeByWheel,
-      },
-    }
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
+  const exportResults = () => {
+    if (!results.length) return
+    const blob = new Blob([results.join("\n")], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
     anchor.href = url
-    anchor.download = `metro-pd-wheel.${extension}`
-    document.body.appendChild(anchor)
+    anchor.download = "mpd-spin-results.txt"
     anchor.click()
-    anchor.remove()
     URL.revokeObjectURL(url)
-    setSaveMenuOpen(false)
-  }, [
-    wheels,
-    animateWinningEntryByWheel,
-    launchConfettiByWheel,
-    afterSoundByWheel,
-    afterVolumeByWheel,
-    spinSlowlyByWheel,
-    spinTimeByWheel,
-    centerImageByWheel,
-    imageSizeByWheel,
-  ])
-
-  const addWheel = useCallback(() => {
-    if (wheels.length >= MAX_WHEELS) {
-      return
-    }
-
-    const nextWheel = createWheel(wheels.length + 1)
-
-    setWheels((current) => {
-      if (current.length >= MAX_WHEELS) {
-        return current
-      }
-
-      return [...current, nextWheel]
-    })
-
-    // Every newly-created wheel starts with the same Wheel of Names-style
-    // defaults. Keep these explicitly per-wheel so a new wheel never inherits
-    // the settings of whichever wheel was active before it was added.
-    setAnimateWinningEntryByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: false,
-    }))
-    setLaunchConfettiByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: false,
-    }))
-    setAfterSoundByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: "Subdued applause",
-    }))
-    setAfterVolumeByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: 50,
-    }))
-    setSpinSlowlyByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: false,
-    }))
-    setSpinTimeByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: 10,
-    }))
-    setCenterImageByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: undefined,
-    }))
-    setImageSizeByWheel((current) => ({
-      ...current,
-      [nextWheel.id]: "S",
-    }))
-
-    setActiveWheelId(nextWheel.id)
-    setSidebarOpen(true)
-  }, [wheels.length])
-
-  const spinAllWheels = useCallback(() => {
-    const wheelButtons =
-      wheelAreaRef.current?.querySelectorAll<HTMLDivElement>(
-        '[role="button"][tabindex="0"]',
-      )
-
-    wheelButtons?.forEach((button) => button.click())
-  }, [])
-
-  const clearResults = useCallback(() => {
-    setResults([])
-  }, [])
-
-  const closeWinnerPopup = useCallback(() => {
-    setWinners([])
-  }, [])
-
-  const closeWinner = useCallback((resultId: string) => {
-    setWinners((current) =>
-      current.filter(
-        (winner) => winner.id !== resultId,
-      ),
-    )
-  }, [])
-
-  const removeWinner = useCallback((result: SpinResult) => {
-    setWheels((current) =>
-      current.map((wheel) =>
-        wheel.id === result.wheelId
-          ? {
-              ...wheel,
-              items: wheel.items.filter(
-                (item) => item.id !== result.item.id,
-              ),
-            }
-          : wheel,
-      ),
-    )
-
-    setWinners((current) =>
-      current.filter(
-        (winner) => winner.id !== result.id,
-      ),
-    )
-  }, [])
-
-  const hideWinner = useCallback((result: SpinResult) => {
-    setWheels((current) =>
-      current.map((wheel) =>
-        wheel.id === result.wheelId
-          ? {
-              ...wheel,
-              items: wheel.items.map((item) =>
-                item.id === result.item.id
-                  ? { ...item, hidden: true }
-                  : item,
-              ),
-            }
-          : wheel,
-      ),
-    )
-
-    setWinners((current) =>
-      current.filter(
-        (winner) => winner.id !== result.id,
-      ),
-    )
-  }, [])
-
-  useEffect(() => {
-    if (winners.length === 0) {
-      return
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault()
-        closeWinnerPopup()
-      }
-    }
-
-    window.addEventListener(
-      "keydown",
-      handleKeyDown,
-    )
-
-    return () =>
-      window.removeEventListener(
-        "keydown",
-        handleKeyDown,
-      )
-  }, [closeWinnerPopup, winners.length])
-
-  const orderedWinners = useMemo(
-    () =>
-      [...winners].sort((a, b) => {
-        const aIndex = wheels.findIndex(
-          (wheel) => wheel.id === a.wheelId,
-        )
-        const bIndex = wheels.findIndex(
-          (wheel) => wheel.id === b.wheelId,
-        )
-
-        return aIndex - bIndex
-      }),
-    [winners, wheels],
-  )
-
-  const wheelSummaries = useMemo(
-    () =>
-      wheels.map((wheel) => ({
-        id: wheel.id,
-        name: wheel.name,
-        items: wheel.items,
-      })),
-    [wheels],
-  )
+  }
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#080b0e] text-foreground">
+    <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
       <Navbar />
 
       <main className="relative min-h-screen pt-20">
-        <div className="pointer-events-none absolute left-4 top-4 z-[220] flex items-center gap-2">
-          <button
-            type="button"
-            onClick={requestCustomize}
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:bg-black/75"
-            aria-label="Customize wheel"
-            title="Customize wheel"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-
-          <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/10 bg-black/45 p-1.5 shadow-lg backdrop-blur-xl">
-            <button type="button" onClick={requestCustomize} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
-              <Palette className="h-4 w-4" />
-              Customize
-            </button>
-            <button type="button" onClick={resetToNewWheel} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
-              <FilePlus2 className="h-4 w-4" />
-              New
-            </button>
-            <button type="button" onClick={() => openFileInputRef.current?.click()} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10">
-              <FolderOpen className="h-4 w-4" />
-              Open
-            </button>
-            <div className="relative">
-              <button type="button" onClick={() => setSaveMenuOpen((value) => !value)} className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white transition hover:bg-white/10" aria-expanded={saveMenuOpen}>
-                <Save className="h-4 w-4" />
-                Save
-                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${saveMenuOpen ? "rotate-180" : ""}`} />
-              </button>
-              {saveMenuOpen && (
-                <div className="absolute left-0 top-[calc(100%+6px)] z-[300] w-36 overflow-hidden rounded-lg border border-white/10 bg-[#181818] p-1 shadow-2xl">
-                  <button type="button" onClick={() => saveWheelFile("wheel")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .wheel</button>
-                  <button type="button" onClick={() => saveWheelFile("json")} className="flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-semibold text-white hover:bg-white/10">Save .json</button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <input ref={openFileInputRef} type="file" accept=".wheel,.json,application/json" className="hidden" onChange={openWheelFile} />
-        </div>
-        <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_35%_35%,rgba(33,70,82,0.42),transparent_45%),radial-gradient(circle_at_78%_25%,rgba(81,42,91,0.28),transparent_42%),linear-gradient(135deg,#07151b_0%,#080b0e_48%,#150b17_100%)]">
-          <div
-            className={`absolute inset-0 min-h-0 overflow-hidden pt-16 transition-[padding] duration-300 ${
-              sidebarOpen ? "lg:pr-[500px]" : ""
-            }`}
-          >
-            <div
-              ref={wheelAreaRef}
-              className="grid h-full min-h-0 w-full grid-rows-1 gap-x-2 overflow-visible p-2 lg:gap-x-3 lg:p-3"
-              style={{
-                gridTemplateColumns: `repeat(${Math.max(1, wheels.length)}, minmax(0, 1fr))`,
-              }}
-            >
-              {wheels.map((wheel) => (
-                <div
-                  key={wheel.id}
-                  className="relative flex min-h-0 min-w-0 items-center justify-center overflow-visible bg-transparent"
-                >
-                  <Wheel
-                    items={wheel.items}
-                    compact={wheels.length > 1}
-                    afterSound={afterSoundByWheel[wheel.id] ?? "Subdued applause"}
-                    afterVolume={afterVolumeByWheel[wheel.id] ?? 50}
-                    spinSlowly={spinSlowlyByWheel[wheel.id] ?? false}
-                    spinTime={spinTimeByWheel[wheel.id] ?? 10}
-                    centerImage={centerImageByWheel[wheel.id]}
-                    imageSize={imageSizeByWheel[wheel.id] ?? "S"}
-                    onResult={(item) =>
-                      handleResult(
-                        wheel.id,
-                        item,
-                      )
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <Sidebar
-          open={sidebarOpen}
-          items={
-            wheels.find(
-              (wheel) =>
-                wheel.id === activeWheelId,
-            )?.items ?? []
-          }
-          results={results.map(
-            (result) =>
-              `${result.wheelName}: ${result.item.label}`,
-          )}
-          wheels={wheelSummaries}
-          activeWheelId={activeWheelId}
-          onSelectWheel={setActiveWheelId}
-          onChange={(items) =>
-            handleWheelChange(
-              activeWheelId,
-              items,
-            )
-          }
-          onClearResults={clearResults}
-          onRenameWheel={renameWheel}
-          onRemoveWheel={removeWheel}
-          onAddWheel={addWheel}
-          canAddWheel={wheels.length < MAX_WHEELS}
-          onSpinAllWheels={spinAllWheels}
-          onOpenWheel={() =>
-            setSidebarOpen(false)
-          }
-          animateWinningEntryByWheel={
-            animateWinningEntryByWheel
-          }
-          onAnimateWinningEntryChange={
-            handleAnimateWinningEntryChange
-          }
-          launchConfettiByWheel={
-            launchConfettiByWheel
-          }
-          onLaunchConfettiChange={
-            handleLaunchConfettiChange
-          }
-          afterSoundByWheel={afterSoundByWheel}
-          afterVolumeByWheel={afterVolumeByWheel}
-          onAfterSoundChange={handleAfterSoundChange}
-          onAfterVolumeChange={handleAfterVolumeChange}
-          spinSlowlyByWheel={spinSlowlyByWheel}
-          onSpinSlowlyChange={handleSpinSlowlyChange}
-          spinTimeByWheel={spinTimeByWheel}
-          onSpinTimeChange={handleSpinTimeChange}
-          centerImageByWheel={centerImageByWheel}
-          onCenterImageChange={handleCenterImageChange}
-          imageSizeByWheel={imageSizeByWheel}
-          onImageSizeChange={handleImageSizeChange}
-          customizeRequest={customizeRequest}
-        />
-
-        <button
-          type="button"
-          onClick={() =>
-            setSidebarOpen((open) => !open)
-          }
-          aria-label={
-            sidebarOpen
-              ? "Hide sidebar"
-              : "Show sidebar"
-          }
-          title={
-            sidebarOpen
-              ? "Hide sidebar"
-              : "Show sidebar"
-          }
-          className={`absolute top-1/2 z-[200] hidden h-14 w-8 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-white/10 bg-black/50 text-muted-foreground shadow-xl backdrop-blur transition-[right] duration-300 hover:bg-black/70 hover:text-foreground lg:flex ${
-            sidebarOpen
-              ? "right-[480px]"
-              : "right-1"
-          }`}
-        >
-          <span
-            className={`text-2xl leading-none transition-transform duration-300 ${
-              sidebarOpen ? "" : "rotate-180"
-            }`}
-          >
-            ‹
-          </span>
-        </button>
-
-        {/*
-         * Wheel of Names-style background winner animation.
-         *
-         * It sits below the winner dialog (z-500) and above the wheel
-         * content. The text starts small, grows very large, and fades
-         * away. It is completely disabled unless the per-wheel setting
-         * "Animate winning entry" is enabled.
-         */}
-        {animatedWinner && (
-          <>
-            <style>
-              {`
-                @keyframes mpdWinnerEntryAnimation {
-                  0% {
-                    transform: translate(-50%, -50%) scale(0.22);
-                    opacity: 0;
-                  }
-
-                  12% {
-                    opacity: 0.14;
-                  }
-
-                  48% {
-                    transform: translate(-50%, -50%) scale(1);
-                    opacity: 0.12;
-                  }
-
-                  100% {
-                    transform: translate(-50%, -50%) scale(3.15);
-                    opacity: 0;
-                  }
-                }
-
-                @media (prefers-reduced-motion: reduce) {
-                  .mpd-winner-entry-animation {
-                    animation: none !important;
-                    opacity: 0 !important;
-                  }
-                }
-              `}
-            </style>
-
-            <div
-              key={animatedWinner.id}
-              aria-hidden="true"
-              className="pointer-events-none fixed inset-0 z-[450] overflow-hidden"
-            >
-              <div
-                className="mpd-winner-entry-animation absolute left-1/2 top-1/2 max-w-[95vw] whitespace-nowrap text-center text-[clamp(4rem,13vw,12rem)] font-extrabold leading-none tracking-[-0.06em] text-white"
-                style={{
-                  animation:
-                    "mpdWinnerEntryAnimation 1.9s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-                }}
-              >
-                {animatedWinner.item.label}
+        <div className="relative mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:py-7">
+          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-500">
+                <Dices className="h-4 w-4" />
+                COMMUNITY
               </div>
+              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+                Spin Wheel
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add entries and spin the Metro Police Department wheel to pick a winner.
+              </p>
             </div>
-          </>
-        )}
 
-        {orderedWinners.length > 0 && (
-          <div
-            className="fixed inset-0 z-[500] flex items-center justify-center p-4"
-            role="presentation"
-            onMouseDown={(event) => {
-              if (
-                event.target ===
-                event.currentTarget
-              ) {
-                closeWinnerPopup()
-              }
-            }}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="winner-dialog-title"
-              className="w-full max-w-[680px] overflow-hidden rounded-[4px] bg-[#191919] shadow-[0_18px_60px_rgba(0,0,0,0.7)] ring-1 ring-black/50"
-              onMouseDown={(event) =>
-                event.stopPropagation()
-              }
-            >
-              <div className="flex min-h-[54px] items-center justify-between bg-[#79d99f] px-4 text-[#111]">
-                <h2
-                  id="winner-dialog-title"
-                  className="text-[16px] font-bold"
-                >
-                  {orderedWinners.length === 1
-                    ? "We have a winner!"
-                    : "We have winners!"}
-                </h2>
-
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={resetWheel}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-input bg-background px-3 text-xs font-semibold shadow-sm transition hover:bg-muted"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
+              </button>
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={closeWinnerPopup}
-                  aria-label="Close winner popup"
-                  className="rounded p-1.5 text-black/70 transition hover:bg-black/10 hover:text-black"
+                  onClick={() => setSettingsOpen((value) => !value)}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-input bg-background px-3 text-xs font-semibold shadow-sm transition hover:bg-muted"
                 >
-                  <X className="h-4 w-4" />
+                  <Settings2 className="h-3.5 w-3.5" />
+                  Settings
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${settingsOpen ? "rotate-180" : ""}`} />
                 </button>
-              </div>
 
-              <div className="divide-y divide-white/10">
-                {orderedWinners.map(
-                  (result) => (
-                    <div
-                      key={result.id}
-                      className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-4 sm:grid-cols-[110px_1fr_auto]"
-                    >
-                      <div className="text-xs font-bold uppercase tracking-wide text-white/45">
-                        {result.wheelName}
+                {settingsOpen && (
+                  <div className="absolute right-0 top-[calc(100%+6px)] z-40 w-72 rounded-xl border border-border bg-popover p-4 shadow-xl">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold">Wheel settings</p>
+                        <p className="text-xs text-muted-foreground">Control the spin behaviour.</p>
                       </div>
-
-                      <div className="min-w-0 truncate text-center text-[25px] font-normal tracking-[-0.5px] text-white sm:text-left">
-                        {result.item.label}
-                      </div>
-
-                      <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            closeWinner(
-                              result.id,
-                            )
-                          }
-                          className="rounded px-2.5 py-1.5 text-[10px] font-bold text-white transition hover:bg-white/10"
-                        >
-                          Close
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            removeWinner(
-                              result,
-                            )
-                          }
-                          className="rounded-[2px] bg-[#5147bd] px-3 py-1.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#5d53cf]"
-                        >
-                          Remove
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            hideWinner(
-                              result,
-                            )
-                          }
-                          className="rounded-[2px] bg-[#5147bd] px-3 py-1.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#5d53cf]"
-                        >
-                          Hide
-                        </button>
-                      </div>
+                      <button type="button" onClick={() => setSettingsOpen(false)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-                  ),
+
+                    <label className="mb-4 block">
+                      <div className="mb-2 flex items-center justify-between text-xs font-medium">
+                        <span>Spin duration</span>
+                        <span className="text-muted-foreground">{duration}s</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="5"
+                        max="12"
+                        value={duration}
+                        onChange={(event) => setDuration(Number(event.target.value))}
+                        className="w-full accent-blue-500"
+                      />
+                    </label>
+
+                    <label className="flex cursor-pointer items-center justify-between rounded-lg border border-border/70 px-3 py-2.5">
+                      <span className="text-xs font-medium">Sound effects</span>
+                      <input type="checkbox" checked={soundEnabled} onChange={(event) => setSoundEnabled(event.target.checked)} className="h-4 w-4 accent-blue-500" />
+                    </label>
+                    <label className="mt-2 flex cursor-pointer items-center justify-between rounded-lg border border-border/70 px-3 py-2.5">
+                      <span className="text-xs font-medium">Remove winner after spin</span>
+                      <input type="checkbox" checked={removeAfterSpin} onChange={(event) => setRemoveAfterSpin(event.target.checked)} className="h-4 w-4 accent-blue-500" />
+                    </label>
+                  </div>
                 )}
               </div>
             </div>
           </div>
-        )}
+
+          <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
+            <div className="grid min-h-[680px] lg:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="relative flex min-h-[520px] items-center justify-center overflow-hidden border-b border-border/70 bg-muted/10 p-5 sm:p-8 lg:min-h-[680px] lg:border-b-0 lg:border-r">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.08),transparent_55%)]" />
+                <div className="relative h-[min(68vw,610px)] w-[min(68vw,610px)] max-h-[610px] max-w-[610px] min-h-[320px] min-w-[320px]">
+                  <Wheel
+                    items={items}
+                    spinTrigger={spinTrigger}
+                    spinTime={duration}
+                    afterSound={soundEnabled ? "Subdued applause" : "No sound"}
+                    afterVolume={55}
+                    duringSound={soundEnabled ? "Ticking sound" : "No sound"}
+                    duringVolume={42}
+                    onResult={handleResult}
+                  />
+                </div>
+
+                <div className="absolute bottom-5 left-1/2 -translate-x-1/2 sm:bottom-7">
+                  <button
+                    type="button"
+                    onClick={spin}
+                    disabled={spinning || visibleItems.length === 0}
+                    className="inline-flex h-11 min-w-36 items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {spinning ? "Spinning…" : "Spin"}
+                  </button>
+                </div>
+
+                <div className="absolute right-4 top-4 hidden items-center gap-1.5 rounded-lg border border-border/70 bg-background/85 px-2.5 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur sm:flex">
+                  <CircleHelp className="h-3.5 w-3.5" />
+                  Click the wheel or press Ctrl + Enter
+                </div>
+              </div>
+
+              <aside className="flex min-h-[680px] flex-col bg-background/60">
+                <div className="grid grid-cols-2 border-b border-border/70">
+                  <button
+                    type="button"
+                    onClick={() => setTab("entries")}
+                    className={`relative flex h-12 items-center justify-center gap-2 text-xs font-semibold transition hover:bg-muted/60 ${tab === "entries" ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`}
+                  >
+                    <List className="h-4 w-4" />
+                    Entries
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{visibleItems.length}</span>
+                    {tab === "entries" && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-blue-500" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab("results")}
+                    className={`relative flex h-12 items-center justify-center gap-2 text-xs font-semibold transition hover:bg-muted/60 ${tab === "results" ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`}
+                  >
+                    <Trophy className="h-4 w-4" />
+                    Results
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{results.length}</span>
+                    {tab === "results" && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-blue-500" />}
+                  </button>
+                </div>
+
+                {tab === "entries" ? (
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="border-b border-border/70 p-3">
+                      <textarea
+                        value={entriesText}
+                        onChange={(event) => syncEntries(event.target.value)}
+                        spellCheck={false}
+                        className="min-h-[330px] w-full resize-none rounded-xl border border-input bg-background px-3 py-3 font-mono text-sm leading-6 outline-none transition placeholder:text-muted-foreground focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/15"
+                        placeholder="Enter one entry per line…"
+                      />
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        One entry per line. Duplicate entries are allowed.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 border-b border-border/70 p-3">
+                      <button type="button" onClick={shuffleEntries} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-input px-2.5 text-xs font-medium hover:bg-muted">
+                        <Shuffle className="h-3.5 w-3.5" /> Shuffle
+                      </button>
+                      <button type="button" onClick={sortEntries} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-input px-2.5 text-xs font-medium hover:bg-muted">
+                        <Dices className="h-3.5 w-3.5" /> Sort
+                      </button>
+                      <button type="button" onClick={addEntry} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-input px-2.5 text-xs font-medium hover:bg-muted">
+                        <Plus className="h-3.5 w-3.5" /> Add
+                      </button>
+                      <button type="button" onClick={clearEntries} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-input px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <Eraser className="h-3.5 w-3.5" /> Clear
+                      </button>
+                    </div>
+
+                    <div className="min-h-0 flex-1 overflow-auto p-3">
+                      <div className="space-y-1.5">
+                        {items.map((item, index) => (
+                          <div key={item.id} className="group flex items-center gap-2 rounded-lg border border-border/60 bg-card px-2.5 py-2 transition hover:border-blue-500/30 hover:bg-muted/40">
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: item.color }} />
+                            <span className="min-w-0 flex-1 truncate text-xs font-medium">{index + 1}. {item.label}</span>
+                            <button type="button" onClick={() => removeEntry(item.id)} className="rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100" aria-label={`Remove ${item.label}`}>
+                              <Minus className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {!items.length && (
+                          <div className="rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+                            Add some entries to start spinning.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex items-center justify-between border-b border-border/70 p-3">
+                      <div>
+                        <p className="text-sm font-semibold">Spin results</p>
+                        <p className="text-[11px] text-muted-foreground">Newest result appears first.</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <button type="button" onClick={copyResults} disabled={!results.length} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40" title="Copy results">
+                          <Copy className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={exportResults} disabled={!results.length} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40" title="Export results">
+                          <Download className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => setResults([])} disabled={!results.length} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40" title="Clear results">
+                          <Eraser className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="min-h-0 flex-1 overflow-auto p-3">
+                      {results.length ? (
+                        <div className="space-y-2">
+                          {results.map((result, index) => (
+                            <div key={`${result}-${index}`} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card px-3 py-3">
+                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-xs font-bold text-blue-600 dark:text-blue-400">{results.length - index}</span>
+                              <span className="min-w-0 flex-1 truncate text-sm font-medium">{result}</span>
+                              {index === 0 && <Sparkles className="h-4 w-4 shrink-0 text-blue-500" />}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex h-full min-h-64 flex-col items-center justify-center text-center">
+                          <Trophy className="mb-3 h-8 w-8 text-muted-foreground/40" />
+                          <p className="text-sm font-semibold">No results yet</p>
+                          <p className="mt-1 max-w-xs text-xs text-muted-foreground">Spin the wheel and your winners will appear here.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </aside>
+            </div>
+          </section>
+        </div>
+
+        <Footer />
       </main>
+
+      {winner && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setWinner(null)
+          }}
+        >
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+                  <Trophy className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold">We have a winner!</p>
+                  <p className="text-[11px] text-muted-foreground">Metro Police Department Spin Wheel</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setWinner(null)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="px-5 py-8 text-center">
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-blue-500">Selected entry</div>
+              <div className="break-words text-3xl font-extrabold tracking-tight sm:text-4xl">{winner}</div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border/70 px-5 py-3">
+              <button type="button" onClick={() => setWinner(null)} className="rounded-lg border border-input px-3 py-2 text-xs font-semibold hover:bg-muted">Close</button>
+              <button type="button" onClick={() => { setWinner(null); setTab("entries") }} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500">Spin again</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
