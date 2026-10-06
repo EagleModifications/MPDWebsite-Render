@@ -11,6 +11,7 @@ export function Wheel({
   config,
   muted,
   onWinner,
+  onMute,
 }: {
   config: WheelConfig;
   muted: boolean;
@@ -19,7 +20,7 @@ export function Wheel({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rotationRef = useRef(0);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | undefined>(undefined);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tickRef = useRef<AudioContext | null>(null);
   const [spinning, setSpinning] = useState(false);
