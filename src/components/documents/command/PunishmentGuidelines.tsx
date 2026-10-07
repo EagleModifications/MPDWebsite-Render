@@ -470,7 +470,7 @@ export default function PunishmentGuidelines() {
         )}
 
         {!loading && !error && (
-          <div className="max-h-[72vh] overflow-y-auto overflow-x-hidden">
+          <div className="overflow-x-hidden">
             <table className="w-full table-fixed border-collapse">
               <colgroup>
                 <col className="w-[30%]" />
