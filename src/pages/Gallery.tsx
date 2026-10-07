@@ -4573,8 +4573,6 @@ function GalleryMediaCollage({
   onClick: (media: GalleryMedia) => void
 }) {
   const visible = media.slice(0, 4)
-  const hiddenCount = Math.max(0, media.length - 3)
-
   if (visible.length === 0) return null
 
   return (
