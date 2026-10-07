@@ -638,12 +638,12 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
             : null
 
       if (field) {
-        if (isChangePair(item)) {
-          const pair = getChangePair(item)
+        const pair = getChangePair(item)
+
+        if (pair.to !== undefined) {
           addRequirementChange(output, field, pair.from, pair.to)
-        } else if (item.to !== undefined) {
-          addRequirementChange(output, field, item.from, item.to)
         }
+
         continue
       }
 
