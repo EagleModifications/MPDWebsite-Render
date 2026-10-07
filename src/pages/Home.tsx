@@ -1586,8 +1586,7 @@ export default function Home() {
         {/* ========================================================= */}
         {/* JOIN THE DEPARTMENT CTA                                     */}
         {/* ========================================================= */}
-        <section className="relative isolate overflow-hidden border-y border-border/40 bg-background/20">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.045),transparent_62%)]" />
+        <section className="relative isolate overflow-hidden bg-background/20">
 
           {visibleDots.slice(0, 28).map((dot, index) => (
             <span
@@ -1612,8 +1611,10 @@ export default function Home() {
             <div className="max-w-5xl">
               <h2 className="text-4xl font-black uppercase leading-[0.94] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                 <span className="text-foreground">
-                  READY TO JOIN THE METRO POLICE
-                </span>{" "}
+                  READY TO JOIN THE
+                  <br />
+                  METRO POLICE {" "}
+                </span>
                 <span className="bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent">
                   DEPARTMENT?
                 </span>
@@ -1642,8 +1643,7 @@ export default function Home() {
         {/* ========================================================= */}
         {/* FINAL DISCORD CTA                                           */}
         {/* ========================================================= */}
-        <section className="relative isolate overflow-hidden border-b border-border/40 bg-background/10">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.055),transparent_62%)]" />
+        <section className="relative isolate overflow-hidden bg-background/10">
 
           {visibleDots.slice(0, 32).map((dot, index) => (
             <span
