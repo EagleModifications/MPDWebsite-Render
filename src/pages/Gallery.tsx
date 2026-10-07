@@ -140,7 +140,7 @@ const GALLERY_TAG_CLASSES: Record<GalleryTag, string> = {
   TRU: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
   SAR: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
 }
-type GalleryMediaFilter = "All" | "Images" | ""
+type GalleryMediaFilter = "All" | "Images" | "Videos"
 
 const GALLERY_CATEGORY_FILTERS: GalleryCategoryFilter[] = [
   "All",
@@ -151,7 +151,7 @@ const GALLERY_CATEGORY_FILTERS: GalleryCategoryFilter[] = [
 const GALLERY_MEDIA_FILTERS: GalleryMediaFilter[] = [
   "All",
   "Images",
-  "",
+  "Videos",
 ]
 
 type DropdownContextValue = {
@@ -264,7 +264,7 @@ function CustomSelect({
                 }}
                 className={[
                   "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
-                  selected ? "bg-blue-500/10 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  selected ? "bg-blue-500 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 ].join(" ")}
               >
                 <span className="flex min-w-0 items-center gap-2">
@@ -280,7 +280,7 @@ function CustomSelect({
                   )}
                   <span>{option}</span>
                 </span>
-                {selected && <Check className="h-4 w-4 text-blue-500" />}
+                {selected && <Check className="h-4 w-4 text-white" />}
               </button>
             )
           })}
@@ -419,7 +419,7 @@ function CustomMultiSelect({
                   />
                   <span>{option}</span>
                 </span>
-                {selected && <Check className="h-4 w-4 text-blue-500" />}
+                {selected && <Check className="h-4 w-4 text-white" />}
               </button>
             )
           })}
