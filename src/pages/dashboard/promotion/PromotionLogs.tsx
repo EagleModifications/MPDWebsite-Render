@@ -206,14 +206,14 @@ const detailLabel = (key: string) => {
     itemId: "Item ID",
     count: "Count",
     hours: "Hours",
-    requiredHours: "Required Hours",
-    promotionHours: "Promotion Hours",
+    requiredHours: "Hours",
+    promotionHours: "Hours",
     timeInRankDays: "Time In Rank",
-    requiredTimeInRankDays: "Required Time In Rank",
+    requiredTimeInRankDays: "Time In Rank",
     trainingLogs: "Training Logs",
-    requiredTrainingLogs: "Required Training Logs",
+    requiredTrainingLogs: "Training Logs",
     recruitmentLogs: "Recruitment Logs",
-    requiredRecruitmentLogs: "Required Recruitment Logs",
+    requiredRecruitmentLogs: "Recruitment Logs",
     requiredLogs: "Required Logs",
     status: "Status",
     rank: "Rank",
@@ -1254,12 +1254,24 @@ function FilterDropdown({
       ? "All Users"
       : placeholder
 
+  const filterName = (() => {
+    const normalized = placeholder
+      .replace(/^All\s+/i, "")
+      .trim()
+
+    if (/^actions?$/i.test(normalized)) return "action"
+    if (/^categories?$/i.test(normalized)) return "category"
+    if (/^divisions?$/i.test(normalized)) return "division"
+    if (/^users?$/i.test(normalized) || /^anyone$/i.test(normalized)) return "user"
+    return normalized.toLowerCase()
+  })()
+
   const buttonLabel =
     selected.length === 0
       ? allLabel
       : selected.length === selectable.length
         ? allLabel
-        : `${selected.length} selected`
+        : `${selected.length} ${filterName}${selected.length === 1 ? "" : "s"} selected`
 
   return (
     <div ref={dropdownRef} className={`relative ${width}`}>
@@ -2405,9 +2417,9 @@ export default function PromotionLogs() {
                                   {detailEntries.map(({ key, value, change }) => (
                                     <div
                                       key={key}
-                                      className="grid grid-cols-[minmax(110px,180px)_1fr] items-start gap-5 py-3 first:pt-0 last:pb-1"
+                                      className="grid grid-cols-[minmax(110px,180px)_minmax(0,1fr)] items-center gap-5 py-2.5 first:pt-0 last:pb-1"
                                     >
-                                      <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
+                                      <span className="whitespace-nowrap text-[11px] font-medium text-muted-foreground sm:text-xs">
                                         {detailLabel(key)}
                                       </span>
 
@@ -2419,7 +2431,7 @@ export default function PromotionLogs() {
                                           }
 
                                           return (
-                                            <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] leading-5 sm:text-xs">
+                                            <div className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[11px] leading-5 sm:text-xs">
                                               <span className="text-red-500 line-through">
                                                 {formatSimpleValue(changePair.from)}
                                               </span>
