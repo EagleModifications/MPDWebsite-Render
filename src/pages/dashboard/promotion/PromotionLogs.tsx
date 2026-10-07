@@ -16,7 +16,6 @@ import {
   RotateCcw,
   Search,
   Settings2,
-  Shield,
   Trash2,
   X,
 } from "lucide-react"
@@ -539,7 +538,7 @@ function IdentityCard({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={`group flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-blue-500/5 ${
+          className={`group flex min-w-0 items-center gap-2 rounded-md text-left transition-colors ${
             compact ? "px-1 py-0.5" : "px-1.5 py-1"
           }`}
           onClick={(event) => event.stopPropagation()}
@@ -1148,23 +1147,15 @@ export default function PromotionLogs() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-                {module === "promotion" ? (
-                  <Shield className="h-5 w-5 text-blue-500" />
-                ) : (
-                  <Activity className="h-5 w-5 text-blue-500" />
-                )}
+                <Activity className="h-5 w-5 text-blue-500" />
               </div>
 
               <div className="min-w-0">
                 <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                  {module === "promotion" ? "Promotion Logs" : module === "activity" ? "Activity Logs" : "All Logs"}
+                  All Logs
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  {module === "promotion"
-                    ? "View promotion management audit history and changes."
-                    : module === "activity"
-                      ? "View activity management audit history and changes."
-                      : "View promotion and activity management audit history and changes."}
+                  View promotion and activity management audit history and changes.
                 </p>
               </div>
             </div>
@@ -1183,7 +1174,7 @@ export default function PromotionLogs() {
           </div>
 
           {/* Log module tabs */}
-          <div className="flex w-fit items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1">
+          <div className="flex w-fit items-center gap-2">
             {([
               ["all", "All"],
               ["promotion", "Promotion Logs"],
@@ -1209,7 +1200,7 @@ export default function PromotionLogs() {
                   className={`h-8 rounded-md border px-3 text-xs font-medium outline-none transition-colors ${
                     active
                       ? "border-blue-500/40 bg-blue-500/10 text-blue-400"
-                      : "border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground"
+                      : "border-border bg-transparent text-muted-foreground hover:border-blue-500/40 hover:bg-transparent hover:text-blue-400"
                   }`}
                 >
                   {label}
@@ -1285,49 +1276,6 @@ export default function PromotionLogs() {
               />
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-              {search.trim() ? (
-                <button
-                  type="button"
-                  onClick={() => changeFilter(setSearch, "")}
-                  className="inline-flex items-center gap-1 bg-transparent px-0 text-[10px] text-foreground outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400"
-                >
-                  <X className="h-3 w-3" />
-                  Clear Search
-                </button>
-              ) : null}
-
-              {hasFilters ? (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex items-center gap-1 bg-transparent px-0 text-[10px] text-foreground outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400"
-                >
-                  <X className="h-3 w-3" />
-                  Clear Filters
-                </button>
-              ) : null}
-
-              {hasFilters ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearch("")
-                    setCategory("")
-                    setDivision("")
-                    setUserId("")
-                    setAction("")
-                    setPage(1)
-                    setExpanded(new Set())
-                  }}
-                  className="inline-flex items-center gap-1 bg-transparent px-0 text-[10px] text-foreground outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  Reset Filters
-                </button>
-              ) : null}
-            </div>
-
             <div className="mt-2 flex items-center justify-end">
               <span className="text-[11px] text-muted-foreground">
                 {pagination.total.toLocaleString()} changes
@@ -1335,8 +1283,8 @@ export default function PromotionLogs() {
             </div>
 
             {/* Active filters */}
-            <div className="mt-2 flex min-h-8 flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <div className="mt-2 flex min-h-9 flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+              <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <Filter className="h-3.5 w-3.5 text-blue-400" />
                 Filters:
               </div>
@@ -1355,14 +1303,14 @@ export default function PromotionLogs() {
                       Category: {categoryLabel(category)}
                     </span>
                   ) : null}
-                  {userId ? (
-                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                      User: {userId}
-                    </span>
-                  ) : null}
                   {division ? (
                     <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
                       Division: {divisionLabel(division)}
+                    </span>
+                  ) : null}
+                  {userId ? (
+                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                      User: {userId}
                     </span>
                   ) : null}
                   {action ? (
@@ -1372,6 +1320,43 @@ export default function PromotionLogs() {
                   ) : null}
                 </>
               )}
+
+              {(search.trim() || hasFilters) ? (
+                <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {search.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => changeFilter(setSearch, "")}
+                      className="inline-flex h-6 items-center gap-1 border-0 bg-transparent px-0 text-[10px] font-medium text-muted-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0"
+                    >
+                      <X className="h-3 w-3" />
+                      Clear Search
+                    </button>
+                  ) : null}
+
+                  {hasFilters ? (
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="inline-flex h-6 items-center gap-1 border-0 bg-transparent px-0 text-[10px] font-medium text-muted-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0"
+                    >
+                      <X className="h-3 w-3" />
+                      Clear Filters
+                    </button>
+                  ) : null}
+
+                  {hasFilters ? (
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="inline-flex h-6 items-center gap-1 border-0 bg-transparent px-0 text-[10px] font-medium text-muted-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Reset Filters
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1469,7 +1454,7 @@ export default function PromotionLogs() {
                             log.id ||
                             `${log.createdAt}-${log.userId}-${index}`
                           }
-                          className={`overflow-visible rounded-lg border bg-card/70 transition-all ${
+                          className={`overflow-visible rounded-xl border bg-card/70 transition-all ${
                             isExpanded
                               ? "border-blue-500/30 shadow-sm shadow-blue-950/20"
                               : "border-border hover:border-blue-500/20"
@@ -1489,9 +1474,9 @@ export default function PromotionLogs() {
                               }
                             }}
                           >
-                            <div className="flex min-w-0 items-center gap-2.5 px-3 py-2.5">
+                            <div className="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
                               {/* Entry + action icon */}
-                              <div className="flex w-8 shrink-0 items-center justify-center">
+                              <div className="flex w-7 shrink-0 items-center justify-center">
                                 <span className="font-mono text-[9px] text-muted-foreground/70">
                                   #{entryNumber}
                                 </span>
@@ -1499,7 +1484,7 @@ export default function PromotionLogs() {
 
                               {/* Action icon */}
                               <div
-                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${getActionIconStyle(
+                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${getActionIconStyle(
                                   log,
                                 )}`}
                               >
@@ -1571,7 +1556,7 @@ export default function PromotionLogs() {
 
                               {/* Status/action badge */}
                               <span
-                                className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:inline-flex ${getActionBadgeStyle(
+                                className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${getActionBadgeStyle(
                                   log,
                                 )}`}
                               >
@@ -1593,14 +1578,6 @@ export default function PromotionLogs() {
                               </div>
                             </div>
 
-                            {/* Summary */}
-                            {log.summary ? (
-                              <div className="border-t border-border/60 px-3 pb-3 pt-2 sm:pl-[68px] sm:pr-3">
-                                <p className="line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                                  {log.summary}
-                                </p>
-                              </div>
-                            ) : null}
                           </div>
 
                           {/* Expanded details */}
