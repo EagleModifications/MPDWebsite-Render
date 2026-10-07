@@ -510,7 +510,7 @@ function IdentityCard({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={`group flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-blue-500/5 ${
+          className={`group flex min-w-0 items-center gap-2 rounded-md text-left ${
             compact ? "px-1 py-0.5" : "px-1.5 py-1"
           }`}
           onClick={(event) => event.stopPropagation()}
@@ -527,6 +527,14 @@ function IdentityCard({
                 className="h-full w-full object-cover"
                 loading="lazy"
                 referrerPolicy="no-referrer"
+                onError={(event) => {
+                  const fallback = userId ? getDefaultAvatar(userId) : undefined
+                  if (fallback && event.currentTarget.src !== fallback) {
+                    event.currentTarget.src = fallback
+                  } else {
+                    event.currentTarget.style.display = "none"
+                  }
+                }}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold">
@@ -536,7 +544,7 @@ function IdentityCard({
           </div>
 
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-[11px] font-medium text-foreground transition-colors group-hover:text-blue-400">
+            <div className="truncate text-[11px] font-medium text-foreground">
               {name || "Unknown User"}
             </div>
             {username ? (
@@ -625,7 +633,11 @@ function TargetIdentity({ log }: { log: ActionLog }) {
   ).trim()
 
   const targetAvatar = String(
-    details.targetAvatar ?? "",
+    details.targetAvatar ??
+      details.targetAvatarHash ??
+      details.targetDiscordAvatar ??
+      details.targetAvatarUrl ??
+      "",
   ).trim()
 
   if (!targetName && !targetUserId) {
@@ -852,7 +864,25 @@ export default function PromotionLogs() {
           ) <= 3000
 
         if (!sameEvent) {
-          nextLogs.push(log)
+          const details = log.details ?? {}
+          const resolvedAvatar =
+            log.avatar ||
+            String(
+              details.avatar ??
+                details.avatarHash ??
+                details.discordAvatar ??
+                details.discordAvatarHash ??
+                details.userAvatar ??
+                details.userAvatarHash ??
+                details.avatarUrl ??
+                "",
+            ).trim() ||
+            null
+
+          nextLogs.push({
+            ...log,
+            avatar: resolvedAvatar,
+          })
         }
       }
 
@@ -999,7 +1029,7 @@ export default function PromotionLogs() {
     <DashboardLayout>
       <div className="flex min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
         {/* Header */}
-        <div className="mx-auto flex w-full max-w-[1360px] shrink-0 flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-[1100px] shrink-0 flex-col gap-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
@@ -1031,7 +1061,7 @@ export default function PromotionLogs() {
               disabled={loading}
             >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              <span>Refresh</span>
+              <span>{loading ? "Refreshing..." : "Refresh"}</span>
             </Button>
           </div>
 
@@ -1212,6 +1242,18 @@ export default function PromotionLogs() {
                         log.userId ||
                         "Unknown User"
 
+                      const actorAvatar =
+                        log.avatar ||
+                        String(
+                          log.details?.avatar ??
+                            log.details?.avatarHash ??
+                            log.details?.discordAvatar ??
+                            log.details?.discordAvatarHash ??
+                            log.details?.avatarUrl ??
+                            "",
+                        ).trim() ||
+                        null
+
                       const Action = getActionIcon(log)
 
                       const globalLogIndex = logs.findIndex(
@@ -1291,10 +1333,7 @@ export default function PromotionLogs() {
                                       <span className="text-muted-foreground">
                                         ·
                                       </span>
-                                      <span className="truncate text-xs text-foreground/80 sm:text-sm">
-                                        {log.targetName ||
-                                          log.targetUserId}
-                                      </span>
+                                      <TargetIdentity log={log} />
                                     </>
                                   ) : null}
                                 </div>
@@ -1307,7 +1346,7 @@ export default function PromotionLogs() {
                                     rank={log.rank}
                                     callsign={log.callsign}
                                     badgeNumber={log.badgeNumber}
-                                    avatar={log.avatar}
+                                    avatar={actorAvatar}
                                     compact
                                   />
 
@@ -1405,7 +1444,7 @@ export default function PromotionLogs() {
                                     badgeNumber={
                                       log.badgeNumber
                                     }
-                                    avatar={log.avatar}
+                                    avatar={actorAvatar}
                                   />
                                 </DetailItem>
 
