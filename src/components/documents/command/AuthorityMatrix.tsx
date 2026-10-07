@@ -78,7 +78,13 @@ const RANK_COLUMNS: RankColumn[] = [
   { column: 19, rank: "Chief Of Police", group: "HIGH COMMAND" },
 ]
 
-const DISPLAY_ORDER = [...RANK_COLUMNS].reverse()
+// Table order follows the Google Sheet: Officers on the left,
+// then Supervisors, Low Command, Trial High Command, and High Command.
+const DISPLAY_ORDER = [...RANK_COLUMNS]
+
+// The rank filter intentionally lists the ranks in reverse order,
+// putting Officers at the bottom of the filter menu.
+const FILTER_ORDER = [...RANK_COLUMNS].reverse()
 
 function clean(value: unknown): string {
   return String(value ?? "")
@@ -411,7 +417,7 @@ export default function AuthorityMatrix() {
                   className="h-9 w-full min-w-[180px] appearance-none rounded-lg border border-border bg-background pl-9 pr-9 text-sm outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
                 >
                   <option value="ALL">All Ranks</option>
-                  {DISPLAY_ORDER.map((rank) => (
+                  {FILTER_ORDER.map((rank) => (
                     <option key={rank.rank} value={rank.rank}>
                       {compactRank(rank.rank)}
                     </option>
