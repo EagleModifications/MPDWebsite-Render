@@ -1882,7 +1882,7 @@ export default function Gallery() {
 
                           <div className="border-t border-border/70 p-3">
                             <div className="relative">
-                              <div className="w-full px-1 py-1 pr-16 text-left">
+                              <div className="w-full px-1 py-1 pb-9 pr-16 text-left">
                                 <div className="mb-1.5 flex flex-col items-start gap-1.5">
                                   <span
                                     className={[
@@ -1912,13 +1912,13 @@ export default function Gallery() {
                                   )}
                                 </div>
 
-                                <h3 className="line-clamp-2 max-w-[35ch] whitespace-pre-line text-sm font-semibold">
+                                <h3 className="line-clamp-2 max-w-[35ch] break-words whitespace-pre-line text-sm font-semibold">
                                   {item.title}
                                 </h3>
 
                                 {item.description && (
                                   <div className="mt-1 max-w-[35ch]">
-                                    <p className="line-clamp-3 whitespace-pre-line text-xs leading-5 text-muted-foreground">
+                                    <p className="line-clamp-3 max-w-[35ch] break-words whitespace-pre-line text-xs leading-5 text-muted-foreground">
                                       {item.description}
                                     </p>
 
@@ -1941,7 +1941,7 @@ export default function Gallery() {
 
                               {canManageGallery && (
                                 <div
-                                  className="absolute right-0 top-0 z-10 flex shrink-0 items-center gap-1"
+                                  className="absolute bottom-0 right-0 z-10 flex shrink-0 items-center gap-1"
                                   onClick={(event) => event.stopPropagation()}
                                   onKeyDown={(event) => event.stopPropagation()}
                                 >
