@@ -42,7 +42,6 @@ import Footer from "@/components/Footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -865,7 +864,9 @@ function GalleryFilterDropdown({
           onClick={() => onChange(allSelected ? [] : [...options])}
           className="gap-2 rounded-lg px-3 py-2.5"
         >
-          <Checkbox checked={allSelected} tabIndex={-1} className="pointer-events-none" />
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+            {allSelected && <Check className="h-4 w-4 text-blue-500" />}
+          </span>
           <span className="font-medium">All {label === "Type" ? "Types" : `${label}s`}</span>
         </DropdownMenuItem>
         <div className="my-1 h-px bg-border" />
@@ -881,7 +882,9 @@ function GalleryFilterDropdown({
                 checked ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/10 focus:text-blue-400" : "",
               ].join(" ")}
             >
-              <Checkbox checked={checked} tabIndex={-1} className="pointer-events-none" />
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                {checked && <Check className="h-4 w-4 text-blue-500" />}
+              </span>
               {optionKind === "type" ? (
                 option === "Images" ? <ImageIcon className="h-4 w-4 shrink-0" /> : <Video className="h-4 w-4 shrink-0" />
               ) : (
@@ -2011,6 +2014,7 @@ export default function Gallery() {
                   value={mediaFilters}
                   ariaLabel="Filter by media type"
                   onChange={setMediaFilters}
+                  optionKind="type"
                 />
 
                 <GalleryFilterDropdown
@@ -2663,6 +2667,7 @@ export default function Gallery() {
               if (event.currentTarget === event.target) setShowTaxonomyModal(false)
             }}
           >
+            <DropdownProvider>
             <div
               role="dialog"
               aria-modal="true"
@@ -2757,6 +2762,7 @@ export default function Gallery() {
               </div>
             </div>
             </div>
+            </DropdownProvider>
           </div>,
           document.body,
         )}
