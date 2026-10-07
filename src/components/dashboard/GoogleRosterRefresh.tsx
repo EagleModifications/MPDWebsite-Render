@@ -11,8 +11,7 @@ interface GoogleRosterRefreshProps {
 export default function GoogleRosterRefresh({
   onRefreshed,
 }: GoogleRosterRefreshProps) {
-  const [refreshing, setRefreshing] =
-    useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const handleRefresh = async (
     event: React.MouseEvent<HTMLButtonElement>,
@@ -41,10 +40,7 @@ export default function GoogleRosterRefresh({
         },
       )
 
-      const data =
-        await response.json().catch(
-          () => null,
-        )
+      const data = await response.json().catch(() => null)
 
       if (!response.ok) {
         throw new Error(
@@ -64,30 +60,22 @@ export default function GoogleRosterRefresh({
         await onRefreshed()
       }
 
-      toast.success(
-        "Roster refreshed successfully",
-        {
-          id: loadingToast,
-          description:
-            "The latest roster information has been synchronized and loaded.",
-        },
-      )
+      toast.success("Roster refreshed successfully", {
+        description:
+          "The latest roster information has been synchronized and loaded.",
+      })
     } catch (error) {
       console.error(
         "[google-sync] Refresh failed:",
         error,
       )
 
-      toast.error(
-        "Roster refresh failed",
-        {
-          id: loadingToast,
-          description:
-            error instanceof Error
-              ? error.message
-              : "Failed to synchronize Google Sheets.",
-        },
-      )
+      toast.error("Roster refresh failed", {
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to synchronize Google Sheets.",
+      })
     } finally {
       setRefreshing(false)
     }
@@ -109,9 +97,7 @@ export default function GoogleRosterRefresh({
         }
       />
 
-      {refreshing
-        ? "Refreshing..."
-        : "Refresh"}
+      {refreshing ? "Refreshing..." : "Refresh"}
     </Button>
   )
 }
