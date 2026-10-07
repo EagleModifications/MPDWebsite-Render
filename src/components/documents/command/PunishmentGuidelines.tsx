@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { FileSpreadsheet, RefreshCw, Search, X } from "lucide-react"
+import { FileSpreadsheet, Filter, RefreshCw, Search, X } from "lucide-react"
 
 const SHEET_URL =
   "https://docs.google.com/spreadsheets/d/1WlES0v7NUSRccYvdd7EUHQgHvcdrBPJGUoKqNWbTDP8/edit?gid=0#gid=0"
@@ -124,17 +124,50 @@ function isFooterRow(values: string[]) {
 
 function parseSheet(response: GvizResponse): SheetData {
   const rawRows = response.table?.rows ?? []
+
   if (!rawRows.length) {
     throw new Error("The Punishment Guidelines sheet returned no data.")
   }
 
   const rows = rawRows.map(rowValues)
   const columns = findHeaderColumns(rows)
+
+  let headerRowIndex = -1
+
+  for (let rowIndex = 0; rowIndex < Math.min(rows.length, 30); rowIndex += 1) {
+    const visible = columns.map((column) => normalizeHeader(rows[rowIndex][column] ?? ""))
+
+    const matchesHeader =
+      visible[0] === "CATEGORY" &&
+      visible[1] === "OFFENSE / EXAMPLE" &&
+      visible[2] === "OFFENSE #1" &&
+      visible[3] === "OFFENSE #2" &&
+      visible[4] === "OFFENSE #3" &&
+      visible[5] === "ELEVATED ACTION"
+
+    if (matchesHeader) {
+      headerRowIndex = rowIndex
+      break
+    }
+  }
+
+  if (headerRowIndex === -1) {
+    throw new Error(
+      "Could not find the six-column Punishment Guidelines header row.",
+    )
+  }
+
   const parsed: PunishmentRow[] = []
   let currentSection: SectionName | null = null
 
-  rows.forEach((row, rowIndex) => {
-    if (isFooterRow(row)) return
+  for (
+    let rowIndex = headerRowIndex + 1;
+    rowIndex < rows.length;
+    rowIndex += 1
+  ) {
+    const row = rows[rowIndex]
+
+    if (isFooterRow(row)) continue
 
     const sectionCandidate = row
       .map(sectionFromValue)
@@ -143,28 +176,31 @@ function parseSheet(response: GvizResponse): SheetData {
     if (sectionCandidate) {
       currentSection = sectionCandidate
 
-      // Section-only rows are rendered as a section divider, not as a data row.
       const visible = columns.map((column) => clean(row[column]))
       const meaningful = visible.filter(Boolean)
+
       if (meaningful.length <= 1) {
         parsed.push({
           id: `punishment-section-${rowIndex}`,
           section: sectionCandidate,
           values: [sectionCandidate, "", "", "", "", ""],
         })
-        return
+        continue
       }
     }
 
-    const values = columns.map((column) => clean(row[column]))
-    if (!values.some(Boolean)) return
+    // Nothing before the first section belongs in the visible table.
+    if (!currentSection) continue
 
-    // Ignore the header itself if the sheet repeats it further down.
+    const values = columns.map((column) => clean(row[column]))
+
+    if (!values.some(Boolean)) continue
+
     if (
       normalizeHeader(values[0]) === "CATEGORY" &&
       normalizeHeader(values[1]) === "OFFENSE / EXAMPLE"
     ) {
-      return
+      continue
     }
 
     parsed.push({
@@ -172,10 +208,12 @@ function parseSheet(response: GvizResponse): SheetData {
       section: currentSection,
       values,
     })
-  })
+  }
 
   if (!parsed.length) {
-    throw new Error("The Punishment Guidelines sheet contained no guideline rows.")
+    throw new Error(
+      "The Punishment Guidelines sheet contained no guideline rows after the table header.",
+    )
   }
 
   return { rows: parsed }
@@ -382,7 +420,10 @@ export default function PunishmentGuidelines() {
                           colSpan={HEADERS.length}
                           className="border-b border-blue-500/20 bg-blue-500/[0.035] px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-blue-400"
                         >
-                          {sectionLabel(row.section)}
+                          <span className="inline-flex items-center gap-1.5">
+                            <Filter className="h-3 w-3 text-blue-400" />
+                            {sectionLabel(row.section)}
+                          </span>
                         </td>
                       </tr>
                     )
@@ -398,7 +439,7 @@ export default function PunishmentGuidelines() {
                           key={header}
                           className="border-r border-border/40 px-3 py-2.5 text-[10px] leading-4 text-foreground last:border-r-0 sm:px-4 sm:text-[11px]"
                         >
-                          {row.values[index] || "—"}
+                          {row.values[index] || ""}
                         </td>
                       ))}
                     </tr>
