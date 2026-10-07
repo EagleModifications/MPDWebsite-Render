@@ -567,6 +567,8 @@ type GalleryMedia = {
   thumbnailUrl: string
   source: "upload" | "url"
   storageId?: string
+  extension?: string
+  publicSlug?: string
 }
 
 type GalleryDocument = {
@@ -593,6 +595,7 @@ type GalleryConfigDocument = {
   _galleryConfig: true
   categories: string[]
   tags: string[]
+  tagCategories?: Record<string, string[]>
   categoryColors?: Record<string, string>
   tagColors?: Record<string, string>
   createdAt: Date
@@ -607,6 +610,9 @@ async function getGalleryConfig() {
     return {
       categories: existing.categories?.length ? existing.categories : [...DEFAULT_GALLERY_CATEGORIES],
       tags: existing.tags?.length ? existing.tags : [...DEFAULT_GALLERY_TAGS],
+      tagCategories: existing.tagCategories ?? Object.fromEntries(
+        (existing.categories?.length ? existing.categories : [...DEFAULT_GALLERY_CATEGORIES]).map((category) => [category, existing.tags?.length ? existing.tags : [...DEFAULT_GALLERY_TAGS]]),
+      ),
       categoryColors: { ...DEFAULT_GALLERY_CATEGORY_COLORS, ...(existing.categoryColors ?? {}) },
       tagColors: { ...DEFAULT_GALLERY_TAG_COLORS, ...(existing.tagColors ?? {}) },
     }
@@ -617,6 +623,7 @@ async function getGalleryConfig() {
     _galleryConfig: true,
     categories: [...DEFAULT_GALLERY_CATEGORIES],
     tags: [...DEFAULT_GALLERY_TAGS],
+    tagCategories: Object.fromEntries(DEFAULT_GALLERY_CATEGORIES.map((category) => [category, [...DEFAULT_GALLERY_TAGS]])),
     categoryColors: { ...DEFAULT_GALLERY_CATEGORY_COLORS },
     tagColors: { ...DEFAULT_GALLERY_TAG_COLORS },
     createdAt: now,
@@ -624,7 +631,7 @@ async function getGalleryConfig() {
   }
 
   await gallery.insertOne(config as GalleryDocument)
-  return { categories: config.categories, tags: config.tags }
+  return { categories: config.categories, tags: config.tags, tagCategories: config.tagCategories ?? {}, categoryColors: config.categoryColors ?? {}, tagColors: config.tagColors ?? {} }
 }
 
 function isGalleryMediaType(
@@ -767,6 +774,12 @@ function getGalleryPublicMediaUrl(
    * perfectly configured.
    */
   if (storageId && ObjectId.isValid(storageId)) {
+    const publicSlug = cleanGalleryString((media as GalleryMedia & { publicSlug?: string }).publicSlug)
+    const extension = cleanGalleryString((media as GalleryMedia & { extension?: string }).extension)
+    const mediaType = media.type === "video" ? "video" : "image"
+    if (publicSlug && extension) {
+      return `/gallery/${mediaType}/${publicSlug}.${extension}`
+    }
     return `/api/gallery/file/${storageId}`
   }
 
@@ -941,8 +954,19 @@ async function safeUnlinkGalleryTempFile(
   }
 }
 
+function slugifyGalleryTitle(value: string) {
+  return cleanGalleryString(value)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80) || "gallery"
+}
+
 async function storeGalleryFile(
   file: Express.Multer.File,
+  publicBaseName?: string,
 ) {
   const type = getGalleryFileType(
     file.mimetype,
@@ -961,9 +985,11 @@ async function storeGalleryFile(
   }
 
   const bucket = await getGalleryBucket()
-  const filename =
-    file.originalname?.trim() ||
-    `gallery-${Date.now()}`
+  const originalFilename = file.originalname?.trim() || `gallery-${Date.now()}`
+  const originalExtension = path.extname(originalFilename).toLowerCase()
+  const filename = publicBaseName
+    ? `${slugifyGalleryTitle(publicBaseName)}${originalExtension || ".bin"}`
+    : originalFilename
   const contentType = getGalleryContentType(
     file.mimetype,
     filename,
@@ -978,6 +1004,9 @@ async function storeGalleryFile(
         originalName: filename,
         mediaType: type,
         contentType,
+        publicSlug: slugifyGalleryTitle(publicBaseName || path.basename(filename, path.extname(filename))),
+        galleryTitle: publicBaseName || path.basename(filename, path.extname(filename)),
+        publicExtension: path.extname(filename).replace(/^\./, "").toLowerCase() || "bin",
       },
     },
   )
@@ -994,7 +1023,9 @@ async function storeGalleryFile(
     })
 
     const storageId = uploadStream.id.toString()
-    const filePath = `/api/gallery/file/${storageId}`
+    const extension = path.extname(filename).replace(/^\./, "").toLowerCase() || "bin"
+    const publicSlug = slugifyGalleryTitle(publicBaseName || path.basename(filename, path.extname(filename)))
+    const filePath = `/gallery/${type}/${publicSlug}.${extension}`
 
     return {
       id: storageId,
@@ -1005,6 +1036,8 @@ async function storeGalleryFile(
       thumbnailUrl: "",
       source: "upload" as const,
       storageId,
+      extension,
+      publicSlug,
     }
   } catch (error) {
     if (uploadStream.id) {
@@ -1035,13 +1068,168 @@ function isSupportedGalleryExternalVideoUrl(value: string) {
   }
 }
 
+function getGalleryExtensionFromContentType(
+  contentType: string,
+  fallback = "bin",
+) {
+  const clean = contentType.toLowerCase().split(";")[0].trim()
+  const map: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "image/avif": "avif",
+    "image/bmp": "bmp",
+    "image/svg+xml": "svg",
+    "image/tiff": "tiff",
+    "video/mp4": "mp4",
+    "video/webm": "webm",
+    "video/quicktime": "mov",
+    "video/x-m4v": "m4v",
+    "video/ogg": "ogv",
+    "video/mpeg": "mpeg",
+  }
+  return map[clean] || fallback
+}
+
+async function downloadGalleryUrlToFile(
+  sourceUrl: string,
+  expectedType?: GalleryMediaType,
+  publicBaseName?: string,
+) {
+  const response = await fetch(sourceUrl, {
+    redirect: "follow",
+    headers: {
+      "User-Agent": "Mozilla/5.0 MPD Gallery",
+      "Accept": "image/*,video/*,*/*;q=0.8",
+    },
+  })
+
+  if (!response.ok || !response.body) {
+    throw new Error(`The URL returned HTTP ${response.status}.`)
+  }
+
+  const contentType = response.headers.get("content-type") || ""
+  let detectedType = getGalleryFileType(contentType, sourceUrl)
+
+  // If the link is a webpage rather than a direct media file, extract the
+  // page's Open Graph media URL and download that actual media instead.
+  if (!detectedType && contentType.toLowerCase().includes("text/html")) {
+    const html = await response.text()
+    const metaPattern =
+      expectedType === "video"
+        ? /<meta[^>]+(?:property|name)=["']og:video(?::secure_url)?["'][^>]+content=["']([^"']+)["'][^>]*>/i
+        : /<meta[^>]+(?:property|name)=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["'][^>]*>/i
+
+    const reverseMetaPattern =
+      expectedType === "video"
+        ? /<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:video(?::secure_url)?["'][^>]*>/i
+        : /<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image(?::secure_url)?["'][^>]*>/i
+
+    const match = html.match(metaPattern) || html.match(reverseMetaPattern)
+    const extractedUrl = match?.[1]?.trim()
+
+    if (extractedUrl) {
+      const absoluteUrl = new URL(extractedUrl, response.url).toString()
+      return downloadGalleryUrlToFile(absoluteUrl, expectedType, publicBaseName)
+    }
+  }
+
+  const type = detectedType || expectedType
+
+  if (!type) {
+    throw new Error("The URL does not point to a supported image or video.")
+  }
+
+  if (expectedType && detectedType && expectedType !== detectedType) {
+    throw new Error(`The URL contains a ${detectedType}, not an ${expectedType}.`)
+  }
+
+  const lengthHeader = response.headers.get("content-length")
+  const length = lengthHeader ? Number(lengthHeader) : 0
+  if (length > 100 * 1024 * 1024) {
+    throw new Error("The downloaded media is larger than the 100 MB gallery limit.")
+  }
+
+  const extension =
+    path.extname(new URL(response.url).pathname).replace(/^\./, "").toLowerCase() ||
+    getGalleryExtensionFromContentType(contentType, type === "video" ? "mp4" : "jpg")
+
+  const jobId = randomUUID()
+  const filePath = path.join(
+    GALLERY_UPLOAD_DIR,
+    `url-${jobId}.${extension}`,
+  )
+
+  try {
+    const output = fs.createWriteStream(filePath)
+    let bytes = 0
+
+    const body = Readable.fromWeb(
+      response.body as globalThis.ReadableStream<Uint8Array>,
+    )
+
+    body.on("data", (chunk: Buffer | Uint8Array) => {
+      bytes += chunk.length
+      if (bytes > 100 * 1024 * 1024) {
+        body.destroy(
+          new Error(
+            "The downloaded media is larger than the 100 MB gallery limit.",
+          ),
+        )
+      }
+    })
+
+    await new Promise<void>((resolve, reject) => {
+      body.once("error", reject)
+      output.once("error", reject)
+      output.once("finish", resolve)
+      body.pipe(output)
+    })
+
+    const stat = await fs.promises.stat(filePath)
+    if (stat.size <= 0) {
+      throw new Error("The URL returned an empty media file.")
+    }
+
+    const stored = await storeGalleryFile({
+      fieldname: "file",
+      originalname: `gallery-${jobId}.${extension}`,
+      encoding: "7bit",
+      mimetype: contentType || (type === "video" ? "video/mp4" : "image/jpeg"),
+      size: stat.size,
+      destination: GALLERY_UPLOAD_DIR,
+      filename: path.basename(filePath),
+      path: filePath,
+      buffer: undefined,
+      stream: fs.createReadStream(filePath),
+    } as Express.Multer.File, publicBaseName)
+
+    return stored
+  } finally {
+    await safeUnlinkGalleryTempFile(filePath)
+  }
+}
+
+function getYouTubeThumbnailForServer(value: string) {
+  try {
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase().replace(/^www\./, "")
+    let id = ""
+    if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0] || ""
+    else if (host === "youtube.com" || host === "m.youtube.com") id = url.searchParams.get("v") || url.pathname.split("/").filter(Boolean).slice(1)[0] || ""
+    return id ? `https://img.youtube.com/vi/${encodeURIComponent(id)}/hqdefault.jpg` : ""
+  } catch { return "" }
+}
+
 async function importGalleryExternalVideo(
   sourceUrl: string,
+  publicBaseName?: string,
 ) {
   const url = sourceUrl.trim()
 
   if (!isSupportedGalleryExternalVideoUrl(url)) {
-    throw new Error("Only YouTube and Vimeo video URLs can be imported as gallery files.")
+    return downloadGalleryUrlToFile(url, "video", publicBaseName)
   }
 
   const jobId = randomUUID()
@@ -1087,32 +1275,23 @@ async function importGalleryExternalVideo(
       throw new Error("The extracted video is larger than the 100 MB gallery limit.")
     }
 
-    const extension = path.extname(filename).toLowerCase()
-    const mimetype =
-      extension === ".mp4"
-        ? "video/mp4"
-        : extension === ".webm"
-          ? "video/webm"
-          : extension === ".mkv"
-            ? "video/x-matroska"
-            : "video/*"
-
+    const extension = path.extname(filename).replace(/^\./, "").toLowerCase() || "mp4"
     const stored = await storeGalleryFile({
       fieldname: "file",
-      originalname: `gallery-${jobId}${extension || ".mp4"}`,
+      originalname: `gallery-${jobId}.${extension}`,
       encoding: "7bit",
-      mimetype,
+      mimetype: extension === "webm" ? "video/webm" : "video/mp4",
       size: stat.size,
       destination: GALLERY_UPLOAD_DIR,
       filename,
       path: filePath,
       buffer: undefined,
       stream: fs.createReadStream(filePath),
-    } as Express.Multer.File)
+    } as Express.Multer.File, publicBaseName)
 
     return {
       ...stored,
-      source: "upload" as const,
+      source: "url" as const,
     }
   } catch (error) {
     for (const name of fs
@@ -1128,10 +1307,32 @@ async function importGalleryExternalVideo(
         ? error.message
         : "Unknown extraction error"
 
+    if (/sign in|cookies|authentication|confirm you.?re not a bot/i.test(message) && getYouTubeVideoId(url)) {
+      return {
+        id: randomUUID(),
+        type: "video" as const,
+        url,
+        thumbnailUrl: getYouTubeThumbnailForServer(url),
+        source: "url" as const,
+      }
+    }
+
     throw new Error(
       `Unable to import the video from the URL. ${message}`,
     )
   }
+}
+
+async function importGalleryMediaUrl(
+  sourceUrl: string,
+  requestedType: GalleryMediaType,
+  publicBaseName?: string,
+) {
+  if (requestedType === "video") {
+    return importGalleryExternalVideo(sourceUrl, publicBaseName)
+  }
+
+  return downloadGalleryUrlToFile(sourceUrl, "image", publicBaseName)
 }
 
 async function deleteGalleryStoredFile(
@@ -6020,6 +6221,89 @@ export function createApp() {
      Gallery
   ───────────────────────────────────────── */
 
+  app.get("/gallery/:type/:slug.:extension", async (req, res) => {
+    try {
+      const type = req.params.type === "video" ? "video" : req.params.type === "image" ? "image" : ""
+      const slug = cleanGalleryString(req.params.slug)
+      const extension = cleanGalleryString(req.params.extension).toLowerCase()
+
+      if (!type || !slug || !extension) {
+        return res.status(404).send("Gallery media not found")
+      }
+
+      const bucket = await getGalleryBucket()
+      const files = await bucket.find({
+        "metadata.publicSlug": slug,
+        "metadata.publicExtension": extension,
+        "metadata.mediaType": type,
+      }).limit(1).toArray()
+
+      const file = files[0]
+      if (!file) return res.status(404).send("Gallery media not found")
+
+      const contentType = getGalleryContentType(
+        typeof file.contentType === "string" ? file.contentType : "",
+        typeof file.filename === "string" ? file.filename : `gallery.${extension}`,
+        type,
+      )
+
+      const raw = req.query.raw === "1"
+      const acceptsHtml = String(req.headers.accept ?? "").includes("text/html")
+
+      if (!raw && acceptsHtml) {
+        const title = typeof file.metadata?.galleryTitle === "string"
+          ? file.metadata.galleryTitle
+          : typeof file.metadata?.originalName === "string"
+            ? file.metadata.originalName
+            : `Gallery ${type}`
+        const safeTitle = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+        const mediaUrl = `/gallery/${type}/${slug}.${extension}?raw=1`
+        const mediaMarkup = type === "image"
+          ? `<img src="${mediaUrl}" alt="${safeTitle}" style="max-width:96vw;max-height:90vh;object-fit:contain;display:block;margin:auto" />`
+          : `<video src="${mediaUrl}" controls autoplay muted playsinline style="max-width:96vw;max-height:90vh;display:block;margin:auto"></video>`
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8")
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable")
+        return res.send(`<!doctype html><html><head><meta charset="utf-8"><title>${safeTitle} | Metro Police Department</title><link rel="icon" href="/logo.png"></head><body style="margin:0;background:#000;min-height:100vh;display:flex;align-items:center;justify-content:center">${mediaMarkup}</body></html>`)
+      }
+
+      res.setHeader("Content-Type", contentType)
+      res.setHeader("Content-Disposition", "inline")
+      res.setHeader("Accept-Ranges", "bytes")
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable")
+
+      const totalLength = Number(file.length)
+      const range = req.headers.range
+      const objectId = file._id
+
+      if (!range) {
+        res.status(200).setHeader("Content-Length", String(totalLength))
+        const stream = bucket.openDownloadStream(objectId)
+        stream.once("error", () => { if (!res.headersSent) res.status(500).end(); else res.end() })
+        stream.pipe(res)
+        return
+      }
+
+      const match = /^bytes=(\d*)-(\d*)$/i.exec(range.trim())
+      if (!match) return res.status(416).end()
+      const requestedStart = match[1] ? Number(match[1]) : null
+      const requestedEnd = match[2] ? Number(match[2]) : null
+      const start = requestedStart === null ? Math.max(0, totalLength - (requestedEnd ?? 0)) : requestedStart
+      let end = requestedStart === null ? totalLength - 1 : (requestedEnd ?? totalLength - 1)
+      if (start < 0 || start >= totalLength || end < start) return res.status(416).end()
+      end = Math.min(end, totalLength - 1)
+      const length = end - start + 1
+      res.status(206)
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${totalLength}`)
+      res.setHeader("Content-Length", String(length))
+      bucket.openDownloadStream(objectId, { start, end: end + 1 }).pipe(res)
+      return
+    } catch (error) {
+      console.error("GET /gallery/:type/:slug.:extension failed:", error)
+      return res.status(404).send("Gallery media not found")
+    }
+  })
+
   app.get("/api/gallery", async (_req, res) => {
     try {
       // Public read endpoint: guests can view the gallery.
@@ -6071,8 +6355,10 @@ export function createApp() {
 
       const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
       const value = cleanGalleryString(req.body?.value)
+      const category = cleanGalleryString(req.body?.category)
       const color = cleanGalleryString(req.body?.color) || "#3b82f6"
       if (!type || !value) return res.status(400).json({ success: false, error: "A valid category or tag name is required." })
+      if (type === "tag" && !category) return res.status(400).json({ success: false, error: "Select a category for this tag." })
       if (value.length > 40) return res.status(400).json({ success: false, error: "Names must be 40 characters or fewer." })
       if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ success: false, error: "Color must be a valid hex color." })
 
@@ -6085,11 +6371,19 @@ export function createApp() {
 
       const next = [...target, value]
       const colors = type === "category" ? { ...config.categoryColors, [value]: color } : { ...config.tagColors, [value]: color }
+      const tagCategories = { ...(config.tagCategories ?? {}) }
+
+      if (type === "category") {
+        tagCategories[value] = []
+      } else {
+        tagCategories[category] = Array.from(new Set([...(tagCategories[category] ?? []), value]))
+      }
+
       await gallery.updateOne(
         { _galleryConfig: true },
         { $set: type === "category"
-          ? { categories: next, categoryColors: colors, updatedAt: new Date() }
-          : { tags: next, tagColors: colors, updatedAt: new Date() } },
+          ? { categories: next, categoryColors: colors, tagCategories, updatedAt: new Date() }
+          : { tags: next, tagColors: colors, tagCategories, updatedAt: new Date() } },
         { upsert: true },
       )
 
@@ -6108,6 +6402,7 @@ export function createApp() {
 
       const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
       const value = cleanGalleryString(req.body?.value)
+      const category = cleanGalleryString(req.body?.category)
       const color = cleanGalleryString(req.body?.color)
       if (!type || !value || !/^#[0-9a-fA-F]{6}$/.test(color)) {
         return res.status(400).json({ success: false, error: "A valid option and hex color are required." })
@@ -6119,9 +6414,14 @@ export function createApp() {
 
       const gallery = await getCollection<GalleryDocument | GalleryConfigDocument>("gallery")
       const colors = type === "category" ? { ...config.categoryColors, [value]: color } : { ...config.tagColors, [value]: color }
+      const tagCategories = { ...(config.tagCategories ?? {}) }
+      if (type === "tag" && category) {
+        for (const key of Object.keys(tagCategories)) tagCategories[key] = (tagCategories[key] ?? []).filter((tag) => tag !== value)
+        tagCategories[category] = Array.from(new Set([...(tagCategories[category] ?? []), value]))
+      }
       await gallery.updateOne(
         { _galleryConfig: true },
-        { $set: type === "category" ? { categoryColors: colors, updatedAt: new Date() } : { tagColors: colors, updatedAt: new Date() } },
+        { $set: type === "category" ? { categoryColors: colors, tagCategories, updatedAt: new Date() } : { tagColors: colors, tagCategories, updatedAt: new Date() } },
         { upsert: true },
       )
 
@@ -6180,13 +6480,16 @@ export function createApp() {
           })
         }
 
+        const title = cleanGalleryString(req.body?.title) || "gallery"
         const uploaded: GalleryMedia[] = []
 
         try {
-          for (const file of files) {
+          for (let index = 0; index < files.length; index += 1) {
+            const file = files[index]
             uploaded.push(
               await storeGalleryFile(
                 file,
+                index === 0 ? title : `${title}_${index + 1}`,
               ),
             )
           }
@@ -6247,15 +6550,18 @@ export function createApp() {
           typeof req.body?.url === "string"
             ? req.body.url.trim()
             : ""
+        const requestedType: GalleryMediaType = req.body?.type === "video" ? "video" : "image"
+        const title = cleanGalleryString(req.body?.title) || "gallery"
+        const publicIndex = Number.isFinite(Number(req.body?.index)) ? Math.max(0, Number(req.body.index)) : 0
 
         if (!url) {
           return res.status(400).json({
             success: false,
-            error: "A video URL is required.",
+            error: "A media URL is required.",
           })
         }
 
-        const media = await importGalleryExternalVideo(url)
+        const media = await importGalleryMediaUrl(url, requestedType, `${title}${publicIndex ? `_${publicIndex + 1}` : ""}`)
 
         return res.status(201).json({
           success: true,
