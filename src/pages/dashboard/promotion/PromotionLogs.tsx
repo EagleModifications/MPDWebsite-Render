@@ -202,6 +202,8 @@ const formatDateHeading = (value: string) => {
 
 const detailLabel = (key: string) => {
   const labels: Record<string, string> = {
+    code: "Code",
+    itemId: "Item ID",
     count: "Count",
     hours: "Hours",
     requiredHours: "Required Hours",
@@ -223,52 +225,184 @@ const detailLabel = (key: string) => {
     reason: "Reason",
     note: "Note",
     notes: "Notes",
+    before: "Before",
+    after: "After",
+    old: "Previous",
+    new: "New",
+    from: "Previous",
+    to: "New",
   }
 
   return labels[key] ?? actionLabel(key)
 }
 
-const formatDetailValue = (value: unknown): string => {
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const hasOwn = (value: Record<string, unknown>, key: string) =>
+  Object.prototype.hasOwnProperty.call(value, key)
+
+const isChangePair = (value: unknown): value is Record<string, unknown> => {
+  if (!isRecord(value)) return false
+
+  return (
+    (hasOwn(value, "from") && hasOwn(value, "to")) ||
+    (hasOwn(value, "old") && hasOwn(value, "new")) ||
+    (hasOwn(value, "before") && hasOwn(value, "after"))
+  )
+}
+
+const getChangePair = (value: Record<string, unknown>) => {
+  if (hasOwn(value, "from") || hasOwn(value, "to")) {
+    return { from: value.from, to: value.to }
+  }
+
+  if (hasOwn(value, "old") || hasOwn(value, "new")) {
+    return { from: value.old, to: value.new }
+  }
+
+  return { from: value.before, to: value.after }
+}
+
+const formatSimpleValue = (value: unknown): string => {
   if (value === null || value === undefined || value === "") return "—"
   if (typeof value === "boolean") return value ? "Yes" : "No"
-  if (Array.isArray(value)) return value.map((item) => formatDetailValue(item)).join(", ")
-  if (typeof value === "object") {
-    return Object.entries(value as Record<string, unknown>)
-      .map(([key, item]) => `${detailLabel(key)}: ${formatDetailValue(item)}`)
-      .join(" · ")
+  if (typeof value === "number") return value.toLocaleString()
+  if (typeof value === "string") return value
+  if (Array.isArray(value)) {
+    return value.map((item) => formatSimpleValue(item)).join(", ")
   }
   return String(value)
 }
 
-const getDetailEntries = (log: ActionLog) => {
-  const details = log.details ?? {}
-  const entries = Object.entries(details).filter(([, value]) => value !== undefined && value !== null)
+const formatDetailValue = (value: unknown): string => {
+  if (!isRecord(value)) return formatSimpleValue(value)
 
-  // Keep requirement changes easy to scan: show the important requirement
-  // values in a predictable order rather than dumping the raw JSON object.
-  const requirementOrder = [
-    "requiredHours",
-    "promotionHours",
-    "requiredTimeInRankDays",
-    "timeInRankDays",
-    "requiredTrainingLogs",
-    "trainingLogs",
-    "requiredRecruitmentLogs",
-    "recruitmentLogs",
-    "requiredLogs",
-    "hours",
-    "count",
-  ]
-
-  if (log.category === "requirements" || log.action.toLowerCase().includes("requirement")) {
-    return entries.sort(([a], [b]) => {
-      const ai = requirementOrder.indexOf(a)
-      const bi = requirementOrder.indexOf(b)
-      return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
-    })
+  if (isChangePair(value)) {
+    const pair = getChangePair(value)
+    return `${formatSimpleValue(pair.from)} → ${formatSimpleValue(pair.to)}`
   }
 
-  return entries
+  return Object.entries(value)
+    .filter(([, item]) => item !== undefined && item !== null)
+    .map(([key, item]) => `${detailLabel(key)}: ${formatDetailValue(item)}`)
+    .join(" · ")
+}
+
+type DetailEntry = {
+  key: string
+  value: unknown
+  change?: {
+    from: unknown
+    to: unknown
+  }
+}
+
+const getDetailEntries = (log: ActionLog): DetailEntry[] => {
+  const details = log.details ?? {}
+  const entries = Object.entries(details).filter(
+    ([, value]) => value !== undefined && value !== null,
+  )
+
+  const isRequirementsLog =
+    log.category === "requirements" ||
+    log.action.toLowerCase().includes("requirement")
+
+  if (!isRequirementsLog) {
+    return entries.map(([key, value]) => ({ key, value }))
+  }
+
+  const requirementOrder = [
+    "code",
+    "hours",
+    "requiredHours",
+    "promotionHours",
+    "timeInRankDays",
+    "requiredTimeInRankDays",
+    "trainingLogs",
+    "requiredTrainingLogs",
+    "recruitmentLogs",
+    "requiredRecruitmentLogs",
+    "requiredLogs",
+    "count",
+    "rank",
+    "division",
+    "status",
+  ]
+
+  const output: DetailEntry[] = []
+
+  const pushEntry = (key: string, value: unknown) => {
+    if (isChangePair(value)) {
+      output.push({ key, value, change: getChangePair(value) })
+    } else if (isRecord(value)) {
+      // Handle nested requirement payloads without ever displaying raw JSON.
+      for (const [nestedKey, nestedValue] of Object.entries(value)) {
+        if (nestedValue === undefined || nestedValue === null) continue
+        pushEntry(nestedKey, nestedValue)
+      }
+    } else {
+      output.push({ key, value })
+    }
+  }
+
+  for (const [key, value] of entries) {
+    if (key === "changes" && isRecord(value)) {
+      for (const [changedKey, changedValue] of Object.entries(value)) {
+        if (changedValue === undefined || changedValue === null) continue
+        pushEntry(changedKey, changedValue)
+      }
+      continue
+    }
+
+    if (key === "before" || key === "after") {
+      // If the API stores a complete before/after object, pair the fields by key.
+      continue
+    }
+
+    pushEntry(key, value)
+  }
+
+  const before = isRecord(details.before) ? details.before : null
+  const after = isRecord(details.after) ? details.after : null
+
+  if (before || after) {
+    const keys = new Set([
+      ...(before ? Object.keys(before) : []),
+      ...(after ? Object.keys(after) : []),
+    ])
+
+    const beforeAfterEntries: DetailEntry[] = []
+
+    for (const key of keys) {
+      const from = before?.[key]
+      const to = after?.[key]
+
+      if (from === undefined && to === undefined) continue
+      if (Object.is(from, to)) continue
+
+      beforeAfterEntries.push({
+        key,
+        value: { from, to },
+        change: { from, to },
+      })
+    }
+
+    // Prefer the clean before/after rows when they are available.
+    if (beforeAfterEntries.length > 0) {
+      return beforeAfterEntries.sort((a, b) => {
+        const ai = requirementOrder.indexOf(a.key)
+        const bi = requirementOrder.indexOf(b.key)
+        return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
+      })
+    }
+  }
+
+  return output.sort((a, b) => {
+    const ai = requirementOrder.indexOf(a.key)
+    const bi = requirementOrder.indexOf(b.key)
+    return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
+  })
 }
 
 const getInitials = (value: string) =>
@@ -567,7 +701,7 @@ function IdentityCard({
         event.preventDefault()
         copy(type)
       }}
-      className="gap-2 text-sm"
+      className="h-7 gap-2 whitespace-nowrap px-2 py-1 text-xs"
     >
       <Clipboard className="h-4 w-4 text-blue-400" />
       {label}
@@ -621,36 +755,36 @@ function IdentityCard({
       <DropdownMenuContent
         align="start"
         sideOffset={4}
-        className="z-[300] w-64"
+        avoidCollisions={false}
+        className="z-[300] w-[285px] max-h-80 overflow-y-auto p-1"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="px-2 py-1.5">
-          <p className="truncate text-sm font-semibold">{name || "Unknown User"}</p>
-          {username ? <p className="truncate text-xs text-muted-foreground">@{username}</p> : null}
-          {rank ? <p className="mt-0.5 text-[10px] text-blue-400">{rank}</p> : null}
-        </div>
+        {item("discord", "Copy Discord ID", !userId)}
+        {item("discord-mention", "Copy Discord Mention", !userId)}
+        {item("name", "Copy Name")}
+        {item("callsign", "Copy Callsign", !callsign)}
+        {item("badge", "Copy Badge Number", !badgeNumber)}
+        {item("rank", "Copy Rank", !rank)}
 
-        <DropdownMenuSeparator />
-        {item("discord", "Discord ID", !userId)}
-        {item("discord-mention", "Discord Mention", !userId)}
-        {item("name", "Name")}
-        {item("callsign", "Callsign", !callsign)}
-        {item("badge", "Badge Number", !badgeNumber)}
-        {item("rank", "Rank", !rank)}
-        <DropdownMenuSeparator />
-        {item("name-discord", "Name + Discord", !userId)}
-        {item("callsign-discord", "Callsign + Discord", !callsign || !userId)}
+        <DropdownMenuSeparator className="my-0.5" />
+
+        {item("name-discord", "Name + Discord ID", !userId)}
+        {item("callsign-discord", "Callsign + Discord ID", !callsign || !userId)}
         {item("callsign-name", "Callsign + Name", !callsign)}
-        {item("callsign-badge", "Callsign + Badge", !callsign || !badgeNumber)}
-        {item("badge-name", "Badge + Name", !badgeNumber)}
-        {item("badge-discord", "Badge + Discord", !badgeNumber || !userId)}
+        {item("callsign-badge", "Callsign + Badge Number", !callsign || !badgeNumber)}
+        {item("badge-name", "Badge Number + Name", !badgeNumber)}
+        {item("badge-discord", "Badge Number + Discord ID", !badgeNumber || !userId)}
+
+        <DropdownMenuSeparator className="my-0.5" />
+
         {item("callsign-name-discord", "Callsign + Name + Discord", !callsign || !userId)}
         {item("callsign-badge-discord", "Callsign + Badge + Discord", !callsign || !badgeNumber || !userId)}
         {item("name-badge-discord", "Name + Badge + Discord", !badgeNumber || !userId)}
         {item("callsign-badge-name", "Callsign + Badge + Name", !callsign || !badgeNumber)}
         {item("callsign-badge-name-discord", "Callsign + Badge + Name + Discord", !callsign || !badgeNumber || !userId)}
         {item("name-rank-discord", "Name + Rank + Discord", !rank || !userId)}
-        <DropdownMenuSeparator />
+
+        <DropdownMenuSeparator className="my-0.5" />
         {item("full", "Copy Full Details")}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -849,6 +983,79 @@ function FilterDropdown({
   )
 }
 
+function SingleSelectDropdown({
+  value,
+  placeholder,
+  options,
+  onChange,
+  width = "w-[92px]",
+}: {
+  value: string
+  placeholder: string
+  options: Option[]
+  onChange: (value: string) => void
+  width?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    const close = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (target && !dropdownRef.current?.contains(target)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener("pointerdown", close)
+    return () => document.removeEventListener("pointerdown", close)
+  }, [open])
+
+  const selectedLabel =
+    options.find((option) => option.value === value)?.label ??
+    placeholder
+
+  return (
+    <div ref={dropdownRef} className={`relative ${width}`}>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-card px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/60"
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown
+          className={`ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open ? (
+        <div className="absolute bottom-[calc(100%+4px)] left-0 z-[100] max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl">
+          {options.map((option) => {
+            const active = option.value === value
+            return (
+              <button
+                key={`${option.value}-${option.label}`}
+                type="button"
+                className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${active ? "bg-blue-500/10 text-blue-400" : "text-foreground hover:bg-accent"}`}
+                onClick={() => {
+                  onChange(option.value)
+                  setOpen(false)
+                }}
+              >
+                <span className="truncate">{option.label}</span>
+                {active ? <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-blue-400" /> : null}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function PromotionLogs() {
   const [module, setModule] = useState<LogModule>("promotion")
   const [sessionUserId, setSessionUserId] = useState("")
@@ -864,7 +1071,7 @@ export default function PromotionLogs() {
   const [actions, setActions] = useState<string[]>([])
   const [search, setSearch] = useState("")
 
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const [expanded, setExpanded] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
 
@@ -982,16 +1189,7 @@ export default function PromotionLogs() {
 
   const toggleExpanded = useCallback((id: string) => {
     if (!id) return
-
-    setExpanded((current) => {
-      const next = new Set(current)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
+    setExpanded((current) => (current === id ? null : id))
   }, [])
 
   const loadLogs = useCallback(async () => {
@@ -1110,7 +1308,7 @@ export default function PromotionLogs() {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setExpanded(new Set())
+        setExpanded(null)
       }
     }
 
@@ -1135,13 +1333,13 @@ export default function PromotionLogs() {
     setUserIds([])
     setActions([])
     setPage(1)
-    setExpanded(new Set())
+    setExpanded(null)
   }
 
   const clearSearch = () => {
     setSearch("")
     setPage(1)
-    setExpanded(new Set())
+    setExpanded(null)
   }
 
   const resetFilters = () => {
@@ -1154,13 +1352,13 @@ export default function PromotionLogs() {
   ) => {
     setter(value)
     setPage(1)
-    setExpanded(new Set())
+    setExpanded(null)
   }
 
   const changePageSize = (value: number) => {
     setPageSize(value)
     setPage(1)
-    setExpanded(new Set())
+    setExpanded(null)
   }
 
   const groupedLogs = useMemo(() => {
@@ -1245,7 +1443,7 @@ export default function PromotionLogs() {
                     if (module === value) return
                     setModule(value)
                     setPage(1)
-                    setExpanded(new Set())
+                    setExpanded(null)
                     setSearch("")
                     setCategories([])
                     setDivisions([])
@@ -1469,7 +1667,7 @@ export default function PromotionLogs() {
 
                   <div className="space-y-2">
                     {group.logs.map((log, index) => {
-                      const isExpanded = expanded.has(log.id)
+                      const isExpanded = expanded === log.id
 
                       const actorProfile = log.userId
                         ? rosterProfiles[log.userId]
@@ -1620,7 +1818,7 @@ export default function PromotionLogs() {
                             <div className="border-t border-border px-4 py-3 sm:px-7 sm:py-4">
                               {detailEntries.length > 0 ? (
                                 <div className="divide-y divide-border">
-                                  {detailEntries.map(([key, value]) => (
+                                  {detailEntries.map(({ key, value, change }) => (
                                     <div
                                       key={key}
                                       className="grid grid-cols-[minmax(110px,180px)_1fr] items-start gap-5 py-3 first:pt-0 last:pb-1"
@@ -1628,9 +1826,22 @@ export default function PromotionLogs() {
                                       <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
                                         {detailLabel(key)}
                                       </span>
-                                      <span className="min-w-0 whitespace-pre-wrap break-words text-[11px] leading-5 text-foreground sm:text-xs">
-                                        {formatDetailValue(value)}
-                                      </span>
+
+                                      {change ? (
+                                        <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] leading-5 sm:text-xs">
+                                          <span className="text-red-500 line-through">
+                                            {formatSimpleValue(change.from)}
+                                          </span>
+                                          <span className="text-muted-foreground">→</span>
+                                          <span className="text-emerald-500">
+                                            {formatSimpleValue(change.to)}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="min-w-0 whitespace-pre-wrap break-words text-[11px] leading-5 text-foreground sm:text-xs">
+                                          {formatDetailValue(value)}
+                                        </span>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -1691,7 +1902,7 @@ export default function PromotionLogs() {
           <div className="mx-auto flex w-full max-w-[1100px] flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-muted-foreground">Entries per page</span>
-              <FilterDropdown
+              <SingleSelectDropdown
                 value={String(pageSize)}
                 placeholder="50"
                 options={[
