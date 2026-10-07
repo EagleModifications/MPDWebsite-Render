@@ -1653,6 +1653,14 @@ export default function Home() {
           </div>
         </section>
 
+        <div className="mx-auto w-full max-w-6xl px-6">
+          <div className="flex items-center gap-4">
+            <div className="h-px flex-1 bg-border/50" />
+            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
+            <div className="h-px flex-1 bg-border/50" />
+          </div>
+        </div>
+
         {/* ========================================================= */}
         {/* FINAL DISCORD CTA                                           */}
         {/* ========================================================= */}
