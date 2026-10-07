@@ -315,31 +315,102 @@ const getDetailValue = (log: ActionLog, keys: string[]) => {
   return undefined
 }
 
+const getRequirementRank = (log: ActionLog): string => {
+  const directRank =
+    log.targetRank?.trim() ||
+    String(
+      getDetailValue(log, [
+        "rank",
+        "targetRank",
+        "selectedRank",
+        "rankName",
+      ]) ?? "",
+    ).trim()
+
+  if (directRank) return directRank
+
+  const details = isRecord(log.details) ? log.details : {}
+  const changes = details.changes
+
+  if (Array.isArray(changes)) {
+    for (const change of changes) {
+      if (!isRecord(change)) continue
+      const rank = String(
+        change.rank ??
+          change.rankName ??
+          change.targetRank ??
+          change.selectedRank ??
+          "",
+      ).trim()
+      if (rank) return rank
+    }
+  }
+
+  if (isRecord(changes)) {
+    const rank = String(
+      changes.rank ??
+        changes.rankName ??
+        changes.targetRank ??
+        changes.selectedRank ??
+        "",
+    ).trim()
+    if (rank) return rank
+  }
+
+  const summary = String(log.summary ?? "")
+  const summaryMatch = summary.match(
+    /(?:for|rank)\s+(.+?)(?:\s+requirements?|\s+in the|\s+from|$)/i,
+  )
+
+  return summaryMatch?.[1]?.trim() ?? ""
+}
+
 const getEntryTitle = (log: ActionLog) => {
   const action = log.action.toLowerCase()
   const target = log.targetName?.trim()
+  const division = log.division?.trim()
+  const divisionSuffix = division ? ` for ${divisionLabel(division)}` : ""
   const rank =
+    getRequirementRank(log) ||
     log.targetRank?.trim() ||
     String(getDetailValue(log, ["rank", "targetRank", "selectedRank"]) ?? "").trim()
 
   if (action.includes("select-rank") || action.includes("select rank")) {
-    return rank ? `Selected rank ${rank}` : "Selected rank"
+    return rank
+      ? `Selected rank ${rank}${divisionSuffix}`
+      : `Selected rank${divisionSuffix}`
   }
 
   if (action.includes("select-member") || action.includes("select member")) {
-    return target ? `Selected Member → ${target}` : "Selected Member"
+    return target
+      ? `Selected Member → ${target}${divisionSuffix}`
+      : `Selected Member${divisionSuffix}`
   }
 
   if (action.includes("deselect-member") || action.includes("deselect member")) {
-    return target ? `Deselected Member → ${target}` : "Deselected Member"
+    return target
+      ? `Deselected Member → ${target}${divisionSuffix}`
+      : `Deselected Member${divisionSuffix}`
   }
 
-  if (action.includes("select-all-visible")) {
-    return "Selected All Visible"
-  }
+  if (action.includes("select-all-visible") || action.includes("deselect-all-visible")) {
+    // Older persisted entries can contain the opposite action name while the
+    // summary contains the actual operation. Prefer the summary when explicit.
+    const summary = String(log.summary ?? "").trim()
+    const wasDeselected = /^deselected\b/i.test(summary)
+    const wasSelected = /^selected\b/i.test(summary)
 
-  if (action.includes("deselect-all-visible")) {
-    return "Deselected All Visible"
+    if (wasDeselected) {
+      return `Deselected All Visible${divisionSuffix}`
+    }
+
+    if (wasSelected) {
+      return `Selected All Visible${divisionSuffix}`
+    }
+
+    return action.includes("deselect-all-visible")
+      ? `Deselected All Visible${divisionSuffix}`
+      : `Selected All Visible${divisionSuffix}`
   }
 
   if (
@@ -348,103 +419,118 @@ const getEntryTitle = (log: ActionLog) => {
     action.includes("edit-requirements") ||
     action.includes("reset-requirements")
   ) {
+    const requirementDivision = divisionSuffix
+      ? ` for ${divisionLabel(division)}`
+      : ""
+
     if (rank) {
-      if (action.includes("reset")) return `Reset Requirements for ${rank}`
-      return `Updated Requirements for ${rank}`
+      if (action.includes("reset")) {
+        return `Reset Requirements${requirementDivision} — ${rank}`
+      }
+
+      return `Updated Requirements${requirementDivision} — ${rank}`
     }
 
     return action.includes("reset")
-      ? "Reset Requirements"
-      : "Updated Requirements"
+      ? `Reset Requirements${requirementDivision}`
+      : `Updated Requirements${requirementDivision}`
   }
 
   if (action.includes("change-division") || action.includes("change division")) {
-    const division =
+    const changedDivision =
       log.division ||
       String(getDetailValue(log, ["division", "to", "new"]) ?? "").trim()
 
-    return division
-      ? `Changed Division to ${divisionLabel(division)}`
+    return changedDivision
+      ? `Changed Division to ${divisionLabel(changedDivision)}`
       : "Changed Division"
   }
 
   if (action.includes("promote-member") || action.includes("promote member")) {
     return target
-      ? `Promoted ${target}${rank ? ` to ${rank}` : ""}`
-      : `Promoted Member${rank ? ` to ${rank}` : ""}`
+      ? `Promoted ${target}${rank ? ` to ${rank}` : ""}${divisionSuffix}`
+      : `Promoted Member${rank ? ` to ${rank}` : ""}${divisionSuffix}`
   }
 
   if (action.includes("demote-member") || action.includes("demote member")) {
     return target
-      ? `Demoted ${target}${rank ? ` to ${rank}` : ""}`
-      : `Demoted Member${rank ? ` to ${rank}` : ""}`
+      ? `Demoted ${target}${rank ? ` to ${rank}` : ""}${divisionSuffix}`
+      : `Demoted Member${rank ? ` to ${rank}` : ""}${divisionSuffix}`
   }
 
   if (action.includes("copy-selected")) {
-    return "Copied Selected Members"
+    return `Copied Selected Members${divisionSuffix}`
   }
 
   if (action.includes("copy-roster")) {
-    return "Copied Roster"
+    return `Copied Roster${divisionSuffix}`
   }
 
   if (action.includes("copy-discord-id")) {
-    return target ? `Copied Discord ID for ${target}` : "Copied Discord ID"
+    return target
+      ? `Copied Discord ID for ${target}${divisionSuffix}`
+      : `Copied Discord ID${divisionSuffix}`
   }
 
   if (action.includes("copy-name")) {
-    return target ? `Copied Name for ${target}` : "Copied Name"
+    return target
+      ? `Copied Name for ${target}${divisionSuffix}`
+      : `Copied Name${divisionSuffix}`
   }
 
   if (action.includes("copy-callsign")) {
-    return target ? `Copied Callsign for ${target}` : "Copied Callsign"
+    return target
+      ? `Copied Callsign for ${target}${divisionSuffix}`
+      : `Copied Callsign${divisionSuffix}`
   }
 
   if (action.includes("copy-badge-number")) {
-    return target ? `Copied Badge Number for ${target}` : "Copied Badge Number"
+    return target
+      ? `Copied Badge Number for ${target}${divisionSuffix}`
+      : `Copied Badge Number${divisionSuffix}`
   }
 
   if (action.includes("import-promotion")) {
-    return target ? `Imported Promotion for ${target}` : "Imported Promotion"
+    return `Imported Promotion${divisionSuffix}`
   }
 
   if (action.includes("create-promotion-list")) {
-    return "Created Promotion List"
+    return `Created Promotion List${divisionSuffix}`
   }
 
   if (action.includes("submit-promotion-list")) {
-    return "Submitted Promotion List"
+    return `Submitted Promotion List${divisionSuffix}`
   }
 
   if (action.includes("delete-promotion-list")) {
-    return "Deleted Promotion List"
+    return `Deleted Promotion List${divisionSuffix}`
   }
 
   if (action.includes("refresh-roster")) {
-    return "Refreshed Roster"
+    return `Refreshed Roster${divisionSuffix}`
   }
 
   if (action.includes("search-roster")) {
-    return "Searched Roster"
+    return `Searched Roster${divisionSuffix}`
   }
 
   if (action.includes("filter-status")) {
-    return "Filtered Roster by Status"
+    return `Filtered Roster by Status${divisionSuffix}`
   }
 
   if (action.includes("filter-rank")) {
-    return "Filtered Roster by Rank"
+    return `Filtered Roster by Rank${divisionSuffix}`
   }
 
   if (action.includes("clear-filters")) {
-    return "Cleared Filters"
+    return `Cleared Filters${divisionSuffix}`
   }
 
   if (action.includes("edit") || action.includes("update") || action.includes("change")) {
-    return actionLabel(log.action)
+    return `${actionLabel(log.action)}${divisionSuffix}`
   }
 
-  return actionLabel(log.action)
+  return `${actionLabel(log.action)}${divisionSuffix}`
 }
 
 const formatSimpleValue = (value: unknown): string => {
@@ -663,7 +749,62 @@ const addSummaryRequirementChange = (
   addRequirementChange(output, key, undefined, newValue)
 }
 
+const isImportLog = (log: ActionLog) =>
+  log.category === "import" ||
+  log.action.toLowerCase().includes("import")
+
+const getImportDetailEntries = (log: ActionLog): DetailEntry[] => {
+  const details = log.details ?? {}
+  const changes = Array.isArray(details.changes) ? details.changes : []
+
+  const numericValue = (value: unknown) => {
+    const number = Number(value)
+    return Number.isFinite(number) ? number : 0
+  }
+
+  const added = numericValue(details.added)
+  const updated = numericValue(details.updated)
+  const imported = numericValue(details.imported)
+  const totalMembers = numericValue(details.totalMembers)
+
+  const changeCount =
+    added + updated > 0
+      ? added + updated
+      : changes.length
+
+  const output: DetailEntry[] = []
+
+  if (changeCount > 0) {
+    output.push({
+      key: "Changes",
+      value: `${changeCount.toLocaleString()} ${changeCount === 1 ? "value" : "values"}`,
+    })
+  }
+
+  if (details.added !== undefined) {
+    output.push({ key: "Added", value: added })
+  }
+
+  if (details.updated !== undefined) {
+    output.push({ key: "Updated", value: updated })
+  }
+
+  if (details.imported !== undefined) {
+    output.push({ key: "Imported", value: imported })
+  }
+
+  if (details.totalMembers !== undefined) {
+    output.push({ key: "Total Members", value: totalMembers })
+  }
+
+  return output
+}
+
 const getDetailEntries = (log: ActionLog): DetailEntry[] => {
+  if (isImportLog(log)) {
+    return getImportDetailEntries(log)
+  }
+
   const details = log.details ?? {}
   const entries = Object.entries(details).filter(
     ([, value]) => value !== undefined && value !== null,
@@ -722,6 +863,18 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
     for (const item of changes) {
       if (!isRecord(item)) continue
 
+      // Requirement audit entries are stored as { rank, old: {...}, new: {...} }.
+      // Compare the old/new objects directly so the previous value is retained.
+      if (isRecord(item.old) && isRecord(item.new)) {
+        collectBeforeAfterChanges(item.old, item.new, output)
+        continue
+      }
+
+      if (isRecord(item.before) && isRecord(item.after)) {
+        collectBeforeAfterChanges(item.before, item.after, output)
+        continue
+      }
+
       // A change item may contain { field, from, to }.
       const field =
         typeof item.field === "string"
@@ -735,27 +888,6 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
 
         if (pair.to !== undefined) {
           addRequirementChange(output, normalizeRequirementKey(field), pair.from, pair.to)
-        }
-
-        continue
-      }
-
-      const oldValues = isRecord(item.old) ? item.old : null
-      const newValues = isRecord(item.new) ? item.new : null
-
-      if (oldValues || newValues) {
-        const keys = new Set([
-          ...Object.keys(oldValues ?? {}),
-          ...Object.keys(newValues ?? {}),
-        ])
-
-        for (const key of keys) {
-          addRequirementChange(
-            output,
-            normalizeRequirementKey(key),
-            oldValues?.[key],
-            newValues?.[key],
-          )
         }
 
         continue
@@ -831,9 +963,28 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
     }
   }
 
-  return Array.from(unique.values()).sort(
+  const sorted = Array.from(unique.values()).sort(
     (a, b) => requirementKeyOrder(a.key) - requirementKeyOrder(b.key),
   )
+
+  // Always show the affected rank as its own row for requirement logs.
+  // This keeps the rank separate from the individual Hours/TIR/Logs rows.
+  if (isRequirementsLog(log)) {
+    const rank = getRequirementRank(log)
+    if (rank && !sorted.some((entry) => entry.key === "rank")) {
+      sorted.unshift({
+        key: "rank",
+        value: rank,
+      })
+    }
+  } else if (log.targetRank?.trim() && !sorted.some((entry) => entry.key === "rank" || entry.key === "targetRank")) {
+    sorted.unshift({
+      key: "rank",
+      value: log.targetRank.trim(),
+    })
+  }
+
+  return sorted
 }
 
 const getInitials = (value: string) =>
@@ -1230,7 +1381,7 @@ function IdentityCard({
         avoidCollisions
         collisionPadding={12}
         sticky="partial"
-        className="z-[300] w-[285px] max-h-[min(28rem,calc(100vh-24px))] overflow-y-auto p-1"
+        className="z-[300] w-[285px] max-h-80 overflow-y-auto p-1"
         onClick={(event) => event.stopPropagation()}
       >
         {item("discord", "Copy Discord ID", !userId)}
@@ -1412,9 +1563,7 @@ function FilterDropdown({
   const buttonLabel =
     selected.length === 0
       ? allLabel
-      : selected.length === selectable.length
-        ? allLabel
-        : `${selected.length} ${filterName}${selected.length === 1 ? "" : "s"} Selected`
+      : `${selected.length} ${filterName}${selected.length === 1 ? "" : "s"} selected`
 
   return (
     <div ref={dropdownRef} className={`relative ${width}`}>
@@ -2214,7 +2363,7 @@ export default function PromotionLogs() {
               <div className="mt-2 flex min-h-8 flex-wrap items-center gap-2 border-t border-border pt-2">
                 <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   <Filter className="h-3.5 w-3.5 text-blue-400" />
-                  Filters:
+                  Active Filters:
                 </div>
 
                 {!hasFilters && !search.trim() ? (
