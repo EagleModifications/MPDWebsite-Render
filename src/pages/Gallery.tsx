@@ -98,11 +98,10 @@ type GalleryMedia = {
   thumbnailUrl: string
   source: "upload" | "url"
   storageId?: string
-  extension?: string
 }
 
-type GalleryCategory = "Community" | "Fleet"
-type GalleryTag = "Dept" | "SWAT" | "MTF-7" | "MCD" | "TRU" | "SAR"
+type GalleryCategory = string
+type GalleryTag = string
 
 type GalleryItem = {
   id: string
@@ -121,9 +120,7 @@ type PendingMedia = GalleryMedia & {
   file?: File
 }
 
-type GalleryCategoryFilter = "All" | GalleryCategory
-
-const GALLERY_TAGS: readonly GalleryTag[] = [
+const DEFAULT_GALLERY_TAGS: readonly GalleryTag[] = [
   "Dept",
   "SWAT",
   "MTF-7",
@@ -132,7 +129,7 @@ const GALLERY_TAGS: readonly GalleryTag[] = [
   "SAR",
 ]
 
-const GALLERY_TAG_CLASSES: Record<GalleryTag, string> = {
+const GALLERY_TAG_CLASSES: Record<string, string> = {
   Dept: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
   SWAT: "border-slate-500/40 bg-slate-800/80 text-slate-100 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-100",
   "MTF-7": "border-sky-500/30 bg-sky-500/10 text-sky-800 dark:text-sky-300",
@@ -140,16 +137,14 @@ const GALLERY_TAG_CLASSES: Record<GalleryTag, string> = {
   TRU: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
   SAR: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
 }
-type GalleryMediaFilter = "All" | "Images" | "Videos"
+type GalleryMediaFilter = "Images" | "Videos"
 
-const GALLERY_CATEGORY_FILTERS: GalleryCategoryFilter[] = [
-  "All",
+const DEFAULT_GALLERY_CATEGORIES: readonly GalleryCategory[] = [
   "Community",
   "Fleet",
 ]
 
-const GALLERY_MEDIA_FILTERS: GalleryMediaFilter[] = [
-  "All",
+const DEFAULT_GALLERY_MEDIA_FILTERS: readonly GalleryMediaFilter[] = [
   "Images",
   "Videos",
 ]
@@ -264,7 +259,7 @@ function CustomSelect({
                 }}
                 className={[
                   "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
-                  selected ? "bg-blue-500 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  selected ? "bg-blue-500/10 text-blue-600 dark:text-blue-300" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 ].join(" ")}
               >
                 <span className="flex min-w-0 items-center gap-2">
@@ -280,7 +275,7 @@ function CustomSelect({
                   )}
                   <span>{option}</span>
                 </span>
-                {selected && <Check className="h-4 w-4 text-white" />}
+                {selected && <Check className="h-4 w-4 text-blue-500" />}
               </button>
             )
           })}
@@ -298,9 +293,9 @@ function CustomMultiSelect({
   ariaLabel,
 }: {
   id: string
-  value: readonly GalleryTag[]
-  options: readonly GalleryTag[]
-  onChange: (value: GalleryTag[]) => void
+  value: readonly string[]
+  options: readonly string[]
+  onChange: (value: string[]) => void
   ariaLabel: string
 }) {
   const dropdown = useContext(DropdownContext)
@@ -335,12 +330,21 @@ function CustomMultiSelect({
     }
   }, [id, open, setOpenDropdown])
 
+  const filterLabel =
+    id === "gallery-filter-type"
+      ? "Type"
+      : id === "gallery-filter-category"
+        ? "Category"
+        : id === "gallery-filter-tags"
+          ? "Tags"
+          : "Select tags"
+
   const selectedLabel =
     value.length === 0
-      ? "Select tags"
+      ? filterLabel
       : value.length === 1
         ? value[0]
-        : `${value.length} tags selected`
+        : `${value.length} selected`
 
   return (
     <div className="relative" data-custom-select={id}>
@@ -419,7 +423,7 @@ function CustomMultiSelect({
                   />
                   <span>{option}</span>
                 </span>
-                {selected && <Check className="h-4 w-4 text-white" />}
+                {selected && <Check className="h-4 w-4 text-blue-500" />}
               </button>
             )
           })}
@@ -564,10 +568,17 @@ function isVideoMedia(media: GalleryMedia) {
   return media.type === "video"
 }
 
-function getAspectClass(_ratio?: number) {
-  // Gallery previews use one consistent size instead of changing height based
-  // on each image's natural dimensions. This keeps every card aligned.
-  return "aspect-video"
+function getAspectClass(ratio?: number) {
+  if (!ratio || !Number.isFinite(ratio)) {
+    return "aspect-[4/3]"
+  }
+
+  if (ratio >= 1.85) return "aspect-[16/8]"
+  if (ratio >= 1.35) return "aspect-[4/3]"
+  if (ratio >= 1.05) return "aspect-square"
+  if (ratio >= 0.8) return "aspect-[4/5]"
+
+  return "aspect-[3/4]"
 }
 
 function formatDate(value: string) {
@@ -658,11 +669,29 @@ export default function Gallery() {
   const [canManageGallery, setCanManageGallery] =
     useState(false)
 
-  const [categoryFilter, setCategoryFilter] =
-    useState<GalleryCategoryFilter>("All")
+  const [categoryFilters, setCategoryFilters] =
+    useState<string[]>([])
 
-  const [mediaFilter, setMediaFilter] =
-    useState<GalleryMediaFilter>("All")
+  const [mediaFilters, setMediaFilters] =
+    useState<string[]>([])
+
+  const [tagFilters, setTagFilters] =
+    useState<string[]>([])
+
+  const [galleryCategories, setGalleryCategories] =
+    useState<string[]>([...DEFAULT_GALLERY_CATEGORIES])
+
+  const [galleryTags, setGalleryTags] =
+    useState<string[]>([...DEFAULT_GALLERY_TAGS])
+
+  const [showTaxonomyModal, setShowTaxonomyModal] =
+    useState(false)
+
+  const [newGalleryCategory, setNewGalleryCategory] =
+    useState("")
+
+  const [newGalleryTag, setNewGalleryTag] =
+    useState("")
 
   const [showModal, setShowModal] =
     useState(false)
@@ -727,6 +756,7 @@ export default function Gallery() {
   useEffect(() => {
     const overlayOpen =
       showModal ||
+      showTaxonomyModal ||
       Boolean(viewer) ||
       Boolean(infoItem) ||
       Boolean(deleteTarget)
@@ -754,7 +784,7 @@ export default function Gallery() {
       html.style.overflow = previousHtmlOverflow
       body.style.paddingRight = previousBodyPaddingRight
     }
-  }, [showModal, viewer, infoItem, deleteTarget])
+  }, [showModal, showTaxonomyModal, viewer, infoItem, deleteTarget])
 
   const dragDepthRef =
     useRef(0)
@@ -768,6 +798,7 @@ export default function Gallery() {
           session,
           galleryResponse,
           permissionResponse,
+          optionsResponse,
         ] = await Promise.all([
           getSession(),
           fetch("/api/gallery", {
@@ -779,6 +810,9 @@ export default function Gallery() {
               credentials: "include",
             },
           ),
+          fetch("/api/gallery/options", {
+            credentials: "include",
+          }),
         ])
 
         if (!active) {
@@ -805,6 +839,16 @@ export default function Gallery() {
         setCanManageGallery(
           permissionResponse.ok,
         )
+
+        if (optionsResponse.ok) {
+          const optionsData = await optionsResponse.json()
+          if (Array.isArray(optionsData.categories)) {
+            setGalleryCategories(optionsData.categories.map(String).filter(Boolean))
+          }
+          if (Array.isArray(optionsData.tags)) {
+            setGalleryTags(optionsData.tags.map(String).filter(Boolean))
+          }
+        }
       } catch (error) {
         console.error(error)
 
@@ -832,64 +876,93 @@ export default function Gallery() {
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       const matchesCategory =
-        categoryFilter === "All" ||
-        (item.category ?? "Community") === categoryFilter
+        categoryFilters.length === 0 ||
+        categoryFilters.includes(item.category ?? "Community")
 
       const matchesMedia =
-        mediaFilter === "All" ||
+        mediaFilters.length === 0 ||
         item.media.some((media) =>
-          mediaFilter === "Images"
-            ? isImageMedia(media)
-            : isVideoMedia(media),
+          mediaFilters.some((filter) =>
+            filter === "Images"
+              ? isImageMedia(media)
+              : isVideoMedia(media),
+          ),
         )
 
-      return matchesCategory && matchesMedia
+      const matchesTags =
+        tagFilters.length === 0 ||
+        tagFilters.some((tag) =>
+          (item.tags ?? []).includes(tag),
+        )
+
+      return matchesCategory && matchesMedia && matchesTags
     })
-  }, [categoryFilter, items, mediaFilter])
+  }, [categoryFilters, items, mediaFilters, tagFilters])
 
   const visibleMediaCount = useMemo(() => {
-    return filteredItems.reduce(
-      (count, item) => {
-        if (mediaFilter === "Images") {
-          return (
-            count +
-            item.media.filter(
-              isImageMedia,
-            ).length
-          )
-        }
-
-        if (mediaFilter === "Videos") {
-          return (
-            count +
-            item.media.filter(
-              isVideoMedia,
-            ).length
-          )
-        }
-
+    return filteredItems.reduce((count, item) => {
+      if (mediaFilters.length === 0) {
         return count + item.media.length
-      },
-      0,
+      }
+
+      return (
+        count +
+        item.media.filter((media) =>
+          mediaFilters.some((filter) =>
+            filter === "Images"
+              ? isImageMedia(media)
+              : isVideoMedia(media),
+          ),
+        ).length
+      )
+    }, 0)
+  }, [filteredItems, mediaFilters])
+
+  function getVisibleMedia(item: GalleryItem) {
+    if (mediaFilters.length === 0) {
+      return item.media
+    }
+
+    return item.media.filter((media) =>
+      mediaFilters.some((filter) =>
+        filter === "Images"
+          ? isImageMedia(media)
+          : isVideoMedia(media),
+      ),
     )
-  }, [filteredItems, mediaFilter])
+  }
 
-  function getVisibleMedia(
-    item: GalleryItem,
-  ) {
-    if (mediaFilter === "Images") {
-      return item.media.filter(
-        isImageMedia,
-      )
+  async function addGalleryOption(type: "category" | "tag") {
+    const rawValue = type === "category" ? newGalleryCategory : newGalleryTag
+    const value = rawValue.trim()
+
+    if (!value) {
+      toast.error(`Enter a ${type} name.`)
+      return
     }
 
-    if (mediaFilter === "Videos") {
-      return item.media.filter(
-        isVideoMedia,
-      )
-    }
+    try {
+      const response = await fetch("/api/gallery/options", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, value }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || `Failed to create ${type}.`)
 
-    return item.media
+      if (type === "category") {
+        setGalleryCategories(Array.isArray(data.categories) ? data.categories : (current => [...current, value]))
+        setNewGalleryCategory("")
+      } else {
+        setGalleryTags(Array.isArray(data.tags) ? data.tags : (current => [...current, value]))
+        setNewGalleryTag("")
+      }
+
+      toast.success(`${type === "category" ? "Category" : "Tag"} created.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `Failed to create ${type}.`)
+    }
   }
 
   function resetForm() {
@@ -908,7 +981,7 @@ export default function Gallery() {
 
     setTitle("")
     setDescription("")
-    setCategory("Community")
+    setCategory(galleryCategories[0] ?? "Community")
     setTags([])
     setPendingMedia([])
     setUrlInput("")
@@ -978,7 +1051,7 @@ export default function Gallery() {
     const url = urlInput.trim()
 
     if (!url) {
-      toast.error("Enter a media link.")
+      toast.error("Enter a media URL.")
       return
     }
 
@@ -1284,10 +1357,15 @@ export default function Gallery() {
           continue
         }
 
-        // Every URL is downloaded/extracted server-side and then treated
-        // exactly like a normal uploaded file. No external media URL is
-        // stored in the gallery document.
-        if (item.source === "url") {
+        // YouTube/Vimeo URLs are imported server-side into GridFS before
+        // the gallery document is saved. After this point they are treated
+        // exactly like a normal uploaded video file.
+        if (
+          item.source === "url" &&
+          item.type === "video" &&
+          (Boolean(getYouTubeVideoId(item.url)) ||
+            Boolean(getVimeoVideoId(item.url)))
+        ) {
           setSavingStage("import")
           setUploadProgress(0)
 
@@ -1301,7 +1379,6 @@ export default function Gallery() {
               },
               body: JSON.stringify({
                 url: item.url,
-                type: item.type,
               }),
             },
           )
@@ -1313,7 +1390,7 @@ export default function Gallery() {
           if (!importResponse.ok || !importData.item) {
             throw new Error(
               importData.error ||
-                "Failed to import the media URL.",
+                "Failed to import the video URL.",
             )
           }
 
@@ -1621,14 +1698,16 @@ export default function Gallery() {
             </div>
 
             {canManageGallery && (
-              <Button
-                type="button"
-                className="shrink-0"
-                onClick={openAdd}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Media
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" className="shrink-0" onClick={() => setShowTaxonomyModal(true)}>
+                  <Settings2 className="mr-2 h-4 w-4" />
+                  Tags & Categories
+                </Button>
+                <Button type="button" className="shrink-0" onClick={openAdd}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Media
+                </Button>
+              </div>
             )}
           </div>
 
@@ -1647,57 +1726,48 @@ export default function Gallery() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Type:
-                  </span>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {GALLERY_MEDIA_FILTERS.map((item) => (
-                      <button
-                        key={`media-${item}`}
-                        type="button"
-                        onClick={() => setMediaFilter(item)}
-                        className={[
-                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          mediaFilter === item
-                            ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                            : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                        ].join(" ")}
-                      >
-                        {item}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <DropdownProvider>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <CustomMultiSelect
+                  id="gallery-filter-type"
+                  value={mediaFilters}
+                  options={DEFAULT_GALLERY_MEDIA_FILTERS}
+                  ariaLabel="Filter by media type"
+                  onChange={setMediaFilters}
+                />
 
-                <span className="hidden text-xs text-muted-foreground/50 sm:block">
-                  •
-                </span>
+                <CustomMultiSelect
+                  id="gallery-filter-category"
+                  value={categoryFilters}
+                  options={galleryCategories}
+                  ariaLabel="Filter by category"
+                  onChange={setCategoryFilters}
+                />
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Category:
-                  </span>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {GALLERY_CATEGORY_FILTERS.map((item) => (
-                      <button
-                        key={`category-${item}`}
-                        type="button"
-                        onClick={() => setCategoryFilter(item)}
-                        className={[
-                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          categoryFilter === item
-                            ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                            : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                        ].join(" ")}
-                      >
-                        {item}
-                      </button>
-                    ))}
-                  </div>
+                <CustomMultiSelect
+                  id="gallery-filter-tags"
+                  value={tagFilters}
+                  options={galleryTags}
+                  ariaLabel="Filter by tags"
+                  onChange={setTagFilters}
+                />
+
+                {(categoryFilters.length > 0 || mediaFilters.length > 0 || tagFilters.length > 0) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-10 px-3 text-xs text-muted-foreground hover:text-blue-400"
+                    onClick={() => {
+                      setCategoryFilters([])
+                      setMediaFilters([])
+                      setTagFilters([])
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
                 </div>
-              </div>
+              </DropdownProvider>
             </div>
 
             {loading ? (
@@ -1741,7 +1811,7 @@ export default function Gallery() {
               </div>
             ) : (
               <div className="h-auto p-3 sm:p-4">
-                  <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3">
+                  <div className="columns-1 gap-3 sm:columns-2 lg:columns-3">
                   {filteredItems.map(
                     (item) => {
                       const mediaList =
@@ -1902,10 +1972,18 @@ export default function Gallery() {
                   it full size.
                 </span>
 
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
+                    <span>
+                      Images
+                    </span>
+                  </span>
+
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
                     <span>
-                      Community
+                      Videos
                     </span>
                   </span>
 
@@ -1916,6 +1994,7 @@ export default function Gallery() {
                     </span>
                   </span>
                 </div>
+              </div>
 
               <span className="shrink-0 font-medium text-foreground/70">
                 {filteredItems.length}{" "}
@@ -2301,6 +2380,51 @@ export default function Gallery() {
         </div>
       )}
 
+      {showTaxonomyModal && canManageGallery && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setShowTaxonomyModal(false)
+          }}
+        >
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
+              <div>
+                <h2 className="text-lg font-semibold">Tags & Categories</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Create the categories and tags available to Gallery entries and filters.</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowTaxonomyModal(false)} aria-label="Close">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="grid gap-5 p-5 sm:grid-cols-2">
+              <div className="rounded-xl border border-border/70 p-4">
+                <h3 className="text-sm font-semibold">Categories</h3>
+                <div className="mt-3 flex gap-2">
+                  <Input value={newGalleryCategory} onChange={(event) => setNewGalleryCategory(event.target.value)} placeholder="New category" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("category") }} />
+                  <Button type="button" onClick={() => void addGalleryOption("category")}><Plus className="mr-2 h-4 w-4" />Add</Button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {galleryCategories.map((entry) => <span key={entry} className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 text-xs text-blue-300">{entry}</span>)}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/70 p-4">
+                <h3 className="text-sm font-semibold">Tags</h3>
+                <div className="mt-3 flex gap-2">
+                  <Input value={newGalleryTag} onChange={(event) => setNewGalleryTag(event.target.value)} placeholder="New tag" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("tag") }} />
+                  <Button type="button" onClick={() => void addGalleryOption("tag")}><Plus className="mr-2 h-4 w-4" />Add</Button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {galleryTags.map((entry) => <span key={entry} className={GALLERY_TAG_CLASSES[entry] ?? "rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 text-xs"}>{entry}</span>)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showModal && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center overscroll-contain bg-black/50 p-4 backdrop-blur-sm"
@@ -2364,7 +2488,7 @@ export default function Gallery() {
                   <CustomSelect
                     id="gallery-category"
                     value={category}
-                    options={["Community", "Fleet"]}
+                    options={galleryCategories}
                     ariaLabel="Gallery category"
                     onChange={(value) =>
                       setCategory(value as GalleryCategory)
@@ -2380,7 +2504,7 @@ export default function Gallery() {
                   <CustomMultiSelect
                     id="gallery-tags"
                     value={tags}
-                    options={GALLERY_TAGS}
+                    options={galleryTags}
                     ariaLabel="Gallery tags"
                     onChange={setTags}
                   />
@@ -2482,11 +2606,12 @@ export default function Gallery() {
                 <div className="sm:col-span-2 rounded-xl border border-border bg-background/40 p-4">
                   <div className="mb-3">
                     <h3 className="text-sm font-semibold">
-                      Add Media Link <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
+                      Add Media URL <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
                     </h3>
 
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      The media is downloaded from the URL and stored with the gallery entry.
+                      URLs can be mixed with uploaded
+                      files.
                     </p>
                   </div>
 
@@ -2848,7 +2973,7 @@ export default function Gallery() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
                 >
-                  Open {getMediaLabel(viewer.item.media[viewer.index].type)}
+                  Open Original
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
@@ -3374,19 +3499,7 @@ function GalleryMediaCollage({
   onClick: (media: GalleryMedia) => void
 }) {
   const visible = media.slice(0, 4)
-  const hiddenMedia = media.slice(3)
-  const extraImageCount = hiddenMedia.filter(isImageMedia).length
-  const extraVideoCount = hiddenMedia.filter(isVideoMedia).length
-  const extraCountLabel = [
-    extraImageCount > 0
-      ? `${extraImageCount} ${extraImageCount === 1 ? "image" : "images"}`
-      : "",
-    extraVideoCount > 0
-      ? `${extraVideoCount} ${extraVideoCount === 1 ? "video" : "videos"}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join(" / ")
+  const extraCount = Math.max(0, media.length - 3)
 
   if (visible.length === 0) return null
 
@@ -3433,20 +3546,16 @@ function GalleryMediaCollage({
                   title={title}
                   onClick={() => onClick(visible[3])}
                 />
-                {media.length >= 5 && (
-                  <>
-                    <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
-                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
-                        <Images className="h-3.5 w-3.5" />
-                      </span>
+                <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
+                    <Images className="h-3.5 w-3.5" />
+                  </span>
 
-                      <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
-                        +{extraCountLabel}
-                      </span>
-                    </div>
-                  </>
-                )}
+                  <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
+                    +{extraCount} {extraCount === 1 ? "image/video" : "images/videos"}
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -3508,7 +3617,7 @@ function GalleryMediaCard({
         <img
           src={media.url}
           alt={title}
-          className="h-full w-full object-contain bg-black transition duration-300 group-hover:scale-[1.02]"
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           onLoad={(event) => {
             const image = event.currentTarget
             if (image.naturalHeight > 0) {
@@ -3521,7 +3630,7 @@ function GalleryMediaCard({
           <img
             src={getMediaThumbnail(media)}
             alt={title}
-            className="h-full w-full object-contain bg-black transition duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
             onLoad={(event) => {
               const image = event.currentTarget
               if (image.naturalHeight > 0) {
@@ -3546,7 +3655,7 @@ function GalleryMediaCard({
           loop
           playsInline
           preload="auto"
-          className="h-full w-full object-contain bg-black transition duration-300 group-hover:scale-[1.02]"
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           onLoadedMetadata={(event) => {
             const video = event.currentTarget
             if (video.videoHeight > 0) {
