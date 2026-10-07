@@ -377,15 +377,6 @@ export default function ActivityRoster() {
         setMembers(roster)
 
         if (resetFilters) {
-          const defaultRanks = Array.from(
-            new Map(
-              roster.map((member) => [
-                normalizeRank(member.rank),
-                cleanValue(member.rank),
-              ] as const),
-            ).values(),
-          ).filter(Boolean)
-
           // "All" is a virtual filter option. The default state is
           // represented by empty filter arrays, so only the All
           // checkbox is checked and no individual options are checked.
