@@ -4617,6 +4617,157 @@ export function createApp() {
     })
   })
 
+  /* ─────────────────────────────────────────
+     Desktop Releases
+  ───────────────────────────────────────── */
+
+  // Keep release metadata server-side instead of exposing the GitHub API
+  // directly to the browser. Only official MPD GitHub Releases are returned,
+  // and only the installer formats that the Download page supports.
+  app.get("/api/releases", async (_req, res) => {
+    const GITHUB_RELEASES_URL =
+      "https://api.github.com/repos/EagleModifications/MPDWebsite-Render/releases?per_page=20"
+
+    const ALLOWED_EXTENSIONS = new Set([
+      ".exe",
+      ".dmg",
+      ".appimage",
+    ])
+
+    const isAllowedGitHubAsset = (value: unknown) => {
+      if (typeof value !== "string") return false
+
+      try {
+        const url = new URL(value)
+        const hostname = url.hostname.toLowerCase()
+
+        if (hostname !== "github.com") return false
+        if (url.protocol !== "https:") return false
+
+        const pathname = url.pathname.toLowerCase()
+        return Array.from(ALLOWED_EXTENSIONS).some((extension) =>
+          pathname.endsWith(extension),
+        )
+      } catch {
+        return false
+      }
+    }
+
+    const isAllowedGitHubUrl = (value: unknown) => {
+      if (typeof value !== "string") return false
+
+      try {
+        const url = new URL(value)
+        return (
+          url.protocol === "https:" &&
+          url.hostname.toLowerCase() === "github.com" &&
+          url.pathname.startsWith("/EagleModifications/MPDWebsite-Render/")
+        )
+      } catch {
+        return false
+      }
+    }
+
+    try {
+      const response = await fetch(GITHUB_RELEASES_URL, {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "User-Agent": "MPDWebsite-Render/desktop-releases",
+        },
+        signal: AbortSignal.timeout(10_000),
+      })
+
+      if (!response.ok) {
+        console.error(
+          "[releases] GitHub API returned HTTP",
+          response.status,
+        )
+
+        return res.status(502).json({
+          success: false,
+          error: "Unable to load desktop releases right now.",
+        })
+      }
+
+      const releases = await response.json() as unknown
+
+      if (!Array.isArray(releases)) {
+        return res.status(502).json({
+          success: false,
+          error: "GitHub returned an invalid release response.",
+        })
+      }
+
+      const safeReleases = releases
+        .filter((release): release is Record<string, unknown> =>
+          Boolean(release && typeof release === "object"),
+        )
+        .map((release) => {
+          const rawAssets = Array.isArray(release.assets)
+            ? release.assets
+            : []
+
+          const assets = rawAssets
+            .filter((asset): asset is Record<string, unknown> =>
+              Boolean(asset && typeof asset === "object"),
+            )
+            .map((asset) => {
+              const browserDownloadUrl = asset.browser_download_url
+              const htmlUrl = asset.html_url
+
+              if (!isAllowedGitHubAsset(browserDownloadUrl)) {
+                return null
+              }
+
+              return {
+                id: String(asset.id ?? ""),
+                name: String(asset.name ?? ""),
+                size: Number(asset.size ?? 0),
+                download_count: Number(asset.download_count ?? 0),
+                browser_download_url: browserDownloadUrl,
+                html_url: isAllowedGitHubUrl(htmlUrl) ? htmlUrl : null,
+                content_type: String(asset.content_type ?? ""),
+                created_at: String(asset.created_at ?? ""),
+                updated_at: String(asset.updated_at ?? ""),
+              }
+            })
+            .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset))
+
+          const htmlUrl = release.html_url
+
+          return {
+            id: String(release.id ?? ""),
+            name: String(release.name ?? release.tag_name ?? "Release"),
+            tag_name: String(release.tag_name ?? ""),
+            body: typeof release.body === "string" ? release.body : "",
+            draft: Boolean(release.draft),
+            prerelease: Boolean(release.prerelease),
+            published_at: String(release.published_at ?? ""),
+            created_at: String(release.created_at ?? ""),
+            html_url: isAllowedGitHubUrl(htmlUrl) ? htmlUrl : null,
+            assets,
+          }
+        })
+        .filter((release) => !release.draft && release.assets.length > 0)
+
+      res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=600")
+
+      return res.json({
+        success: true,
+        source: "github-releases",
+        repository: "EagleModifications/MPDWebsite-Render",
+        releases: safeReleases,
+      })
+    } catch (error) {
+      console.error("[releases] Failed to load GitHub releases:", error)
+
+      return res.status(502).json({
+        success: false,
+        error: "Unable to load desktop releases right now.",
+      })
+    }
+  })
+
   // Serve the production Vite build from the same Express service.
   // This keeps the React app and /api/* on the same origin in production.
   const clientDist = path.join(process.cwd(), "dist")
