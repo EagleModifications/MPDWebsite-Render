@@ -200,20 +200,75 @@ const formatDateHeading = (value: string) => {
     .toUpperCase()
 }
 
-const formatDetailValue = (value: unknown) => {
-  if (value === null || value === undefined) {
-    return "—"
+const detailLabel = (key: string) => {
+  const labels: Record<string, string> = {
+    count: "Count",
+    hours: "Hours",
+    requiredHours: "Required Hours",
+    promotionHours: "Promotion Hours",
+    timeInRankDays: "Time In Rank",
+    requiredTimeInRankDays: "Required Time In Rank",
+    trainingLogs: "Training Logs",
+    requiredTrainingLogs: "Required Training Logs",
+    recruitmentLogs: "Recruitment Logs",
+    requiredRecruitmentLogs: "Required Recruitment Logs",
+    requiredLogs: "Required Logs",
+    status: "Status",
+    rank: "Rank",
+    targetRank: "Target Rank",
+    division: "Division",
+    category: "Category",
+    action: "Action",
+    page: "Page",
+    reason: "Reason",
+    note: "Note",
+    notes: "Notes",
   }
 
-  if (typeof value === "string") {
-    return value
+  return labels[key] ?? actionLabel(key)
+}
+
+const formatDetailValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") return "—"
+  if (typeof value === "boolean") return value ? "Yes" : "No"
+  if (Array.isArray(value)) return value.map((item) => formatDetailValue(item)).join(", ")
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, item]) => `${detailLabel(key)}: ${formatDetailValue(item)}`)
+      .join(" · ")
+  }
+  return String(value)
+}
+
+const getDetailEntries = (log: ActionLog) => {
+  const details = log.details ?? {}
+  const entries = Object.entries(details).filter(([, value]) => value !== undefined && value !== null)
+
+  // Keep requirement changes easy to scan: show the important requirement
+  // values in a predictable order rather than dumping the raw JSON object.
+  const requirementOrder = [
+    "requiredHours",
+    "promotionHours",
+    "requiredTimeInRankDays",
+    "timeInRankDays",
+    "requiredTrainingLogs",
+    "trainingLogs",
+    "requiredRecruitmentLogs",
+    "recruitmentLogs",
+    "requiredLogs",
+    "hours",
+    "count",
+  ]
+
+  if (log.category === "requirements" || log.action.toLowerCase().includes("requirement")) {
+    return entries.sort(([a], [b]) => {
+      const ai = requirementOrder.indexOf(a)
+      const bi = requirementOrder.indexOf(b)
+      return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
+    })
   }
 
-  try {
-    return JSON.stringify(value, null, 2)
-  } catch {
-    return String(value)
-  }
+  return entries
 }
 
 const getInitials = (value: string) =>
@@ -687,20 +742,24 @@ function TargetIdentity({
 }
 
 function FilterDropdown({
-  value,
+  values,
   placeholder,
   options,
   onChange,
   width = "w-[180px]",
 }: {
-  value: string
+  values: string[]
   placeholder: string
   options: Option[]
-  onChange: (value: string) => void
+  onChange: (values: string[]) => void
   width?: string
 }) {
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const selectable = options.filter((option) => option.value !== "")
+  const selected = values.filter((value) =>
+    selectable.some((option) => option.value === value),
+  )
 
   useEffect(() => {
     if (!open) return
@@ -716,43 +775,74 @@ function FilterDropdown({
     return () => document.removeEventListener("pointerdown", close)
   }, [open])
 
-  const selected = options.find((option) => option.value === value)
+  const toggle = (value: string) => {
+    const next = selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value]
+    onChange(next)
+  }
+
+  const buttonLabel =
+    selected.length === 0
+      ? placeholder
+      : selected.length === selectable.length
+        ? `All ${placeholder.replace(/^All /i, "")}`
+        : `${selected.length} selected`
 
   return (
     <div ref={dropdownRef} className={`relative ${width}`}>
       <button
         type="button"
         aria-expanded={open}
-        onClick={() => {
-          setOpen((current) => !current)
-        }}
+        onClick={() => setOpen((current) => !current)}
         className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-card px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/60"
       >
-        <span className="truncate">{selected?.label ?? placeholder}</span>
-        <ChevronDown className={`ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        <span className="truncate">{buttonLabel}</span>
+        <ChevronDown
+          className={`ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open ? (
-        <div
-          className="absolute left-0 top-[calc(100%+4px)] z-[100] max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl"
-        >
-          {options.map((option) => {
-            const active = option.value === value
+        <div className="absolute left-0 top-[calc(100%+4px)] z-[100] max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] text-foreground transition-colors hover:bg-accent"
+            onClick={() => onChange([])}
+          >
+            <span>All</span>
+            {selected.length === 0 ? <Check className="h-3.5 w-3.5 text-blue-400" /> : null}
+          </button>
+
+          <div className="my-1 border-t border-border" />
+
+          {selectable.map((option) => {
+            const active = selected.includes(option.value)
             return (
               <button
                 key={`${option.value}-${option.label}`}
                 type="button"
                 className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${active ? "bg-blue-500/10 text-blue-400" : "text-foreground hover:bg-accent"}`}
-                onClick={() => {
-                  onChange(option.value)
-                  setOpen(false)
-                }}
+                onClick={() => toggle(option.value)}
               >
                 <span className="truncate">{option.label}</span>
                 {active ? <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-blue-400" /> : null}
               </button>
             )
           })}
+
+          {selected.length > 0 ? (
+            <>
+              <div className="my-1 border-t border-border" />
+              <button
+                type="button"
+                className="flex w-full items-center justify-center rounded-md px-2.5 py-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-transparent hover:text-blue-400"
+                onClick={() => onChange([])}
+              >
+                Clear selection
+              </button>
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -768,10 +858,10 @@ export default function PromotionLogs() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [category, setCategory] = useState<Category>("")
-  const [division, setDivision] = useState<Division>("")
-  const [userId, setUserId] = useState("")
-  const [action, setAction] = useState("")
+  const [categories, setCategories] = useState<string[]>([])
+  const [divisions, setDivisions] = useState<string[]>([])
+  const [userIds, setUserIds] = useState<string[]>([])
+  const [actions, setActions] = useState<string[]>([])
   const [search, setSearch] = useState("")
 
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
@@ -794,11 +884,10 @@ export default function PromotionLogs() {
   const rosterLoadingRef = useRef<Set<string>>(new Set())
 
   const hasFilters = Boolean(
-    search.trim() ||
-      category ||
-      division ||
-      userId ||
-      action,
+    categories.length ||
+      divisions.length ||
+      userIds.length ||
+      actions.length,
   )
 
   useEffect(() => {
@@ -923,21 +1012,10 @@ export default function PromotionLogs() {
         params.set("search", search.trim())
       }
 
-      if (category) {
-        params.set("category", category)
-      }
-
-      if (division) {
-        params.set("division", division)
-      }
-
-      if (userId) {
-        params.set("userId", userId)
-      }
-
-      if (action) {
-        params.set("action", action)
-      }
+      categories.forEach((value) => params.append("category", value))
+      divisions.forEach((value) => params.append("division", value))
+      userIds.forEach((value) => params.append("userId", value))
+      actions.forEach((value) => params.append("action", value))
 
       const response = await fetch(
         `/api/action-logs?${params.toString()}`,
@@ -1010,10 +1088,10 @@ export default function PromotionLogs() {
     module,
     loadRosterProfiles,
     search,
-    category,
-    division,
-    userId,
-    action,
+    categories,
+    divisions,
+    userIds,
+    actions,
   ])
 
   useEffect(() => {
@@ -1052,13 +1130,22 @@ export default function PromotionLogs() {
   )
 
   const clearFilters = () => {
-    setSearch("")
-    setCategory("")
-    setDivision("")
-    setUserId("")
-    setAction("")
+    setCategories([])
+    setDivisions([])
+    setUserIds([])
+    setActions([])
     setPage(1)
     setExpanded(new Set())
+  }
+
+  const clearSearch = () => {
+    setSearch("")
+    setPage(1)
+    setExpanded(new Set())
+  }
+
+  const resetFilters = () => {
+    clearFilters()
   }
 
   const changeFilter = <T,>(
@@ -1160,10 +1247,10 @@ export default function PromotionLogs() {
                     setPage(1)
                     setExpanded(new Set())
                     setSearch("")
-                    setCategory("")
-                    setDivision("")
-                    setUserId("")
-                    setAction("")
+                    setCategories([])
+                    setDivisions([])
+                    setUserIds([])
+                    setActions([])
                   }}
                   className={`h-8 rounded-md border px-3 text-xs font-medium outline-none transition-colors ${
                     active
@@ -1177,154 +1264,155 @@ export default function PromotionLogs() {
             })}
           </div>
 
-          {/* Search + filters */}
+          {/* Search + filters — all controls live inside the Filters box. */}
           <div className="w-full">
-            <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-[minmax(280px,1fr)_180px_180px_180px_180px]">
-              <div className="relative min-w-0">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(event) => changeFilter(setSearch, event.target.value)}
-                  placeholder="Search users, actions, IDs, targets..."
-                  className="h-9 w-full border-border bg-card pl-9 text-[12px]"
-                />
-              </div>
-
-              <FilterDropdown
-                value={category}
-                placeholder="All Categories"
-                options={categoryOptions}
-                onChange={(value) => changeFilter(setCategory, value as Category)}
-                width="w-full"
-              />
-
-              <FilterDropdown
-                value={division}
-                placeholder="All Divisions"
-                options={divisionOptions}
-                onChange={(value) => changeFilter(setDivision, value as Division)}
-                width="w-full"
-              />
-
-              <FilterDropdown
-                value={userId}
-                placeholder="Anyone"
-                options={[
-                  { value: "", label: "Anyone" },
-                  ...Array.from(
-                    new Map<string, Option>(
-                      logs
-                        .filter((log) => log.userId)
-                        .map((log) => [
-                          log.userId,
-                          {
-                            value: log.userId,
-                            label: log.userName || log.username || log.userId,
-                          },
-                        ] as const),
-                    ).values(),
-                  ),
-                ]}
-                onChange={(value) => changeFilter(setUserId, value)}
-                width="w-full"
-              />
-
-              <FilterDropdown
-                value={action}
-                placeholder="All actions"
-                options={[
-                  { value: "", label: "All actions" },
-                  ...actionOptions.map((item) => ({
-                    value: item,
-                    label: actionLabel(item),
-                  })),
-                ]}
-                onChange={(value) => changeFilter(setAction, value)}
-                width="w-full"
-              />
-            </div>
-
-            <div className="mt-2 flex items-center justify-end">
+            <div className="mb-2 flex items-center justify-between">
               <span className="text-[11px] text-muted-foreground">
                 {pagination.total.toLocaleString()} changes
               </span>
             </div>
 
-            {/* Active filters */}
-            <div className="mt-2 flex min-h-9 flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
-              <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Filter className="h-3.5 w-3.5 text-blue-400" />
-                Filters:
+            <div className="rounded-lg border border-border bg-card p-2.5">
+              <div className="grid w-full grid-cols-1 gap-2 lg:grid-cols-[minmax(260px,1fr)_170px_170px_170px_180px]">
+                <div className="relative min-w-0">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(event) => changeFilter(setSearch, event.target.value)}
+                    placeholder="Search users, actions, IDs, targets..."
+                    className="h-9 w-full border-border bg-background pl-9 text-[12px]"
+                  />
+                </div>
+
+                <FilterDropdown
+                  values={categories}
+                  placeholder="All Categories"
+                  options={categoryOptions}
+                  onChange={(values) => changeFilter(setCategories, values)}
+                  width="w-full"
+                />
+
+                <FilterDropdown
+                  values={divisions}
+                  placeholder="All Divisions"
+                  options={divisionOptions}
+                  onChange={(values) => changeFilter(setDivisions, values)}
+                  width="w-full"
+                />
+
+                <FilterDropdown
+                  values={userIds}
+                  placeholder="Anyone"
+                  options={[
+                    { value: "", label: "Anyone" },
+                    ...Array.from(
+                      new Map<string, Option>(
+                        logs
+                          .filter((log) => log.userId)
+                          .map((log) => [
+                            log.userId,
+                            {
+                              value: log.userId,
+                              label: log.userName || log.username || log.userId,
+                            },
+                          ] as const),
+                      ).values(),
+                    ),
+                  ]}
+                  onChange={(values) => changeFilter(setUserIds, values)}
+                  width="w-full"
+                />
+
+                <FilterDropdown
+                  values={actions}
+                  placeholder="All actions"
+                  options={[
+                    { value: "", label: "All actions" },
+                    ...actionOptions.map((item) => ({
+                      value: item,
+                      label: actionLabel(item),
+                    })),
+                  ]}
+                  onChange={(values) => changeFilter(setActions, values)}
+                  width="w-full"
+                />
               </div>
 
-              {!hasFilters ? (
-                <span className="text-xs text-muted-foreground">None</span>
-              ) : (
-                <>
-                  {search.trim() ? (
-                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                      Search: {search.trim()}
-                    </span>
-                  ) : null}
-                  {category ? (
-                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                      Category: {categoryLabel(category)}
-                    </span>
-                  ) : null}
-                  {division ? (
-                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                      Division: {divisionLabel(division)}
-                    </span>
-                  ) : null}
-                  {userId ? (
-                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                      User: {userId}
-                    </span>
-                  ) : null}
-                  {action ? (
-                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                      Action: {actionLabel(action)}
-                    </span>
-                  ) : null}
-                </>
-              )}
-
-              {(search.trim() || hasFilters) ? (
-                <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
-                  {search.trim() ? (
-                    <button
-                      type="button"
-                      onClick={() => changeFilter(setSearch, "")}
-                      className="inline-flex h-6 items-center gap-1 border-0 bg-transparent px-0 text-[10px] font-medium text-muted-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0"
-                    >
-                      <X className="h-3 w-3" />
-                      Clear Search
-                    </button>
-                  ) : null}
-
-                  {hasFilters ? (
-                    <button
-                      type="button"
-                      onClick={clearFilters}
-                      className="inline-flex h-6 items-center gap-1 border-0 bg-transparent px-0 text-[10px] font-medium text-muted-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0"
-                    >
-                      <X className="h-3 w-3" />
-                      Clear Filters
-                    </button>
-                  ) : null}
-
-                  {hasFilters ? (
-                    <button
-                      type="button"
-                      onClick={clearFilters}
-                      className="inline-flex h-6 items-center gap-1 border-0 bg-transparent px-0 text-[10px] font-medium text-muted-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0"
-                    >
-                      <RotateCcw className="h-3 w-3" />
-                      Reset Filters
-                    </button>
-                  ) : null}
+              <div className="mt-2 flex min-h-8 flex-wrap items-center gap-2 border-t border-border pt-2">
+                <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <Filter className="h-3.5 w-3.5 text-blue-400" />
+                  Filters:
                 </div>
-              ) : null}
+
+                {!hasFilters && !search.trim() ? (
+                  <span className="text-xs text-muted-foreground">None</span>
+                ) : (
+                  <>
+                    {search.trim() ? (
+                      <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                        Search: {search.trim()}
+                      </span>
+                    ) : null}
+                    {categories.map((value) => (
+                      <span key={`category-${value}`} className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                        Category: {categoryLabel(value)}
+                      </span>
+                    ))}
+                    {divisions.map((value) => (
+                      <span key={`division-${value}`} className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                        Division: {divisionLabel(value)}
+                      </span>
+                    ))}
+                    {userIds.map((value) => (
+                      <span key={`user-${value}`} className="max-w-48 truncate rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                        User: {logs.find((log) => log.userId === value)?.userName || logs.find((log) => log.userId === value)?.username || value}
+                      </span>
+                    ))}
+                    {actions.map((value) => (
+                      <span key={`action-${value}`} className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                        Action: {actionLabel(value)}
+                      </span>
+                    ))}
+                  </>
+                )}
+
+                {(search.trim() || hasFilters) ? (
+                  <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {search.trim() ? (
+                      <button
+                        type="button"
+                        onClick={clearSearch}
+                        className="inline-flex h-6 items-center gap-1 border-0 bg-transparent px-0 text-[10px] font-medium text-muted-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0"
+                      >
+                        <X className="h-3 w-3" />
+                        Clear Search
+                      </button>
+                    ) : null}
+
+                    {hasFilters ? (
+                      <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="inline-flex h-6 items-center gap-1 border-0 bg-transparent px-0 text-[10px] font-medium text-muted-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0"
+                      >
+                        <X className="h-3 w-3" />
+                        Clear Filters
+                      </button>
+                    ) : null}
+
+                    {hasFilters ? (
+                      <button
+                        type="button"
+                        onClick={resetFilters}
+                        className="inline-flex h-6 items-center gap-1 border-0 bg-transparent px-0 text-[10px] font-medium text-muted-foreground shadow-none outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400 focus:outline-none focus:ring-0"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Reset Filters
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
@@ -1413,12 +1501,7 @@ export default function PromotionLogs() {
                         Math.max(globalLogIndex, 0) +
                         1
 
-                      const detailEntries = log.details
-                        ? Object.entries(log.details).filter(
-                            ([, value]) =>
-                              value !== undefined && value !== null,
-                          )
-                        : []
+                      const detailEntries = getDetailEntries(log)
 
                       return (
                         <div
@@ -1532,7 +1615,7 @@ export default function PromotionLogs() {
                             </div>
                           </div>
 
-                          {/* Expanded entry — same flat, separated-row structure as the reference. */}
+                          {/* Expanded entry — readable rows for every log type. */}
                           {isExpanded ? (
                             <div className="border-t border-border px-4 py-3 sm:px-7 sm:py-4">
                               {detailEntries.length > 0 ? (
@@ -1540,32 +1623,28 @@ export default function PromotionLogs() {
                                   {detailEntries.map(([key, value]) => (
                                     <div
                                       key={key}
-                                      className="grid grid-cols-[minmax(90px,150px)_1fr] gap-4 py-2.5 first:pt-0 last:pb-2 sm:grid-cols-[160px_1fr]"
+                                      className="grid grid-cols-[minmax(110px,180px)_1fr] items-start gap-5 py-3 first:pt-0 last:pb-1"
                                     >
-                                      <span className="text-[11px] text-muted-foreground sm:text-xs">
-                                        {actionLabel(key)}
+                                      <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
+                                        {detailLabel(key)}
                                       </span>
-                                      <pre className="m-0 whitespace-pre-wrap break-words font-sans text-[11px] leading-5 text-foreground sm:text-xs">
+                                      <span className="min-w-0 whitespace-pre-wrap break-words text-[11px] leading-5 text-foreground sm:text-xs">
                                         {formatDetailValue(value)}
-                                      </pre>
+                                      </span>
                                     </div>
                                   ))}
                                 </div>
-                              ) : (
-                                <div className="py-1 text-[11px] leading-5 text-muted-foreground sm:text-xs">
-                                  {log.summary || "No additional details available."}
-                                </div>
-                              )}
+                              ) : null}
 
-                              {log.summary && detailEntries.length > 0 ? (
-                                <div className="mt-3 border-t border-border pt-3">
+                              {log.summary ? (
+                                <div className={`${detailEntries.length > 0 ? "mt-3 border-t border-border pt-3" : ""}`}>
                                   <p className="text-[11px] leading-5 text-muted-foreground sm:text-xs">
                                     {log.summary}
                                   </p>
                                 </div>
                               ) : null}
 
-                              <div className="mt-3 grid gap-4 border-t border-border pt-3 sm:grid-cols-2">
+                              <div className="mt-3 grid gap-4 border-t border-border pt-3 sm:grid-cols-[1fr_auto]">
                                 <div className="min-w-0">
                                   <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                                     Changed By
@@ -1590,7 +1669,7 @@ export default function PromotionLogs() {
                                   <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                                     Entry
                                   </p>
-                                  <p className="font-mono text-sm text-foreground">
+                                  <p className="font-mono text-sm font-medium text-foreground">
                                     #{entryNumber}
                                   </p>
                                 </div>
