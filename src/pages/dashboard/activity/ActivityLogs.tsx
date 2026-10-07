@@ -1521,9 +1521,6 @@ function FilterDropdown({
     selectable.some((option) => option.value === value),
   )
 
-  const allSelected =
-    selectable.length > 0 && selected.length === selectable.length
-
   useEffect(() => {
     if (!open) return
 
@@ -1563,7 +1560,7 @@ function FilterDropdown({
     return normalized || placeholder
   })()
 
-  const showCount = selected.length > 0 && !allSelected
+  const showCount = selected.length > 0
 
   return (
     <div ref={dropdownRef} className={`relative shrink-0 ${width}`}>
@@ -1594,14 +1591,14 @@ function FilterDropdown({
           <button
             type="button"
             className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${
-              selected.length === 0 || allSelected
+              selected.length === 0
                 ? "bg-blue-500/10 text-blue-400"
                 : "text-foreground hover:bg-accent"
             }`}
             onClick={() => onChange([])}
           >
             <span className="whitespace-nowrap">{allLabel}</span>
-            {selected.length === 0 || allSelected ? (
+            {selected.length === 0 ? (
               <Check className="ml-3 h-3.5 w-3.5 shrink-0 text-blue-400" />
             ) : null}
           </button>
