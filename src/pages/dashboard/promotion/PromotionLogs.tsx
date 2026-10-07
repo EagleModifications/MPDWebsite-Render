@@ -56,7 +56,7 @@ type Division =
   | "sar"
   | ""
 
-type LogModule = "promotion" | "activity"
+type LogModule = "all" | "promotion" | "activity"
 
 type ActionLog = {
   id: string
@@ -68,7 +68,7 @@ type ActionLog = {
   rank: string
   callsign: string
   badgeNumber: string
-  avatar?: string | null
+  avatar?: string | { hash?: string | null; url?: string | null } | null
   action: string
   module?: "promotion" | "activity" | string
   category: Exclude<Category, ""> | string
@@ -238,24 +238,28 @@ const getDefaultAvatar = (discordId: string) => {
 
 const getAvatarUrl = (
   discordId: string,
-  avatar?: string | null,
+  avatar?: string | { hash?: string | null; url?: string | null } | null,
 ) => {
-  if (!avatar) {
-    return getDefaultAvatar(discordId)
+  const id = String(discordId || "").trim()
+  if (!id) return undefined
+
+  const avatarValue =
+    typeof avatar === "string"
+      ? avatar.trim()
+      : avatar?.url?.trim() || avatar?.hash?.trim() || ""
+
+  if (avatarValue) {
+    if (/^https?:\/\//i.test(avatarValue)) {
+      return avatarValue
+    }
+
+    // Accept either a raw Discord avatar hash or a hash prefixed with a_.
+    const hash = avatarValue.replace(/^a_/, "a_")
+    const extension = hash.startsWith("a_") ? "gif" : "png"
+    return `https://cdn.discordapp.com/avatars/${id}/${hash}.${extension}?size=128`
   }
 
-  if (
-    avatar.startsWith("http://") ||
-    avatar.startsWith("https://")
-  ) {
-    return avatar
-  }
-
-  if (avatar.startsWith("a_")) {
-    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.gif?size=128`
-  }
-
-  return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png?size=128`
+  return getDefaultAvatar(id)
 }
 
 const getActionIcon = (log: ActionLog) => {
@@ -402,6 +406,54 @@ async function readApiResponse(
   }
 }
 
+const extractAvatar = (details: Record<string, unknown> | null | undefined) => {
+  if (!details) return null
+
+  const nested = (value: unknown): Record<string, unknown> | null =>
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : null
+
+  const userProfile = nested(details.userProfile)
+  const discordUser = nested(details.discordUser)
+
+  const candidates: unknown[] = [
+    details.avatar,
+    details.avatarHash,
+    details.discordAvatar,
+    details.discordAvatarHash,
+    details.userAvatar,
+    details.userAvatarHash,
+    details.profilePicture,
+    details.profilePictureUrl,
+    details.avatarUrl,
+    details.userAvatarUrl,
+    details.discordAvatarUrl,
+    userProfile?.avatar,
+    userProfile?.avatarHash,
+    userProfile?.avatarUrl,
+    discordUser?.avatar,
+    discordUser?.avatarUrl,
+  ]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim()
+    }
+
+    if (candidate && typeof candidate === "object") {
+      const value = candidate as Record<string, unknown>
+      const url = value.url
+      const hash = value.hash
+
+      if (typeof url === "string" && url.trim()) return url.trim()
+      if (typeof hash === "string" && hash.trim()) return hash.trim()
+    }
+  }
+
+  return null
+}
+
 function IdentityCard({
   name,
   username,
@@ -418,7 +470,7 @@ function IdentityCard({
   rank?: string
   callsign?: string
   badgeNumber?: string
-  avatar?: string | null
+  avatar?: string | { hash?: string | null; url?: string | null } | null
   compact?: boolean
 }) {
   const avatarUrl = userId
@@ -544,7 +596,7 @@ function IdentityCard({
           </div>
 
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-[11px] font-medium text-foreground">
+            <div className="truncate text-[11px] font-medium text-foreground transition-colors group-hover:text-blue-400">
               {name || "Unknown User"}
             </div>
             {username ? (
@@ -563,7 +615,7 @@ function IdentityCard({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="px-2 py-1.5">
-          <p className="truncate text-sm font-semibold">{name || "Unknown User"}</p>
+          <p className="truncate text-sm font-semibold text-foreground transition-colors hover:text-blue-400">{name || "Unknown User"}</p>
           {username ? <p className="truncate text-xs text-muted-foreground">@{username}</p> : null}
           {rank ? <p className="mt-0.5 text-[10px] text-blue-400">{rank}</p> : null}
         </div>
@@ -632,13 +684,17 @@ function TargetIdentity({ log }: { log: ActionLog }) {
       "",
   ).trim()
 
-  const targetAvatar = String(
-    details.targetAvatar ??
-      details.targetAvatarHash ??
-      details.targetDiscordAvatar ??
-      details.targetAvatarUrl ??
-      "",
-  ).trim()
+  const targetAvatar =
+    (typeof details.targetAvatar === "string" && details.targetAvatar.trim()
+      ? details.targetAvatar.trim()
+      : typeof details.targetAvatarHash === "string" && details.targetAvatarHash.trim()
+        ? details.targetAvatarHash.trim()
+        : typeof details.targetDiscordAvatar === "string" && details.targetDiscordAvatar.trim()
+          ? details.targetDiscordAvatar.trim()
+          : typeof details.targetAvatarUrl === "string" && details.targetAvatarUrl.trim()
+            ? details.targetAvatarUrl.trim()
+            : extractAvatar(details)) ||
+    null
 
   if (!targetName && !targetUserId) {
     return (
@@ -779,13 +835,41 @@ export default function PromotionLogs() {
   const [availableActions, setAvailableActions] =
     useState<string[]>(fallbackActions)
 
-  const hasFilters = Boolean(
-    search.trim() ||
-      category ||
+  const hasSearch = Boolean(search.trim())
+
+  const hasFilterSelection = Boolean(
+    category ||
       division ||
       userId ||
       action,
   )
+
+  const hasFilters = hasSearch || hasFilterSelection
+
+  const filterSummary = useMemo(() => {
+    const values: string[] = []
+
+    if (search.trim()) {
+      values.push(`Search: ${search.trim()}`)
+    }
+
+    if (category) {
+      values.push(`Category: ${categoryLabel(category)}`)
+    }
+
+    if (userId) {
+      const selectedUser = logs.find((log) => log.userId === userId)
+      values.push(
+        `User: ${selectedUser?.userName || selectedUser?.username || userId}`,
+      )
+    }
+
+    if (action) {
+      values.push(`Action: ${actionLabel(action)}`)
+    }
+
+    return values
+  }, [search, category, userId, action, logs])
 
   const loadLogs = useCallback(async () => {
     setLoading(true)
@@ -795,8 +879,11 @@ export default function PromotionLogs() {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(pageSize),
-        module,
       })
+
+      if (module !== "all") {
+        params.set("module", module)
+      }
 
       if (search.trim()) {
         params.set("search", search.trim())
@@ -867,16 +954,7 @@ export default function PromotionLogs() {
           const details = log.details ?? {}
           const resolvedAvatar =
             log.avatar ||
-            String(
-              details.avatar ??
-                details.avatarHash ??
-                details.discordAvatar ??
-                details.discordAvatarHash ??
-                details.userAvatar ??
-                details.userAvatarHash ??
-                details.avatarUrl ??
-                "",
-            ).trim() ||
+            extractAvatar(details) ||
             null
 
           nextLogs.push({
@@ -969,7 +1047,23 @@ export default function PromotionLogs() {
     [availableActions],
   )
 
+  const clearSearch = () => {
+    if (!search) return
+    setSearch("")
+    setPage(1)
+    setExpanded(null)
+  }
+
   const clearFilters = () => {
+    setCategory("")
+    setDivision("")
+    setUserId("")
+    setAction("")
+    setPage(1)
+    setExpanded(null)
+  }
+
+  const resetFilters = () => {
     setSearch("")
     setCategory("")
     setDivision("")
@@ -1033,21 +1127,19 @@ export default function PromotionLogs() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-                {module === "promotion" ? (
-                  <Shield className="h-5 w-5 text-blue-500" />
-                ) : (
-                  <Activity className="h-5 w-5 text-blue-500" />
-                )}
+                <Activity className="h-5 w-5 text-blue-500" />
               </div>
 
               <div className="min-w-0">
                 <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-                  {module === "promotion" ? "Promotion Logs" : "Activity Logs"}
+                  {module === "all" ? "Action Logs" : module === "promotion" ? "Promotion Logs" : "Activity Logs"}
                 </h1>
                 <p className="mt-0.5 text-sm leading-5 text-muted-foreground">
-                  {module === "promotion"
-                    ? "View promotion management audit history and changes."
-                    : "View activity management audit history and changes."}
+                  {module === "all"
+                    ? "View promotion and activity management audit history and changes."
+                    : module === "promotion"
+                      ? "View promotion management audit history and changes."
+                      : "View activity management audit history and changes."}
                 </p>
               </div>
             </div>
@@ -1066,54 +1158,62 @@ export default function PromotionLogs() {
           </div>
 
           {/* Log module tabs */}
-          <div className="flex w-fit items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1">
-            <button
-              type="button"
-              onClick={() => {
-                if (module === "promotion") return
-                setModule("promotion")
-                setPage(1)
-                setExpanded(null)
-                setSearch("")
-                setCategory("")
-                setDivision("")
-                setUserId("")
-                setAction("")
-              }}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${module === "promotion" ? "bg-blue-500/10 text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Promotion Logs
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (module === "activity") return
-                setModule("activity")
-                setPage(1)
-                setExpanded(null)
-                setSearch("")
-                setCategory("")
-                setDivision("")
-                setUserId("")
-                setAction("")
-              }}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${module === "activity" ? "bg-blue-500/10 text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Activity Logs
-            </button>
+          <div className="flex w-fit items-center gap-1">
+            {([
+              { value: "all", label: "All" },
+              { value: "promotion", label: "Promotion Logs" },
+              { value: "activity", label: "Activity Logs" },
+            ] as const).map((tab) => {
+              const active = module === tab.value
+
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => {
+                    if (module === tab.value) return
+                    setModule(tab.value)
+                    setPage(1)
+                    setExpanded(null)
+                    setSearch("")
+                    setCategory("")
+                    setDivision("")
+                    setUserId("")
+                    setAction("")
+                  }}
+                  className={`inline-flex h-8 items-center justify-center rounded-md border px-3 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                    active
+                      ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
+                      : "border-border bg-transparent text-muted-foreground hover:border-blue-500/30 hover:bg-transparent hover:text-foreground"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
           </div>
 
           {/* Filters */}
           <div className="w-full">
-            <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-[minmax(280px,1fr)_190px_190px_190px_auto]">
+            <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-[minmax(280px,1fr)_190px_190px_190px]">
               <div className="relative min-w-0">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(event) => changeFilter(setSearch, event.target.value)}
                   placeholder="Search users, actions, IDs, targets..."
-                  className="h-9 w-full border-border bg-card pl-9 text-[12px]"
+                  className="h-9 w-full border-border bg-card pl-9 pr-9 text-[12px]"
                 />
+                {hasSearch ? (
+                  <button
+                    type="button"
+                    aria-label="Clear search"
+                    onClick={clearSearch}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
               </div>
 
               <FilterDropdown
@@ -1160,23 +1260,70 @@ export default function PromotionLogs() {
                 onChange={(value) => changeFilter(setAction, value)}
                 width="w-full"
               />
-
             </div>
 
-            <div className="mt-2 flex min-h-5 items-center justify-end gap-2">
-              {hasFilters ? (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  <X className="h-3 w-3" />
-                  Clear filters
-                </button>
-              ) : null}
+            <div className="mt-2 flex min-h-7 flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1">
+                {hasSearch ? (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="inline-flex h-7 items-center gap-1 rounded-md border border-transparent px-2 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                    Clear Search
+                  </button>
+                ) : null}
+
+                {hasFilterSelection ? (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="inline-flex h-7 items-center gap-1 rounded-md border border-transparent px-2 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                    Clear Filters
+                  </button>
+                ) : null}
+
+                {hasFilters ? (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="inline-flex h-7 items-center gap-1 rounded-md border border-transparent px-2 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Reset Filters
+                  </button>
+                ) : null}
+              </div>
+
               <span className="text-[11px] text-muted-foreground">
                 {pagination.total.toLocaleString()} changes
               </span>
+            </div>
+
+            <div className="mt-1.5 flex min-w-0 items-center gap-2 rounded-lg border border-border bg-card/60 px-3 py-2">
+              <span className="shrink-0 text-[11px] font-medium text-foreground">
+                Filters:
+              </span>
+
+              {filterSummary.length > 0 ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  {filterSummary.map((filter) => (
+                    <span
+                      key={filter}
+                      className="inline-flex max-w-full items-center rounded-md border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] text-blue-400"
+                    >
+                      <span className="truncate">{filter}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-[11px] text-muted-foreground">
+                  None
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1244,14 +1391,7 @@ export default function PromotionLogs() {
 
                       const actorAvatar =
                         log.avatar ||
-                        String(
-                          log.details?.avatar ??
-                            log.details?.avatarHash ??
-                            log.details?.discordAvatar ??
-                            log.details?.discordAvatarHash ??
-                            log.details?.avatarUrl ??
-                            "",
-                        ).trim() ||
+                        extractAvatar(log.details) ||
                         null
 
                       const Action = getActionIcon(log)
