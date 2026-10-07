@@ -386,12 +386,11 @@ export default function ActivityRoster() {
             ).values(),
           ).filter(Boolean)
 
-          setStatusFilters(
-            statusOptions.map(
-              (status) => status.id,
-            ),
-          )
-          setRankFilters(defaultRanks)
+          // "All" is a virtual filter option. The default state is
+          // represented by empty filter arrays, so only the All
+          // checkbox is checked and no individual options are checked.
+          setStatusFilters([])
+          setRankFilters([])
           setSearch("")
         }
 
@@ -976,11 +975,8 @@ export default function ActivityRoster() {
   }
 
   const selectAllStatuses = () => {
-    setStatusFilters(
-      statusOptions.map(
-        (status) => status.id,
-      ),
-    )
+    // "All Statuses" means no status restriction.
+    setStatusFilters([])
 
     setSelectedCopied(false)
     void logAction({ module: "activity", action: "filter-status", category: "roster", division, summary: `Selected all status filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
@@ -1023,7 +1019,8 @@ export default function ActivityRoster() {
   }
 
   const selectAllRanks = () => {
-    setRankFilters([...rankOptions])
+    // "All Ranks" means no rank restriction.
+    setRankFilters([])
     setSelectedCopied(false)
     void logAction({ module: "activity", action: "filter-rank", category: "roster", division, summary: `Selected all rank filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`, details: { ranks: rankOptions } })
   }
@@ -1075,18 +1072,8 @@ export default function ActivityRoster() {
   }
 
   const filtersAreDefault =
-    statusFilters.length === statusOptions.length &&
-    statusOptions.every((status) =>
-      statusFilters.includes(status.id),
-    ) &&
-    rankFilters.length === rankOptions.length &&
-    rankOptions.every((rank) =>
-      rankFilters.some(
-        (selectedRank) =>
-          normalizeRank(selectedRank) ===
-          normalizeRank(rank),
-      ),
-    )
+    statusFilters.length === 0 &&
+    rankFilters.length === 0
 
   /*
    * All selected means no filtering is being applied, so the
@@ -1339,22 +1326,12 @@ export default function ActivityRoster() {
                   onSelect={(event) =>
                     event.preventDefault()
                   }
-                  onClick={() => {
-                    if (
-                      statusFilters.length ===
-                      statusOptions.length
-                    ) {
-                      clearStatuses()
-                    } else {
-                      selectAllStatuses()
-                    }
-                  }}
+                  onClick={selectAllStatuses}
                   className="gap-2"
                 >
                   <Checkbox
                     checked={
-                      statusFilters.length ===
-                      statusOptions.length
+                      statusFilters.length === 0
                     }
                     tabIndex={-1}
                     className="pointer-events-none"
@@ -1470,24 +1447,12 @@ export default function ActivityRoster() {
                   onSelect={(event) =>
                     event.preventDefault()
                   }
-                  onClick={() => {
-                    if (
-                      rankOptions.length > 0 &&
-                      rankFilters.length ===
-                        rankOptions.length
-                    ) {
-                      clearRanks()
-                    } else {
-                      selectAllRanks()
-                    }
-                  }}
+                  onClick={selectAllRanks}
                   className="gap-2"
                 >
                   <Checkbox
                     checked={
-                      rankOptions.length > 0 &&
-                      rankFilters.length ===
-                        rankOptions.length
+                      rankFilters.length === 0
                     }
                     tabIndex={-1}
                     className="pointer-events-none"
