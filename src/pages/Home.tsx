@@ -1165,7 +1165,7 @@ export default function Home() {
                 href="https://discord.gg/metropd"
                 className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
               >
-                <span>Join Discord</span>
+                <span>Join Metro PD</span>
 
                 <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
               </a>
@@ -1617,7 +1617,7 @@ export default function Home() {
         {/* ========================================================= */}
         {/* JOIN THE DEPARTMENT CTA                                     */}
         {/* ========================================================= */}
-        <section className="relative isolate overflow-hidden">
+        <section className="relative isolate overflow-hidden border-t border-border/40 bg-white/[0.008]">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.055),transparent_55%)]" />
 
           {visibleDots.slice(0, 32).map((dot, index) => (
@@ -1639,7 +1639,7 @@ export default function Home() {
             />
           ))}
 
-          <div className="relative mx-auto flex min-h-[430px] w-full max-w-6xl items-center justify-center px-6 py-24 text-center">
+          <div className="relative mx-auto flex min-h-[360px] w-full max-w-6xl items-center justify-center px-6 py-20 text-center">
             <div className="max-w-4xl">
               <h2 className="text-4xl font-black uppercase leading-[0.92] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                 <span className="text-foreground">
@@ -1672,15 +1672,14 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-blue-500/20" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border/40" />
         </section>
 
         {/* ========================================================= */}
         {/* FINAL DISCORD CTA                                           */}
         {/* ========================================================= */}
-        <section className="relative isolate overflow-hidden">
-          {/* No large bottom glare.
-              Just a very subtle blue atmospheric wash. */}
+        <section className="relative isolate overflow-hidden border-t border-border/40 bg-white/[0.008]">
+          {/* Subtle blue atmosphere to carry the same depth used throughout the page. */}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.055),transparent_55%)]" />
 
           {/* A few stars continue through the CTA */}
@@ -1705,7 +1704,7 @@ export default function Home() {
             ),
           )}
 
-          <div className="relative mx-auto flex min-h-[430px] w-full max-w-6xl items-center justify-center px-6 py-24 text-center">
+          <div className="relative mx-auto flex min-h-[360px] w-full max-w-6xl items-center justify-center px-6 py-20 text-center">
             <div className="max-w-4xl">
               <h2 className="text-4xl font-black uppercase leading-[0.92] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                 <span className="text-foreground">
@@ -1740,7 +1739,7 @@ export default function Home() {
           </div>
 
           {/* Very subtle divider instead of heavy bottom glow */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-blue-500/20" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border/40" />
         </section>
       </main>
 
