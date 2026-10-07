@@ -1791,8 +1791,16 @@ export default function Gallery() {
                     {filteredItems.map((item) => {
                       const mediaList = getVisibleMedia(item)
                       const previewMedia = mediaList[0]
+                      const previewThumbnail = previewMedia
+                        ? getMediaThumbnail(previewMedia)
+                        : ""
+                      const previewOriginalUrl = previewMedia
+                        ? getGalleryMediaUrl(previewMedia)
+                        : ""
                       const previewUrl = previewMedia
-                        ? getMediaThumbnail(previewMedia) || getGalleryMediaUrl(previewMedia)
+                        ? (isImageMedia(previewMedia)
+                            ? previewOriginalUrl || previewThumbnail
+                            : previewThumbnail || previewOriginalUrl)
                         : ""
 
                       return (
@@ -1816,21 +1824,36 @@ export default function Gallery() {
                                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                                   onError={(event) => {
                                     const image = event.currentTarget
-                                    const fallback = previewMedia?.thumbnailUrl
-                                      ? getGalleryMediaUrl({ ...previewMedia, url: previewMedia.thumbnailUrl })
-                                      : ""
-                                    if (fallback && image.src !== fallback) {
-                                      image.src = fallback
-                                    } else {
-                                      image.style.display = "none"
+                                    const originalUrl = previewOriginalUrl
+                                    const thumbnailUrl = previewThumbnail
+
+                                    // Home layout should never leave a large empty black
+                                    // preview when a thumbnail has expired. Try the original
+                                    // media URL before falling back to the neutral placeholder.
+                                    if (
+                                      originalUrl &&
+                                      image.src !== originalUrl
+                                    ) {
+                                      image.src = originalUrl
+                                      return
                                     }
+
+                                    if (
+                                      thumbnailUrl &&
+                                      image.src !== thumbnailUrl
+                                    ) {
+                                      image.src = thumbnailUrl
+                                      return
+                                    }
+
+                                    image.style.display = "none"
                                   }}
                                   onClick={() => previewMedia && openViewer(item, previewMedia)}
                                 />
                               )
                             ) : (
-                              <div className="flex h-full items-center justify-center text-muted-foreground">
-                                <ImageIcon className="h-8 w-8" />
+                              <div className="flex h-full items-center justify-center bg-muted/20 text-muted-foreground">
+                                <ImageIcon className="h-8 w-8 opacity-60" />
                               </div>
                             )}
 
