@@ -242,7 +242,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const hasOwn = (value: Record<string, unknown>, key: string) =>
   Object.prototype.hasOwnProperty.call(value, key)
 
-const isChangePair = (value: unknown): value is Record<string, unknown> => {
+const isChangePair = (value: unknown): boolean => {
   if (!isRecord(value)) return false
 
   return (
