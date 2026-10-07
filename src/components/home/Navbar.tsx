@@ -521,17 +521,13 @@ export default function Navbar() {
           <ThemeToggle />
 
           {user ? (
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="!h-8 !rounded-lg !border-white !bg-transparent !px-3 text-xs font-medium !text-white shadow-none hover:!bg-transparent hover:!text-white"
+            <a
+              href="/api/auth/logout"
+              className="inline-flex h-8 items-center justify-center rounded-lg border border-white bg-transparent px-3 text-xs font-medium text-white shadow-none transition-colors hover:bg-transparent hover:text-white focus:bg-transparent focus:text-white"
             >
-              <a href="/api/auth/logout">
-                <LogOut className="mr-1.5 h-4 w-4" />
-                Sign Out
-              </a>
-            </Button>
+              <LogOut className="mr-1.5 h-4 w-4" />
+              Sign Out
+            </a>
           ) : (
             <Button
               asChild
@@ -788,17 +784,13 @@ export default function Navbar() {
             {/* Mobile Authentication */}
             <div className="mt-2 flex items-center border-t border-border/50 pt-3">
               {user ? (
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="!h-8 !rounded-lg !border-white !bg-transparent !px-3 text-xs font-medium !text-white shadow-none hover:!bg-transparent hover:!text-white"
+                <a
+                  href="/api/auth/logout"
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-white bg-transparent px-3 text-xs font-medium text-white shadow-none transition-colors hover:bg-transparent hover:text-white focus:bg-transparent focus:text-white"
                 >
-                  <a href="/api/auth/logout">
-                    <LogOut className="mr-1.5 h-4 w-4" />
-                    Sign Out
-                  </a>
-                </Button>
+                  <LogOut className="mr-1.5 h-4 w-4" />
+                  Sign Out
+                </a>
               ) : (
                 <Button
                   asChild
