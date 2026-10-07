@@ -1413,13 +1413,11 @@ export default function PromotionLogs() {
 
                   <div className="space-y-2">
                     {group.logs.map((log, index) => {
-                      const isExpanded =
-                        expanded.has(log.id)
+                      const isExpanded = expanded.has(log.id)
 
-                      const actorProfile =
-                        log.userId
-                          ? rosterProfiles[log.userId]
-                          : undefined
+                      const actorProfile = log.userId
+                        ? rosterProfiles[log.userId]
+                        : undefined
 
                       const actorName =
                         actorProfile?.name ||
@@ -1443,10 +1441,16 @@ export default function PromotionLogs() {
 
                       const entryNumber =
                         log.entryNumber ??
-                        (pagination.page - 1) *
-                          pagination.limit +
+                        (pagination.page - 1) * pagination.limit +
                         Math.max(globalLogIndex, 0) +
                         1
+
+                      const detailEntries = log.details
+                        ? Object.entries(log.details).filter(
+                            ([, value]) =>
+                              value !== undefined && value !== null,
+                          )
+                        : []
 
                       return (
                         <div
@@ -1454,19 +1458,18 @@ export default function PromotionLogs() {
                             log.id ||
                             `${log.createdAt}-${log.userId}-${index}`
                           }
-                          className={`overflow-visible rounded-xl border bg-card transition-all ${
+                          className={`overflow-hidden rounded-xl border bg-card transition-colors ${
                             isExpanded
-                              ? "border-blue-500/30 shadow-sm shadow-blue-950/20"
-                              : "border-border hover:border-blue-500/20"
+                              ? "border-blue-500/40"
+                              : "border-border hover:border-blue-500/25"
                           }`}
                         >
+                          {/* Compact log entry — intentionally matches the reference entry layout. */}
                           <div
                             role="button"
                             tabIndex={0}
                             className="w-full cursor-pointer text-left outline-none"
-                            onClick={() =>
-                              toggleExpanded(log.id)
-                            }
+                            onClick={() => toggleExpanded(log.id)}
                             onKeyDown={(event) => {
                               if (event.key === "Enter" || event.key === " ") {
                                 event.preventDefault()
@@ -1475,14 +1478,6 @@ export default function PromotionLogs() {
                             }}
                           >
                             <div className="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
-                              {/* Entry + action icon */}
-                              <div className="flex w-7 shrink-0 items-center justify-center">
-                                <span className="font-mono text-[9px] text-muted-foreground/70">
-                                  #{entryNumber}
-                                </span>
-                              </div>
-
-                              {/* Action icon */}
                               <div
                                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${getActionIconStyle(
                                   log,
@@ -1491,85 +1486,75 @@ export default function PromotionLogs() {
                                 <Action className="h-4 w-4" />
                               </div>
 
-                              {/* Main event */}
                               <div className="min-w-0 flex-1">
-                                <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                                  <span className="truncate text-xs font-semibold sm:text-sm">
-                                    {actionLabel(
-                                      log.action,
-                                    )}
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="truncate text-[13px] font-semibold text-foreground sm:text-sm">
+                                    {actionLabel(log.action)}
                                   </span>
 
                                   {log.targetName || log.targetUserId ? (
                                     <>
-                                      <span className="text-muted-foreground">·</span>
+                                      <span className="shrink-0 text-muted-foreground">
+                                        →
+                                      </span>
                                       <div
                                         className="min-w-0"
-                                        onClick={(event) => event.stopPropagation()}
+                                        onClick={(event) =>
+                                          event.stopPropagation()
+                                        }
                                       >
-                                        <TargetIdentity log={log} rosterProfiles={rosterProfiles} />
+                                        <TargetIdentity
+                                          log={log}
+                                          rosterProfiles={rosterProfiles}
+                                        />
                                       </div>
                                     </>
                                   ) : null}
                                 </div>
 
-                                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
+                                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground sm:text-[11px]">
                                   <IdentityCard
                                     name={actorName}
                                     username={log.username}
                                     userId={log.userId}
                                     rank={actorProfile?.rank || log.rank}
-                                    callsign={actorProfile?.callsign || log.callsign}
-                                    badgeNumber={actorProfile?.badgeNumber || log.badgeNumber}
+                                    callsign={
+                                      actorProfile?.callsign || log.callsign
+                                    }
+                                    badgeNumber={
+                                      actorProfile?.badgeNumber ||
+                                      log.badgeNumber
+                                    }
                                     avatar={actorAvatar}
                                     compact
                                   />
 
                                   <span>·</span>
-
-                                  <span>
-                                    {formatTime(
-                                      log.createdAt,
-                                    )}
-                                  </span>
+                                  <span>{formatDateTime(log.createdAt).split(",")[0]}</span>
 
                                   <span>·</span>
-
-                                  <span className="truncate">
-                                    {categoryLabel(
-                                      log.category,
-                                    )}
-                                  </span>
+                                  <span>{categoryLabel(log.category)}</span>
 
                                   {log.division ? (
                                     <>
                                       <span>·</span>
                                       <span className="text-blue-400">
-                                        {divisionLabel(
-                                          log.division,
-                                        )}
+                                        {divisionLabel(log.division)}
                                       </span>
                                     </>
                                   ) : null}
                                 </div>
                               </div>
 
-                              {/* Status/action badge */}
                               <span
-                                className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${getActionBadgeStyle(
+                                className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:inline-flex ${getActionBadgeStyle(
                                   log,
                                 )}`}
                               >
                                 {actionLabel(log.action)}
                               </span>
 
-                              <div className="flex shrink-0 items-center gap-2">
-                                <span className="hidden text-[10px] text-muted-foreground md:block">
-                                  {formatDateTime(
-                                    log.createdAt,
-                                  )}
-                                </span>
-
+                              <div className="flex shrink-0 items-center">
                                 {isExpanded ? (
                                   <ChevronUp className="h-4 w-4 text-muted-foreground" />
                                 ) : (
@@ -1577,162 +1562,71 @@ export default function PromotionLogs() {
                                 )}
                               </div>
                             </div>
-
-                            {/* Entry summary — present on every entry, matching the reference layout. */}
-                            <div className="border-t border-border px-3 py-2.5 sm:px-4">
-                              <p className="pl-[4.25rem] text-[10px] leading-5 text-muted-foreground sm:pl-[4.75rem] sm:text-[11px]">
-                                {log.summary || "No summary available."}
-                              </p>
-                            </div>
                           </div>
 
-                          {/* Expanded details */}
+                          {/* Expanded entry — same flat, separated-row structure as the reference. */}
                           {isExpanded ? (
-                            <div className="border-t border-border px-3 py-3 sm:px-4">
-                              <div className="mb-3 flex items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-xs font-semibold">
-                                    Change details
-                                  </p>
-                                  <p className="mt-0.5 text-[10px] text-muted-foreground">
-                                    Full audit information for this entry.
+                            <div className="border-t border-border px-4 py-3 sm:px-7 sm:py-4">
+                              {detailEntries.length > 0 ? (
+                                <div className="divide-y divide-border">
+                                  {detailEntries.map(([key, value]) => (
+                                    <div
+                                      key={key}
+                                      className="grid grid-cols-[minmax(90px,150px)_1fr] gap-4 py-2.5 first:pt-0 last:pb-2 sm:grid-cols-[160px_1fr]"
+                                    >
+                                      <span className="text-[11px] text-muted-foreground sm:text-xs">
+                                        {actionLabel(key)}
+                                      </span>
+                                      <pre className="m-0 whitespace-pre-wrap break-words font-sans text-[11px] leading-5 text-foreground sm:text-xs">
+                                        {formatDetailValue(value)}
+                                      </pre>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="py-1 text-[11px] leading-5 text-muted-foreground sm:text-xs">
+                                  {log.summary || "No additional details available."}
+                                </div>
+                              )}
+
+                              {log.summary && detailEntries.length > 0 ? (
+                                <div className="mt-3 border-t border-border pt-3">
+                                  <p className="text-[11px] leading-5 text-muted-foreground sm:text-xs">
+                                    {log.summary}
                                   </p>
                                 </div>
+                              ) : null}
 
-                                <span className="font-mono text-[10px] text-muted-foreground">
-                                  Entry #{entryNumber}
-                                </span>
-                              </div>
-
-                              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                                <DetailItem label="Changed By">
+                              <div className="mt-3 grid gap-4 border-t border-border pt-3 sm:grid-cols-2">
+                                <div className="min-w-0">
+                                  <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                                    Changed By
+                                  </p>
                                   <IdentityCard
                                     name={actorName}
                                     username={log.username}
                                     userId={log.userId}
                                     rank={log.rank}
-                                    callsign={
-                                      log.callsign
-                                    }
-                                    badgeNumber={
-                                      log.badgeNumber
-                                    }
+                                    callsign={log.callsign}
+                                    badgeNumber={log.badgeNumber}
                                     avatar={actorAvatar}
                                   />
-                                </DetailItem>
-
-                                <DetailItem label="Action">
-                                  <div className="grid gap-1 text-xs">
-                                    <span>
-                                      <b>Action:</b>{" "}
-                                      {actionLabel(
-                                        log.action,
-                                      )}
-                                    </span>
-                                    <span>
-                                      <b>Category:</b>{" "}
-                                      {categoryLabel(
-                                        log.category,
-                                      )}
-                                    </span>
-                                    <span>
-                                      <b>Division:</b>{" "}
-                                      {divisionLabel(
-                                        log.division,
-                                      )}
-                                    </span>
-                                    <span className="truncate">
-                                      <b>Page:</b>{" "}
-                                      {log.path || "—"}
-                                    </span>
-                                  </div>
-                                </DetailItem>
-
-                                <DetailItem label="Changed">
-                                  <TargetIdentity log={log} rosterProfiles={rosterProfiles} />
-
-                                  {log.targetRank ? (
-                                    <p className="mt-1 text-[10px] text-muted-foreground">
-                                      Rank:{" "}
-                                      <span className="text-foreground">
-                                        {log.targetRank}
-                                      </span>
+                                  {log.userId ? (
+                                    <p className="mt-1 font-mono text-[9px] text-muted-foreground">
+                                      {log.userId}
                                     </p>
                                   ) : null}
-
-                                  {log.targetUserId ? (
-                                    <p className="mt-1 truncate font-mono text-[9px] text-blue-400/70">
-                                      {log.targetUserId}
-                                    </p>
-                                  ) : null}
-                                </DetailItem>
-
-                                <DetailItem label="Recorded">
-                                  <p className="font-medium">
-                                    {formatDateTime(
-                                      log.createdAt,
-                                    )}
-                                  </p>
-
-                                  {log.entryNumber ? (
-                                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                                      Entry #{log.entryNumber}
-                                    </p>
-                                  ) : null}
-                                </DetailItem>
-                              </div>
-
-                              <div className="mt-2 rounded-lg border border-border bg-background/60 px-3 py-2.5">
-                                <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                  Summary
-                                </p>
-
-                                <p className="text-xs leading-5">
-                                  {log.summary ||
-                                    "No summary available."}
-                                </p>
-                              </div>
-
-                              {log.details &&
-                              Object.keys(log.details)
-                                .length > 0 ? (
-                                <div className="mt-2 rounded-lg border border-border bg-background/60 px-3 py-2.5">
-                                  <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                    Additional Details
-                                  </p>
-
-                                  <div className="grid max-h-64 gap-2 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
-                                    {Object.entries(
-                                      log.details,
-                                    ).map(
-                                      ([key, value]) => (
-                                        <div
-                                          key={key}
-                                          className="min-w-0 rounded-md border border-border bg-muted/10 px-2.5 py-2"
-                                        >
-                                          <p className="truncate text-[10px] font-medium text-muted-foreground">
-                                            {actionLabel(
-                                              key,
-                                            )}
-                                          </p>
-
-                                          <pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4">
-                                            {formatDetailValue(
-                                              value,
-                                            )}
-                                          </pre>
-                                        </div>
-                                      ),
-                                    )}
-                                  </div>
                                 </div>
-                              ) : null}
 
-                              {log.path ? (
-                                <p className="mt-2 break-all border-t border-border pt-2 text-[10px] text-muted-foreground">
-                                  {log.path}
-                                </p>
-                              ) : null}
+                                <div className="min-w-0 sm:text-right">
+                                  <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                                    Entry
+                                  </p>
+                                  <p className="font-mono text-sm text-foreground">
+                                    #{entryNumber}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
                           ) : null}
                         </div>
