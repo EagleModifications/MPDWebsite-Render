@@ -140,7 +140,7 @@ const GALLERY_TAG_CLASSES: Record<GalleryTag, string> = {
   TRU: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
   SAR: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
 }
-type GalleryMediaFilter = "All" | "Images" | "Videos"
+type GalleryMediaFilter = "All" | "Images" | ""
 
 const GALLERY_CATEGORY_FILTERS: GalleryCategoryFilter[] = [
   "All",
@@ -151,7 +151,7 @@ const GALLERY_CATEGORY_FILTERS: GalleryCategoryFilter[] = [
 const GALLERY_MEDIA_FILTERS: GalleryMediaFilter[] = [
   "All",
   "Images",
-  "Videos",
+  "",
 ]
 
 type DropdownContextValue = {
@@ -1902,18 +1902,10 @@ export default function Gallery() {
                   it full size.
                 </span>
 
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
-                    <span>
-                      Images
-                    </span>
-                  </span>
-
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
                     <span>
-                      Videos
+                      Community
                     </span>
                   </span>
 
