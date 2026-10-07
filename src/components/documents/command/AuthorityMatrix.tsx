@@ -244,6 +244,21 @@ function parseMatrix(response: GvizResponse): MatrixData {
   return { ranks, entries }
 }
 
+function displayRank(rank: string): string {
+  switch (rank) {
+    case "Lieutenant Colonel":
+      return "Lt. Colonel"
+    case "Assistant Chief Of Police":
+      return "Asst. Chief"
+    case "Deputy Chief Of Police":
+      return "Dep. Chief"
+    case "Chief Of Police":
+      return "Chief"
+    default:
+      return rank
+  }
+}
+
 function groupText(group: GroupName): string {
   switch (group) {
     case "OFFICERS":
@@ -399,7 +414,7 @@ export default function AuthorityMatrix() {
             >
               <td
                 colSpan={visibleRanks.length + 1}
-                className="border-b border-blue-500/15 bg-blue-500/[0.035] px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-[0.12em] text-blue-400 sm:px-4 sm:text-[10px]"
+                className="border-b border-blue-500/15 bg-blue-500/[0.035] px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-[0.10em] text-blue-400 sm:px-3 sm:text-[10px]"
               >
                 {entry.section}
               </td>
@@ -407,7 +422,7 @@ export default function AuthorityMatrix() {
           )}
 
           <tr className="border-b border-border/50 transition-colors hover:bg-blue-500/[0.025]">
-            <td className="border-r border-border/50 px-3 py-2.5 text-left text-[10px] font-medium leading-4 text-foreground sm:px-4 sm:text-[11px]">
+            <td className="border-r border-border/50 px-3 py-2.5 text-left text-[10px] font-medium leading-4 text-foreground whitespace-nowrap sm:px-3 sm:text-[11px]">
               {entry.name}
             </td>
 
@@ -424,8 +439,8 @@ export default function AuthorityMatrix() {
                     aria-label={`${rank.rank}: ${allowed ? "Allowed" : "Not allowed"}`}
                     className={
                       allowed
-                        ? "mx-auto inline-flex h-4 w-4 items-center justify-center rounded-[4px] border border-blue-500/40 bg-blue-500/15 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.08)] sm:h-5 sm:w-5"
-                        : "mx-auto inline-flex h-4 w-4 items-center justify-center rounded-[4px] border border-border/80 bg-muted/20 text-transparent sm:h-5 sm:w-5"
+                        ? "mx-auto inline-flex h-4 w-4 items-center justify-center rounded-[4px] border border-blue-500/40 bg-blue-500/15 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.08)] sm:h-[18px] sm:w-[18px]"
+                        : "mx-auto inline-flex h-4 w-4 items-center justify-center rounded-[4px] border border-border/80 bg-muted/20 text-transparent sm:h-[18px] sm:w-[18px]"
                     }
                   >
                     <Check
@@ -572,7 +587,7 @@ export default function AuthorityMatrix() {
             <table className="w-full table-fixed border-collapse">
 
               <colgroup>
-                <col className="w-[28%]" />
+                <col className="w-[25%]" />
                 {visibleRanks.map((rank) => (
                   <col key={rank.rank} />
                 ))}
@@ -582,7 +597,7 @@ export default function AuthorityMatrix() {
                 <tr className="border-b border-border/70 bg-muted/20">
                   <th
                     rowSpan={2}
-                    className="border-r border-border/70 bg-background/30 px-2.5 py-3 text-left align-middle text-[8px] font-bold uppercase tracking-[0.06em] text-muted-foreground sm:px-3 sm:text-[9px] whitespace-nowrap"
+                    className="border-r border-border/70 bg-background/30 px-3 py-3 text-left align-middle text-[8px] font-bold uppercase tracking-[0.04em] text-muted-foreground whitespace-nowrap"
                   >
                     Responsibility / Authority
                   </th>
@@ -590,7 +605,7 @@ export default function AuthorityMatrix() {
                     <th
                       key={group}
                       colSpan={ranks.length}
-                      className={`border-r border-border/50 bg-background/40 px-0.5 py-2 text-center text-[7px] font-bold uppercase tracking-[0.01em] whitespace-nowrap last:border-r-0 sm:text-[8px] ${groupText(group)}`}
+                      className={`border-r border-border/50 bg-background/40 px-0.5 py-2 text-center text-[7px] font-bold uppercase tracking-[0.015em] whitespace-nowrap last:border-r-0 sm:text-[8px] ${groupText(group)}`}
                     >
                       {group}
                     </th>
@@ -602,10 +617,13 @@ export default function AuthorityMatrix() {
                     <th
                       key={rank.rank}
                       title={rank.rank}
-                      className="h-[44px] overflow-hidden border-r border-border/50 bg-background/20 px-0.5 py-1 text-center text-[6px] font-semibold leading-none text-muted-foreground whitespace-nowrap last:border-r-0 sm:text-[7px]"
+                      className="h-[38px] overflow-hidden border-r border-border/50 bg-background/20 px-0.5 py-1 text-center text-[6.5px] font-semibold leading-none text-muted-foreground whitespace-nowrap last:border-r-0 sm:text-[7px]"
                     >
-                      <span className="mx-auto block max-w-[38px] break-words">
-                        {rank.rank}
+                      <span
+                        className="block truncate whitespace-nowrap"
+                        title={rank.rank}
+                      >
+                        {displayRank(rank.rank)}
                       </span>
                     </th>
                   ))}
