@@ -2,6 +2,7 @@ import express from "express"
 import cookieParser from "cookie-parser"
 import multer from "multer"
 import path from "node:path"
+import { Readable } from "node:stream"
 import fs from "node:fs"
 import os from "node:os"
 import XLSX from "xlsx"
@@ -579,6 +580,7 @@ type GalleryMedia = {
   thumbnailUrl: string
   source: "upload" | "url"
   storageId?: string
+  extension?: string
 }
 
 type GalleryDocument = {
@@ -724,35 +726,15 @@ const APP_ORIGIN =
 function getGalleryPublicMediaUrl(
   media: GalleryMedia,
 ) {
-  const originalUrl = cleanGalleryString(media.url)
   const storageId = cleanGalleryString(media.storageId)
 
-  /*
-   * GridFS-backed media must always use the current application's
-   * gallery-file endpoint. Older records may contain an absolute URL
-   * generated from a previous APP_ORIGIN/domain. Returning that stale
-   * absolute URL is what causes existing images to become unavailable
-   * after a domain/deployment change.
-   *
-   * The relative URL also works on local development, Render previews,
-   * and the production custom domain without requiring APP_ORIGIN to be
-   * perfectly configured.
-   */
   if (storageId && ObjectId.isValid(storageId)) {
-    return `/api/gallery/file/${storageId}`
+    const extension = cleanGalleryString(media.extension) || "bin"
+    return `/gallery/${media.type}/${storageId}.${extension}`
   }
 
-  if (originalUrl) {
-    if (originalUrl.startsWith("/")) {
-      return APP_ORIGIN
-        ? `${APP_ORIGIN}${originalUrl}`
-        : originalUrl
-    }
-
-    return originalUrl
-  }
-
-  return ""
+  // Legacy external records are returned as-is for backwards compatibility.
+  return cleanGalleryString(media.url)
 }
 
 function serializeGalleryItem(
@@ -766,22 +748,10 @@ function serializeGalleryItem(
     tags: normalizeGalleryTags(item.tags),
     media: getGalleryMedia(item).map((media) => {
       const publicUrl = getGalleryPublicMediaUrl(media)
-      const originalUrl = cleanGalleryString(media.url)
 
       return {
         ...media,
         url: publicUrl,
-        // Give the frontend a second chance to use the original URL if an
-        // old GridFS reference is broken. This is intentionally only sent
-        // when the URLs are different.
-        fallbackUrl:
-          originalUrl && originalUrl !== publicUrl
-            ? originalUrl.startsWith("/")
-              ? APP_ORIGIN
-                ? `${APP_ORIGIN}${originalUrl}`
-                : originalUrl
-              : originalUrl
-            : undefined,
         thumbnailUrl: media.thumbnailUrl?.startsWith("/")
           ? APP_ORIGIN
             ? `${APP_ORIGIN}${media.thumbnailUrl}`
@@ -966,17 +936,18 @@ async function storeGalleryFile(
     })
 
     const storageId = uploadStream.id.toString()
-    const filePath = `/api/gallery/file/${storageId}`
+    const extension = path.extname(filename).replace(/^\./, "").toLowerCase() || (
+      contentType.split("/")[1]?.split(";")[0] || "bin"
+    )
 
     return {
       id: storageId,
       type,
-      url: APP_ORIGIN
-        ? `${APP_ORIGIN}${filePath}`
-        : filePath,
+      url: `/gallery/${type}/${storageId}.${extension}`,
       thumbnailUrl: "",
       source: "upload" as const,
       storageId,
+      extension,
     }
   } catch (error) {
     if (uploadStream.id) {
@@ -1007,13 +978,155 @@ function isSupportedGalleryExternalVideoUrl(value: string) {
   }
 }
 
+function getGalleryExtensionFromContentType(
+  contentType: string,
+  fallback = "bin",
+) {
+  const clean = contentType.toLowerCase().split(";")[0].trim()
+  const map: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "image/avif": "avif",
+    "image/bmp": "bmp",
+    "image/svg+xml": "svg",
+    "image/tiff": "tiff",
+    "video/mp4": "mp4",
+    "video/webm": "webm",
+    "video/quicktime": "mov",
+    "video/x-m4v": "m4v",
+    "video/ogg": "ogv",
+    "video/mpeg": "mpeg",
+  }
+  return map[clean] || fallback
+}
+
+async function downloadGalleryUrlToFile(
+  sourceUrl: string,
+  expectedType?: GalleryMediaType,
+) {
+  const response = await fetch(sourceUrl, {
+    redirect: "follow",
+    headers: {
+      "User-Agent": "Mozilla/5.0 MPD Gallery",
+      "Accept": "image/*,video/*,*/*;q=0.8",
+    },
+  })
+
+  if (!response.ok || !response.body) {
+    throw new Error(`The URL returned HTTP ${response.status}.`)
+  }
+
+  const contentType = response.headers.get("content-type") || ""
+  let detectedType = getGalleryFileType(contentType, sourceUrl)
+
+  // If the link is a webpage rather than a direct media file, extract the
+  // page's Open Graph media URL and download that actual media instead.
+  if (!detectedType && contentType.toLowerCase().includes("text/html")) {
+    const html = await response.text()
+    const metaPattern =
+      expectedType === "video"
+        ? /<meta[^>]+(?:property|name)=["']og:video(?::secure_url)?["'][^>]+content=["']([^"']+)["'][^>]*>/i
+        : /<meta[^>]+(?:property|name)=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["'][^>]*>/i
+
+    const reverseMetaPattern =
+      expectedType === "video"
+        ? /<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:video(?::secure_url)?["'][^>]*>/i
+        : /<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image(?::secure_url)?["'][^>]*>/i
+
+    const match = html.match(metaPattern) || html.match(reverseMetaPattern)
+    const extractedUrl = match?.[1]?.trim()
+
+    if (extractedUrl) {
+      const absoluteUrl = new URL(extractedUrl, response.url).toString()
+      return downloadGalleryUrlToFile(absoluteUrl, expectedType)
+    }
+  }
+
+  const type = detectedType || expectedType
+
+  if (!type) {
+    throw new Error("The URL does not point to a supported image or video.")
+  }
+
+  if (expectedType && detectedType && expectedType !== detectedType) {
+    throw new Error(`The URL contains a ${detectedType}, not an ${expectedType}.`)
+  }
+
+  const lengthHeader = response.headers.get("content-length")
+  const length = lengthHeader ? Number(lengthHeader) : 0
+  if (length > 100 * 1024 * 1024) {
+    throw new Error("The downloaded media is larger than the 100 MB gallery limit.")
+  }
+
+  const extension =
+    path.extname(new URL(response.url).pathname).replace(/^\./, "").toLowerCase() ||
+    getGalleryExtensionFromContentType(contentType, type === "video" ? "mp4" : "jpg")
+
+  const jobId = randomUUID()
+  const filePath = path.join(
+    GALLERY_UPLOAD_DIR,
+    `url-${jobId}.${extension}`,
+  )
+
+  try {
+    const output = fs.createWriteStream(filePath)
+    let bytes = 0
+
+    const body = Readable.fromWeb(
+      response.body as globalThis.ReadableStream<Uint8Array>,
+    )
+
+    body.on("data", (chunk: Buffer | Uint8Array) => {
+      bytes += chunk.length
+      if (bytes > 100 * 1024 * 1024) {
+        body.destroy(
+          new Error(
+            "The downloaded media is larger than the 100 MB gallery limit.",
+          ),
+        )
+      }
+    })
+
+    await new Promise<void>((resolve, reject) => {
+      body.once("error", reject)
+      output.once("error", reject)
+      output.once("finish", resolve)
+      body.pipe(output)
+    })
+
+    const stat = await fs.promises.stat(filePath)
+    if (stat.size <= 0) {
+      throw new Error("The URL returned an empty media file.")
+    }
+
+    const stored = await storeGalleryFile({
+      fieldname: "file",
+      originalname: `gallery-${jobId}.${extension}`,
+      encoding: "7bit",
+      mimetype: contentType || (type === "video" ? "video/mp4" : "image/jpeg"),
+      size: stat.size,
+      destination: GALLERY_UPLOAD_DIR,
+      filename: path.basename(filePath),
+      path: filePath,
+      buffer: undefined,
+      stream: fs.createReadStream(filePath),
+    } as Express.Multer.File)
+
+    return stored
+  } finally {
+    await safeUnlinkGalleryTempFile(filePath)
+  }
+}
+
 async function importGalleryExternalVideo(
   sourceUrl: string,
 ) {
   const url = sourceUrl.trim()
 
   if (!isSupportedGalleryExternalVideoUrl(url)) {
-    throw new Error("Only YouTube and Vimeo video URLs can be imported as gallery files.")
+    return downloadGalleryUrlToFile(url, "video")
   }
 
   const jobId = randomUUID()
@@ -1059,21 +1172,12 @@ async function importGalleryExternalVideo(
       throw new Error("The extracted video is larger than the 100 MB gallery limit.")
     }
 
-    const extension = path.extname(filename).toLowerCase()
-    const mimetype =
-      extension === ".mp4"
-        ? "video/mp4"
-        : extension === ".webm"
-          ? "video/webm"
-          : extension === ".mkv"
-            ? "video/x-matroska"
-            : "video/*"
-
+    const extension = path.extname(filename).replace(/^\./, "").toLowerCase() || "mp4"
     const stored = await storeGalleryFile({
       fieldname: "file",
-      originalname: `gallery-${jobId}${extension || ".mp4"}`,
+      originalname: `gallery-${jobId}.${extension}`,
       encoding: "7bit",
-      mimetype,
+      mimetype: extension === "webm" ? "video/webm" : "video/mp4",
       size: stat.size,
       destination: GALLERY_UPLOAD_DIR,
       filename,
@@ -1084,7 +1188,7 @@ async function importGalleryExternalVideo(
 
     return {
       ...stored,
-      source: "upload" as const,
+      source: "url" as const,
     }
   } catch (error) {
     for (const name of fs
@@ -1104,6 +1208,17 @@ async function importGalleryExternalVideo(
       `Unable to import the video from the URL. ${message}`,
     )
   }
+}
+
+async function importGalleryMediaUrl(
+  sourceUrl: string,
+  requestedType: GalleryMediaType,
+) {
+  if (requestedType === "video") {
+    return importGalleryExternalVideo(sourceUrl)
+  }
+
+  return downloadGalleryUrlToFile(sourceUrl, "image")
 }
 
 async function deleteGalleryStoredFile(
@@ -6148,7 +6263,13 @@ export function createApp() {
           })
         }
 
-        const media = await importGalleryExternalVideo(url)
+        const requestedType =
+          req.body?.type === "video" ? "video" : "image"
+
+        const media = await importGalleryMediaUrl(
+          url,
+          requestedType,
+        )
 
         return res.status(201).json({
           success: true,
@@ -6175,8 +6296,37 @@ export function createApp() {
     "/api/gallery/file/:id",
     async (req, res) => {
       try {
+        if (!ObjectId.isValid(req.params.id)) {
+          return res.status(400).json({ success: false, error: "Invalid gallery file ID" })
+        }
+        const bucket = await getGalleryBucket()
+        const files = await bucket.find({ _id: new ObjectId(req.params.id) }).limit(1).toArray()
+        const file = files[0]
+        if (!file) return res.status(404).json({ success: false, error: "Gallery file not found" })
+        const metadata = (file.metadata as { mediaType?: unknown } | undefined) ?? {}
+        const type = metadata.mediaType === "video" ? "video" : "image"
+        const extension = path.extname(String(file.filename || "")).replace(/^\./, "").toLowerCase() || "bin"
+        return res.redirect(302, `/gallery/${type}/${req.params.id}.${extension}`)
+      } catch {
+        return res.status(500).json({ success: false, error: "Failed to resolve gallery file" })
+      }
+    },
+  )
+
+  app.get(
+    "/gallery/:type/:id.:extension",
+    async (req, res) => {
+      try {
         // Public media endpoint: guests must be able to render gallery media.
         const id = req.params.id
+        const requestedType = req.params.type
+
+        if (requestedType !== "image" && requestedType !== "video") {
+          return res.status(400).json({
+            success: false,
+            error: "Invalid gallery media type",
+          })
+        }
 
         if (!ObjectId.isValid(id)) {
           return res.status(400).json({
