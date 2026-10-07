@@ -12,7 +12,7 @@ import {
   cleanValue,
   fetchSheet,
   type SheetRow,
-} from "@/components/roster/rosterShared"
+} from "@/components/documents/roster/rosterShared"
 
 const HOME_GID = "1932029060"
 
