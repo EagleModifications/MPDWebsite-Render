@@ -7068,9 +7068,6 @@ export function createApp() {
       const requestedTags = Array.isArray(req.body?.tags)
         ? Array.from(new Set(req.body.tags.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
         : []
-      const requestedTags = Array.isArray(req.body?.tags)
-        ? Array.from(new Set(req.body.tags.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
-        : []
       const legacyCategory = cleanGalleryString(req.body?.category)
       const categoriesForTag = requestedCategories.length
         ? requestedCategories
