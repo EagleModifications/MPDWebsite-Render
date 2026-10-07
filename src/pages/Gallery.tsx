@@ -670,20 +670,6 @@ export default function Gallery() {
   const [mediaFilter, setMediaFilter] =
     useState<GalleryMediaFilter>("All")
 
-  const [galleryLayout, setGalleryLayout] =
-    useState<"masonry" | "home">(() => {
-      try {
-        return window.localStorage.getItem("mpd-gallery-layout") === "home"
-          ? "home"
-          : "masonry"
-      } catch {
-        return "masonry"
-      }
-    })
-
-  const [layoutSettingsOpen, setLayoutSettingsOpen] =
-    useState(false)
-
   const [showModal, setShowModal] =
     useState(false)
 
@@ -743,27 +729,6 @@ export default function Gallery() {
 
   const fileInputRef =
     useRef<HTMLInputElement | null>(null)
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("mpd-gallery-layout", galleryLayout)
-    } catch {
-      // Ignore storage failures (private browsing / blocked storage).
-    }
-  }, [galleryLayout])
-
-  useEffect(() => {
-    if (!layoutSettingsOpen) return
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setLayoutSettingsOpen(false)
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [layoutSettingsOpen])
 
   useEffect(() => {
     const overlayOpen =
@@ -1786,196 +1751,6 @@ export default function Gallery() {
               </div>
             ) : (
               <div className="h-auto p-3 sm:p-4">
-                {galleryLayout === "home" ? (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {filteredItems.map((item) => {
-                      const mediaList = getVisibleMedia(item)
-                      const previewMedia = mediaList[0]
-                      const previewThumbnail = previewMedia
-                        ? getMediaThumbnail(previewMedia)
-                        : ""
-                      const previewOriginalUrl = previewMedia
-                        ? getGalleryMediaUrl(previewMedia)
-                        : ""
-                      const previewUrl = previewMedia
-                        ? (isImageMedia(previewMedia)
-                            ? previewOriginalUrl || previewThumbnail
-                            : previewThumbnail || previewOriginalUrl)
-                        : ""
-
-                      return (
-                        <article
-                          key={item.id}
-                          className="group overflow-hidden rounded-xl border border-border/70 bg-background/60 transition-all hover:-translate-y-0.5 hover:border-blue-500/40 hover:bg-blue-500/[0.02]"
-                        >
-                          {previewUrl && previewMedia && (
-                            <div className="relative aspect-[16/10] overflow-hidden bg-black/30">
-                              {isVideoMedia(previewMedia) ? (
-                                <video
-                                  src={previewUrl}
-                                  muted
-                                  playsInline
-                                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                  onError={(event) => {
-                                    // If the preview cannot load, remove the entire
-                                    // media area so Home Style does not leave a large
-                                    // empty black block above the card content.
-                                    event.currentTarget.parentElement?.style.setProperty(
-                                      "display",
-                                      "none",
-                                    )
-                                  }}
-                                />
-                              ) : (
-                                <img
-                                  src={previewUrl}
-                                  alt={item.title}
-                                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                  onError={(event) => {
-                                    const image = event.currentTarget
-                                    const originalUrl = previewOriginalUrl
-                                    const thumbnailUrl = previewThumbnail
-
-                                    if (
-                                      originalUrl &&
-                                      image.src !== originalUrl
-                                    ) {
-                                      image.src = originalUrl
-                                      return
-                                    }
-
-                                    if (
-                                      thumbnailUrl &&
-                                      image.src !== thumbnailUrl
-                                    ) {
-                                      image.src = thumbnailUrl
-                                      return
-                                    }
-
-                                    // All sources failed: collapse the whole
-                                    // image container instead of leaving black space.
-                                    image.parentElement?.style.setProperty(
-                                      "display",
-                                      "none",
-                                    )
-                                  }}
-                                  onClick={() => previewMedia && openViewer(item, previewMedia)}
-                                />
-                              )}
-
-                              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
-
-                              {item.category && (
-                                <span
-                                  className={[
-                                    "absolute left-3 top-3 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                                    item.category === "Fleet"
-                                      ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
-                                      : "border-blue-500/30 bg-blue-500/10 text-blue-300",
-                                  ].join(" ")}
-                                >
-                                  {item.category}
-                                </span>
-                              )}
-                            </div>
-                          )}
-
-                          <div className="border-t border-border/70 p-3">
-                            <div className="relative">
-                              <div className="w-full px-1 py-1 pb-9 pr-16 text-left">
-                                <div className="mb-1.5 flex flex-col items-start gap-1.5">
-                                  <span
-                                    className={[
-                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                                      item.category === "Fleet"
-                                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                                        : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-                                    ].join(" ")}
-                                  >
-                                    {item.category ?? "Community"}
-                                  </span>
-
-                                  {(item.tags ?? []).length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      {(item.tags ?? []).map((tag) => (
-                                        <span
-                                          key={`${item.id}-tag-${tag}`}
-                                          className={[
-                                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide",
-                                            GALLERY_TAG_CLASSES[tag],
-                                          ].join(" ")}
-                                        >
-                                          {tag}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-
-                                <h3 className="line-clamp-2 max-w-[35ch] break-words whitespace-pre-line text-sm font-semibold">
-                                  {item.title}
-                                </h3>
-
-                                {item.description && (
-                                  <div className="mt-1 max-w-[35ch]">
-                                    <p className="line-clamp-3 max-w-[35ch] break-words whitespace-pre-line text-xs leading-5 text-muted-foreground">
-                                      {item.description}
-                                    </p>
-
-                                    {getWrappedLineCount(item.description, 35) > 3 && (
-                                      <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
-                                        Show more...
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-
-                                <p className="mt-2 truncate whitespace-nowrap text-[10px] text-muted-foreground">
-                                  {mediaList.length}{" "}
-                                  {mediaList.length === 1 ? "item" : "items"}
-                                  {item.createdAt
-                                    ? ` · ${formatDate(item.createdAt)}`
-                                    : ""}
-                                </p>
-                              </div>
-
-                              {canManageGallery && (
-                                <div
-                                  className="absolute bottom-0 right-0 z-10 flex shrink-0 items-center gap-1"
-                                  onClick={(event) => event.stopPropagation()}
-                                  onKeyDown={(event) => event.stopPropagation()}
-                                >
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => openEdit(item)}
-                                    aria-label={`Edit ${item.title}`}
-                                  >
-                                    <Edit3 className="h-3.5 w-3.5" />
-                                  </Button>
-
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive hover:text-destructive"
-                                    disabled={deletingId === item.id}
-                                    onClick={() => requestDeleteGallery(item)}
-                                    aria-label={`Delete ${item.title}`}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </article>
-                      )
-                    })}
-                  </div>
-                ) : (
                   <div className="columns-1 gap-3 sm:columns-2 lg:columns-4">
                   {filteredItems.map(
                     (item) => {
@@ -2120,7 +1895,6 @@ export default function Gallery() {
                     },
                   )}
                   </div>
-                )}
               </div>
             )}
 
@@ -2163,95 +1937,6 @@ export default function Gallery() {
               </span>
             </div>
           </section>
-
-          {layoutSettingsOpen && (
-            <div
-              className="fixed inset-0 z-[70] bg-black/30 backdrop-blur-[1px]"
-              onClick={() => setLayoutSettingsOpen(false)}
-              aria-hidden="true"
-            />
-          )}
-
-          <aside
-            className={[
-              "fixed right-0 top-0 z-[80] h-full w-[min(360px,90vw)] border-l border-border/70 bg-background/95 shadow-2xl backdrop-blur-xl transition-transform duration-300",
-              layoutSettingsOpen ? "translate-x-0" : "translate-x-full",
-            ].join(" ")}
-            aria-hidden={!layoutSettingsOpen}
-          >
-            <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
-                <div>
-                  <h2 className="text-sm font-semibold">Gallery settings</h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Choose how the gallery is displayed.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLayoutSettingsOpen(false)}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  aria-label="Close gallery settings"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="space-y-3 p-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGalleryLayout("masonry")
-                    setLayoutSettingsOpen(false)
-                  }}
-                  className={[
-                    "w-full rounded-xl border p-3 text-left transition-colors",
-                    galleryLayout === "masonry"
-                      ? "border-blue-500/40 bg-blue-500/10"
-                      : "border-border/70 bg-card/60 hover:bg-muted/60",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">4-Column Masonry</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Compact cards with minimal vertical gaps.</p>
-                    </div>
-                    {galleryLayout === "masonry" && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGalleryLayout("home")
-                    setLayoutSettingsOpen(false)
-                  }}
-                  className={[
-                    "w-full rounded-xl border p-3 text-left transition-colors",
-                    galleryLayout === "home"
-                      ? "border-blue-500/40 bg-blue-500/10"
-                      : "border-border/70 bg-card/60 hover:bg-muted/60",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">Home Style</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Large image cards in a clean 4-column grid.</p>
-                    </div>
-                    {galleryLayout === "home" && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
-                  </div>
-                </button>
-              </div>
-            </div>
-          </aside>
-
-          <button
-            type="button"
-            onClick={() => setLayoutSettingsOpen(true)}
-            className="fixed bottom-5 right-5 z-[60] flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-card/95 text-muted-foreground shadow-xl backdrop-blur transition-all hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-500"
-            aria-label="Gallery layout settings"
-            title="Gallery settings"
-          >
-            <Settings2 className="h-5 w-5" />
-          </button>
 
           {canManageGallery && (
             <section className="mt-6 overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
