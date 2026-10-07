@@ -7065,13 +7065,18 @@ export function createApp() {
       const requestedCategories = Array.isArray(req.body?.categories)
         ? Array.from(new Set(req.body.categories.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
         : []
+      const requestedTags = Array.isArray(req.body?.tags)
+        ? Array.from(new Set(req.body.tags.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
+        : []
+      const requestedTags = Array.isArray(req.body?.tags)
+        ? Array.from(new Set(req.body.tags.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
+        : []
       const legacyCategory = cleanGalleryString(req.body?.category)
       const categoriesForTag = requestedCategories.length
         ? requestedCategories
         : (legacyCategory ? [legacyCategory] : [])
       const color = normalizeGalleryColor(req.body?.color)
       if (!type || !value) return res.status(400).json({ success: false, error: "A valid category or tag name is required." })
-      if (type === "tag" && categoriesForTag.length === 0) return res.status(400).json({ success: false, error: "Select at least one category for this tag." })
       if (value.length > 40) return res.status(400).json({ success: false, error: "Names must be 40 characters or fewer." })
 
       const gallery = await getCollection<GalleryTagsConfigDocument>("galleryTags")
@@ -7087,6 +7092,11 @@ export function createApp() {
 
       if (type === "category") {
         tagCategories[value] = []
+        for (const tagName of requestedTags) {
+          if (config.tags.includes(tagName)) {
+            tagCategories[value] = Array.from(new Set([...(tagCategories[value] ?? []), tagName]))
+          }
+        }
       } else {
         for (const categoryName of categoriesForTag) {
           if (config.categories.includes(categoryName)) {
@@ -7149,18 +7159,22 @@ export function createApp() {
 
       if (type === "category") {
         categories = categories.map((entry) => entry === value ? newValue : entry)
-        const assignedTags = tagCategories[value] ?? []
         delete tagCategories[value]
-        tagCategories[newValue] = assignedTags
+        tagCategories[newValue] = []
         categoryColors[newValue] = color
         delete categoryColors[value]
 
-        const fallbackCategory = categories[0] ?? newValue
+        for (const key of Object.keys(tagCategories)) {
+          tagCategories[key] = (tagCategories[key] ?? []).filter((tag) => !requestedTags.includes(tag) || key !== newValue)
+        }
+        for (const tagName of requestedTags) {
+          if (tags.includes(tagName)) {
+            tagCategories[newValue] = Array.from(new Set([...(tagCategories[newValue] ?? []), tagName]))
+          }
+        }
+
         const galleryItems = await getCollection<GalleryDocument>("gallery")
         await galleryItems.updateMany({ category: value }, { $set: { category: newValue } })
-        if (fallbackCategory !== value) {
-          await galleryItems.updateMany({ _galleryConfig: true, category: value }, { $set: { category: fallbackCategory } })
-        }
       } else {
         tags = tags.map((entry) => entry === value ? newValue : entry)
         for (const key of Object.keys(tagCategories)) {
@@ -7200,6 +7214,56 @@ export function createApp() {
     } catch (error) {
       console.error("PUT /api/gallery/options failed:", error)
       return res.status(500).json({ success: false, error: "Failed to update gallery option" })
+    }
+  })
+
+  app.post("/api/gallery/options/duplicate", async (req, res) => {
+    try {
+      const user = await getRequestUser(req)
+      if (!user) return res.status(401).json({ success: false, error: "Not authenticated" })
+      if (!hasPermission(user, "gallery")) return res.status(403).json({ success: false, error: "You do not have permission to manage the gallery" })
+
+      const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
+      const value = cleanGalleryString(req.body?.value)
+      if (!type || !value) return res.status(400).json({ success: false, error: "A valid option is required." })
+
+      const config = await getGalleryConfig()
+      const source = type === "category" ? config.categories : config.tags
+      if (!source.includes(value)) return res.status(404).json({ success: false, error: "Gallery option not found." })
+
+      const base = `${value} Copy`
+      let duplicate = base
+      let counter = 2
+      while (source.some((entry) => entry.toLowerCase() === duplicate.toLowerCase())) {
+        duplicate = `${base} ${counter++}`
+      }
+
+      const categories = [...config.categories]
+      const tags = [...config.tags]
+      const categoryColors = { ...config.categoryColors }
+      const tagColors = { ...config.tagColors }
+      const tagCategories = Object.fromEntries(Object.entries(config.tagCategories ?? {}).map(([key, values]) => [key, [...(values ?? [])]]))
+      const gallery = await getCollection<GalleryTagsConfigDocument>("galleryTags")
+
+      if (type === "category") {
+        categories.push(duplicate)
+        categoryColors[duplicate] = categoryColors[value] ?? "#3b82f6"
+        tagCategories[duplicate] = [...(tagCategories[value] ?? [])]
+      } else {
+        tags.push(duplicate)
+        tagColors[duplicate] = tagColors[value] ?? "#3b82f6"
+        for (const key of Object.keys(tagCategories)) {
+          if ((tagCategories[key] ?? []).includes(value)) {
+            tagCategories[key] = Array.from(new Set([...(tagCategories[key] ?? []), duplicate]))
+          }
+        }
+      }
+
+      await gallery.updateOne({ key: "default" }, { $set: { categories, tags, categoryColors, tagColors, tagCategories, updatedAt: new Date() } }, { upsert: true })
+      return res.status(201).json({ success: true, ...(await getGalleryConfig()) })
+    } catch (error) {
+      console.error("POST /api/gallery/options/duplicate failed:", error)
+      return res.status(500).json({ success: false, error: "Failed to duplicate gallery option" })
     }
   })
 
