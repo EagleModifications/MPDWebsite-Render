@@ -101,14 +101,6 @@ function rankOf(value: string) {
   return RANK_ALIASES[key(value)] ?? null
 }
 
-function cellValue(row: GvizRow | undefined, index: number) {
-  const cell = row?.c?.[index]
-  if (!cell) return ""
-  if (cell.f !== undefined && cell.f !== null) return clean(cell.f)
-  if (cell.v !== undefined && cell.v !== null) return clean(cell.v)
-  return ""
-}
-
 function rowValues(row: GvizRow | undefined) {
   return (row?.c ?? []).map((cell) => {
     if (!cell) return ""
