@@ -1165,7 +1165,7 @@ export default function Home() {
                 href="https://discord.gg/metropd"
                 className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
               >
-                <span>Join Metro PD</span>
+                <span>Join Discord</span>
 
                 <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
               </a>
