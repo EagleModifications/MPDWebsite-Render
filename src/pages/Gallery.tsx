@@ -977,8 +977,15 @@ function GalleryFilterDropdown({
           aria-label={ariaLabel}
           className="h-10 w-[132px] shrink-0 justify-between gap-2 px-3 text-sm font-medium"
         >
-          <span>{label}</span>
-          <ChevronDown className="h-4 w-4 opacity-60" />
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span>{label}</span>
+            {!allSelected && (
+              <span className="inline-flex min-w-[18px] h-[18px] items-center justify-center rounded-full bg-blue-500/15 px-1 text-[11px] font-semibold leading-none text-blue-500">
+                {value.length}
+              </span>
+            )}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
 
