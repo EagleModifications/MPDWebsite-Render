@@ -29,7 +29,6 @@ const SLIDE_URLS: Record<Exclude<TabId, "command-authority-matrix" | "command-pu
 
 export default function CommandDocuments() {
   const [activeTab, setActiveTab] = useState<TabId>("command-authority-matrix")
-  const active = tabs.find((tab) => tab.id === activeTab) ?? tabs[0]
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
