@@ -319,14 +319,24 @@ export default function RosterListDialog({
       }
 
       const promotionSections: string[] = []
+      let promotionGroupIndex = 0
       for (const [key, group] of grouped) {
         const [fromRank, toRank] = key.split("|||")
+
+        if (promotionGroupIndex > 0) {
+          promotionSections.push(DIVIDER)
+        }
+
         promotionSections.push(`**${fromRank.toUpperCase()} → ${toRank.toUpperCase()}**`)
         promotionSections.push("**Personnel:**")
         promotionSections.push(
           group.map((member) => `• <@${member.discordId}>`).join("\n"),
         )
         promotionSections.push("")
+        promotionGroupIndex += 1
+      }
+
+      if (promotionSections.length) {
         promotionSections.push(DIVIDER)
       }
 
@@ -339,7 +349,7 @@ export default function RosterListDialog({
           ? promotionSections
           : ["**Personnel:**", "• N/A", "", DIVIDER]),
         PROMOTION_NOTES,
-        `**Promotion Date:** <t:${now}:F> (<t:${now}:t>)`,
+        `**Promotion Date:** <t:${now}:F>`,
       ].join("\n")
     }
 
@@ -697,10 +707,11 @@ export default function RosterListDialog({
                         })
 
                         return groups.size ? (
-                          Array.from(groups.entries()).map(([key, group]) => {
+                          Array.from(groups.entries()).map(([key, group], index) => {
                             const [fromRank, toRank] = key.split("|||")
                             return (
                               <div key={key} className="mt-3">
+                                {index > 0 && <p className="my-3">{DIVIDER}</p>}
                                 <p className="font-semibold">{fromRank.toUpperCase()} → {toRank.toUpperCase()}</p>
                                 <p className="font-semibold">Personnel:</p>
                                 {group.map((member) => (
