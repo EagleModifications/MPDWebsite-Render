@@ -240,77 +240,49 @@ function isExcludedRow(values: string[]): boolean {
   return excluded.some((phrase) => text.includes(phrase))
 }
 
-/**
- * Finds rank columns without assuming that the rank headers occupy a
- * particular row. This is important because merged cells in Google Sheets
- * can be represented differently by the GViz response.
- */
-function findRankColumns(rows: GvizRow[]): RankColumn[] {
-  const found = new Map<string, number>()
-
-  for (const row of rows) {
-    const values = rowValues(row)
-
-    values.forEach((value, column) => {
-      const rank = getRank(value)
-      if (!rank || found.has(rank)) return
-      found.set(rank, column)
-    })
-  }
-
-  return RANK_ORDER.filter((rank) => found.has(rank)).map((rank) => ({
-    rank,
-    column: found.get(rank) as number,
-    group: getGroup(rank),
-  }))
-}
-
-function findRankHeaderRow(rows: GvizRow[], ranks: RankColumn[]): number {
-  let bestIndex = -1
-  let bestMatches = 0
-
-  for (let index = 0; index < rows.length; index += 1) {
-    const values = rowValues(rows[index])
-    const matches = ranks.reduce((count, rank) => {
-      return count + (getRank(values[rank.column]) === rank.rank ? 1 : 0)
-    }, 0)
-
-    if (matches > bestMatches) {
-      bestMatches = matches
-      bestIndex = index
-    }
-  }
-
-  return bestMatches > 0 ? bestIndex : -1
-}
+const RANK_COLUMNS: RankColumn[] = [
+  { column: 2, rank: "Officer", group: "OFFICERS" },
+  { column: 3, rank: "Officer 2", group: "OFFICERS" },
+  { column: 4, rank: "Officer 3", group: "OFFICERS" },
+  { column: 5, rank: "LCPL", group: "SUPERVISORS" },
+  { column: 6, rank: "CPL", group: "SUPERVISORS" },
+  { column: 7, rank: "SGT", group: "SUPERVISORS" },
+  { column: 8, rank: "SSGT", group: "SUPERVISORS" },
+  { column: 9, rank: "MSGT", group: "SUPERVISORS" },
+  { column: 10, rank: "2LT", group: "LOW COMMAND" },
+  { column: 11, rank: "1LT", group: "LOW COMMAND" },
+  { column: 12, rank: "CPT", group: "LOW COMMAND" },
+  { column: 13, rank: "MAJ", group: "LOW COMMAND" },
+  { column: 14, rank: "Lieutenant Colonel", group: "TRIAL HIGH COMMAND" },
+  { column: 15, rank: "Colonel", group: "HIGH COMMAND" },
+  { column: 16, rank: "Chief Of Staff", group: "HIGH COMMAND" },
+  { column: 17, rank: "Assistant Chief Of Police", group: "HIGH COMMAND" },
+  { column: 18, rank: "Deputy Chief Of Police", group: "HIGH COMMAND" },
+  { column: 19, rank: "Chief Of Police", group: "HIGH COMMAND" },
+]
 
 function parseMatrix(response: GvizResponse): MatrixData {
   const rows = response.table?.rows ?? []
 
   if (!rows.length) {
-    throw new Error("The Authority Matrix sheet returned no data.")
+    throw new Error(`The "${SHEET_NAME}" tab returned no data.`)
   }
 
-  const ranks = findRankColumns(rows)
-
-  if (!ranks.length) {
-    throw new Error(
-      "No rank columns were found in the Authority Matrix sheet. Check that the tab is named exactly \"Authority Matrix\"."
-    )
-  }
-
-  const rankHeaderRow = findRankHeaderRow(rows, ranks)
+  const ranks = RANK_COLUMNS
   const entries: MatrixEntry[] = []
   let currentSection: Section | null = null
 
-  for (let rowIndex = rankHeaderRow + 1; rowIndex < rows.length; rowIndex += 1) {
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
     const row = rows[rowIndex]
     const values = rowValues(row)
 
     if (isExcludedRow(values)) continue
 
     const detectedSection = getSection(cellValue(row, 0))
-    if (detectedSection) currentSection = detectedSection
+    if (detectedSection) {
+      currentSection = detectedSection
+      continue
+    }
 
     if (!currentSection) continue
 
@@ -321,8 +293,7 @@ function parseMatrix(response: GvizResponse): MatrixData {
 
     if (
       normalizedName === "PRIMARY RESPONSIBILITY" ||
-      normalizedName === "AUTHORITY" ||
-      isExcludedRow([name])
+      normalizedName === "AUTHORITY"
     ) {
       continue
     }
@@ -343,7 +314,7 @@ function parseMatrix(response: GvizResponse): MatrixData {
 
   if (!entries.length) {
     throw new Error(
-      "The Authority Matrix loaded, but no responsibility or authority rows were found."
+      `The "${SHEET_NAME}" tab was reached, but no matrix rows were found. Check that columns A:T still contain the Authority Matrix.`,
     )
   }
 
