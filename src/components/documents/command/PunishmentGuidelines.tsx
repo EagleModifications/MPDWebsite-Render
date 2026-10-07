@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
+  ChevronDown,
   FileSpreadsheet,
   Filter,
   RefreshCw,
   Search,
+  X,
 } from "lucide-react"
 
 const SHEET_URL =
@@ -11,7 +13,7 @@ const SHEET_URL =
 
 const SHEET_NAME = "Sheet1"
 
-const HEADERS = [
+const SHEET_HEADERS = [
   "Category",
   "Offense / Example",
   "Offense #1",
@@ -20,7 +22,16 @@ const HEADERS = [
   "Elevated Action",
 ] as const
 
-type Header = (typeof HEADERS)[number]
+type Header = (typeof SHEET_HEADERS)[number]
+type DisplayHeader = Exclude<Header, "Category">
+
+const DISPLAY_HEADERS: DisplayHeader[] = [
+  "Offense / Example",
+  "Offense #1",
+  "Offense #2",
+  "Offense #3",
+  "Elevated Action",
+]
 type Section = "INFRACTION" | "MODERATE" | "SEVERE"
 
 type Row = {
@@ -87,7 +98,7 @@ function findHeaderRow(rows: GvizRow[]): number {
 
     for (let column = 0; column < values.length; column += 1) {
       const value = key(cellValue(row, column))
-      if (HEADERS.some((header) => key(header) === value)) score += 1
+      if (SHEET_HEADERS.some((header) => key(header) === value)) score += 1
     }
 
     if (score > bestScore) {
@@ -118,7 +129,7 @@ function parseSheet(response: GvizResponse): Row[] {
     column += 1
   ) {
     const value = key(cellValue(rows[headerRowIndex], column))
-    const header = HEADERS.find((item) => key(item) === value)
+    const header = SHEET_HEADERS.find((item) => key(item) === value)
     if (header) headerColumns.set(header, column)
   }
 
@@ -164,18 +175,24 @@ function parseSheet(response: GvizResponse): Row[] {
     if (!currentSection) continue
 
     const values = {} as Record<Header, string>
-    for (const header of HEADERS) {
+    for (const header of SHEET_HEADERS) {
       const column = headerColumns.get(header)
       values[header] =
         column === undefined ? "" : clean(cellValue(row, column))
     }
 
-    const hasData = HEADERS.some(
-      (header) => header !== "Category" && values[header],
-    )
-    if (!hasData) continue
+    const hasPunishmentAction = [
+      "Offense #1",
+      "Offense #2",
+      "Offense #3",
+      "Elevated Action",
+    ].some((header) => values[header])
 
-    // Category is represented by the section separator.
+    // The sheet has explanatory rows at the bottom of each section.
+    // They contain only the offense/example description and no punishment.
+    if (!values["Offense / Example"] || !hasPunishmentAction) continue
+
+    // Category is represented by the section separator and is not rendered.
     values.Category = ""
 
     rowsOut.push({
@@ -200,6 +217,9 @@ export default function PunishmentGuidelines() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [sectionFilter, setSectionFilter] = useState<"ALL" | Section>("ALL")
+  const [actionFilter, setActionFilter] = useState<"ALL" | "Offense #1" | "Offense #2" | "Offense #3" | "Elevated Action">("ALL")
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const loadGuidelines = useCallback(async (manualRefresh = false) => {
     try {
@@ -254,12 +274,23 @@ export default function PunishmentGuidelines() {
 
   const filteredRows = useMemo(() => {
     const query = key(search)
-    if (!query) return rows
 
-    return rows.filter((row) =>
-      HEADERS.some((header) => key(row.values[header]).includes(query)),
-    )
-  }, [rows, search])
+    return rows.filter((row) => {
+      const matchesSearch =
+        !query ||
+        DISPLAY_HEADERS.some((header) =>
+          key(row.values[header]).includes(query),
+        )
+
+      const matchesSection =
+        sectionFilter === "ALL" || row.section === sectionFilter
+
+      const matchesAction =
+        actionFilter === "ALL" || Boolean(row.values[actionFilter])
+
+      return matchesSearch && matchesSection && matchesAction
+    })
+  }, [rows, search, sectionFilter, actionFilter])
 
   const groupedRows = useMemo(() => {
     const groups: Array<{ section: Section; rows: Row[] }> = []
@@ -272,6 +303,14 @@ export default function PunishmentGuidelines() {
 
     return groups
   }, [filteredRows])
+
+  const activeFilterCount =
+    (sectionFilter !== "ALL" ? 1 : 0) + (actionFilter !== "ALL" ? 1 : 0)
+
+  const clearFilters = () => {
+    setSectionFilter("ALL")
+    setActionFilter("ALL")
+  }
 
 
   return (
@@ -304,15 +343,95 @@ export default function PunishmentGuidelines() {
             </button>
           </div>
 
-          <div className="mt-4 relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search punishment guidelines..."
-              className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
-            />
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search punishment guidelines..."
+                className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((open) => !open)}
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              <Filter className="h-4 w-4 text-blue-400" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+              />
+            </button>
           </div>
+
+          {filtersOpen && (
+            <div className="mt-3 rounded-xl border border-border/70 bg-background/60 p-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Category
+                  </span>
+                  <select
+                    value={sectionFilter}
+                    onChange={(event) =>
+                      setSectionFilter(event.target.value as "ALL" | Section)
+                    }
+                    className="h-9 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-blue-500/50"
+                  >
+                    <option value="ALL">All categories</option>
+                    <option value="INFRACTION">Infraction</option>
+                    <option value="MODERATE">Moderate</option>
+                    <option value="SEVERE">Severe</option>
+                  </select>
+                </label>
+
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Punishment
+                  </span>
+                  <select
+                    value={actionFilter}
+                    onChange={(event) =>
+                      setActionFilter(
+                        event.target.value as
+                          | "ALL"
+                          | "Offense #1"
+                          | "Offense #2"
+                          | "Offense #3"
+                          | "Elevated Action",
+                      )
+                    }
+                    className="h-9 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-blue-500/50"
+                  >
+                    <option value="ALL">All punishment columns</option>
+                    <option value="Offense #1">Offense #1</option>
+                    <option value="Offense #2">Offense #2</option>
+                    <option value="Offense #3">Offense #3</option>
+                    <option value="Elevated Action">Elevated Action</option>
+                  </select>
+                </label>
+              </div>
+
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-xs font-medium hover:bg-muted"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Clear filters
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {loading && (
@@ -354,17 +473,16 @@ export default function PunishmentGuidelines() {
           <div className="max-h-[72vh] overflow-y-auto overflow-x-hidden">
             <table className="w-full table-fixed border-collapse">
               <colgroup>
-                <col className="w-[14%]" />
-                <col className="w-[23%]" />
-                <col className="w-[15.75%]" />
-                <col className="w-[15.75%]" />
-                <col className="w-[15.75%]" />
-                <col className="w-[15.75%]" />
+                <col className="w-[30%]" />
+                <col className="w-[17.5%]" />
+                <col className="w-[17.5%]" />
+                <col className="w-[17.5%]" />
+                <col className="w-[17.5%]" />
               </colgroup>
 
               <thead className="sticky top-0 z-30">
                 <tr className="border-b border-border/70 bg-card">
-                  {HEADERS.map((header) => (
+                  {DISPLAY_HEADERS.map((header) => (
                     <th
                       key={header}
                       className="border-r border-border/50 bg-card px-2 py-2.5 text-left text-[8px] font-bold uppercase tracking-[0.06em] text-blue-400 last:border-r-0 sm:px-4 sm:text-[9px]"
@@ -379,7 +497,7 @@ export default function PunishmentGuidelines() {
                 {groupedRows.flatMap((group) => [
                   <tr key={`section-${group.section}`}>
                     <td
-                      colSpan={HEADERS.length}
+                      colSpan={DISPLAY_HEADERS.length}
                       className="border-b border-t border-blue-500/20 bg-muted/20 px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-[0.1em] text-blue-400 sm:px-4 sm:text-[10px]"
                     >
                       <span className="inline-flex items-center gap-1.5">
@@ -393,7 +511,7 @@ export default function PunishmentGuidelines() {
                       key={row.id}
                       className="border-b border-border/50 hover:bg-muted/10"
                     >
-                      {HEADERS.map((header) => (
+                      {DISPLAY_HEADERS.map((header) => (
                         <td
                           key={`${row.id}-${header}`}
                           className="border-r border-border/50 px-3 py-2.5 align-top text-[10px] leading-4 text-foreground last:border-r-0 sm:px-4 sm:text-[11px]"
@@ -412,7 +530,7 @@ export default function PunishmentGuidelines() {
                 <Search className="mx-auto h-5 w-5 text-muted-foreground/50" />
                 <p className="mt-2 text-sm font-medium">No results found</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Try changing your search.
+                  Try changing your search or filters.
                 </p>
               </div>
             )}
