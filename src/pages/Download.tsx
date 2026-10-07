@@ -16,6 +16,9 @@ import {
 import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
 
+const GITHUB_RELEASES_API =
+  "https://api.github.com/repos/EagleModifications/MPDWebsite-Render/releases?per_page=20"
+
 type ReleaseAsset = {
   id: number
   name: string
@@ -565,41 +568,112 @@ export default function Download() {
 
       setError("")
 
-      const response = await fetch("/api/releases", {
-        headers: {
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      })
+      let validReleases: GitHubRelease[] | null = null
+      let serviceError = ""
 
-      if (!response.ok) {
-        throw new Error(
-          `The release service returned HTTP ${response.status}.`,
-        )
+      // Prefer the same-origin release service. This keeps GitHub API
+      // access off the browser when the server can reach GitHub normally.
+      try {
+        const response = await fetch("/api/releases", {
+          headers: {
+            Accept: "application/json",
+          },
+          cache: "no-store",
+        })
+
+        if (response.ok) {
+          const payload = (await response.json()) as
+            | { success?: boolean; releases?: GitHubRelease[] }
+            | GitHubRelease[]
+
+          const releases = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload.releases)
+              ? payload.releases
+              : []
+
+          validReleases = releases
+            .filter((release) => !release.draft)
+            .map((release) => ({
+              ...release,
+              assets: Array.isArray(release.assets)
+                ? release.assets.filter((asset) =>
+                    /^https:\/\/github\.com\/EagleModifications\/MPDWebsite-Render\/releases\/download\//i.test(
+                      asset.browser_download_url,
+                    ) && getPlatform(asset.name) !== null,
+                  )
+                : [],
+            }))
+            .filter((release) => release.assets.length > 0)
+        } else {
+          serviceError = `The release service returned HTTP ${response.status}.`
+        }
+      } catch (serviceLoadError) {
+        serviceError =
+          serviceLoadError instanceof Error
+            ? serviceLoadError.message
+            : "The release service could not be reached."
       }
 
-      const data = (await response.json()) as GitHubRelease[]
+      // Fallback to the public GitHub Releases API. This is important on
+      // hosts where outbound requests from the server are temporarily blocked
+      // or GitHub rate-limits the hosting provider's shared IP.
+      if (!validReleases) {
+        const response = await fetch(GITHUB_RELEASES_API, {
+          headers: {
+            Accept: "application/vnd.github+json",
+          },
+          cache: "no-store",
+        })
 
-      const validReleases = data
-        .filter((release) => !release.draft)
-        .sort(
-          (a, b) =>
-            new Date(
-              b.published_at ?? b.created_at,
-            ).getTime() -
-            new Date(
-              a.published_at ?? a.created_at,
-            ).getTime(),
-        )
+        if (!response.ok) {
+          throw new Error(
+            serviceError
+              ? `${serviceError} GitHub also returned HTTP ${response.status}.`
+              : `GitHub returned HTTP ${response.status}.`,
+          )
+        }
+
+        const data = (await response.json()) as GitHubRelease[]
+
+        if (!Array.isArray(data)) {
+          throw new Error("GitHub returned an invalid release response.")
+        }
+
+        validReleases = data
+          .filter((release) => !release.draft)
+          .map((release) => ({
+            ...release,
+            assets: Array.isArray(release.assets)
+              ? release.assets.filter((asset) =>
+                  /^https:\/\/github\.com\/EagleModifications\/MPDWebsite-Render\/releases\/download\//i.test(
+                    asset.browser_download_url,
+                  ) && getPlatform(asset.name) !== null,
+                )
+              : [],
+          }))
+          .filter((release) => release.assets.length > 0)
+      }
+
+      validReleases.sort(
+        (a, b) =>
+          new Date(
+            b.published_at ?? b.created_at,
+          ).getTime() -
+          new Date(
+            a.published_at ?? a.created_at,
+          ).getTime(),
+      )
 
       setReleases(validReleases)
     } catch (loadError) {
-      console.error(loadError)
+      console.error("[download] Failed to load releases:", loadError)
 
+      setReleases([])
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Failed to load GitHub releases.",
+          : "Failed to load desktop releases.",
       )
     } finally {
       setLoading(false)
