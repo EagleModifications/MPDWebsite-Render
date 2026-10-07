@@ -10,8 +10,6 @@ import DashboardSidebar from "@/components/dashboard/Sidebar"
 import DashboardNavbar from "@/components/dashboard/Navbar"
 import DashboardFooter from "@/components/dashboard/Footer"
 
-import DevelopmentNotice from "@/components/DevelopmentNotice"
-
 interface DashboardLayoutProps {
   children: ReactNode
 }
