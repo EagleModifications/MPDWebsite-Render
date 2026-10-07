@@ -564,17 +564,10 @@ function isVideoMedia(media: GalleryMedia) {
   return media.type === "video"
 }
 
-function getAspectClass(ratio?: number) {
-  if (!ratio || !Number.isFinite(ratio)) {
-    return "aspect-[4/3]"
-  }
-
-  if (ratio >= 1.85) return "aspect-[16/8]"
-  if (ratio >= 1.35) return "aspect-[4/3]"
-  if (ratio >= 1.05) return "aspect-square"
-  if (ratio >= 0.8) return "aspect-[4/5]"
-
-  return "aspect-[3/4]"
+function getAspectClass(_ratio?: number) {
+  // Gallery previews use one consistent size instead of changing height based
+  // on each image's natural dimensions. This keeps every card aligned.
+  return "aspect-[4/3]"
 }
 
 function formatDate(value: string) {
