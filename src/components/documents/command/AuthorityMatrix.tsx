@@ -27,42 +27,43 @@ import {
 const GOOGLE_SHEET_URL =
   "https://docs.google.com/spreadsheets/d/18Io5OdkKsZ9aVDh8I5nsAPjBUISGGM77461K06ziALU/edit"
 
+/*
+ * IMPORTANT:
+ * This must be the NAME OF THE TAB at the bottom of Google Sheets,
+ * not necessarily the name of the spreadsheet.
+ */
 const SHEET_NAME = "Authority Matrix"
 
-const REFRESH_INTERVAL = 60_000
+const AUTO_REFRESH_MS = 60_000
 
-type SheetCell = {
+type GvizCell = {
   v?: unknown
   f?: string
 }
 
 type GvizRow = {
-  c?: Array<SheetCell | null>
+  c?: Array<GvizCell | null>
 }
 
 type GvizResponse = {
   table?: {
-    cols?: Array<{
-      id?: string
-      label?: string
-    }>
     rows?: GvizRow[]
   }
 }
 
-type RankGroup = {
+type Group = {
   id: string
   label: string
 }
 
-type RankColumn = {
+type Rank = {
   id: string
   label: string
   groupId: string
-  sourceIndex: number
+  sourceColumn: number
 }
 
-type MatrixRow = {
+type MatrixEntry = {
   id: string
   section: string
   name: string
@@ -70,30 +71,31 @@ type MatrixRow = {
 }
 
 type MatrixData = {
-  groups: RankGroup[]
-  columns: RankColumn[]
-  rows: MatrixRow[]
+  groups: Group[]
+  ranks: Rank[]
+  entries: MatrixEntry[]
 }
 
-const GROUPS = [
+const KNOWN_GROUPS = [
   "OFFICERS",
   "SUPERVISORS",
   "LOW COMMAND",
   "TRIAL HIGH COMMAND",
 ]
 
-function clean(value: unknown): string {
+function text(value: unknown): string {
   return String(value ?? "")
     .replace(/\*+/g, "")
+    .replace(/\r?\n/g, " ")
     .replace(/\s+/g, " ")
     .trim()
 }
 
 function upper(value: unknown): string {
-  return clean(value).toUpperCase()
+  return text(value).toUpperCase()
 }
 
-function getCell(
+function cell(
   row: GvizRow | undefined,
   index: number,
 ): string {
@@ -101,14 +103,18 @@ function getCell(
     return ""
   }
 
-  return clean(
-    row.c[index]?.v ??
-      row.c[index]?.f ??
+  const item = row.c[index]
+
+  return text(
+    item?.v ??
+      item?.f ??
       "",
   )
 }
 
-function getGroup(value: unknown): string | null {
+function detectGroup(
+  value: string,
+): string | null {
   const valueUpper = upper(value)
 
   if (
@@ -139,24 +145,9 @@ function getGroup(value: unknown): string | null {
   return null
 }
 
-function getSection(value: unknown): string {
-  const valueUpper = upper(value)
-
-  if (
-    valueUpper === "PRIMARY RESPONSIBILITY"
-  ) {
-    return "PRIMARY RESPONSIBILITY"
-  }
-
-  if (valueUpper === "AUTHORITY") {
-    return "AUTHORITY"
-  }
-
-  return clean(value)
-}
-
-function isPermission(value: unknown): boolean {
-  const text = clean(value).toLowerCase()
+function permission(value: string): boolean {
+  const normalised =
+    text(value).toLowerCase()
 
   return [
     "true",
@@ -168,406 +159,534 @@ function isPermission(value: unknown): boolean {
     "✔",
     "check",
     "checked",
-  ].includes(text)
+  ].includes(normalised)
 }
 
-function isDocumentNote(
+function ignoredDocumentText(
   value: string,
 ): boolean {
-  const text = value.toLowerCase()
-
-  if (!text) {
-    return false
-  }
+  const lower =
+    value.toLowerCase()
 
   return (
-    text.includes(
+    lower.includes(
       "this document supersedes",
     ) ||
-    text.includes(
+    lower.includes(
       "takes precedent over any other document",
     ) ||
-    text.includes(
+    lower.includes(
       "takes precedence over any other document",
     ) ||
-    text.includes(
+    lower.includes(
       "restrictions apply based on the rank",
     ) ||
-    text.includes(
+    lower.includes(
       "determined by rank in ftd",
     ) ||
-    text.includes("last updated") ||
+    lower.includes(
+      "last updated",
+    ) ||
     /^\d{1,2}\/\d{1,2}\/\d{4}/.test(
-      text,
+      lower,
     )
   )
 }
 
 /*
- * Google Sheets can return the merged group heading in
- * different rows depending on how the sheet was created.
+ * Find the row containing the rank groups.
  *
- * This function searches the first several rows and finds
- * the row with the greatest number of recognisable group
- * headings.
+ * Google Sheets often returns merged cells with the value
+ * only in the first cell of the merged area, so we only
+ * need to find one or more recognised groups.
  */
 function findGroupRow(
   rows: GvizRow[],
-  maxColumns: number,
 ): number {
-  let bestRow = -1
-  let bestCount = 0
+  let bestIndex = -1
+  let bestScore = 0
 
-  const rowsToCheck = Math.min(
+  const limit = Math.min(
     rows.length,
-    15,
+    20,
   )
 
   for (
     let rowIndex = 0;
-    rowIndex < rowsToCheck;
-    rowIndex += 1
+    rowIndex < limit;
+    rowIndex++
   ) {
-    let count = 0
+    let score = 0
 
     for (
       let columnIndex = 0;
-      columnIndex < maxColumns;
-      columnIndex += 1
+      columnIndex < 40;
+      columnIndex++
     ) {
-      if (
-        getGroup(
-          getCell(
-            rows[rowIndex],
-            columnIndex,
-          ),
+      const value =
+        cell(
+          rows[rowIndex],
+          columnIndex,
         )
-      ) {
-        count += 1
+
+      if (detectGroup(value)) {
+        score++
       }
     }
 
-    if (count > bestCount) {
-      bestCount = count
-      bestRow = rowIndex
+    if (score > bestScore) {
+      bestScore = score
+      bestIndex = rowIndex
     }
   }
 
-  return bestRow
+  return bestIndex
 }
 
-function parseSheet(
-  responseText: string,
-): MatrixData {
-  const jsonStart =
-    responseText.indexOf("{")
-
-  const jsonEnd =
-    responseText.lastIndexOf("}")
+/*
+ * If Google has stripped the merged group cells completely,
+ * infer the groups from the rank labels.
+ *
+ * This is only a fallback. Normally the group headings from
+ * the sheet are used.
+ */
+function inferGroupFromRank(
+  value: string,
+): string | null {
+  const rank = upper(value)
 
   if (
-    jsonStart === -1 ||
-    jsonEnd === -1
+    rank === "OFFICER" ||
+    /^OFFICER\s*[123]$/.test(rank)
+  ) {
+    return "OFFICERS"
+  }
+
+  if (
+    [
+      "LCPL",
+      "CPL",
+      "SGT",
+      "SSGT",
+      "MSGT",
+    ].includes(rank)
+  ) {
+    return "SUPERVISORS"
+  }
+
+  if (
+    [
+      "2LT",
+      "1LT",
+      "CPT",
+      "MAJ",
+    ].includes(rank)
+  ) {
+    return "LOW COMMAND"
+  }
+
+  if (
+    rank.includes("LTCOL") ||
+    rank.includes("LIEUTENANT COLONEL")
+  ) {
+    return "TRIAL HIGH COMMAND"
+  }
+
+  return null
+}
+
+function parseGviz(
+  raw: string,
+): MatrixData {
+  const start =
+    raw.indexOf("{")
+
+  const end =
+    raw.lastIndexOf("}")
+
+  if (
+    start === -1 ||
+    end === -1
   ) {
     throw new Error(
-      "Google Sheets returned an invalid response.",
+      "Google Sheets did not return readable sheet data.",
     )
   }
 
-  const response =
+  const json =
     JSON.parse(
-      responseText.slice(
-        jsonStart,
-        jsonEnd + 1,
+      raw.slice(
+        start,
+        end + 1,
       ),
     ) as GvizResponse
 
   const rows =
-    response.table?.rows ?? []
+    json.table?.rows ?? []
 
   if (!rows.length) {
     throw new Error(
-      `No data was found in "${SHEET_NAME}".`,
+      `The "${SHEET_NAME}" tab returned no rows.`,
     )
   }
 
-  const maxColumns = Math.max(
-    ...rows.map(
-      (row) =>
-        row.c?.length ?? 0,
-    ),
-  )
-
   /*
-   * Find the row containing the command groups.
+   * Work out the widest row.
    */
-  const groupRowIndex =
-    findGroupRow(
-      rows,
-      maxColumns,
+  const width =
+    Math.max(
+      ...rows.map(
+        (row) =>
+          row.c?.length ?? 0,
+      ),
     )
 
-  if (groupRowIndex === -1) {
-    /*
-     * Do not fail immediately.
-     *
-     * Some versions of GViz return the first row as
-     * column metadata instead of a normal row. We therefore
-     * try to infer the groups from the first rows.
-     */
-    const possibleRows =
-      rows.slice(0, 10)
+  const groupRow =
+    findGroupRow(rows)
 
-    let found = false
+  /*
+   * Build group information.
+   */
+  const groupsByColumn =
+    new Map<
+      number,
+      string
+    >()
 
-    for (const row of possibleRows) {
+  if (groupRow >= 0) {
+    let currentGroup:
+      | string
+      | null = null
+
+    for (
+      let column = 0;
+      column < width;
+      column++
+    ) {
+      const value =
+        cell(
+          rows[groupRow],
+          column,
+        )
+
+      const detected =
+        detectGroup(value)
+
+      if (detected) {
+        currentGroup = detected
+      }
+
+      if (currentGroup) {
+        groupsByColumn.set(
+          column,
+          currentGroup,
+        )
+      }
+    }
+  }
+
+  /*
+   * Find the rank/header row.
+   *
+   * Normally this is immediately beneath the group row.
+   * We inspect the next few rows and choose the one containing
+   * the greatest number of non-boolean labels.
+   */
+  let rankRow = -1
+
+  if (groupRow >= 0) {
+    let bestScore = 0
+
+    for (
+      let candidate =
+        groupRow + 1;
+      candidate <
+        Math.min(
+          rows.length,
+          groupRow + 6,
+        );
+      candidate++
+    ) {
+      let score = 0
+
       for (
-        let i = 0;
-        i < maxColumns;
-        i += 1
+        let column = 0;
+        column < width;
+        column++
       ) {
         if (
-          getGroup(
-            getCell(row, i),
+          !groupsByColumn.has(
+            column,
           )
         ) {
-          found = true
-          break
+          continue
+        }
+
+        const value =
+          cell(
+            rows[candidate],
+            column,
+          )
+
+        const lower =
+          value.toLowerCase()
+
+        if (
+          value &&
+          lower !== "true" &&
+          lower !== "false"
+        ) {
+          score++
         }
       }
 
-      if (found) {
+      if (score > bestScore) {
+        bestScore = score
+        rankRow = candidate
+      }
+    }
+  }
+
+  /*
+   * If the group row wasn't found, inspect the first few rows
+   * for likely rank headers and use their labels to construct
+   * the columns.
+   */
+  if (rankRow === -1) {
+    for (
+      let candidate = 0;
+      candidate <
+        Math.min(
+          rows.length,
+          10,
+        );
+      candidate++
+    ) {
+      let score = 0
+
+      for (
+        let column = 0;
+        column < width;
+        column++
+      ) {
+        const value =
+          cell(
+            rows[candidate],
+            column,
+          )
+
+        if (
+          inferGroupFromRank(
+            value,
+          )
+        ) {
+          score++
+        }
+      }
+
+      if (score >= 2) {
+        rankRow = candidate
         break
       }
     }
-
-    if (!found) {
-      throw new Error(
-        `Could not find the "${SHEET_NAME}" table structure.`,
-      )
-    }
   }
 
-  const actualGroupRow =
-    groupRowIndex === -1
-      ? 0
-      : groupRowIndex
-
-  /*
-   * Carry merged group headings across columns.
-   */
-  const groupsAtColumn: Record<
-    number,
-    string
-  > = {}
-
-  let currentGroup: string | null =
-    null
-
-  for (
-    let columnIndex = 0;
-    columnIndex < maxColumns;
-    columnIndex += 1
-  ) {
-    const detected =
-      getGroup(
-        getCell(
-          rows[actualGroupRow],
-          columnIndex,
-        ),
-      )
-
-    if (detected) {
-      currentGroup = detected
-    }
-
-    if (currentGroup) {
-      groupsAtColumn[
-        columnIndex
-      ] = currentGroup
-    }
+  if (rankRow === -1) {
+    throw new Error(
+      `Could not identify the rank header row in "${SHEET_NAME}".`,
+    )
   }
 
   /*
-   * The next row is normally the actual rank row.
-   *
-   * If the next row contains TRUE/FALSE instead,
-   * search the following few rows for the real rank row.
+   * Build ranks.
    */
-  let rankRowIndex =
-    actualGroupRow + 1
+  const ranks: Rank[] = []
+
+  let currentFallbackGroup:
+    | string
+    | null = null
 
   for (
-    let attempt = 0;
-    attempt < 4 &&
-    rankRowIndex < rows.length;
-    attempt += 1
+    let column = 0;
+    column < width;
+    column++
   ) {
-    let usefulLabels = 0
+    const rankLabel =
+      cell(
+        rows[rankRow],
+        column,
+      )
 
-    for (
-      let columnIndex = 0;
-      columnIndex < maxColumns;
-      columnIndex += 1
+    if (!rankLabel) {
+      continue
+    }
+
+    const lower =
+      rankLabel.toLowerCase()
+
+    /*
+     * Don't turn TRUE/FALSE into rank names.
+     */
+    if (
+      lower === "true" ||
+      lower === "false"
     ) {
-      if (
-        !groupsAtColumn[
-          columnIndex
-        ]
-      ) {
-        continue
-      }
+      continue
+    }
 
-      const label =
-        getCell(
-          rows[rankRowIndex],
-          columnIndex,
+    let groupId =
+      groupsByColumn.get(
+        column,
+      ) ?? null
+
+    /*
+     * If the merged group header wasn't returned,
+     * infer it from the actual rank name.
+     */
+    if (!groupId) {
+      groupId =
+        inferGroupFromRank(
+          rankLabel,
         )
-
-      const lower =
-        label.toLowerCase()
-
-      if (
-        label &&
-        lower !== "true" &&
-        lower !== "false"
-      ) {
-        usefulLabels += 1
-      }
     }
-
-    if (usefulLabels >= 2) {
-      break
-    }
-
-    rankRowIndex += 1
-  }
-
-  const columns: RankColumn[] = []
-
-  for (
-    let columnIndex = 0;
-    columnIndex < maxColumns;
-    columnIndex += 1
-  ) {
-    const groupId =
-      groupsAtColumn[
-        columnIndex
-      ]
 
     if (!groupId) {
       continue
     }
 
-    const label =
-      getCell(
-        rows[rankRowIndex],
-        columnIndex,
-      )
+    currentFallbackGroup =
+      groupId
 
-    if (!label) {
-      continue
-    }
-
-    const lower =
-      label.toLowerCase()
-
-    if (
-      lower === "true" ||
-      lower === "false" ||
-      lower === "yes" ||
-      lower === "no"
-    ) {
-      continue
-    }
-
-    columns.push({
-      id: `${groupId}-${columnIndex}`,
-      label,
+    ranks.push({
+      id: `${groupId}-${column}`,
+      label: rankLabel,
       groupId,
-      sourceIndex: columnIndex,
+      sourceColumn: column,
     })
   }
 
-  if (!columns.length) {
+  /*
+   * If only the first merged column carried the group name,
+   * fill the group across any rank columns that didn't receive
+   * a group.
+   */
+  if (
+    ranks.length === 0 &&
+    groupRow >= 0
+  ) {
     throw new Error(
-      "No rank columns could be read from the sheet.",
+      `The "${SHEET_NAME}" tab was read, but no rank columns were found.`,
     )
   }
 
-  const groups: RankGroup[] =
-    GROUPS
+  /*
+   * Remove duplicate columns.
+   */
+  const uniqueRanks =
+    ranks.filter(
+      (rank, index, array) =>
+        array.findIndex(
+          (other) =>
+            other.sourceColumn ===
+            rank.sourceColumn,
+        ) === index,
+    )
+
+  /*
+   * Build group list in the correct order.
+   */
+  const groups: Group[] =
+    KNOWN_GROUPS
       .filter(
-        (group) =>
-          columns.some(
-            (column) =>
-              column.groupId ===
-              group,
+        (id) =>
+          uniqueRanks.some(
+            (rank) =>
+              rank.groupId ===
+              id,
           ),
       )
-      .map((group) => ({
-        id: group,
-        label: group,
+      .map((id) => ({
+        id,
+        label: id,
       }))
 
-  const matrixRows: MatrixRow[] =
+  /*
+   * Find the first data row.
+   */
+  const firstDataRow =
+    rankRow + 1
+
+  const entries: MatrixEntry[] =
     []
 
   let currentSection = ""
 
-  /*
-   * Everything after the rank header is table data.
-   */
   for (
     let rowIndex =
-      rankRowIndex + 1;
+      firstDataRow;
     rowIndex < rows.length;
-    rowIndex += 1
+    rowIndex++
   ) {
     const row =
       rows[rowIndex]
 
     const columnA =
-      getSection(
-        getCell(row, 0),
-      )
+      cell(row, 0)
 
-    const name =
-      getCell(row, 1)
+    const columnB =
+      cell(row, 1)
 
     /*
-     * Ignore the document notes and timestamp rows.
+     * Remove all unwanted footer/document information.
      */
     if (
-      isDocumentNote(
+      ignoredDocumentText(
         columnA,
       ) ||
-      isDocumentNote(name)
+      ignoredDocumentText(
+        columnB,
+      )
     ) {
       continue
     }
 
-    /*
-     * Column A controls the section.
-     */
+    const sectionValue =
+      upper(columnA)
+
     if (
-      columnA ===
+      sectionValue ===
       "PRIMARY RESPONSIBILITY"
     ) {
       currentSection =
         "PRIMARY RESPONSIBILITY"
     } else if (
-      columnA === "AUTHORITY"
+      sectionValue === "AUTHORITY"
     ) {
       currentSection =
         "AUTHORITY"
     }
 
     /*
-     * Empty Column B rows are section/header rows,
-     * not actual entries.
+     * Some sheets put the responsibility directly in Column A
+     * and the permissions immediately after it. Support that too.
      */
+    let name = columnB
+    let nameColumn = 1
+
     if (!name) {
+      name = columnA
+      nameColumn = 0
+    }
+
+    if (!name) {
+      continue
+    }
+
+    if (
+      upper(name) ===
+        "PRIMARY RESPONSIBILITY" ||
+      upper(name) === "AUTHORITY"
+    ) {
       continue
     }
 
@@ -575,86 +694,113 @@ function parseSheet(
       continue
     }
 
-    const permissions: Record<
-      string,
-      boolean
-    > = {}
+    if (
+      ignoredDocumentText(
+        name,
+      )
+    ) {
+      continue
+    }
 
-    for (const column of columns) {
+    const permissions:
+      Record<
+        string,
+        boolean
+      > = {}
+
+    for (const rank of uniqueRanks) {
+      /*
+       * If the responsibility is in Column A,
+       * permissions still start from the original rank columns.
+       *
+       * If the responsibility is in Column B,
+       * the rank columns remain unchanged.
+       */
+      void nameColumn
+
       permissions[
-        column.id
-      ] = isPermission(
-        getCell(
+        rank.id
+      ] = permission(
+        cell(
           row,
-          column.sourceIndex,
+          rank.sourceColumn,
         ),
       )
     }
 
-    matrixRows.push({
+    entries.push({
       id: `${rowIndex}-${name}`,
-      section: currentSection,
+      section:
+        currentSection,
       name,
       permissions,
     })
   }
 
+  if (!entries.length) {
+    throw new Error(
+      `The "${SHEET_NAME}" tab was found, but no responsibility/authority entries could be read.`,
+    )
+  }
+
   return {
     groups,
-    columns,
-    rows: matrixRows,
+    ranks: uniqueRanks,
+    entries,
   }
 }
 
-function groupClasses(
-  groupId: string,
+function groupStyle(
+  group: string,
 ) {
-  switch (groupId) {
+  switch (group) {
     case "OFFICERS":
       return {
         header:
-          "bg-blue-500/[0.10] text-blue-300",
+          "bg-blue-500/[0.08] text-blue-300",
         cell:
-          "bg-blue-500/[0.025]",
+          "bg-blue-500/[0.015]",
       }
 
     case "SUPERVISORS":
       return {
         header:
-          "bg-violet-500/[0.10] text-violet-300",
+          "bg-violet-500/[0.08] text-violet-300",
         cell:
-          "bg-violet-500/[0.025]",
+          "bg-violet-500/[0.015]",
       }
 
     case "LOW COMMAND":
       return {
         header:
-          "bg-amber-500/[0.10] text-amber-300",
+          "bg-amber-500/[0.08] text-amber-300",
         cell:
-          "bg-amber-500/[0.025]",
+          "bg-amber-500/[0.015]",
       }
 
     case "TRIAL HIGH COMMAND":
       return {
         header:
-          "bg-red-500/[0.10] text-red-300",
+          "bg-red-500/[0.08] text-red-300",
         cell:
-          "bg-red-500/[0.025]",
+          "bg-red-500/[0.015]",
       }
 
     default:
       return {
         header:
-          "bg-muted/30 text-muted-foreground",
+          "bg-muted/20 text-muted-foreground",
         cell:
-          "bg-muted/[0.02]",
+          "bg-transparent",
       }
   }
 }
 
 export default function AuthorityMatrix() {
   const [data, setData] =
-    useState<MatrixData | null>(null)
+    useState<MatrixData | null>(
+      null,
+    )
 
   const [search, setSearch] =
     useState("")
@@ -674,7 +820,7 @@ export default function AuthorityMatrix() {
   const [error, setError] =
     useState("")
 
-  const loadSheet =
+  const load =
     useCallback(
       async (
         manual = false,
@@ -693,13 +839,18 @@ export default function AuthorityMatrix() {
 
           if (!match?.[1]) {
             throw new Error(
-              "Invalid Google Sheet URL.",
+              "The Google Sheet URL is invalid.",
             )
           }
 
           const sheetId =
             match[1]
 
+          /*
+           * No GID.
+           * No API key.
+           * The tab is selected by its name.
+           */
           const url =
             `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq` +
             `?sheet=${encodeURIComponent(
@@ -711,27 +862,28 @@ export default function AuthorityMatrix() {
 
           const response =
             await fetch(url, {
+              method: "GET",
               cache: "no-store",
             })
 
           if (!response.ok) {
             throw new Error(
-              `Google Sheets returned ${response.status}.`,
+              `Google Sheets returned HTTP ${response.status}.`,
             )
           }
 
-          const text =
+          const raw =
             await response.text()
 
           const parsed =
-            parseSheet(text)
+            parseGviz(raw)
 
           setData(parsed)
-        } catch (err) {
+        } catch (reason) {
           setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to load the Google Sheet.",
+            reason instanceof Error
+              ? reason.message
+              : "Unable to load the Authority Matrix.",
           )
         } finally {
           setLoading(false)
@@ -742,23 +894,23 @@ export default function AuthorityMatrix() {
     )
 
   useEffect(() => {
-    void loadSheet()
+    void load()
 
     const interval =
       window.setInterval(
         () => {
-          void loadSheet()
+          void load()
         },
-        REFRESH_INTERVAL,
+        AUTO_REFRESH_MS,
       )
 
     return () =>
       window.clearInterval(
         interval,
       )
-  }, [loadSheet])
+  }, [load])
 
-  const sectionOptions =
+  const sections =
     useMemo(() => {
       if (!data) {
         return []
@@ -766,9 +918,9 @@ export default function AuthorityMatrix() {
 
       return Array.from(
         new Set(
-          data.rows.map(
-            (row) =>
-              row.section,
+          data.entries.map(
+            (entry) =>
+              entry.section,
           ),
         ),
       )
@@ -788,21 +940,21 @@ export default function AuthorityMatrix() {
       )
     }, [data, hiddenGroups])
 
-  const visibleColumns =
+  const visibleRanks =
     useMemo(() => {
       if (!data) {
         return []
       }
 
-      return data.columns.filter(
-        (column) =>
+      return data.ranks.filter(
+        (rank) =>
           !hiddenGroups.includes(
-            column.groupId,
+            rank.groupId,
           ),
       )
     }, [data, hiddenGroups])
 
-  const filteredRows =
+  const filtered =
     useMemo(() => {
       if (!data) {
         return []
@@ -813,11 +965,11 @@ export default function AuthorityMatrix() {
           .trim()
           .toLowerCase()
 
-      return data.rows.filter(
-        (row) => {
+      return data.entries.filter(
+        (entry) => {
           if (
             hiddenSections.includes(
-              row.section,
+              entry.section,
             )
           ) {
             return false
@@ -828,10 +980,10 @@ export default function AuthorityMatrix() {
           }
 
           return (
-            row.name
+            entry.name
               .toLowerCase()
               .includes(query) ||
-            row.section
+            entry.section
               .toLowerCase()
               .includes(query)
           )
@@ -843,30 +995,30 @@ export default function AuthorityMatrix() {
       search,
     ])
 
-  const rowsBySection =
+  const bySection =
     useMemo(() => {
-      const result =
+      const map =
         new Map<
           string,
-          MatrixRow[]
+          MatrixEntry[]
         >()
 
-      for (const row of filteredRows) {
-        const rows =
-          result.get(
-            row.section,
+      for (const entry of filtered) {
+        const list =
+          map.get(
+            entry.section,
           ) ?? []
 
-        rows.push(row)
+        list.push(entry)
 
-        result.set(
-          row.section,
-          rows,
+        map.set(
+          entry.section,
+          list,
         )
       }
 
-      return result
-    }, [filteredRows])
+      return map
+    }, [filtered])
 
   const orderedSections =
     useMemo(() => {
@@ -877,7 +1029,7 @@ export default function AuthorityMatrix() {
 
       const existing =
         Array.from(
-          rowsBySection.keys(),
+          bySection.keys(),
         )
 
       return [
@@ -894,12 +1046,41 @@ export default function AuthorityMatrix() {
             ),
         ),
       ]
-    }, [rowsBySection])
+    }, [bySection])
 
-  const hasFilters =
-    search.trim() !== "" ||
-    hiddenSections.length > 0 ||
-    hiddenGroups.length > 0
+  const toggleSection = (
+    value: string,
+  ) => {
+    setHiddenSections(
+      (current) =>
+        current.includes(value)
+          ? current.filter(
+              (item) =>
+                item !== value,
+            )
+          : [
+              ...current,
+              value,
+            ],
+    )
+  }
+
+  const toggleGroup = (
+    value: string,
+  ) => {
+    setHiddenGroups(
+      (current) =>
+        current.includes(value)
+          ? current.filter(
+              (item) =>
+                item !== value,
+            )
+          : [
+              ...current,
+              value,
+            ],
+    )
+  }
 
   const clearFilters = () => {
     setSearch("")
@@ -907,44 +1088,15 @@ export default function AuthorityMatrix() {
     setHiddenGroups([])
   }
 
-  const toggleSection = (
-    section: string,
-  ) => {
-    setHiddenSections(
-      (current) =>
-        current.includes(section)
-          ? current.filter(
-              (item) =>
-                item !== section,
-            )
-          : [
-              ...current,
-              section,
-            ],
-    )
-  }
-
-  const toggleGroup = (
-    group: string,
-  ) => {
-    setHiddenGroups(
-      (current) =>
-        current.includes(group)
-          ? current.filter(
-              (item) =>
-                item !== group,
-            )
-          : [
-              ...current,
-              group,
-            ],
-    )
-  }
+  const hasFilters =
+    Boolean(search.trim()) ||
+    hiddenSections.length > 0 ||
+    hiddenGroups.length > 0
 
   if (loading) {
     return (
-      <div className="flex min-h-[380px] items-center justify-center rounded-xl border border-border bg-card">
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+      <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-border bg-card">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <RefreshCw className="h-4 w-4 animate-spin" />
           Loading Authority Matrix...
         </div>
@@ -954,10 +1106,10 @@ export default function AuthorityMatrix() {
 
   if (!data) {
     return (
-      <div className="rounded-xl border border-red-500/30 bg-red-500/[0.03] p-6">
-        <h3 className="text-sm font-semibold text-red-300">
+      <div className="rounded-xl border border-red-500/30 bg-red-500/[0.025] p-6">
+        <p className="text-sm font-semibold text-red-300">
           Unable to load Authority Matrix
-        </h3>
+        </p>
 
         <p className="mt-2 text-sm text-muted-foreground">
           {error}
@@ -969,7 +1121,7 @@ export default function AuthorityMatrix() {
           size="sm"
           className="mt-4"
           onClick={() =>
-            void loadSheet(true)
+            void load(true)
           }
         >
           <RefreshCw className="mr-2 h-4 w-4" />
@@ -981,158 +1133,146 @@ export default function AuthorityMatrix() {
 
   return (
     <div className="w-full min-w-0 overflow-hidden rounded-xl border border-border bg-card">
-      {/* Header */}
-      <div className="border-b border-border px-5 py-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold">
-              Authority Matrix
-            </h2>
+      {/* FILTER BAR */}
+      <div className="border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1 sm:min-w-[220px]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
-            <p className="mt-1 text-sm text-muted-foreground">
-              Command authority and primary responsibilities.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-full sm:w-[240px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
-              <input
-                value={search}
-                onChange={(event) =>
-                  setSearch(
-                    event.target.value,
-                  )
-                }
-                placeholder="Search..."
-                className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* SECTION FILTER */}
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                asChild
-              >
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                >
-                  <Filter className="mr-2 h-4 w-4" />
-                  Section
-                  <ChevronDown className="ml-2 h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-
-              <DropdownMenuContent
-                align="end"
-                className="w-[245px]"
-              >
-                <DropdownMenuLabel>
-                  Sections
-                </DropdownMenuLabel>
-
-                <DropdownMenuSeparator />
-
-                {sectionOptions.map(
-                  (section) => (
-                    <DropdownMenuCheckboxItem
-                      key={section}
-                      checked={
-                        !hiddenSections.includes(
-                          section,
-                        )
-                      }
-                      onCheckedChange={() =>
-                        toggleSection(
-                          section,
-                        )
-                      }
-                    >
-                      {section}
-                    </DropdownMenuCheckboxItem>
-                  ),
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* RANK FILTER */}
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                asChild
-              >
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                >
-                  <Filter className="mr-2 h-4 w-4" />
-                  Rank
-                  <ChevronDown className="ml-2 h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-
-              <DropdownMenuContent
-                align="end"
-                className="w-[220px]"
-              >
-                <DropdownMenuLabel>
-                  Rank Groups
-                </DropdownMenuLabel>
-
-                <DropdownMenuSeparator />
-
-                {data.groups.map(
-                  (group) => (
-                    <DropdownMenuCheckboxItem
-                      key={group.id}
-                      checked={
-                        !hiddenGroups.includes(
-                          group.id,
-                        )
-                      }
-                      onCheckedChange={() =>
-                        toggleGroup(
-                          group.id,
-                        )
-                      }
-                    >
-                      {group.label}
-                    </DropdownMenuCheckboxItem>
-                  ),
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9"
-              disabled={refreshing}
-              onClick={() =>
-                void loadSheet(true)
+            <input
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value,
+                )
               }
-            >
-              <RefreshCw
-                className={`mr-2 h-4 w-4 ${
-                  refreshing
-                    ? "animate-spin"
-                    : ""
-                }`}
-              />
-              Refresh
-            </Button>
+              placeholder="Search responsibilities..."
+              className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
           </div>
+
+          {/* SECTION */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              asChild
+            >
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+              >
+                <Filter className="mr-2 h-3.5 w-3.5" />
+                Section
+                <ChevronDown className="ml-2 h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+              align="end"
+              className="w-64"
+            >
+              <DropdownMenuLabel>
+                Section
+              </DropdownMenuLabel>
+
+              <DropdownMenuSeparator />
+
+              {sections.map(
+                (section) => (
+                  <DropdownMenuCheckboxItem
+                    key={section}
+                    checked={
+                      !hiddenSections.includes(
+                        section,
+                      )
+                    }
+                    onCheckedChange={() =>
+                      toggleSection(
+                        section,
+                      )
+                    }
+                  >
+                    {section}
+                  </DropdownMenuCheckboxItem>
+                ),
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* RANK */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              asChild
+            >
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+              >
+                <Filter className="mr-2 h-3.5 w-3.5" />
+                Rank
+                <ChevronDown className="ml-2 h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+              align="end"
+              className="w-56"
+            >
+              <DropdownMenuLabel>
+                Rank Groups
+              </DropdownMenuLabel>
+
+              <DropdownMenuSeparator />
+
+              {data.groups.map(
+                (group) => (
+                  <DropdownMenuCheckboxItem
+                    key={group.id}
+                    checked={
+                      !hiddenGroups.includes(
+                        group.id,
+                      )
+                    }
+                    onCheckedChange={() =>
+                      toggleGroup(
+                        group.id,
+                      )
+                    }
+                  >
+                    {group.label}
+                  </DropdownMenuCheckboxItem>
+                ),
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9"
+            disabled={refreshing}
+            onClick={() =>
+              void load(true)
+            }
+          >
+            <RefreshCw
+              className={`mr-2 h-3.5 w-3.5 ${
+                refreshing
+                  ? "animate-spin"
+                  : ""
+              }`}
+            />
+            Refresh
+          </Button>
         </div>
 
         {hasFilters && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[11px] text-muted-foreground">
               Filters:
             </span>
 
@@ -1142,7 +1282,7 @@ export default function AuthorityMatrix() {
                 onClick={() =>
                   setSearch("")
                 }
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
               >
                 Search: {search}
                 <X className="h-3 w-3" />
@@ -1159,7 +1299,7 @@ export default function AuthorityMatrix() {
                       section,
                     )
                   }
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                  className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
                 >
                   Hidden: {section}
                   <X className="h-3 w-3" />
@@ -1175,7 +1315,7 @@ export default function AuthorityMatrix() {
                   onClick={() =>
                     toggleGroup(group)
                   }
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                  className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
                 >
                   Hidden: {group}
                   <X className="h-3 w-3" />
@@ -1188,7 +1328,7 @@ export default function AuthorityMatrix() {
               onClick={
                 clearFilters
               }
-              className="text-xs font-medium text-blue-400 hover:text-blue-300"
+              className="ml-1 text-[11px] font-medium text-blue-400 hover:text-blue-300"
             >
               Clear filters
             </button>
@@ -1196,9 +1336,9 @@ export default function AuthorityMatrix() {
         )}
 
         {error && (
-          <div className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/[0.03] px-3 py-2 text-xs text-amber-300">
-            Latest Google Sheet refresh failed. Showing the
-            last successfully loaded data.
+          <div className="mt-2 text-[11px] text-amber-400">
+            Refresh failed. Showing the last successfully
+            loaded version.
           </div>
         )}
       </div>
@@ -1207,17 +1347,17 @@ export default function AuthorityMatrix() {
       <div className="w-full overflow-hidden">
         <table className="w-full table-fixed border-collapse">
           <colgroup>
-            <col className="w-[28%]" />
+            <col className="w-[30%]" />
 
-            {visibleColumns.map(
-              (column) => (
+            {visibleRanks.map(
+              (rank) => (
                 <col
-                  key={column.id}
+                  key={rank.id}
                   style={{
                     width: `${
-                      72 /
+                      70 /
                       Math.max(
-                        visibleColumns.length,
+                        visibleRanks.length,
                         1,
                       )
                     }%`,
@@ -1228,30 +1368,29 @@ export default function AuthorityMatrix() {
           </colgroup>
 
           <thead>
-            {/* GROUPS */}
             <tr>
               <th
                 rowSpan={2}
-                className="border-b border-r border-border bg-background px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground"
+                className="border-b border-r border-border bg-background px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
               >
                 Responsibility / Authority
               </th>
 
               {visibleGroups.map(
                 (group) => {
-                  const columns =
-                    visibleColumns.filter(
-                      (column) =>
-                        column.groupId ===
+                  const ranks =
+                    visibleRanks.filter(
+                      (rank) =>
+                        rank.groupId ===
                         group.id,
                     )
 
-                  if (!columns.length) {
+                  if (!ranks.length) {
                     return null
                   }
 
                   const styles =
-                    groupClasses(
+                    groupStyle(
                       group.id,
                     )
 
@@ -1259,9 +1398,9 @@ export default function AuthorityMatrix() {
                     <th
                       key={group.id}
                       colSpan={
-                        columns.length
+                        ranks.length
                       }
-                      className={`border-b border-r border-border px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider ${styles.header}`}
+                      className={`border-b border-r border-border px-1 py-2 text-center text-[9px] font-bold uppercase tracking-wider ${styles.header}`}
                     >
                       {group.label}
                     </th>
@@ -1270,23 +1409,22 @@ export default function AuthorityMatrix() {
               )}
             </tr>
 
-            {/* RANKS */}
             <tr>
-              {visibleColumns.map(
-                (column) => {
+              {visibleRanks.map(
+                (rank) => {
                   const styles =
-                    groupClasses(
-                      column.groupId,
+                    groupStyle(
+                      rank.groupId,
                     )
 
                   return (
                     <th
-                      key={column.id}
-                      title={column.label}
-                      className={`border-b border-r border-border px-1 py-2 text-center text-[10px] font-semibold ${styles.header}`}
+                      key={rank.id}
+                      title={rank.label}
+                      className={`border-b border-r border-border px-1 py-2 text-center text-[9px] font-semibold ${styles.header}`}
                     >
                       <span className="block truncate">
-                        {column.label}
+                        {rank.label}
                       </span>
                     </th>
                   )
@@ -1298,12 +1436,12 @@ export default function AuthorityMatrix() {
           <tbody>
             {orderedSections.map(
               (section) => {
-                const rows =
-                  rowsBySection.get(
+                const entries =
+                  bySection.get(
                     section,
                   ) ?? []
 
-                if (!rows.length) {
+                if (!entries.length) {
                   return null
                 }
 
@@ -1311,93 +1449,91 @@ export default function AuthorityMatrix() {
                   <Fragment
                     key={section}
                   >
-                    {/* PRIMARY RESPONSIBILITY */}
-                    {section ===
-                      "PRIMARY RESPONSIBILITY" && (
-                      <tr>
-                        <td
-                          colSpan={
-                            1 +
-                            visibleColumns.length
-                          }
-                          className="border-b border-border bg-muted/[0.025] px-4 py-2"
-                        >
-                          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-400">
-                            Primary Responsibility
+                    <tr>
+                      <td
+                        colSpan={
+                          1 +
+                          visibleRanks.length
+                        }
+                        className={`border-b border-border px-3 py-2 ${
+                          section ===
+                          "AUTHORITY"
+                            ? "border-t-2 border-t-blue-500/30 bg-blue-500/[0.025]"
+                            : "bg-muted/[0.015]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {section ===
+                            "AUTHORITY" && (
+                            <div className="h-px flex-1 bg-border" />
+                          )}
+
+                          <span
+                            className={`text-[9px] font-bold uppercase tracking-[0.18em] ${
+                              section ===
+                              "AUTHORITY"
+                                ? "text-blue-400"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {section}
                           </span>
-                        </td>
-                      </tr>
-                    )}
 
-                    {/* AUTHORITY */}
-                    {section ===
-                      "AUTHORITY" && (
-                      <tr>
-                        <td
-                          colSpan={
-                            1 +
-                            visibleColumns.length
-                          }
-                          className="border-y border-border bg-background px-4 py-2.5"
-                        >
-                          <div className="flex items-center gap-3">
+                          {section ===
+                            "AUTHORITY" && (
                             <div className="h-px flex-1 bg-border" />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
 
-                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-400">
-                              Authority
-                            </span>
-
-                            <div className="h-px flex-1 bg-border" />
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-
-                    {rows.map(
-                      (row) => (
+                    {entries.map(
+                      (entry) => (
                         <tr
-                          key={row.id}
-                          className="hover:bg-white/[0.02]"
+                          key={
+                            entry.id
+                          }
+                          className="transition hover:bg-white/[0.02]"
                         >
-                          <td className="border-b border-r border-border bg-background px-4 py-2.5">
+                          <td className="border-b border-r border-border bg-background px-3 py-2">
                             <span
-                              className="block truncate text-[13px] font-medium text-foreground"
-                              title={row.name}
+                              title={
+                                entry.name
+                              }
+                              className="block truncate text-[12px] font-medium text-foreground"
                             >
                               {
-                                row.name
+                                entry.name
                               }
                             </span>
                           </td>
 
-                          {visibleColumns.map(
-                            (
-                              column,
-                            ) => {
+                          {visibleRanks.map(
+                            (rank) => {
                               const styles =
-                                groupClasses(
-                                  column.groupId,
+                                groupStyle(
+                                  rank.groupId,
                                 )
 
                               const allowed =
-                                row
+                                entry
                                   .permissions[
-                                  column.id
+                                  rank.id
                                 ]
 
                               return (
                                 <td
                                   key={
-                                    column.id
+                                    rank.id
                                   }
-                                  className={`border-b border-r border-border px-1 py-2 text-center ${styles.cell}`}
+                                  className={`border-b border-r border-border px-1 py-1.5 text-center ${styles.cell}`}
                                 >
                                   {allowed ? (
-                                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/15">
-                                      <Check className="h-3.5 w-3.5 text-blue-400" />
+                                    <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-blue-500/15">
+                                      <Check className="h-3 w-3 text-blue-400" />
                                     </span>
                                   ) : (
-                                    <span className="text-xs text-muted-foreground/25">
+                                    <span className="text-[10px] text-muted-foreground/20">
                                       —
                                     </span>
                                   )}
@@ -1415,7 +1551,7 @@ export default function AuthorityMatrix() {
           </tbody>
         </table>
 
-        {!filteredRows.length && (
+        {!filtered.length && (
           <div className="border-t border-border px-4 py-10 text-center">
             <p className="text-sm font-medium">
               No results found
@@ -1428,10 +1564,10 @@ export default function AuthorityMatrix() {
         )}
       </div>
 
-      <div className="border-t border-border px-4 py-2.5">
-        <span className="text-[11px] text-muted-foreground">
-          {filteredRows.length}{" "}
-          {filteredRows.length ===
+      <div className="border-t border-border px-4 py-2">
+        <span className="text-[10px] text-muted-foreground">
+          {filtered.length}{" "}
+          {filtered.length ===
           1
             ? "entry"
             : "entries"}
