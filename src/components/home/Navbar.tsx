@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { NavLink, Link } from "react-router-dom"
+import { Link, NavLink } from "react-router-dom"
 import {
   ChevronDown,
   LogIn,
@@ -287,11 +287,30 @@ export default function Navbar() {
     (item) => item.name === "Download",
   )
 
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    [
+      "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+      isActive
+        ? "text-foreground"
+        : "text-muted-foreground hover:text-foreground",
+    ].join(" ")
+
+  const mobileNavLinkClass = ({
+    isActive,
+  }: {
+    isActive: boolean
+  }) =>
+    [
+      "rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+      isActive
+        ? "text-foreground"
+        : "text-muted-foreground hover:text-foreground",
+    ].join(" ")
+
   return (
     <>
-      <header className="absolute left-0 top-0 z-50 w-full">
+      <header className="relative z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-xl">
         <div className="mx-auto grid h-20 max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-6 lg:px-8">
-
           {/* Logo */}
           <div className="flex items-center justify-start">
             <Link
@@ -313,20 +332,11 @@ export default function Navbar() {
 
           {/* Desktop Navigation */}
           <nav className="hidden items-center justify-center gap-1 md:flex">
-
-            {/* Main Navigation */}
             {mainNavItems.map((item) => (
               <NavLink
                 key={item.href}
                 to={item.href}
-                className={({ isActive }) =>
-                  [
-                    "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  ].join(" ")
-                }
+                className={navLinkClass}
               >
                 {item.name}
               </NavLink>
@@ -348,13 +358,18 @@ export default function Navbar() {
                       : "text-muted-foreground hover:text-foreground",
                   ].join(" ")}
                 >
-                  Documents
+                  <span>Documents</span>
+
+                  <ChevronDown
+                    className={[
+                      "h-4 w-4 transition-transform duration-200",
+                      documentsOpen ? "rotate-180" : "",
+                    ].join(" ")}
+                  />
                 </button>
 
                 {documentsOpen && (
                   <div className="absolute left-0 top-full mt-2 w-64 rounded-xl border border-border/60 bg-background/95 p-2 shadow-xl backdrop-blur-xl">
-
-                    {/* Rosters */}
                     {visibleRosters.length > 0 && (
                       <div className="relative">
                         <button
@@ -401,7 +416,6 @@ export default function Navbar() {
                       </div>
                     )}
 
-                    {/* SOPs */}
                     {visibleSops.length > 0 && (
                       <div className="relative">
                         <button
@@ -448,7 +462,6 @@ export default function Navbar() {
                       </div>
                     )}
 
-                    {/* Supervisor */}
                     {canViewSupervisor && (
                       <NavLink
                         to={supervisorItem.href}
@@ -464,7 +477,6 @@ export default function Navbar() {
                       </NavLink>
                     )}
 
-                    {/* Command */}
                     {canViewCommand && (
                       <NavLink
                         to={commandItem.href}
@@ -488,14 +500,7 @@ export default function Navbar() {
             {dashboardItem && (
               <NavLink
                 to={dashboardItem.href}
-                className={({ isActive }) =>
-                  [
-                    "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  ].join(" ")
-                }
+                className={navLinkClass}
               >
                 {dashboardItem.name}
               </NavLink>
@@ -505,14 +510,7 @@ export default function Navbar() {
             {downloadItem && (
               <NavLink
                 to={downloadItem.href}
-                className={({ isActive }) =>
-                  [
-                    "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  ].join(" ")
-                }
+                className={navLinkClass}
               >
                 {downloadItem.name}
               </NavLink>
@@ -576,63 +574,37 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="border-t border-border/50 bg-background/95 px-6 py-4 shadow-xl backdrop-blur-xl md:hidden">
             <nav className="mx-auto flex max-w-[1600px] flex-col gap-1">
-
-              {/* Main Mobile Navigation */}
               {mainNavItems.map((item) => (
                 <NavLink
                   key={item.href}
                   to={item.href}
                   onClick={closeMobileMenu}
-                  className={({ isActive }) =>
-                    [
-                      "rounded-lg px-4 py-3 text-sm font-medium transition-colors",
-                      isActive
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    ].join(" ")
-                  }
+                  className={mobileNavLinkClass}
                 >
                   {item.name}
                 </NavLink>
               ))}
 
-              {/* Mobile Dashboard */}
               {dashboardItem && (
                 <NavLink
                   to={dashboardItem.href}
                   onClick={closeMobileMenu}
-                  className={({ isActive }) =>
-                    [
-                      "rounded-lg px-4 py-3 text-sm font-medium transition-colors",
-                      isActive
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    ].join(" ")
-                  }
+                  className={mobileNavLinkClass}
                 >
                   {dashboardItem.name}
                 </NavLink>
               )}
 
-              {/* Mobile Download */}
               {downloadItem && (
                 <NavLink
                   to={downloadItem.href}
                   onClick={closeMobileMenu}
-                  className={({ isActive }) =>
-                    [
-                      "rounded-lg px-4 py-3 text-sm font-medium transition-colors",
-                      isActive
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    ].join(" ")
-                  }
+                  className={mobileNavLinkClass}
                 >
                   {downloadItem.name}
                 </NavLink>
               )}
 
-              {/* Mobile Documents */}
               {hasDocuments && (
                 <div className="mt-1">
                   <button
@@ -657,8 +629,6 @@ export default function Navbar() {
 
                   {documentsOpen && (
                     <div className="mt-1 space-y-1 pl-3">
-
-                      {/* Mobile Rosters */}
                       {visibleRosters.length > 0 && (
                         <div>
                           <button
@@ -705,7 +675,6 @@ export default function Navbar() {
                         </div>
                       )}
 
-                      {/* Mobile SOPs */}
                       {visibleSops.length > 0 && (
                         <div>
                           <button
@@ -752,7 +721,6 @@ export default function Navbar() {
                         </div>
                       )}
 
-                      {/* Mobile Supervisor */}
                       {canViewSupervisor && (
                         <NavLink
                           to={supervisorItem.href}
@@ -768,7 +736,6 @@ export default function Navbar() {
                         </NavLink>
                       )}
 
-                      {/* Mobile Command */}
                       {canViewCommand && (
                         <NavLink
                           to={commandItem.href}
@@ -823,6 +790,7 @@ export default function Navbar() {
         )}
       </header>
 
+      {/* Development notice is now directly BELOW the navbar */}
       <DevelopmentNotice />
     </>
   )
