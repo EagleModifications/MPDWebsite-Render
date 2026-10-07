@@ -525,7 +525,7 @@ export default function Navbar() {
               asChild
               variant="outline"
               size="sm"
-              className="h-8 rounded-lg border-foreground/70 bg-transparent px-3 text-xs font-medium text-foreground shadow-none hover:bg-foreground/5 hover:text-foreground"
+              className="h-8 rounded-lg border-white bg-transparent px-3 text-xs font-medium text-white shadow-none hover:bg-white/5 hover:text-white"
             >
               <a href="/api/auth/logout">
                 <LogOut className="mr-1.5 h-4 w-4" />
@@ -792,7 +792,7 @@ export default function Navbar() {
                   asChild
                   variant="outline"
                   size="sm"
-                  className="h-8 rounded-lg border-foreground/70 bg-transparent px-3 text-xs font-medium text-foreground shadow-none hover:bg-foreground/5 hover:text-foreground"
+                  className="h-8 rounded-lg border-white bg-transparent px-3 text-xs font-medium text-white shadow-none hover:bg-white/5 hover:text-white"
                 >
                   <a href="/api/auth/logout">
                     <LogOut className="mr-1.5 h-4 w-4" />
