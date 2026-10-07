@@ -911,14 +911,10 @@ function GalleryColorPicker({
         aria-label={ariaLabel}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className="flex h-10 items-center gap-2 rounded-lg border border-border bg-background pl-3 pr-1.5 shadow-sm transition-colors hover:border-blue-500/50 hover:bg-muted/40"
+        className="flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-2.5 shadow-sm transition-colors hover:border-blue-500/50 hover:bg-muted/40"
       >
+        <span className="h-5 w-5 rounded-md border border-white/20 shadow-inner" style={{ backgroundColor: normalized }} />
         <span className="font-mono text-[11px] uppercase text-muted-foreground">{normalized}</span>
-        <span
-          className="h-8 w-8 shrink-0 rounded-md border border-white/20 shadow-inner"
-          style={{ backgroundColor: normalized }}
-          aria-hidden="true"
-        />
         <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
@@ -944,20 +940,17 @@ function GalleryColorPicker({
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="h-10 w-10 shrink-0 rounded-lg border border-white/15 shadow-inner" style={{ backgroundColor: normalized }} />
             <Input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { commit(draft); setOpen(false) } }} onBlur={() => commit(draft)} placeholder={format === "HEX" ? "#3b82f6" : format === "RGB" ? "rgb(59, 130, 246)" : "hsl(217, 91%, 60%)"} className="font-mono text-xs" />
-            <label
-              className="relative h-10 w-10 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-white/15 shadow-inner"
-              style={{ backgroundColor: normalized }}
-              title="Choose color"
-            >
-              <input
-                type="color"
-                value={normalized}
-                aria-label={`${ariaLabel} native color picker`}
-                onChange={(event) => commit(event.target.value)}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              />
-            </label>
+            <input type="color" value={normalized} aria-label={`${ariaLabel} native color picker`} onChange={(event) => commit(event.target.value)} className="h-10 w-10 shrink-0 cursor-pointer rounded-lg border border-border bg-background p-1" />
+          </div>
+
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-border/70 bg-background/50 px-3 py-2">
+            <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="h-4 w-4 rounded border border-white/20 shadow-inner" style={{ backgroundColor: normalized }} />
+              Current
+            </span>
+            <span className="font-mono text-[11px] text-foreground">{normalized}</span>
           </div>
         </div>
       )}
@@ -4575,36 +4568,64 @@ function GalleryMediaCollage({
   const visible = media.slice(0, 4)
   if (visible.length === 0) return null
 
-  return (
-    <div className="relative aspect-video w-full overflow-hidden bg-black">
-      {visible.length === 1 && (
-        <GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} />
-      )}
+  const imageCount = media.filter((entry) => entry.type === "image").length
+  const videoCount = media.filter((entry) => entry.type === "video").length
 
-      {visible.length === 2 && (
-        <div className="grid h-full min-h-0 grid-cols-2 gap-1 bg-black">
+  const mediaLabel = (() => {
+    if (media.length === 1) {
+      return imageCount === 1 ? "Image" : "Video"
+    }
+
+    if (imageCount > 0 && videoCount > 0) {
+      return `${media.length} images/videos`
+    }
+
+    if (imageCount > 0) {
+      return `${media.length} ${media.length === 1 ? "Image" : "Images"}`
+    }
+
+    return `${media.length} ${media.length === 1 ? "Video" : "Videos"}`
+  })()
+
+  const renderMedia = (item: GalleryMedia) => (
+    <GalleryMediaCard
+      key={item.id}
+      media={item}
+      title={title}
+      showOverlay={false}
+      onClick={() => onClick(item)}
+    />
+  )
+
+  return (
+    <div className="relative w-full overflow-hidden bg-black">
+      {visible.length === 1 ? (
+        <div className="flex w-full items-center justify-center bg-black">
+          {renderMedia(visible[0])}
+        </div>
+      ) : visible.length === 2 ? (
+        <div className="grid w-full grid-cols-2 gap-1 bg-black">
           {visible.map((item) => (
-            <GalleryMediaCard key={item.id} media={item} title={title} onClick={() => onClick(item)} />
+            <div key={item.id} className="min-w-0 bg-black">
+              {renderMedia(item)}
+            </div>
           ))}
         </div>
-      )}
-
-      {visible.length === 3 && (
-        <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-1 bg-black">
-          <div className="min-h-0 min-w-0"><GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} /></div>
-          <div className="min-h-0 min-w-0"><GalleryMediaCard media={visible[1]} title={title} onClick={() => onClick(visible[1])} /></div>
-          <div className="col-span-2 min-h-0 min-w-0"><GalleryMediaCard media={visible[2]} title={title} onClick={() => onClick(visible[2])} /></div>
+      ) : visible.length === 3 ? (
+        <div className="grid w-full grid-cols-2 grid-rows-2 gap-1 bg-black">
+          <div className="min-h-0 min-w-0">{renderMedia(visible[0])}</div>
+          <div className="min-h-0 min-w-0">{renderMedia(visible[1])}</div>
+          <div className="col-span-2 min-h-0 min-w-0">{renderMedia(visible[2])}</div>
         </div>
-      )}
-
-      {visible.length === 4 && (
-        <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-1 bg-black">
+      ) : (
+        <div className="grid w-full grid-cols-2 grid-rows-2 gap-1 bg-black">
           {visible.map((item, index) => (
-            <div key={item.id} className="group relative min-h-0 min-w-0">
-              <GalleryMediaCard media={item} title={title} onClick={() => onClick(item)} />
-              {index === 3 && media.length >= 5 && (
+            <div key={item.id} className="group relative min-h-0 min-w-0 bg-black">
+              {renderMedia(item)}
+
+              {index === 3 && media.length >= 5 ? (
                 <>
-                  <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
+                  <div className="pointer-events-none absolute inset-0 bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
                       <Images className="h-3.5 w-3.5" />
@@ -4612,32 +4633,53 @@ function GalleryMediaCollage({
                     <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
                       {(() => {
                         const hidden = media.slice(3)
-                        const imageCount = hidden.filter((entry) => entry.type === "image").length
-                        const videoCount = hidden.filter((entry) => entry.type === "video").length
-                        const hiddenCount = hidden.length
+                        const hiddenImages = hidden.filter((entry) => entry.type === "image").length
+                        const hiddenVideos = hidden.filter((entry) => entry.type === "video").length
 
-                        if (imageCount > 0 && videoCount > 0) {
-                          return `${hiddenCount}+ images/videos`
+                        if (hiddenImages > 0 && hiddenVideos > 0) {
+                          return `${hidden.length}+ images/videos`
                         }
 
-                        if (imageCount > 0) {
-                          return `${hiddenCount}+ images`
+                        if (hiddenImages > 0) {
+                          return `${hidden.length}+ images`
                         }
 
-                        if (videoCount > 0) {
-                          return `${hiddenCount}+ videos`
+                        if (hiddenVideos > 0) {
+                          return `${hidden.length}+ videos`
                         }
 
-                        return `${hiddenCount}+ media`
+                        return `${hidden.length}+ media`
                       })()}
                     </span>
                   </div>
                 </>
-              )}
+              ) : null}
             </div>
           ))}
         </div>
       )}
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 pt-8 text-white">
+        <span className="inline-flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
+          {imageCount > 0 && videoCount > 0 ? (
+            <Images className="h-3 w-3" />
+          ) : imageCount > 0 ? (
+            <ImageIcon className="h-3 w-3" />
+          ) : (
+            <Video className="h-3 w-3" />
+          )}
+          {mediaLabel}
+        </span>
+
+        <button
+          type="button"
+          className="pointer-events-auto rounded-md bg-black/60 px-2.5 py-1 text-[10px] font-semibold backdrop-blur-sm transition-colors hover:bg-black/80"
+          onClick={() => onClick(visible[0])}
+          aria-label={`View ${title}`}
+        >
+          View
+        </button>
+      </div>
     </div>
   )
 }
@@ -4667,17 +4709,18 @@ function GalleryMediaCard({
   media,
   title,
   onClick,
+  showOverlay = true,
 }: {
   media: GalleryMedia
   title: string
   onClick: () => void
+  showOverlay?: boolean
 }) {
   return (
     <button
       type="button"
       className={[
-        "group relative flex h-full w-full items-center justify-center overflow-hidden bg-black text-left",
-        "min-h-0",
+        "group relative flex h-auto min-h-0 w-full items-center justify-center overflow-hidden bg-black text-left",
       ].join(" ")}
       onClick={onClick}
       aria-label={`View ${title}`}
@@ -4691,14 +4734,14 @@ function GalleryMediaCard({
         <img
           src={media.url}
           alt={title}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+          className="block h-auto max-h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
         />
       ) : getMediaThumbnail(media) ? (
-        <div className="relative h-full w-full">
+        <div className="relative w-full">
           <img
             src={getMediaThumbnail(media)}
             alt={title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+            className="block h-auto max-h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
           />
         </div>
       ) : isEmbeddableVideo(media) ? (
@@ -4706,7 +4749,7 @@ function GalleryMediaCard({
           src={getVideoEmbedUrl(media.url)}
           title={title}
           tabIndex={-1}
-          className="pointer-events-none h-full w-full border-0"
+          className="pointer-events-none aspect-video h-auto min-h-0 w-full border-0"
           allow="autoplay; encrypted-media; picture-in-picture"
         />
       ) : (
@@ -4717,29 +4760,31 @@ function GalleryMediaCard({
           loop
           playsInline
           preload="auto"
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+          className="block h-auto max-h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
         />
       )}
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0 opacity-70 transition-opacity group-hover:opacity-100" />
+      {showOverlay ? (
+        <>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0 opacity-70 transition-opacity group-hover:opacity-100" />
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-2.5 text-white">
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
-          {media.type === "image" ? (
-            <ImageIcon className="h-3 w-3" />
-          ) : (
-            <Video className="h-3 w-3" />
-          )}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-2.5 text-white">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
+              {media.type === "image" ? (
+                <ImageIcon className="h-3 w-3" />
+              ) : (
+                <Video className="h-3 w-3" />
+              )}
 
-          {getMediaLabel(
-            media.type,
-          )}
-        </span>
+              {getMediaLabel(media.type)}
+            </span>
 
-        <span className="rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
-          View
-        </span>
-      </div>
+            <span className="rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
+              View
+            </span>
+          </div>
+        </>
+      ) : null}
     </button>
   )
 }
