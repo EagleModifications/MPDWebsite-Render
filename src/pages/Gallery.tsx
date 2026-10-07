@@ -1808,14 +1808,23 @@ export default function Gallery() {
                           key={item.id}
                           className="group overflow-hidden rounded-xl border border-border/70 bg-background/60 transition-all hover:-translate-y-0.5 hover:border-blue-500/40 hover:bg-blue-500/[0.02]"
                         >
-                          <div className="relative aspect-[16/10] overflow-hidden bg-black/30">
-                            {previewUrl && previewMedia ? (
-                              isVideoMedia(previewMedia) ? (
+                          {previewUrl && previewMedia && (
+                            <div className="relative aspect-[16/10] overflow-hidden bg-black/30">
+                              {isVideoMedia(previewMedia) ? (
                                 <video
                                   src={previewUrl}
                                   muted
                                   playsInline
                                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                  onError={(event) => {
+                                    // If the preview cannot load, remove the entire
+                                    // media area so Home Style does not leave a large
+                                    // empty black block above the card content.
+                                    event.currentTarget.parentElement?.style.setProperty(
+                                      "display",
+                                      "none",
+                                    )
+                                  }}
                                 />
                               ) : (
                                 <img
@@ -1827,9 +1836,6 @@ export default function Gallery() {
                                     const originalUrl = previewOriginalUrl
                                     const thumbnailUrl = previewThumbnail
 
-                                    // Home layout should never leave a large empty black
-                                    // preview when a thumbnail has expired. Try the original
-                                    // media URL before falling back to the neutral placeholder.
                                     if (
                                       originalUrl &&
                                       image.src !== originalUrl
@@ -1846,82 +1852,124 @@ export default function Gallery() {
                                       return
                                     }
 
-                                    image.style.display = "none"
+                                    // All sources failed: collapse the whole
+                                    // image container instead of leaving black space.
+                                    image.parentElement?.style.setProperty(
+                                      "display",
+                                      "none",
+                                    )
                                   }}
                                   onClick={() => previewMedia && openViewer(item, previewMedia)}
                                 />
-                              )
-                            ) : (
-                              <div className="flex h-full items-center justify-center bg-muted/20 text-muted-foreground">
-                                <ImageIcon className="h-8 w-8 opacity-60" />
-                              </div>
-                            )}
+                              )}
 
-                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+                              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
-                            {item.category && (
-                              <span
-                                className={[
-                                  "absolute left-3 top-3 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                                  item.category === "Fleet"
-                                    ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
-                                    : "border-blue-500/30 bg-blue-500/10 text-blue-300",
-                                ].join(" ")}
-                              >
-                                {item.category}
-                              </span>
-                            )}
-                          </div>
+                              {item.category && (
+                                <span
+                                  className={[
+                                    "absolute left-3 top-3 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                    item.category === "Fleet"
+                                      ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                                      : "border-blue-500/30 bg-blue-500/10 text-blue-300",
+                                  ].join(" ")}
+                                >
+                                  {item.category}
+                                </span>
+                              )}
+                            </div>
+                          )}
 
-                          <div className="p-4">
-                            <h3 className="line-clamp-2 max-w-[35ch] whitespace-pre-line text-sm font-semibold">
-                              {item.title}
-                            </h3>
-
-                            {item.description && (
-                              <div className="mt-2 max-w-[35ch]">
-                                <p className="line-clamp-3 whitespace-pre-line text-xs leading-5 text-muted-foreground">
-                                  {item.description}
-                                </p>
-
-                                {getWrappedLineCount(item.description, 35) > 3 && (
-                                  <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
-                                    Show more...
+                          <div className="border-t border-border/70 p-3">
+                            <div className="relative">
+                              <div className="w-full px-1 py-1 pr-16 text-left">
+                                <div className="mb-1.5 flex flex-col items-start gap-1.5">
+                                  <span
+                                    className={[
+                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                      item.category === "Fleet"
+                                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                                        : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+                                    ].join(" ")}
+                                  >
+                                    {item.category ?? "Community"}
                                   </span>
+
+                                  {(item.tags ?? []).length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      {(item.tags ?? []).map((tag) => (
+                                        <span
+                                          key={`${item.id}-tag-${tag}`}
+                                          className={[
+                                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide",
+                                            GALLERY_TAG_CLASSES[tag],
+                                          ].join(" ")}
+                                        >
+                                          {tag}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <h3 className="line-clamp-2 max-w-[35ch] whitespace-pre-line text-sm font-semibold">
+                                  {item.title}
+                                </h3>
+
+                                {item.description && (
+                                  <div className="mt-1 max-w-[35ch]">
+                                    <p className="line-clamp-3 whitespace-pre-line text-xs leading-5 text-muted-foreground">
+                                      {item.description}
+                                    </p>
+
+                                    {getWrappedLineCount(item.description, 35) > 3 && (
+                                      <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
+                                        Show more...
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
-                              </div>
-                            )}
 
-                            <p className="mt-2 truncate text-[10px] text-muted-foreground">
-                              {mediaList.length} {mediaList.length === 1 ? "item" : "items"}
-                              {item.createdAt ? ` · ${formatDate(item.createdAt)}` : ""}
-                            </p>
-
-                            {canManageGallery && (
-                              <div className="mt-3 flex justify-end gap-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => openEdit(item)}
-                                  aria-label={`Edit ${item.title}`}
-                                >
-                                  <Edit3 className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive hover:text-destructive"
-                                  disabled={deletingId === item.id}
-                                  onClick={() => requestDeleteGallery(item)}
-                                  aria-label={`Delete ${item.title}`}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
+                                <p className="mt-2 truncate whitespace-nowrap text-[10px] text-muted-foreground">
+                                  {mediaList.length}{" "}
+                                  {mediaList.length === 1 ? "item" : "items"}
+                                  {item.createdAt
+                                    ? ` · ${formatDate(item.createdAt)}`
+                                    : ""}
+                                </p>
                               </div>
-                            )}
+
+                              {canManageGallery && (
+                                <div
+                                  className="absolute right-0 top-0 z-10 flex shrink-0 items-center gap-1"
+                                  onClick={(event) => event.stopPropagation()}
+                                  onKeyDown={(event) => event.stopPropagation()}
+                                >
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => openEdit(item)}
+                                    aria-label={`Edit ${item.title}`}
+                                  >
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                  </Button>
+
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    disabled={deletingId === item.id}
+                                    onClick={() => requestDeleteGallery(item)}
+                                    aria-label={`Delete ${item.title}`}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </article>
                       )
