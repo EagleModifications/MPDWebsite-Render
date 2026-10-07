@@ -164,6 +164,14 @@ jobs:
           name: mpd-linux
           path: release/linux
 
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          find release -type f \
+            \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" \) \
+            -print0 | sort -z | xargs -0 sha256sum > release/SHA256SUMS.txt
+
       - name: Determine release tag
         id: release
         shell: bash
@@ -188,6 +196,7 @@ jobs:
             release/linux/*.AppImage
             release/linux/*.blockmap
             release/linux/latest-linux.yml
+            release/SHA256SUMS.txt
           generate_release_notes: false
           prerelease: false
         env:
