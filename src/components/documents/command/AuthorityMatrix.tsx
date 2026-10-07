@@ -476,7 +476,7 @@ export default function AuthorityMatrix() {
         )}
 
         {!loading && !error && data && (
-          <div className="max-h-[72vh] overflow-y-auto overflow-x-hidden">
+          <div className="overflow-visible">
             <table className="w-full table-fixed border-collapse">
               <colgroup>
                 <col className="w-[34%]" />
@@ -485,7 +485,7 @@ export default function AuthorityMatrix() {
                 ))}
               </colgroup>
 
-              <thead className="sticky top-0 z-30">
+              <thead>
                 <tr className="border-b border-border/70 bg-card">
                   <th
                     rowSpan={2}
