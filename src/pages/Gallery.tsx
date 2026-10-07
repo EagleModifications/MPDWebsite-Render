@@ -1860,7 +1860,16 @@ export default function Gallery() {
         xhr.timeout = 15 * 60 * 1000
         xhr.upload.onprogress = (event) => {
           if (!event.lengthComputable) return
-          const progress = Math.min(100, Math.round((event.loaded / event.total) * 100))
+
+          // 100% is reserved for the point where the server has completely
+          // accepted and stored the file. The request body can reach 100%
+          // before the server finishes writing it to GridFS, so show 99%
+          // while that final server-side step is still in progress.
+          const uploadedPercent = Math.round((event.loaded / event.total) * 100)
+          const progress = event.loaded >= event.total
+            ? 99
+            : Math.min(99, uploadedPercent)
+
           updatePendingMedia(item.id, { progress })
         }
         xhr.onload = () => resolve({ status: xhr.status, raw: xhr.responseText || "" })
@@ -3816,7 +3825,7 @@ export default function Gallery() {
                                   <span>{media.progress ?? 0}%</span>
                                 </div>
                                 <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
-                                  <div className={`h-full transition-all duration-200 ${media.error ? "bg-red-500" : "bg-blue-500"}`} style={{ width: `${Math.max(0, Math.min(100, media.progress ?? 0))}%` }} />
+                                  <div className={`${media.error ? "bg-red-500" : "bg-blue-500"}`} style={{ width: `${Math.max(0, Math.min(100, media.progress ?? 0))}%` }} />
                                 </div>
                                 {media.error && (
                                   <div className="mt-1.5 flex items-center justify-between gap-2">
