@@ -1292,25 +1292,6 @@ export default function Gallery() {
     }
   }
 
-  async function updateGalleryOptionColor(type: "category" | "tag", value: string, color: string, optionCategory?: string) {
-    try {
-      const response = await fetch("/api/gallery/options", {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, value, color, category: optionCategory }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || "Failed to update color.")
-      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
-      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
-      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
-      toast.success(`${type === "category" ? "Category" : "Tag"} color updated.`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update color.")
-    }
-  }
-
   function beginTaxonomyEdit(type: "category" | "tag", value: string) {
     setTaxonomyEdit({ type, value })
     setTaxonomyEditName(value)
