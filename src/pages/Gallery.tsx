@@ -28,6 +28,7 @@ import {
   Settings2,
   Gauge,
   PictureInPicture2,
+  Pipette,
   Trash2,
   Upload,
   Video,
@@ -574,19 +575,6 @@ function isVideoMedia(media: GalleryMedia) {
   return media.type === "video"
 }
 
-function getAspectClass(ratio?: number) {
-  if (!ratio || !Number.isFinite(ratio)) {
-    return "aspect-[4/3]"
-  }
-
-  if (ratio >= 1.85) return "aspect-[16/8]"
-  if (ratio >= 1.35) return "aspect-[4/3]"
-  if (ratio >= 1.05) return "aspect-square"
-  if (ratio >= 0.8) return "aspect-[4/5]"
-
-  return "aspect-[3/4]"
-}
-
 function formatDate(value: string) {
   const date = new Date(value)
 
@@ -654,6 +642,77 @@ function getWrappedLineCount(
 }
 
 
+function normalizeHexColor(value: string) {
+  const trimmed = value.trim()
+  const short = /^#?([0-9a-fA-F]{3})$/.exec(trimmed)
+  if (short) return `#${short[1].split("").map((char) => char + char).join("")}`.toLowerCase()
+  const full = /^#?([0-9a-fA-F]{6})$/.exec(trimmed)
+  return full ? `#${full[1]}`.toLowerCase() : null
+}
+
+function hexToRgb(hex: string) {
+  const normalized = normalizeHexColor(hex) ?? "#3b82f6"
+  return {
+    r: Number.parseInt(normalized.slice(1, 3), 16),
+    g: Number.parseInt(normalized.slice(3, 5), 16),
+    b: Number.parseInt(normalized.slice(5, 7), 16),
+  }
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+  const clamp = (value: number) => Math.max(0, Math.min(255, Math.round(value)))
+  return `#${[clamp(r), clamp(g), clamp(b)].map((value) => value.toString(16).padStart(2, "0")).join("")}`
+}
+
+function rgbToHsl(r: number, g: number, b: number) {
+  const red = r / 255
+  const green = g / 255
+  const blue = b / 255
+  const max = Math.max(red, green, blue)
+  const min = Math.min(red, green, blue)
+  const delta = max - min
+  let h = 0
+  let s = 0
+  const l = (max + min) / 2
+  if (delta !== 0) {
+    s = delta / (1 - Math.abs(2 * l - 1))
+    if (max === red) h = 60 * (((green - blue) / delta) % 6)
+    else if (max === green) h = 60 * ((blue - red) / delta + 2)
+    else h = 60 * ((red - green) / delta + 4)
+  }
+  if (h < 0) h += 360
+  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) }
+}
+
+function hslToRgb(h: number, s: number, l: number) {
+  const hue = ((h % 360) + 360) % 360 / 360
+  const saturation = Math.max(0, Math.min(100, s)) / 100
+  const lightness = Math.max(0, Math.min(100, l)) / 100
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation
+  const x = chroma * (1 - Math.abs((hue * 6) % 2 - 1))
+  const m = lightness - chroma / 2
+  let r = 0, g = 0, b = 0
+  if (hue < 1 / 6) [r, g, b] = [chroma, x, 0]
+  else if (hue < 2 / 6) [r, g, b] = [x, chroma, 0]
+  else if (hue < 3 / 6) [r, g, b] = [0, chroma, x]
+  else if (hue < 4 / 6) [r, g, b] = [0, x, chroma]
+  else if (hue < 5 / 6) [r, g, b] = [x, 0, chroma]
+  else [r, g, b] = [chroma, 0, x]
+  return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255) }
+}
+
+function parseRgb(value: string) {
+  const match = value.match(/rgba?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*[, ]\s*([\d.]+)/i)
+  return match ? rgbToHex(Number(match[1]), Number(match[2]), Number(match[3])) : null
+}
+
+function parseHsl(value: string) {
+  const match = value.match(/hsla?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)%\s*[, ]\s*([\d.]+)%/i)
+  if (!match) return null
+  const rgb = hslToRgb(Number(match[1]), Number(match[2]), Number(match[3]))
+  return rgbToHex(rgb.r, rgb.g, rgb.b)
+}
+
 function GalleryColorPicker({
   value,
   onChange,
@@ -663,28 +722,100 @@ function GalleryColorPicker({
   onChange: (value: string) => void
   ariaLabel: string
 }) {
-  const colors = [
-    { value: "#3b82f6", label: "Blue" },
-    { value: "#ffffff", label: "White" },
-  ]
+  const [open, setOpen] = useState(false)
+  const [format, setFormat] = useState<"HEX" | "RGB" | "HSL">("HEX")
+  const [draft, setDraft] = useState(value)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const normalized = normalizeHexColor(value) ?? "#3b82f6"
+  const rgb = hexToRgb(normalized)
+  const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b)
+
+  useEffect(() => setDraft(value), [value])
+  useEffect(() => {
+    if (!open) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false)
+    }
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [open])
+
+  function commit(next: string) {
+    const hex = normalizeHexColor(next) ?? parseRgb(next) ?? parseHsl(next)
+    if (!hex) return
+    setDraft(hex)
+    onChange(hex)
+  }
+
+  async function pickFromScreen() {
+    const EyeDropperCtor = (window as unknown as { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper
+    if (!EyeDropperCtor) {
+      toast.error("Eyedropper is not supported by this browser.")
+      return
+    }
+    try {
+      const result = await new EyeDropperCtor().open()
+      commit(result.sRGBHex)
+    } catch {
+      // The user cancelled the eyedropper.
+    }
+  }
 
   return (
-    <div className="flex items-center gap-1 rounded-lg border border-border bg-background p-1" role="radiogroup" aria-label={ariaLabel}>
-      {colors.map((color) => (
-        <button
-          key={color.value}
-          type="button"
-          title={color.label}
-          aria-label={`${ariaLabel}: ${color.label}`}
-          aria-pressed={value.toLowerCase() === color.value}
-          onClick={() => onChange(color.value)}
-          className={[
-            "h-7 w-7 rounded-md border transition-all",
-            value.toLowerCase() === color.value ? "border-blue-500 ring-2 ring-blue-500/30" : "border-border/70 hover:border-blue-500/50",
-          ].join(" ")}
-          style={{ backgroundColor: color.value }}
-        />
-      ))}
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        title={ariaLabel}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-2.5 shadow-sm transition-colors hover:border-blue-500/50 hover:bg-muted/40"
+      >
+        <span className="h-5 w-5 rounded-md border border-white/20 shadow-inner" style={{ backgroundColor: normalized }} />
+        <span className="font-mono text-[11px] uppercase text-muted-foreground">{normalized}</span>
+        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+8px)] z-[320] w-[290px] rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl ring-1 ring-black/10">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold">Color</p>
+              <p className="text-[11px] text-muted-foreground">Choose a color for this gallery label.</p>
+            </div>
+            <button type="button" onClick={() => void pickFromScreen()} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:border-blue-500/50 hover:bg-muted/40" title="Pick a color from your screen">
+              <Pipette className="h-3.5 w-3.5 text-blue-500" />
+              Eyedropper
+            </button>
+          </div>
+
+          <div className="mb-3 grid grid-cols-3 gap-1 rounded-lg border border-border bg-background/70 p-1">
+            {(["HEX", "RGB", "HSL"] as const).map((item) => (
+              <button key={item} type="button" onClick={() => { setFormat(item); if (item === "HEX") setDraft(normalized); if (item === "RGB") setDraft(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`); if (item === "HSL") setDraft(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`) }} className={`rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors ${format === item ? "bg-blue-500/15 text-blue-400" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                {item}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="h-10 w-10 shrink-0 rounded-lg border border-white/15 shadow-inner" style={{ backgroundColor: normalized }} />
+            <Input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { commit(draft); setOpen(false) } }} onBlur={() => commit(draft)} placeholder={format === "HEX" ? "#3b82f6" : format === "RGB" ? "rgb(59, 130, 246)" : "hsl(217, 91%, 60%)"} className="font-mono text-xs" />
+            <input type="color" value={normalized} aria-label={`${ariaLabel} native color picker`} onChange={(event) => commit(event.target.value)} className="h-10 w-10 shrink-0 cursor-pointer rounded-lg border border-border bg-background p-1" />
+          </div>
+
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-border/70 bg-background/50 px-3 py-2">
+            <span className="text-[11px] text-muted-foreground">Current</span>
+            <span className="font-mono text-[11px] text-foreground">{normalized}</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
