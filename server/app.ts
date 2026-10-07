@@ -266,7 +266,12 @@ function getActivityRequirementForRank(
 type PromotionRequirement = {
   rankId: string
   rankName: string
-  points: number
+  points?: number
+  hours?: number
+  timeInRankDays?: number
+  trainingLogs?: number
+  recruitmentLogs?: number
+  trainings?: number
 }
 
 type PromotionRequirements = {
@@ -325,19 +330,44 @@ function buildPromotionRequirementChanges(
     ...Object.keys(newRequirements),
   ])
 
+  const fields = [
+    "points",
+    "hours",
+    "timeInRankDays",
+    "trainingLogs",
+    "recruitmentLogs",
+    "trainings",
+  ] as const
+
   return Array.from(ids)
     .map((rankId) => {
       const oldValue = oldRequirements[rankId]
       const newValue = newRequirements[rankId]
-      const oldPoints = Number(oldValue?.points ?? 0)
-      const newPoints = Number(newValue?.points ?? 0)
+      const oldChanges: Record<string, unknown> = {}
+      const newChanges: Record<string, unknown> = {}
 
-      if (oldPoints === newPoints) return null
+      for (const field of fields) {
+        const oldField = oldValue?.[field]
+        const newField = newValue?.[field]
+
+        if (oldField === undefined && newField === undefined) continue
+
+        const oldNumber = oldField === undefined ? 0 : Number(oldField)
+        const newNumber = newField === undefined ? 0 : Number(newField)
+
+        if (!Number.isFinite(oldNumber) || !Number.isFinite(newNumber)) continue
+        if (oldNumber === newNumber) continue
+
+        oldChanges[field] = oldNumber
+        newChanges[field] = newNumber
+      }
+
+      if (!Object.keys(oldChanges).length) return null
 
       return {
         rank: newValue?.rankName || oldValue?.rankName || rankId,
-        old: { points: oldPoints },
-        new: { points: newPoints },
+        old: oldChanges,
+        new: newChanges,
       }
     })
     .filter((value): value is RequirementChange => Boolean(value))
@@ -3113,212 +3143,117 @@ async function readPromotionRequirements(
       "promotionRequirements",
     )
 
-  const document =
-    await collection.findOne({
-      userId,
-      division,
-    })
+  const document = await collection.findOne({ userId, division })
+  const rawRequirements = document?.requirements ?? {}
+  const requirements: Record<string, PromotionRequirement> = {}
+  const rankConfig = await readPromotionRankConfig(division)
 
-  const rawRequirements =
-    document?.requirements ?? {}
+  const numericFields = [
+    "points",
+    "hours",
+    "timeInRankDays",
+    "trainingLogs",
+    "recruitmentLogs",
+    "trainings",
+  ] as const
 
-  const requirements: Record<
-    string,
-    PromotionRequirement
-  > = {}
+  for (const [rankId, value] of Object.entries(rawRequirements)) {
+    const item = value as Partial<PromotionRequirement>
+    const cleanRankId = String(item.rankId ?? rankId).trim()
+    if (!cleanRankId) continue
 
-  const rankConfig =
-    await readPromotionRankConfig(
-      division,
-    )
+    const configuredRank = findRankById(rankConfig, cleanRankId)
+    const storedRankName = String(item.rankName ?? "").trim()
+    const rankName = configuredRank?.name || storedRankName || cleanRankId
 
-  for (const [
-    rankId,
-    value,
-  ] of Object.entries(
-    rawRequirements,
-  )) {
-    const item =
-      value as Partial<PromotionRequirement>
-
-    const cleanRankId =
-      String(
-        item.rankId ??
-          rankId,
-      ).trim()
-
-    if (!cleanRankId) {
-      continue
-    }
-
-    const configuredRank =
-      findRankById(
-        rankConfig,
-        cleanRankId,
-      )
-
-    const storedRankName =
-      String(
-        item.rankName ?? "",
-      ).trim()
-
-    const rankName =
-      configuredRank?.name ||
-      storedRankName ||
-      cleanRankId
-
-    const points =
-      Number(
-        item.points ?? 0,
-      )
-
-    requirements[
-      cleanRankId
-    ] = {
-      rankId:
-        cleanRankId,
-
+    const normalized: PromotionRequirement = {
+      rankId: cleanRankId,
       rankName,
-
-      points:
-        Number.isFinite(points)
-          ? Math.max(
-              0,
-              Math.floor(points),
-            )
-          : 0,
     }
+
+    for (const field of numericFields) {
+      const valueForField = item[field]
+      if (valueForField === undefined || valueForField === null || valueForField === "") continue
+      const number = Number(valueForField)
+      if (Number.isFinite(number)) {
+        normalized[field] = Math.max(0, Math.floor(number))
+      }
+    }
+
+    requirements[cleanRankId] = normalized
   }
 
-  return {
-    division,
-    requirements,
-  }
+  return { division, requirements }
 }
 
 async function writePromotionRequirements(
   userId: string,
   division: RequirementDivision,
-  requirements: Record<
-    string,
-    PromotionRequirement
-  >,
+  requirements: Record<string, PromotionRequirement>,
 ) {
   const collection =
     await getCollection<PromotionRequirementsDocument>(
       "promotionRequirements",
     )
 
-  const existing =
-    await collection.findOne({
-      userId,
-      division,
-    })
+  const existing = await collection.findOne({ userId, division })
+  const existingRequirements = existing?.requirements ?? {}
+  const rankConfig = await readPromotionRankConfig(division)
+  const normalizedRequirements: Record<string, PromotionRequirement> = {}
 
-  const existingRequirements =
-    existing?.requirements ?? {}
+  const numericFields = [
+    "points",
+    "hours",
+    "timeInRankDays",
+    "trainingLogs",
+    "recruitmentLogs",
+    "trainings",
+  ] as const
 
-  const rankConfig =
-    await readPromotionRankConfig(
-      division,
-    )
+  for (const [rankId, value] of Object.entries(requirements)) {
+    const input = value as Partial<PromotionRequirement>
+    const cleanRankId = String(input.rankId ?? rankId).trim()
+    if (!cleanRankId) continue
 
-  const normalizedRequirements: Record<
-    string,
-    PromotionRequirement
-  > = {}
+    const configuredRank = findRankById(rankConfig, cleanRankId)
+    const existingRequirement = existingRequirements[cleanRankId] as PromotionRequirement | undefined
+    const suppliedRankName = String(input.rankName ?? "").trim()
+    const rankName = configuredRank?.name || suppliedRankName || existingRequirement?.rankName || cleanRankId
 
-  for (const [
-    rankId,
-    value,
-  ] of Object.entries(
-    requirements,
-  )) {
-    const input =
-      value as Partial<PromotionRequirement>
-
-    const cleanRankId =
-      String(
-        input.rankId ??
-          rankId,
-      ).trim()
-
-    if (!cleanRankId) {
-      continue
-    }
-
-    const configuredRank =
-      findRankById(
-        rankConfig,
-        cleanRankId,
-      )
-
-    const existingRequirement =
-      existingRequirements[
-        cleanRankId
-      ] as
-        | PromotionRequirement
-        | undefined
-
-    const suppliedRankName =
-      String(
-        input.rankName ??
-          "",
-      ).trim()
-
-    const rankName =
-      configuredRank?.name ||
-      suppliedRankName ||
-      existingRequirement?.rankName ||
-      cleanRankId
-
-    const points =
-      Number(
-        input.points ?? 0,
-      )
-
-    normalizedRequirements[
-      cleanRankId
-    ] = {
-      rankId:
-        cleanRankId,
-
+    const normalized: PromotionRequirement = {
+      rankId: cleanRankId,
       rankName,
-
-      points:
-        Number.isFinite(points)
-          ? Math.max(
-              0,
-              Math.floor(points),
-            )
-          : 0,
     }
+
+    for (const field of numericFields) {
+      const supplied = input[field]
+      const previous = existingRequirement?.[field]
+      if (supplied === undefined && previous === undefined) continue
+
+      const raw = supplied === undefined ? previous : supplied
+      const number = Number(raw ?? 0)
+      normalized[field] = Number.isFinite(number)
+        ? Math.max(0, Math.floor(number))
+        : 0
+    }
+
+    normalizedRequirements[cleanRankId] = normalized
   }
 
   await collection.updateOne(
-    {
-      userId,
-      division,
-    },
+    { userId, division },
     {
       $set: {
         userId,
         division,
-        requirements:
-          normalizedRequirements,
+        requirements: normalizedRequirements,
         updatedAt: new Date(),
       },
     },
-    {
-      upsert: true,
-    },
+    { upsert: true },
   )
 
-  return {
-    division,
-    requirements:
-      normalizedRequirements,
-  }
+  return { division, requirements: normalizedRequirements }
 }
 
 function getRequiredPromotionPointsForRank(
@@ -4019,26 +3954,36 @@ async function handlePromotionRequirementsSave(
         })
       }
 
-      const input =
-        value as {
-          rankId?: unknown
-          rankName?: unknown
-          name?: unknown
-          points?: unknown
+      const input = value as {
+        rankId?: unknown
+        rankName?: unknown
+        name?: unknown
+        points?: unknown
+        hours?: unknown
+        timeInRankDays?: unknown
+        trainingLogs?: unknown
+        recruitmentLogs?: unknown
+        trainings?: unknown
+      }
+
+      const numericFields = [
+        "points",
+        "hours",
+        "timeInRankDays",
+        "trainingLogs",
+        "recruitmentLogs",
+        "trainings",
+      ] as const
+
+      for (const field of numericFields) {
+        if (input[field] === undefined) continue
+        const number = Number(input[field])
+        if (!Number.isFinite(number) || number < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid promotion ${field} for rank: ${rankId}`,
+          })
         }
-
-      const points =
-        Number(input.points)
-
-      if (
-        !Number.isFinite(points) ||
-        points < 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            `Invalid promotion points for rank: ${rankId}`,
-        })
       }
 
       const cleanRankId =
@@ -4062,17 +4007,27 @@ async function handlePromotionRequirementsSave(
             "",
         ).trim()
 
-      requirements[
-        cleanRankId
-      ] = {
-        rankId:
-          cleanRankId,
-
+      const normalizedInput: PromotionRequirement = {
+        rankId: cleanRankId,
         rankName,
-
-        points:
-          Math.floor(points),
       }
+
+      for (const field of [
+        "points",
+        "hours",
+        "timeInRankDays",
+        "trainingLogs",
+        "recruitmentLogs",
+        "trainings",
+      ] as const) {
+        if (input[field] === undefined) continue
+        const number = Number(input[field])
+        normalizedInput[field] = Number.isFinite(number)
+          ? Math.floor(number)
+          : 0
+      }
+
+      requirements[cleanRankId] = normalizedInput
     }
 
     const previous = await readPromotionRequirements(userId, division)
@@ -4084,7 +4039,7 @@ async function handlePromotionRequirementsSave(
       action: "update-requirements",
       category: "requirements",
       division,
-      summary: requirementChangeSummary(division, changes, "points"),
+      summary: requirementChangeSummary(division, changes, "hours"),
       details: {
         changes,
         changedRanks: changes.length,
