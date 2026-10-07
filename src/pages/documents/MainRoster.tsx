@@ -9,10 +9,10 @@ import { useMemo, useState } from "react"
 
 import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
-import DepartmentRoster from "@/components/roster/DepartmentRoster"
-import EmployeeDatabase from "@/components/roster/EmployeeDatabase"
-import UniformRoster from "@/components/roster/UniformRoster"
-import VehicleRoster from "@/components/roster/VehicleRoster"
+import DepartmentRoster from "@/components/documents/roster/DepartmentRoster"
+import EmployeeDatabase from "@/components/documents/roster/EmployeeDatabase"
+import UniformRoster from "@/components/documents/roster/UniformRoster"
+import VehicleRoster from "@/components/documents/roster/VehicleRoster"
 
 type TabId =
   | "department"
