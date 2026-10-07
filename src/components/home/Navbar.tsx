@@ -17,6 +17,8 @@ import {
   type User,
 } from "@/lib/auth"
 
+import DevelopmentNotice from "@/components/DevelopmentNotice"
+
 type NavItem = {
   name: string
   href: string
@@ -819,5 +821,7 @@ export default function Navbar() {
         </div>
       )}
     </header>
+
+    <DevelopmentNotice />
   )
 }
