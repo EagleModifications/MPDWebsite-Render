@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Check,
   ChevronDown,
@@ -79,8 +79,6 @@ const RANK_COLUMNS: RankColumn[] = [
 ]
 
 const DISPLAY_ORDER = [...RANK_COLUMNS]
-
-// Filter order is intentionally reversed so Officers appear at the bottom.
 const FILTER_ORDER = [...RANK_COLUMNS].reverse()
 
 function clean(value: unknown): string {
@@ -251,8 +249,32 @@ export default function AuthorityMatrix() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [sectionFilter, setSectionFilter] = useState("ALL")
-  const [rankFilter, setRankFilter] = useState("ALL")
+  const [rankFilter, setRankFilter] = useState<string[]>([])
   const [openFilter, setOpenFilter] = useState<"section" | "rank" | null>(null)
+  const filterMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!openFilter) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (!filterMenuRef.current?.contains(target)) {
+        setOpenFilter(null)
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenFilter(null)
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [openFilter])
 
   const loadMatrix = useCallback(async (manualRefresh = false) => {
     try {
@@ -316,10 +338,8 @@ export default function AuthorityMatrix() {
 
   const visibleRanks = useMemo(() => {
     if (!data) return []
-    const ranks = rankFilter === "ALL"
-      ? DISPLAY_ORDER
-      : DISPLAY_ORDER.filter((rank) => rank.rank === rankFilter)
-    return ranks
+    if (rankFilter.length === 0) return DISPLAY_ORDER
+    return DISPLAY_ORDER.filter((rank) => rankFilter.includes(rank.rank))
   }, [data, rankFilter])
 
   const filteredEntries = useMemo(() => {
@@ -348,11 +368,28 @@ export default function AuthorityMatrix() {
   const clearFilters = () => {
     setSearch("")
     setSectionFilter("ALL")
-    setRankFilter("ALL")
+    setRankFilter([])
   }
 
   return (
     <div className="w-full min-w-0">
+      <style>{`
+        .authority-rank-scroll::-webkit-scrollbar {
+          width: 7px;
+        }
+        .authority-rank-scroll::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.04);
+          border-radius: 9999px;
+        }
+        .authority-rank-scroll::-webkit-scrollbar-thumb {
+          background: rgba(59, 130, 246, 0.72);
+          border-radius: 9999px;
+          border: 1px solid rgba(0, 0, 0, 0.35);
+        }
+        .authority-rank-scroll::-webkit-scrollbar-thumb:hover {
+          background: rgba(59, 130, 246, 0.95);
+        }
+      `}</style>
       <div className="overflow-visible rounded-2xl border border-border/70 bg-card/80 shadow-sm">
         <div className="border-b border-border/70 bg-card/95 px-4 py-4 sm:px-5">
           <div className="flex items-center justify-between gap-3">
@@ -377,7 +414,7 @@ export default function AuthorityMatrix() {
               <RefreshCw
                 className={`h-4 w-4 text-blue-400 ${refreshing ? "animate-spin" : ""}`}
               />
-              Refresh
+              {refreshing ? "Refreshing" : "Refresh"}
             </button>
           </div>
 
@@ -393,54 +430,58 @@ export default function AuthorityMatrix() {
                 />
               </div>
 
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenFilter((current) =>
-                      current === "section" ? null : "section",
-                    )
-                  }
-                  className="inline-flex h-9 w-full min-w-[190px] items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium outline-none transition-colors hover:bg-muted/40 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Filter className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-                    <span className="truncate">
+              <div ref={filterMenuRef} className="relative flex shrink-0 gap-2.5">
+                {/* Sections filter */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenFilter((current) =>
+                        current === "section" ? null : "section",
+                      )
+                    }
+                    className="inline-flex h-9 min-w-[190px] items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium outline-none transition-colors hover:bg-muted/40 focus:border-blue-500/50"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Filter className="h-3.5 w-3.5 text-blue-400" />
                       {sectionFilter === "ALL"
                         ? "All Sections"
                         : sectionFilter === "PRIMARY RESPONSIBILITY"
                           ? "Primary Responsibility"
                           : "Authority"}
                     </span>
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </button>
-
-                {openFilter === "section" && (
-                  <div className="absolute right-0 top-[calc(100%+6px)] z-[80] w-[240px] rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSectionFilter("ALL")
-                        setOpenFilter(null)
-                      }}
-                      className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/70 ${
-                        sectionFilter === "ALL"
-                          ? "text-foreground"
-                          : "text-muted-foreground"
+                    <ChevronDown
+                      className={`h-4 w-4 text-muted-foreground transition-transform ${
+                        openFilter === "section" ? "rotate-180" : ""
                       }`}
-                    >
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                        {sectionFilter === "ALL" ? (
-                          <Check className="h-4 w-4 text-blue-400" />
-                        ) : null}
-                      </span>
-                      <Filter className="h-4 w-4 text-blue-400" />
-                      All Sections
-                    </button>
+                    />
+                  </button>
 
-                    {(["PRIMARY RESPONSIBILITY", "AUTHORITY"] as Section[]).map(
-                      (section) => (
+                  {openFilter === "section" && (
+                    <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[240px] overflow-hidden rounded-xl border border-border/70 bg-card shadow-2xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSectionFilter("ALL")
+                          setOpenFilter(null)
+                        }}
+                        className="flex w-full items-center gap-2.5 px-3 py-3 text-left text-sm transition-colors hover:bg-muted/60"
+                      >
+                        <span className="flex h-4 w-4 items-center justify-center">
+                          {sectionFilter === "ALL" && (
+                            <Check className="h-4 w-4 text-blue-400" />
+                          )}
+                        </span>
+                        <Filter className="h-4 w-4 text-blue-400" />
+                        <span>All Sections</span>
+                      </button>
+
+                      <div className="border-t border-border/60" />
+
+                      {[
+                        "PRIMARY RESPONSIBILITY",
+                        "AUTHORITY",
+                      ].map((section) => (
                         <button
                           key={section}
                           type="button"
@@ -448,135 +489,122 @@ export default function AuthorityMatrix() {
                             setSectionFilter(section)
                             setOpenFilter(null)
                           }}
-                          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/70"
+                          className="flex w-full items-center gap-2.5 px-3 py-3 text-left text-sm transition-colors hover:bg-muted/60"
                         >
-                          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                            {sectionFilter === section ? (
+                          <span className="flex h-4 w-4 items-center justify-center">
+                            {sectionFilter === section && (
                               <Check className="h-4 w-4 text-blue-400" />
-                            ) : null}
+                            )}
                           </span>
                           <Filter className="h-4 w-4 text-blue-400" />
-                          {section === "PRIMARY RESPONSIBILITY"
-                            ? "Primary Responsibility"
-                            : "Authority"}
+                          <span>
+                            {section === "PRIMARY RESPONSIBILITY"
+                              ? "Primary Responsibility"
+                              : "Authority"}
+                          </span>
                         </button>
-                      ),
-                    )}
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-                    {sectionFilter !== "ALL" && (
-                      <>
-                        <div className="my-1.5 border-t border-border/70" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSectionFilter("ALL")
-                            setOpenFilter(null)
-                          }}
-                          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-white hover:text-blue-500 focus:bg-white focus:text-blue-500"
-                        >
-                          <X className="h-4 w-4" />
-                          Clear Sections
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenFilter((current) =>
-                      current === "rank" ? null : "rank",
-                    )
-                  }
-                  className="inline-flex h-9 w-full min-w-[180px] items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium outline-none transition-colors hover:bg-muted/40 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Shield className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-                    <span className="truncate">
-                      {rankFilter === "ALL" ? "All Ranks" : compactRank(rankFilter)}
-                    </span>
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </button>
-
-                {openFilter === "rank" && (
-                  <div className="absolute right-0 top-[calc(100%+6px)] z-[80] max-h-[330px] w-[260px] overflow-y-auto rounded-xl border border-border/70 bg-card p-1.5 shadow-2xl [scrollbar-width:thin]">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRankFilter("ALL")
-                        setOpenFilter(null)
-                      }}
-                      className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/70 ${
-                        rankFilter === "ALL"
-                          ? "text-foreground"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                        {rankFilter === "ALL" ? (
-                          <Check className="h-4 w-4 text-blue-400" />
-                        ) : null}
-                      </span>
-                      <Shield className="h-4 w-4 text-blue-400" />
+                {/* Rank multi-select filter */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenFilter((current) =>
+                        current === "rank" ? null : "rank",
+                      )
+                    }
+                    className="inline-flex h-9 min-w-[180px] items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium outline-none transition-colors hover:bg-muted/40 focus:border-blue-500/50"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Shield className="h-3.5 w-3.5 text-blue-400" />
                       All Ranks
-                    </button>
+                      <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
+                        {rankFilter.length === 0
+                          ? RANK_COLUMNS.length
+                          : rankFilter.length}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-muted-foreground transition-transform ${
+                        openFilter === "rank" ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
 
-                    <div className="my-1.5 border-t border-border/70" />
-
-                    {FILTER_ORDER.map((rank) => (
-                      <button
-                        key={rank.rank}
-                        type="button"
-                        onClick={() => {
-                          setRankFilter(rank.rank)
-                          setOpenFilter(null)
-                        }}
-                        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/70"
-                      >
-                        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                          {rankFilter === rank.rank ? (
-                            <Check className="h-4 w-4 text-blue-400" />
-                          ) : null}
-                        </span>
-                        <Shield className="h-4 w-4 text-blue-400" />
-                        {compactRank(rank.rank)}
-                      </button>
-                    ))}
-
-                    {rankFilter !== "ALL" && (
-                      <>
-                        <div className="my-1.5 border-t border-border/70" />
+                  {openFilter === "rank" && (
+                    <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[250px] overflow-hidden rounded-xl border border-border/70 bg-card shadow-2xl">
+                      <div className="authority-rank-scroll max-h-[330px] overflow-y-auto [scrollbar-color:rgba(59,130,246,0.75)_rgba(255,255,255,0.04)] [scrollbar-width:thin]">
                         <button
                           type="button"
-                          onClick={() => {
-                            setRankFilter("ALL")
-                            setOpenFilter(null)
-                          }}
-                          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-white hover:text-blue-500 focus:bg-white focus:text-blue-500"
+                          onClick={() => setRankFilter([])}
+                          className="flex w-full items-center gap-2.5 border-b border-border/60 px-3 py-3 text-left text-sm transition-colors hover:bg-muted/60"
                         >
-                          <X className="h-4 w-4" />
-                          Clear Ranks
+                          <span className="flex h-4 w-4 items-center justify-center rounded-[3px]">
+                            {rankFilter.length === 0 && (
+                              <Check className="h-4 w-4 text-blue-400" />
+                            )}
+                          </span>
+                          <Shield className="h-4 w-4 text-blue-400" />
+                          <span>All Ranks</span>
                         </button>
-                      </>
-                    )}
-                  </div>
+
+                        {FILTER_ORDER.map((rank) => {
+                          const selected =
+                            rankFilter.length === 0 ||
+                            rankFilter.includes(rank.rank)
+
+                          return (
+                            <button
+                              key={rank.rank}
+                              type="button"
+                              onClick={() => {
+                                setRankFilter((current) => {
+                                  const allSelected = current.length === 0
+                                  const selectedRanks = allSelected
+                                    ? FILTER_ORDER.map((item) => item.rank)
+                                    : current
+
+                                  const next = selectedRanks.includes(rank.rank)
+                                    ? selectedRanks.filter((item) => item !== rank.rank)
+                                    : [...selectedRanks, rank.rank]
+
+                                  return next.length === RANK_COLUMNS.length
+                                    ? []
+                                    : next
+                                })
+                              }}
+                              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/60"
+                            >
+                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px]">
+                                {selected && (
+                                  <Check className="h-4 w-4 text-blue-400" />
+                                )}
+                              </span>
+                              <Shield className="h-4 w-4 shrink-0 text-blue-400" />
+                              <span>{compactRank(rank.rank)}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {(search || sectionFilter !== "ALL" || rankFilter.length > 0) && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-white hover:text-blue-500"
+                  >
+                    <X className="h-3.5 w-3.5 text-blue-400" />
+                    Clear
+                  </button>
                 )}
               </div>
-
-              {(search || sectionFilter !== "ALL" || rankFilter !== "ALL") && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-white hover:text-blue-500 focus:bg-white focus:text-blue-500"
-                >
-                  <X className="h-3.5 w-3.5 text-blue-400" />
-                  Clear
-                </button>
-              )}
             </div>
           )}
         </div>
