@@ -6562,10 +6562,16 @@ export function createApp() {
 
       const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
       const value = cleanGalleryString(req.body?.value)
-      const category = cleanGalleryString(req.body?.category)
+      const requestedCategories = Array.isArray(req.body?.categories)
+        ? Array.from(new Set(req.body.categories.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
+        : []
+      const legacyCategory = cleanGalleryString(req.body?.category)
+      const categoriesForTag = requestedCategories.length
+        ? requestedCategories
+        : (legacyCategory ? [legacyCategory] : [])
       const color = normalizeGalleryColor(req.body?.color)
       if (!type || !value) return res.status(400).json({ success: false, error: "A valid category or tag name is required." })
-      if (type === "tag" && !category) return res.status(400).json({ success: false, error: "Select a category for this tag." })
+      if (type === "tag" && categoriesForTag.length === 0) return res.status(400).json({ success: false, error: "Select at least one category for this tag." })
       if (value.length > 40) return res.status(400).json({ success: false, error: "Names must be 40 characters or fewer." })
 
       const gallery = await getCollection<GalleryTagsConfigDocument>("galleryTags")
@@ -6582,7 +6588,11 @@ export function createApp() {
       if (type === "category") {
         tagCategories[value] = []
       } else {
-        tagCategories[category] = Array.from(new Set([...(tagCategories[category] ?? []), value]))
+        for (const categoryName of categoriesForTag) {
+          if (config.categories.includes(categoryName)) {
+            tagCategories[categoryName] = Array.from(new Set([...(tagCategories[categoryName] ?? []), value]))
+          }
+        }
       }
 
       await gallery.updateOne(
@@ -6609,7 +6619,13 @@ export function createApp() {
       const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
       const value = cleanGalleryString(req.body?.value)
       const newValue = cleanGalleryString(req.body?.newValue || value)
-      const category = cleanGalleryString(req.body?.category)
+      const requestedCategories = Array.isArray(req.body?.categories)
+        ? Array.from(new Set(req.body.categories.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
+        : []
+      const legacyCategory = cleanGalleryString(req.body?.category)
+      const requestedTagCategories = requestedCategories.length
+        ? requestedCategories
+        : (legacyCategory ? [legacyCategory] : [])
       const color = normalizeGalleryColor(req.body?.color, "#3b82f6")
       if (!type || !value || !newValue) return res.status(400).json({ success: false, error: "A valid option name is required." })
       if (newValue.length > 40) return res.status(400).json({ success: false, error: "Names must be 40 characters or fewer." })
@@ -6662,11 +6678,15 @@ export function createApp() {
       }
 
       if (type === "tag") {
+        // Rebuild all assignments from the submitted multi-select. This also
+        // allows a tag to be reset to zero categories (Unassigned).
         for (const key of Object.keys(tagCategories)) {
           tagCategories[key] = (tagCategories[key] ?? []).filter((tag) => tag !== newValue && tag !== value)
         }
-        if (category && categories.includes(category)) {
-          tagCategories[category] = Array.from(new Set([...(tagCategories[category] ?? []), newValue]))
+        for (const categoryName of requestedTagCategories) {
+          if (categories.includes(categoryName)) {
+            tagCategories[categoryName] = Array.from(new Set([...(tagCategories[categoryName] ?? []), newValue]))
+          }
         }
       }
 
