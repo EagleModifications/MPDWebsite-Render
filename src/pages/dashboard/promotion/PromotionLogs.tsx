@@ -2411,16 +2411,25 @@ export default function PromotionLogs() {
                                         {detailLabel(key)}
                                       </span>
 
-                                      {change ? (
-                                        <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] leading-5 sm:text-xs">
-                                          <span className="text-red-500 line-through">
-                                            {formatSimpleValue(change.from)}
-                                          </span>
-                                          <span className="text-muted-foreground">→</span>
-                                          <span className="text-emerald-500">
-                                            {formatSimpleValue(change.to)}
-                                          </span>
-                                        </div>
+                                      {change != null ? (
+                                        (() => {
+                                          const changePair = change as {
+                                            from: unknown
+                                            to: unknown
+                                          }
+
+                                          return (
+                                            <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] leading-5 sm:text-xs">
+                                              <span className="text-red-500 line-through">
+                                                {formatSimpleValue(changePair.from)}
+                                              </span>
+                                              <span className="text-muted-foreground">→</span>
+                                              <span className="text-emerald-500">
+                                                {formatSimpleValue(changePair.to)}
+                                              </span>
+                                            </div>
+                                          )
+                                        })()
                                       ) : (
                                         <span className="min-w-0 whitespace-pre-wrap break-words text-[11px] leading-5 text-foreground sm:text-xs">
                                           {formatDetailValue(value)}
