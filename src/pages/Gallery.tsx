@@ -567,7 +567,7 @@ function isVideoMedia(media: GalleryMedia) {
 function getAspectClass(_ratio?: number) {
   // Gallery previews use one consistent size instead of changing height based
   // on each image's natural dimensions. This keeps every card aligned.
-  return "aspect-[4/3]"
+  return "aspect-video"
 }
 
 function formatDate(value: string) {
@@ -1741,7 +1741,7 @@ export default function Gallery() {
               </div>
             ) : (
               <div className="h-auto p-3 sm:p-4">
-                  <div className="columns-1 gap-3 sm:columns-2 lg:columns-3">
+                  <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3">
                   {filteredItems.map(
                     (item) => {
                       const mediaList =
@@ -3508,7 +3508,7 @@ function GalleryMediaCard({
         <img
           src={media.url}
           alt={title}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+          className="h-full w-full object-contain bg-black transition duration-300 group-hover:scale-[1.02]"
           onLoad={(event) => {
             const image = event.currentTarget
             if (image.naturalHeight > 0) {
@@ -3521,7 +3521,7 @@ function GalleryMediaCard({
           <img
             src={getMediaThumbnail(media)}
             alt={title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-contain bg-black transition duration-300 group-hover:scale-[1.02]"
             onLoad={(event) => {
               const image = event.currentTarget
               if (image.naturalHeight > 0) {
@@ -3546,7 +3546,7 @@ function GalleryMediaCard({
           loop
           playsInline
           preload="auto"
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+          className="h-full w-full object-contain bg-black transition duration-300 group-hover:scale-[1.02]"
           onLoadedMetadata={(event) => {
             const video = event.currentTarget
             if (video.videoHeight > 0) {
