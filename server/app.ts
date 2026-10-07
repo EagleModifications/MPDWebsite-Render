@@ -4938,6 +4938,165 @@ export function createApp() {
   )
 
   /*
+   * Electron auto-update proxy.
+   *
+   * electron-updater's generic provider requests files such as:
+   *   latest.yml
+   *   latest-mac.yml
+   *   latest-linux.yml
+   * and then the installer/blockmap named by those metadata files.
+   *
+   * GitHub stays private. The Electron app talks only to this public
+   * endpoint; the GitHub token remains on the Render server.
+   */
+  app.get(
+    "/api/desktop-updates/:fileName",
+    async (req, res) => {
+      const fileName =
+        typeof req.params.fileName === "string"
+          ? path.basename(req.params.fileName).trim()
+          : ""
+
+      // electron-updater only needs these metadata and release artifact files.
+      // Keep the route deliberately narrow so it cannot become a generic
+      // proxy into GitHub.
+      const isUpdateMetadata =
+        /^latest(?:-mac|-linux)?\.yml$/i.test(fileName)
+
+      const isUpdateArtifact =
+        /\.(?:exe|dmg|appimage|blockmap)$/i.test(fileName)
+
+      if (!fileName || (!isUpdateMetadata && !isUpdateArtifact)) {
+        return res.status(404).end()
+      }
+
+      try {
+        // Use GitHub's latest-release endpoint here rather than the public
+        // /api/releases cache. The public download API intentionally exposes
+        // installers only, while electron-updater also needs its YAML and
+        // blockmap metadata files.
+        const releaseResponse = await fetch(
+          `${GITHUB_API_BASE}/releases/latest`,
+          {
+            headers: githubHeaders(),
+            signal: AbortSignal.timeout(10_000),
+          },
+        )
+
+        if (!releaseResponse.ok) {
+          const body = await releaseResponse.text().catch(() => "")
+
+          console.error(
+            "[desktop-updates] Latest release lookup failed:",
+            releaseResponse.status,
+            body.slice(0, 500),
+          )
+
+          return res.status(502).end()
+        }
+
+        const latestRelease =
+          (await releaseResponse.json()) as {
+            assets?: Array<{
+              id?: number
+              name?: string
+            }>
+          }
+
+        const knownAsset =
+          latestRelease.assets?.find(
+            (asset) =>
+              Number.isSafeInteger(Number(asset.id)) &&
+              Number(asset.id) > 0 &&
+              typeof asset.name === "string" &&
+              asset.name.toLowerCase() ===
+                fileName.toLowerCase(),
+          )
+
+        if (!knownAsset) {
+          return res.status(404).end()
+        }
+
+        const response = await fetch(
+          `${GITHUB_API_BASE}/releases/assets/${Number(
+            knownAsset.id,
+          )}`,
+          {
+            headers: githubHeaders(
+              "application/octet-stream",
+            ),
+            redirect: "follow",
+            signal: AbortSignal.timeout(60_000),
+          },
+        )
+
+        if (!response.ok || !response.body) {
+          const body = await response.text().catch(() => "")
+
+          console.error(
+            "[desktop-updates] GitHub asset request failed:",
+            response.status,
+            body.slice(0, 500),
+          )
+
+          return res.status(502).end()
+        }
+
+        res.setHeader(
+          "Content-Type",
+          isUpdateMetadata
+            ? "text/yaml; charset=utf-8"
+            : (
+                response.headers.get("content-type") ||
+                "application/octet-stream"
+              ),
+        )
+        res.setHeader(
+          "Cache-Control",
+          isUpdateMetadata
+            ? "no-store"
+            : "public, max-age=300",
+        )
+        res.setHeader("X-Content-Type-Options", "nosniff")
+
+        const contentLength =
+          response.headers.get("content-length")
+
+        if (contentLength) {
+          res.setHeader(
+            "Content-Length",
+            contentLength,
+          )
+        }
+
+        Readable.fromWeb(
+          response.body as unknown as Parameters<
+            typeof Readable.fromWeb
+          >[0],
+        ).on("error", (error) => {
+          console.error(
+            "[desktop-updates] Streaming failed:",
+            error,
+          )
+
+          if (!res.headersSent) {
+            res.status(502).end()
+          } else {
+            res.destroy()
+          }
+        }).pipe(res)
+      } catch (error) {
+        console.error(
+          "[desktop-updates] Failed:",
+          error,
+        )
+
+        return res.status(502).end()
+      }
+    },
+  )
+
+  /*
    * Private-repository download proxy.
    *
    * The client supplies only the numeric GitHub asset ID returned by
@@ -5197,15 +5356,15 @@ export function createApp() {
           "/verifying",
         )
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Authentication failed"
+        // Never send the underlying OAuth/Discord error to the browser.
+        // Authentication failures can contain provider details, request
+        // information, or other implementation details that should remain
+        // server-side. Log the real error for diagnostics and expose only a
+        // stable, generic error code to the user.
+        console.error("[auth] Discord OAuth callback failed:", error)
 
         res.redirect(
-          `/sign-in?error=${encodeURIComponent(
-            message,
-          )}`,
+          "/sign-in?error=authentication_failed",
         )
       }
     },
