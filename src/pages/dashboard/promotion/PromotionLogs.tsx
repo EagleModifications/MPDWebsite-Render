@@ -2363,7 +2363,7 @@ export default function PromotionLogs() {
               <div className="mt-2 flex min-h-8 flex-wrap items-center gap-2 border-t border-border pt-2">
                 <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   <Filter className="h-3.5 w-3.5 text-blue-400" />
-                  Filters:
+                  Active Filters:
                 </div>
 
                 {!hasFilters && !search.trim() ? (
