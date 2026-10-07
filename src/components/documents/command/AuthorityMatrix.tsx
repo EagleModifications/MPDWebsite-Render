@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import type { ReactNode } from "react"
 import {
   Check,
   ChevronDown,
@@ -14,7 +15,6 @@ const SHEET_URL =
   "https://docs.google.com/spreadsheets/d/18Io5OdkKsZ9aVDh8I5nsAPjBUISGGM77461K06ziALU/edit"
 
 const SHEET_NAME = "Authority Matrix"
-
 
 type Section = "PRIMARY RESPONSIBILITY" | "AUTHORITY"
 
@@ -66,7 +66,6 @@ type GvizResponse = {
 function clean(value: unknown): string {
   return String(value ?? "")
     .replace(/\u00a0/g, " ")
-    .replace(/\r?\n/g, " ")
     .replace(/\*+/g, "")
     .replace(/\s+/g, " ")
     .trim()
@@ -80,36 +79,21 @@ function cellValue(row: GvizRow | undefined, column: number): string {
   const cell = row?.c?.[column]
 
   if (!cell) return ""
-  if (cell.f !== undefined && cell.f !== null) return clean(cell.f)
-  if (cell.v !== undefined && cell.v !== null) return clean(cell.v)
+  if (cell.f !== undefined && cell.f !== null) return String(cell.f)
+  if (cell.v !== undefined && cell.v !== null) return String(cell.v)
 
   return ""
-}
-
-function rowValues(row: GvizRow | undefined): string[] {
-  return (row?.c ?? []).map((cell) => {
-    if (!cell) return ""
-    if (cell.f !== undefined && cell.f !== null) return clean(cell.f)
-    if (cell.v !== undefined && cell.v !== null) return clean(cell.v)
-    return ""
-  })
 }
 
 function parseGviz(raw: string): GvizResponse {
   const start = raw.indexOf("{")
   const end = raw.lastIndexOf("}")
 
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error(
-      "Google Sheets did not return spreadsheet data. Make sure the sheet is publicly viewable."
-    )
+  if (start === -1 || end === -1) {
+    throw new Error("Google Sheets returned an invalid response.")
   }
 
-  try {
-    return JSON.parse(raw.slice(start, end + 1)) as GvizResponse
-  } catch {
-    throw new Error("Google Sheets returned an unreadable response.")
-  }
+  return JSON.parse(raw.slice(start, end + 1)) as GvizResponse
 }
 
 function getSheetId(): string {
@@ -122,6 +106,66 @@ function getSheetId(): string {
   return match[1]
 }
 
+const RANK_ALIASES: Record<string, string> = {
+  OFFICER: "Officer",
+  "OFFICER 1": "Officer",
+  "OFFICER 2": "Officer 2",
+  "OFFICER 3": "Officer 3",
+  LCPL: "LCPL",
+  CPL: "CPL",
+  SGT: "SGT",
+  SSGT: "SSGT",
+  MSGT: "MSGT",
+  "2LT": "2LT",
+  "1LT": "1LT",
+  CPT: "CPT",
+  MAJ: "MAJ",
+  "LIEUTENANT COLONEL": "Lieutenant Colonel",
+  LTCOL: "Lieutenant Colonel",
+  "LT COL": "Lieutenant Colonel",
+  COLONEL: "Colonel",
+  COL: "Colonel",
+  "CHIEF OF STAFF": "Chief Of Staff",
+  "ASSISTANT CHIEF OF POLICE": "Assistant Chief Of Police",
+  "ASSISTANT CHIEF": "Assistant Chief Of Police",
+  "DEPUTY CHIEF OF POLICE": "Deputy Chief Of Police",
+  "DEPUTY CHIEF": "Deputy Chief Of Police",
+  "CHIEF OF POLICE": "Chief Of Police",
+  CHIEF: "Chief Of Police",
+}
+
+function getRank(value: string): string | null {
+  return RANK_ALIASES[key(value)] ?? null
+}
+
+function getGroup(rank: string): GroupName {
+  switch (key(rank)) {
+    case "OFFICER":
+    case "OFFICER 2":
+    case "OFFICER 3":
+      return "OFFICERS"
+
+    case "LCPL":
+    case "CPL":
+    case "SGT":
+    case "SSGT":
+    case "MSGT":
+      return "SUPERVISORS"
+
+    case "2LT":
+    case "1LT":
+    case "CPT":
+    case "MAJ":
+      return "LOW COMMAND"
+
+    case "LIEUTENANT COLONEL":
+      return "TRIAL HIGH COMMAND"
+
+    default:
+      return "HIGH COMMAND"
+  }
+}
+
 function getSection(value: string): Section | null {
   const normalized = key(value)
 
@@ -132,17 +176,25 @@ function getSection(value: string): Section | null {
     return "PRIMARY RESPONSIBILITY"
   }
 
-  if (normalized === "AUTHORITY") return "AUTHORITY"
+  if (normalized === "AUTHORITY") {
+    return "AUTHORITY"
+  }
 
   return null
 }
 
 function isAllowed(value: string): boolean {
-  const normalized = key(value)
-
-  return ["TRUE", "YES", "Y", "1", "X", "CHECK", "CHECKED", "✓", "✔"].includes(
-    normalized
-  )
+  return [
+    "TRUE",
+    "YES",
+    "Y",
+    "1",
+    "X",
+    "CHECK",
+    "CHECKED",
+    "✓",
+    "✔",
+  ].includes(key(value))
 }
 
 function isExcludedRow(values: string[]): boolean {
@@ -152,7 +204,6 @@ function isExcludedRow(values: string[]): boolean {
 
   const excluded = [
     "THIS DOCUMENT SUPERCEDES",
-    "THIS DOCUMENT SUPERSEDES",
     "TAKES PRECEDENT",
     "RESTRICTIONS APPLY",
     "DETERMINED BY RANK IN FTD",
@@ -162,50 +213,82 @@ function isExcludedRow(values: string[]): boolean {
   return excluded.some((phrase) => text.includes(phrase))
 }
 
-const RANK_COLUMNS: RankColumn[] = [
-  { column: 2, rank: "Officer", group: "OFFICERS" },
-  { column: 3, rank: "Officer 2", group: "OFFICERS" },
-  { column: 4, rank: "Officer 3", group: "OFFICERS" },
-  { column: 5, rank: "LCPL", group: "SUPERVISORS" },
-  { column: 6, rank: "CPL", group: "SUPERVISORS" },
-  { column: 7, rank: "SGT", group: "SUPERVISORS" },
-  { column: 8, rank: "SSGT", group: "SUPERVISORS" },
-  { column: 9, rank: "MSGT", group: "SUPERVISORS" },
-  { column: 10, rank: "2LT", group: "LOW COMMAND" },
-  { column: 11, rank: "1LT", group: "LOW COMMAND" },
-  { column: 12, rank: "CPT", group: "LOW COMMAND" },
-  { column: 13, rank: "MAJ", group: "LOW COMMAND" },
-  { column: 14, rank: "Lieutenant Colonel", group: "TRIAL HIGH COMMAND" },
-  { column: 15, rank: "Colonel", group: "HIGH COMMAND" },
-  { column: 16, rank: "Chief Of Staff", group: "HIGH COMMAND" },
-  { column: 17, rank: "Assistant Chief Of Police", group: "HIGH COMMAND" },
-  { column: 18, rank: "Deputy Chief Of Police", group: "HIGH COMMAND" },
-  { column: 19, rank: "Chief Of Police", group: "HIGH COMMAND" },
-]
+function findRankRow(rows: GvizRow[]): number {
+  let bestRow = -1
+  let bestCount = 0
+
+  const scanLimit = Math.min(rows.length, 20)
+
+  for (let rowIndex = 0; rowIndex < scanLimit; rowIndex += 1) {
+    const row = rows[rowIndex]
+    let count = 0
+
+    for (let column = 0; column < (row?.c?.length ?? 0); column += 1) {
+      if (getRank(cellValue(row, column))) count += 1
+    }
+
+    if (count > bestCount) {
+      bestCount = count
+      bestRow = rowIndex
+    }
+  }
+
+  return bestCount >= 3 ? bestRow : -1
+}
 
 function parseMatrix(response: GvizResponse): MatrixData {
   const rows = response.table?.rows ?? []
 
-  if (!rows.length) {
-    throw new Error(`The "${SHEET_NAME}" tab returned no data.`)
+  if (rows.length === 0) {
+    throw new Error("The Authority Matrix sheet returned no data.")
   }
 
-  const ranks = [...RANK_COLUMNS].reverse()
+  const rankRowIndex = findRankRow(rows)
+
+  if (rankRowIndex === -1) {
+    throw new Error(
+      "Could not find the rank columns in the Authority Matrix sheet.",
+    )
+  }
+
+  const rankRow = rows[rankRowIndex]
+  const ranks: RankColumn[] = []
+
+  for (let column = 0; column < (rankRow?.c?.length ?? 0); column += 1) {
+    const rank = getRank(cellValue(rankRow, column))
+
+    if (!rank) continue
+
+    ranks.push({
+      column,
+      rank,
+      group: getGroup(rank),
+    })
+  }
+
+  if (ranks.length === 0) {
+    throw new Error("No rank columns could be read from the Authority Matrix.")
+  }
+
   const entries: MatrixEntry[] = []
   let currentSection: Section | null = null
 
-  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+  for (
+    let rowIndex = rankRowIndex + 1;
+    rowIndex < rows.length;
+    rowIndex += 1
+  ) {
     const row = rows[rowIndex]
-    const values = rowValues(row)
+    if (!row) continue
+
+    const values = (row.c ?? []).map((cell) =>
+      clean(cell?.f ?? cell?.v ?? ""),
+    )
 
     if (isExcludedRow(values)) continue
 
-    const detectedSection = getSection(cellValue(row, 0))
-    if (detectedSection) {
-      currentSection = detectedSection
-      continue
-    }
-
+    const section = getSection(cellValue(row, 0))
+    if (section) currentSection = section
     if (!currentSection) continue
 
     const name = clean(cellValue(row, 1))
@@ -215,7 +298,11 @@ function parseMatrix(response: GvizResponse): MatrixData {
 
     if (
       normalizedName === "PRIMARY RESPONSIBILITY" ||
-      normalizedName === "AUTHORITY"
+      normalizedName === "AUTHORITY" ||
+      normalizedName.includes("THIS DOCUMENT") ||
+      normalizedName.includes("RESTRICTIONS APPLY") ||
+      normalizedName.includes("LAST UPDATED") ||
+      normalizedName.includes("DETERMINED BY RANK")
     ) {
       continue
     }
@@ -234,13 +321,36 @@ function parseMatrix(response: GvizResponse): MatrixData {
     })
   }
 
-  if (!entries.length) {
+  if (entries.length === 0) {
     throw new Error(
-      `The "${SHEET_NAME}" tab was reached, but no matrix rows were found. Check that columns A:T still contain the Authority Matrix.`,
+      "The Authority Matrix loaded, but no matrix entries were found.",
     )
   }
 
-  return { ranks, entries }
+  /*
+   * The sheet is read in its natural left-to-right order, but the UI
+   * intentionally displays the command structure from Chief down to Officer.
+   */
+  const orderedRanks = [...ranks].sort((a, b) => b.column - a.column)
+
+  return {
+    ranks: orderedRanks,
+    entries,
+  }
+}
+
+function groupText(group: GroupName): string {
+  switch (group) {
+    case "OFFICERS":
+      return "text-sky-400"
+    case "SUPERVISORS":
+      return "text-orange-400"
+    case "LOW COMMAND":
+      return "text-green-400"
+    case "TRIAL HIGH COMMAND":
+    case "HIGH COMMAND":
+      return "text-cyan-400"
+  }
 }
 
 function displayRank(rank: string): string {
@@ -258,174 +368,76 @@ function displayRank(rank: string): string {
   }
 }
 
-function groupText(group: GroupName): string {
-  switch (group) {
-    case "OFFICERS":
-      return "text-sky-400"
-    case "SUPERVISORS":
-      return "text-orange-400"
-    case "LOW COMMAND":
-      return "text-green-400"
-    case "TRIAL HIGH COMMAND":
-      return "text-cyan-400"
-    case "HIGH COMMAND":
-      return "text-cyan-400"
-  }
-}
-
-type FilterDropdownProps = {
-  label: string
-  icon: typeof Filter
-  options: string[]
-  selected: string[]
-  onChange: (next: string[]) => void
-  open: boolean
-  onToggle: () => void
-  onClose: () => void
-  displayOption?: (value: string) => string
-  itemIcon?: typeof Shield
-}
-
 function FilterDropdown({
   label,
-  icon: Icon,
-  options,
-  selected,
-  onChange,
+  count,
+  icon,
   open,
   onToggle,
-  onClose,
-  displayOption = (value) => value,
-  itemIcon: ItemIcon,
-}: FilterDropdownProps) {
-  const wrapperRef = useRef<HTMLDivElement>(null)
-  const allSelected = selected.length === 0
-  const selectedCount = allSelected ? options.length : selected.length
-
-  useEffect(() => {
-    if (!open) return
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!wrapperRef.current?.contains(event.target as Node)) onClose()
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose()
-    }
-
-    document.addEventListener("mousedown", handlePointerDown)
-    document.addEventListener("keydown", handleKeyDown)
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown)
-      document.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [open, onClose])
-
-  const toggleOption = (option: string) => {
-    if (allSelected) {
-      onChange(options.filter((value) => value !== option))
-      return
-    }
-
-    const next = selected.includes(option)
-      ? selected.filter((value) => value !== option)
-      : [...selected, option]
-
-    onChange(next.length === options.length ? [] : next)
-  }
-
+  children,
+}: {
+  label: string
+  count: number
+  icon: ReactNode
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
   return (
-    <div ref={wrapperRef} className="relative min-w-0">
+    <div className="relative shrink-0">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className={`flex h-9 w-full items-center gap-2 rounded-lg border bg-background px-3 text-sm font-medium outline-none transition-colors ${
-          open
-            ? "border-blue-500/70 ring-2 ring-blue-500/10"
-            : "border-border hover:border-blue-500/40"
-        }`}
+        className="inline-flex h-9 min-w-[190px] items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium outline-none transition-colors hover:bg-muted focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
       >
-        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 truncate">{label}</span>
-        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-blue-400">
-          {selectedCount}
+        <span className="text-blue-400">{icon}</span>
+        <span className="truncate">{label}</span>
+        <span className="ml-auto rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
+          {count}
         </span>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+          className={`h-4 w-4 shrink-0 text-blue-400 transition-transform ${
             open ? "rotate-180" : ""
           }`}
         />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-[80] w-[260px] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl shadow-black/40">
-          <div className="max-h-[330px] overflow-y-auto p-1.5">
-            <button
-              type="button"
-              onClick={() => onChange([])}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium transition-colors hover:bg-muted/70"
-            >
-              <span
-                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                  allSelected
-                    ? "border-blue-500 bg-blue-500 text-white"
-                    : "border-border bg-background"
-                }`}
-              >
-                {allSelected && <Check className="h-3 w-3 stroke-[3]" />}
-              </span>
-              <Icon className="h-4 w-4 shrink-0 text-blue-400" />
-              <span className="truncate">{label}</span>
-            </button>
-
-            <div className="my-1 border-t border-border/70" />
-
-            {options.map((option) => {
-              const checked = allSelected || selected.includes(option)
-              const OptionIcon = ItemIcon
-
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => toggleOption(option)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/70"
-                >
-                  <span
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                      checked
-                        ? "border-blue-500 bg-blue-500 text-white"
-                        : "border-border bg-background"
-                    }`}
-                  >
-                    {checked && <Check className="h-3 w-3 stroke-[3]" />}
-                  </span>
-                  {OptionIcon ? (
-                    <OptionIcon className="h-4 w-4 shrink-0 text-blue-400" />
-                  ) : null}
-                  <span className="min-w-0 truncate">{displayOption(option)}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {!allSelected && (
-            <div className="border-t border-border/70 p-1.5">
-              <button
-                type="button"
-                onClick={() => onChange([])}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-                Clear {label}
-              </button>
-            </div>
-          )}
+        <div className="absolute right-0 top-[calc(100%+6px)] z-[80] w-[260px] rounded-xl border border-border bg-background p-2 shadow-2xl shadow-black/40">
+          {children}
         </div>
       )}
     </div>
+  )
+}
+
+function FilterOption({
+  checked,
+  label,
+  onClick,
+}: {
+  checked: boolean
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-muted"
+    >
+      <span
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border ${
+          checked
+            ? "border-blue-500 bg-blue-500 text-white"
+            : "border-border bg-background"
+        }`}
+      >
+        {checked && <Check className="h-3 w-3" />}
+      </span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+    </button>
   )
 }
 
@@ -435,14 +447,17 @@ export default function AuthorityMatrix() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
-  const [sectionFilter, setSectionFilter] = useState<string[]>([])
-  const [rankFilter, setRankFilter] = useState<string[]>([])
+  const [sectionFilter, setSectionFilter] = useState<Section | "ALL">("ALL")
+  const [rankFilter, setRankFilter] = useState<string>("ALL")
   const [openFilter, setOpenFilter] = useState<"section" | "rank" | null>(null)
 
   const loadMatrix = useCallback(async (manualRefresh = false) => {
     try {
-      if (manualRefresh) setRefreshing(true)
-      else setLoading(true)
+      if (manualRefresh) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
 
       setError(null)
 
@@ -450,7 +465,6 @@ export default function AuthorityMatrix() {
       const url =
         `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq` +
         `?sheet=${encodeURIComponent(SHEET_NAME)}` +
-        `&tq=${encodeURIComponent("select *")}` +
         `&headers=0` +
         `&tqx=out:json` +
         `&cacheBust=${Date.now()}`
@@ -466,9 +480,9 @@ export default function AuthorityMatrix() {
 
       const raw = await response.text()
 
-      if (/<!doctype html|<html/i.test(raw)) {
+      if (raw.includes("<html") || raw.includes("<!DOCTYPE")) {
         throw new Error(
-          "Google Sheets returned a webpage instead of sheet data. Make sure the spreadsheet is publicly viewable."
+          "Google Sheets did not return spreadsheet data. The sheet must be publicly viewable.",
         )
       }
 
@@ -478,12 +492,14 @@ export default function AuthorityMatrix() {
         throw new Error(
           responseData.errors[0]?.detailed_message ??
             responseData.errors[0]?.message ??
-            "Google Sheets returned an error."
+            "Google Sheets returned an error.",
         )
       }
 
       if (responseData.status && responseData.status !== "ok") {
-        throw new Error(`Google Sheets returned status \"${responseData.status}\".`)
+        throw new Error(
+          `Google Sheets returned status "${responseData.status}".`,
+        )
       }
 
       setData(parseMatrix(responseData))
@@ -492,7 +508,7 @@ export default function AuthorityMatrix() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to load Authority Matrix."
+          : "Unable to load Authority Matrix.",
       )
     } finally {
       setLoading(false)
@@ -504,12 +520,12 @@ export default function AuthorityMatrix() {
     void loadMatrix()
   }, [loadMatrix])
 
-  const sectionOptions: Section[] = ["PRIMARY RESPONSIBILITY", "AUTHORITY"]
-
   const visibleRanks = useMemo(() => {
     if (!data) return []
-    if (rankFilter.length === 0) return data.ranks
-    return data.ranks.filter((rank) => rankFilter.includes(rank.rank))
+
+    if (rankFilter === "ALL") return data.ranks
+
+    return data.ranks.filter((rank) => rank.rank === rankFilter)
   }, [data, rankFilter])
 
   const filteredEntries = useMemo(() => {
@@ -518,13 +534,15 @@ export default function AuthorityMatrix() {
     const searchText = key(search)
 
     return data.entries.filter((entry) => {
-      const matchesSearch = !searchText || key(entry.name).includes(searchText)
+      const matchesSearch =
+        !searchText || key(entry.name).includes(searchText)
+
       const matchesSection =
-        sectionFilter.length === 0 || sectionFilter.includes(entry.section)
-      const selectedRanks =
-        rankFilter.length === 0 ? data.ranks : data.ranks.filter((rank) => rankFilter.includes(rank.rank))
+        sectionFilter === "ALL" || entry.section === sectionFilter
+
       const matchesRank =
-        selectedRanks.length === 0 || selectedRanks.some((rank) => entry.permissions[rank.rank] === true)
+        rankFilter === "ALL" ||
+        entry.permissions[rankFilter] !== undefined
 
       return matchesSearch && matchesSection && matchesRank
     })
@@ -536,8 +554,14 @@ export default function AuthorityMatrix() {
     for (const rank of visibleRanks) {
       const existing = groups.find((item) => item.group === rank.group)
 
-      if (existing) existing.ranks.push(rank)
-      else groups.push({ group: rank.group, ranks: [rank] })
+      if (existing) {
+        existing.ranks.push(rank)
+      } else {
+        groups.push({
+          group: rank.group,
+          ranks: [rank],
+        })
+      }
     }
 
     return groups
@@ -545,85 +569,24 @@ export default function AuthorityMatrix() {
 
   const clearFilters = () => {
     setSearch("")
-    setSectionFilter([])
-    setRankFilter([])
-    setOpenFilter(null)
+    setSectionFilter("ALL")
+    setRankFilter("ALL")
   }
 
-  const renderEntries = () => {
-    let lastSection: Section | null = null
-
-    return filteredEntries.map((entry) => {
-      const showSection = entry.section !== lastSection
-      lastSection = entry.section
-
-      return (
-        <tbody key={entry.id}>
-          {showSection && (
-            <tr
-              className={
-                entry.section === "AUTHORITY"
-                  ? "border-t-2 border-blue-500/30"
-                  : ""
-              }
-            >
-              <td
-                colSpan={visibleRanks.length + 1}
-                className="border-b border-blue-500/15 bg-blue-500/[0.035] px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-[0.10em] text-blue-400 sm:px-3 sm:text-[10px]"
-              >
-                {entry.section}
-              </td>
-            </tr>
-          )}
-
-          <tr className="border-b border-border/50 transition-colors hover:bg-blue-500/[0.025]">
-            <td className="border-r border-border/50 px-3 py-2.5 text-left text-[10px] font-medium leading-4 text-foreground whitespace-nowrap sm:px-3 sm:text-[11px]">
-              {entry.name}
-            </td>
-
-            {visibleRanks.map((rank) => {
-              const allowed = entry.permissions[rank.rank] === true
-
-              return (
-                <td
-                  key={`${entry.id}-${rank.rank}`}
-                  className="border-r border-border/40 px-0.5 py-2.5 text-center last:border-r-0"
-                >
-                  <span
-                    title={`${rank.rank}: ${allowed ? "Allowed" : "Not allowed"}`}
-                    aria-label={`${rank.rank}: ${allowed ? "Allowed" : "Not allowed"}`}
-                    className={
-                      allowed
-                        ? "mx-auto inline-flex h-4 w-4 items-center justify-center rounded-[4px] border border-blue-500/40 bg-blue-500/15 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.08)] sm:h-[18px] sm:w-[18px]"
-                        : "mx-auto inline-flex h-4 w-4 items-center justify-center rounded-[4px] border border-border/80 bg-muted/20 text-transparent sm:h-[18px] sm:w-[18px]"
-                    }
-                  >
-                    <Check
-                      className={
-                        allowed
-                          ? "h-2.5 w-2.5 stroke-[3] sm:h-3 sm:w-3"
-                          : "h-2.5 w-2.5 sm:h-3 sm:w-3"
-                      }
-                    />
-                  </span>
-                </td>
-              )
-            })}
-          </tr>
-        </tbody>
-      )
-    })
-  }
+  const sectionCount = sectionFilter === "ALL" ? 2 : 1
+  const rankCount = rankFilter === "ALL" ? 18 : 1
 
   return (
     <div className="w-full min-w-0">
-      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm">
-        <div className="sticky top-20 z-40 border-b border-border/70 bg-card/95 px-4 py-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85 sm:px-5">
+      <div className="rounded-2xl border border-border/70 bg-card/80 shadow-sm">
+        {/* Sticky controls. It stays visible while the matrix is scrolled. */}
+        <div className="sticky top-0 z-[70] border-b border-border/70 bg-card/95 px-4 py-4 shadow-sm backdrop-blur-md sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-500">
                 <FileSpreadsheet className="h-5 w-5" />
               </div>
+
               <div className="min-w-0">
                 <h2 className="text-base font-semibold">Authority Matrix</h2>
                 <p className="text-xs text-muted-foreground">
@@ -646,9 +609,10 @@ export default function AuthorityMatrix() {
           </div>
 
           {!loading && !error && data && (
-            <div className="mt-4 grid grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_190px_190px_auto]">
-              <div className="relative min-w-0">
+            <div className="mt-4 flex flex-col gap-2.5 lg:flex-row">
+              <div className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
@@ -658,47 +622,95 @@ export default function AuthorityMatrix() {
               </div>
 
               <FilterDropdown
-                label="All Sections"
-                icon={Filter}
-                options={sectionOptions}
-                selected={sectionFilter}
-                onChange={setSectionFilter}
+                label={
+                  sectionFilter === "ALL"
+                    ? "All Sections"
+                    : sectionFilter === "PRIMARY RESPONSIBILITY"
+                      ? "Primary Responsibility"
+                      : "Authority"
+                }
+                count={sectionCount}
+                icon={<Filter className="h-3.5 w-3.5" />}
                 open={openFilter === "section"}
                 onToggle={() =>
                   setOpenFilter((current) =>
                     current === "section" ? null : "section",
                   )
                 }
-                onClose={() => setOpenFilter(null)}
-                displayOption={(value) =>
-                  value === "PRIMARY RESPONSIBILITY"
-                    ? "Primary Responsibility"
-                    : "Authority"
-                }
-              />
+              >
+                <div className="border-b border-border/70 px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="inline-flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5 text-blue-400" />
+                    Sections
+                  </span>
+                </div>
+
+                <div className="mt-1">
+                  <FilterOption
+                    checked={sectionFilter === "ALL"}
+                    label="All Sections"
+                    onClick={() => setSectionFilter("ALL")}
+                  />
+                  <FilterOption
+                    checked={sectionFilter === "PRIMARY RESPONSIBILITY"}
+                    label="Primary Responsibility"
+                    onClick={() =>
+                      setSectionFilter("PRIMARY RESPONSIBILITY")
+                    }
+                  />
+                  <FilterOption
+                    checked={sectionFilter === "AUTHORITY"}
+                    label="Authority"
+                    onClick={() => setSectionFilter("AUTHORITY")}
+                  />
+                </div>
+              </FilterDropdown>
 
               <FilterDropdown
-                label="All Ranks"
-                icon={Shield}
-                options={data.ranks.map((rank) => rank.rank)}
-                selected={rankFilter}
-                onChange={setRankFilter}
+                label={
+                  rankFilter === "ALL" ? "All Ranks" : displayRank(rankFilter)
+                }
+                count={rankCount}
+                icon={<Shield className="h-3.5 w-3.5" />}
                 open={openFilter === "rank"}
                 onToggle={() =>
                   setOpenFilter((current) =>
                     current === "rank" ? null : "rank",
                   )
                 }
-                onClose={() => setOpenFilter(null)}
-                displayOption={displayRank}
-                itemIcon={Shield}
-              />
+              >
+                <div className="border-b border-border/70 px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="inline-flex items-center gap-2">
+                    <Shield className="h-3.5 w-3.5 text-blue-400" />
+                    Ranks
+                  </span>
+                </div>
 
-              {(search || sectionFilter.length > 0 || rankFilter.length > 0) && (
+                <div className="mt-1 max-h-[300px] overflow-y-auto pr-1">
+                  <FilterOption
+                    checked={rankFilter === "ALL"}
+                    label="All Ranks"
+                    onClick={() => setRankFilter("ALL")}
+                  />
+
+                  {data.ranks.map((rank) => (
+                    <FilterOption
+                      key={rank.rank}
+                      checked={rankFilter === rank.rank}
+                      label={displayRank(rank.rank)}
+                      onClick={() => setRankFilter(rank.rank)}
+                    />
+                  ))}
+                </div>
+              </FilterDropdown>
+
+              {(search ||
+                sectionFilter !== "ALL" ||
+                rankFilter !== "ALL") && (
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-muted"
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-muted"
                 >
                   <X className="h-3.5 w-3.5" />
                   Clear
@@ -724,11 +736,14 @@ export default function AuthorityMatrix() {
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-400">
                   <FileSpreadsheet className="h-4 w-4" />
                 </div>
-                <div className="min-w-0">
+
+                <div>
                   <h3 className="text-sm font-semibold text-red-400">
                     Unable to load Authority Matrix
                   </h3>
+
                   <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+
                   <button
                     type="button"
                     onClick={() => void loadMatrix(true)}
@@ -744,54 +759,121 @@ export default function AuthorityMatrix() {
         )}
 
         {!loading && !error && data && (
-          <div className="w-full overflow-hidden">
+          <div className="w-full">
             <table className="w-full table-fixed border-collapse">
-
               <colgroup>
-                <col className="w-[25%]" />
+                <col className="w-[28%]" />
                 {visibleRanks.map((rank) => (
                   <col key={rank.rank} />
                 ))}
               </colgroup>
 
-              <thead>
-                <tr className="sticky top-[190px] z-30 border-b border-border/70 bg-background/95">
+              <thead className="sticky top-[108px] z-[60]">
+                <tr className="border-b border-border/70 bg-background">
                   <th
                     rowSpan={2}
-                    className="border-r border-border/70 bg-background/30 px-3 py-3 text-left align-middle text-[8px] font-bold uppercase tracking-[0.04em] text-muted-foreground whitespace-nowrap"
+                    className="border-r border-border/70 bg-background px-3 py-2 text-left align-middle text-[9px] font-bold uppercase tracking-[0.08em] text-muted-foreground sm:px-4 sm:text-[10px]"
                   >
-                    Responsibility / Authority
+                    <span className="inline-flex items-center gap-1.5">
+                      <Filter className="h-3 w-3 text-blue-400" />
+                      Responsibility / Authority
+                    </span>
                   </th>
+
                   {groupedRanks.map(({ group, ranks }) => (
                     <th
                       key={group}
                       colSpan={ranks.length}
-                      className={`border-r border-border/50 bg-background/40 px-0.5 py-2 text-center text-[7px] font-bold uppercase tracking-[0.015em] whitespace-nowrap last:border-r-0 sm:text-[8px] ${groupText(group)}`}
+                      className={`border-r border-border/50 bg-background px-1 py-2 text-center text-[8px] font-bold uppercase tracking-[0.06em] last:border-r-0 sm:text-[9px] ${groupText(
+                        group,
+                      )}`}
                     >
                       {group}
                     </th>
                   ))}
                 </tr>
 
-                <tr className="sticky top-[228px] z-30 border-b border-border/70 bg-background/95">
+                <tr className="border-b border-border/70 bg-background">
                   {visibleRanks.map((rank) => (
                     <th
                       key={rank.rank}
                       title={rank.rank}
-                      className="h-[38px] overflow-hidden border-r border-border/50 bg-background/20 px-0.5 py-1 text-center text-[6.5px] font-semibold leading-none text-muted-foreground whitespace-nowrap last:border-r-0 sm:text-[7px]"
+                      className="border-r border-border/50 bg-background px-0.5 py-2 text-center text-[8px] font-semibold leading-tight text-muted-foreground last:border-r-0 sm:text-[9px]"
                     >
-                      <span
-                        className="block truncate whitespace-nowrap"
-                        title={rank.rank}
-                      >
-                        {displayRank(rank.rank)}
-                      </span>
+                      {displayRank(rank.rank)}
                     </th>
                   ))}
                 </tr>
               </thead>
 
-              {renderEntries()}
+              <tbody>
+                {(["PRIMARY RESPONSIBILITY", "AUTHORITY"] as Section[]).map(
+                  (section) => {
+                    const sectionEntries = filteredEntries.filter(
+                      (entry) => entry.section === section,
+                    )
+
+                    if (sectionEntries.length === 0) return null
+
+                    return (
+                      <tr
+                        key={`section-${section}`}
+                        className={
+                          section === "AUTHORITY"
+                            ? "border-t-2 border-blue-500/20"
+                            : ""
+                        }
+                      >
+                        <td
+                          colSpan={visibleRanks.length + 1}
+                          className="border-b border-border/70 bg-muted/20 px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-[0.1em] text-blue-400 sm:px-4 sm:text-[10px]"
+                        >
+                          <span className="inline-flex items-center gap-1.5">
+                            <Filter className="h-3 w-3 text-blue-400" />
+                            {section}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  },
+                )}
+
+                {filteredEntries.map((entry) => (
+                  <tr
+                    key={entry.id}
+                    className="border-b border-border/50 hover:bg-muted/10"
+                  >
+                    <td className="border-r border-border/50 px-3 py-2 text-left text-[10px] font-medium leading-4 text-foreground sm:px-4 sm:text-[11px]">
+                      {entry.name}
+                    </td>
+
+                    {visibleRanks.map((rank) => {
+                      const allowed = Boolean(entry.permissions[rank.rank])
+
+                      return (
+                        <td
+                          key={`${entry.id}-${rank.rank}`}
+                          className="border-r border-border/50 px-0.5 py-2 text-center last:border-r-0"
+                        >
+                          {allowed ? (
+                            <span
+                              title={`${rank.rank}: Allowed`}
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-[3px] border border-blue-500/50 bg-blue-500/10 text-blue-400 sm:h-5 sm:w-5"
+                            >
+                              <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                            </span>
+                          ) : (
+                            <span
+                              title={`${rank.rank}: Not allowed`}
+                              className="inline-flex h-4 w-4 rounded-[3px] border border-border bg-background sm:h-5 sm:w-5"
+                            />
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
             </table>
 
             {filteredEntries.length === 0 && (
