@@ -1584,6 +1584,17 @@ export default function Home() {
         </section>
 
         {/* ========================================================= */}
+        {/* SEPARATOR                                                  */}
+        {/* ========================================================= */}
+        <div className="mx-auto w-full max-w-6xl px-6">
+          <div className="flex items-center gap-4">
+            <div className="h-px flex-1 bg-border/50" />
+            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
+            <div className="h-px flex-1 bg-border/50" />
+          </div>
+        </div>
+
+        {/* ========================================================= */}
         {/* JOIN THE DEPARTMENT CTA                                     */}
         {/* ========================================================= */}
         <section className="relative isolate overflow-hidden bg-background/20">
@@ -1613,10 +1624,12 @@ export default function Home() {
                 <span className="text-foreground">
                   READY TO JOIN THE
                   <br />
-                  METRO POLICE {" "}
-                </span>
-                <span className="bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent">
-                  DEPARTMENT?
+                  <span className="whitespace-nowrap">
+                    METRO POLICE {" "}
+                    <span className="bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent">
+                      DEPARTMENT?
+                    </span>
+                  </span>
                 </span>
               </h2>
 
@@ -1697,6 +1710,17 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* ========================================================= */}
+        {/* SEPARATOR                                                  */}
+        {/* ========================================================= */}
+        <div className="mx-auto w-full max-w-6xl px-6">
+          <div className="flex items-center gap-4">
+            <div className="h-px flex-1 bg-border/50" />
+            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
+            <div className="h-px flex-1 bg-border/50" />
+          </div>
+        </div>
 
       </main>
 
