@@ -242,7 +242,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const hasOwn = (value: Record<string, unknown>, key: string) =>
   Object.prototype.hasOwnProperty.call(value, key)
 
-const isChangePair = (value: unknown): boolean => {
+const isChangePair = (value: unknown): value is Record<string, unknown> => {
   if (!isRecord(value)) return false
 
   return (
@@ -252,16 +252,29 @@ const isChangePair = (value: unknown): boolean => {
   )
 }
 
-const getChangePair = (value: Record<string, unknown>) => {
+const getChangePair = (value: unknown) => {
+  if (!isRecord(value)) {
+    return { from: undefined, to: undefined }
+  }
+
   if (hasOwn(value, "from") || hasOwn(value, "to")) {
-    return { from: value.from, to: value.to }
+    return {
+      from: value.from,
+      to: value.to,
+    }
   }
 
   if (hasOwn(value, "old") || hasOwn(value, "new")) {
-    return { from: value.old, to: value.new }
+    return {
+      from: value.old,
+      to: value.new,
+    }
   }
 
-  return { from: value.before, to: value.after }
+  return {
+    from: value.before,
+    to: value.after,
+  }
 }
 
 
