@@ -16,13 +16,9 @@ import {
 import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
 
-const GITHUB_RELEASES_API =
-  "https://api.github.com/repos/EagleModifications/MPDWebsite-Render/releases?per_page=20"
-
 type ReleaseAsset = {
   id: number
   name: string
-  browser_download_url: string
   size: number
   content_type: string
 }
@@ -32,8 +28,6 @@ type GitHubRelease = {
   name: string | null
   tag_name: string
   body: string | null
-  html_url: string
-  checksum_url: string | null
   published_at: string | null
   created_at: string
   draft: boolean
@@ -191,7 +185,7 @@ function ReleaseAssetButton({
 
   return (
     <a
-      href={asset.browser_download_url}
+      href={`/api/releases/download/${asset.id}`}
       className={[
         "inline-flex items-center justify-center gap-2 rounded-lg border border-border/70 bg-background text-xs font-semibold text-foreground transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-blue-400",
         compact
@@ -341,17 +335,31 @@ function renderInlineMarkdown(value: string): React.ReactNode {
 
     const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
     if (link) {
-      return (
-        <a
-          key={index}
-          href={link[2]}
-          target="_blank"
-          rel="noreferrer"
-          className="text-blue-400 underline underline-offset-2 hover:text-blue-300"
-        >
-          {link[1]}
-        </a>
-      )
+      try {
+        const url = new URL(link[2])
+
+        if (
+          url.protocol === "https:" &&
+          url.hostname.toLowerCase() !== "github.com" &&
+          url.hostname.toLowerCase() !== "www.github.com"
+        ) {
+          return (
+            <a
+              key={index}
+              href={url.toString()}
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-400 underline underline-offset-2 hover:text-blue-300"
+            >
+              {link[1]}
+            </a>
+          )
+        }
+      } catch {
+        // Treat malformed or unsupported release-note links as plain text.
+      }
+
+      return <span key={index}>{link[1]}</span>
     }
 
     return <span key={index}>{part}</span>
@@ -502,9 +510,7 @@ function ReleaseModal({
                       </div>
 
                       <a
-                        href={asset.browser_download_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={`/api/releases/download/${asset.id}`}
                         className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-500/15"
                       >
                         <DownloadIcon className="h-3.5 w-3.5" />
@@ -522,27 +528,8 @@ function ReleaseModal({
           <span className="text-xs text-muted-foreground">
             {release.tag_name} • Metro Police Department Desktop
           </span>
-          <div className="flex flex-wrap items-center gap-3">
-            {release.checksum_url && (
-              <a
-                href={release.checksum_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
-              >
-                SHA-256 checksums
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-            <a
-              href={release.html_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300"
-            >
-              View this release on GitHub
-              <ExternalLink className="h-3 w-3" />
-            </a>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            Downloads are served securely through the MPD website.
           </div>
         </div>
       </div>
@@ -568,92 +555,39 @@ export default function Download() {
 
       setError("")
 
-      let validReleases: GitHubRelease[] | null = null
-      let serviceError = ""
+      const response = await fetch("/api/releases", {
+        headers: {
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      })
 
-      // Prefer the same-origin release service. This keeps GitHub API
-      // access off the browser when the server can reach GitHub normally.
-      try {
-        const response = await fetch("/api/releases", {
-          headers: {
-            Accept: "application/json",
-          },
-          cache: "no-store",
-        })
+      const payload = (await response.json().catch(() => null)) as
+        | { success?: boolean; releases?: GitHubRelease[]; error?: string }
+        | null
 
-        if (response.ok) {
-          const payload = (await response.json()) as
-            | { success?: boolean; releases?: GitHubRelease[] }
-            | GitHubRelease[]
+      if (!response.ok || !payload?.success) {
+        throw new Error(
+          payload?.error ||
+            `Desktop releases returned HTTP ${response.status}.`,
+        )
+      }
 
-          const releases = Array.isArray(payload)
-            ? payload
-            : Array.isArray(payload.releases)
-              ? payload.releases
-              : []
-
-          validReleases = releases
+      const validReleases = Array.isArray(payload.releases)
+        ? payload.releases
             .filter((release) => !release.draft)
             .map((release) => ({
               ...release,
               assets: Array.isArray(release.assets)
-                ? release.assets.filter((asset) =>
-                    /^https:\/\/github\.com\/EagleModifications\/MPDWebsite-Render\/releases\/download\//i.test(
-                      asset.browser_download_url,
-                    ) && getPlatform(asset.name) !== null,
+                ? release.assets.filter(
+                    (asset) =>
+                      asset.id > 0 &&
+                      getPlatform(asset.name) !== null,
                   )
                 : [],
             }))
             .filter((release) => release.assets.length > 0)
-        } else {
-          serviceError = `The release service returned HTTP ${response.status}.`
-        }
-      } catch (serviceLoadError) {
-        serviceError =
-          serviceLoadError instanceof Error
-            ? serviceLoadError.message
-            : "The release service could not be reached."
-      }
-
-      // Fallback to the public GitHub Releases API. This is important on
-      // hosts where outbound requests from the server are temporarily blocked
-      // or GitHub rate-limits the hosting provider's shared IP.
-      if (!validReleases) {
-        const response = await fetch(GITHUB_RELEASES_API, {
-          headers: {
-            Accept: "application/vnd.github+json",
-          },
-          cache: "no-store",
-        })
-
-        if (!response.ok) {
-          throw new Error(
-            serviceError
-              ? `${serviceError} GitHub also returned HTTP ${response.status}.`
-              : `GitHub returned HTTP ${response.status}.`,
-          )
-        }
-
-        const data = (await response.json()) as GitHubRelease[]
-
-        if (!Array.isArray(data)) {
-          throw new Error("GitHub returned an invalid release response.")
-        }
-
-        validReleases = data
-          .filter((release) => !release.draft)
-          .map((release) => ({
-            ...release,
-            assets: Array.isArray(release.assets)
-              ? release.assets.filter((asset) =>
-                  /^https:\/\/github\.com\/EagleModifications\/MPDWebsite-Render\/releases\/download\//i.test(
-                    asset.browser_download_url,
-                  ) && getPlatform(asset.name) !== null,
-                )
-              : [],
-          }))
-          .filter((release) => release.assets.length > 0)
-      }
+        : []
 
       validReleases.sort(
         (a, b) =>
@@ -706,9 +640,9 @@ export default function Download() {
               </h1>
 
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                Download the Metro Police Department desktop application from
-                its public GitHub release. Downloads are provided directly by
-                GitHub and are only started when you choose a release asset.
+                Download the Metro Police Department desktop application.
+                Downloads are securely delivered through the MPD website and
+                only start when you choose a release asset.
               </p>
             </div>
 
@@ -737,19 +671,10 @@ export default function Download() {
                 <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
                   This is a community roleplay project and is not affiliated with
                   any real police department, government agency, or law-enforcement
-                  organisation. This page links to the project's public GitHub Releases.
-                  The desktop application is optional and is not required to use the website.
+                  organisation. The desktop application is optional and is not
+                  required to use the website.
                 </p>
               </div>
-              <a
-                href="https://github.com/EagleModifications/MPDWebsite-Render"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-500/30 px-3 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-500/10"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                View source on GitHub
-              </a>
             </div>
           </section>
 
@@ -772,7 +697,7 @@ export default function Download() {
                   Loading releases...
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Checking GitHub Releases for the latest desktop builds.
+                  Checking for the latest desktop builds.
                 </p>
               </div>
             </section>
