@@ -2,7 +2,6 @@ import { useMemo, useState } from "react"
 import {
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
   Presentation,
   RefreshCw,
 } from "lucide-react"
@@ -22,6 +21,7 @@ export default function ScreeningDocument({
   url,
 }: ScreeningDocumentProps) {
   const [refreshKey, setRefreshKey] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const presentationId = useMemo(
     () => getPresentationId(url),
@@ -29,7 +29,7 @@ export default function ScreeningDocument({
   )
 
   const embedUrl = presentationId
-    ? `https://docs.google.com/presentation/d/${presentationId}/embed?start=false&loop=false&delayms=3000`
+    ? `https://docs.google.com/presentation/d/${presentationId}/embed?start=false&loop=false&delayms=3000&slide=${currentPage}`
     : url
 
   return (
@@ -69,29 +69,35 @@ export default function ScreeningDocument({
             allowFullScreen
           />
 
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex h-11 items-center border-t border-border/70 bg-background/95 px-3 backdrop-blur-sm"
-          >
+          <div className="absolute inset-x-0 bottom-0 z-20 flex h-11 items-center border-t border-border/70 bg-background/95 px-3 backdrop-blur-sm">
             <div className="flex items-center gap-1.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-black/70 text-blue-400">
+              <button
+                type="button"
+                aria-label="Previous page"
+                disabled={currentPage <= 1}
+                onClick={() =>
+                  setCurrentPage((page) => Math.max(1, page - 1))
+                }
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-black/70 text-blue-400 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+              >
                 <ChevronLeft className="h-4 w-4" />
-              </span>
+              </button>
 
               <span
-                aria-label="Current page"
+                aria-label={`Current page ${currentPage}`}
                 className="flex h-8 min-w-10 items-center justify-center rounded-lg border border-blue-500/40 bg-blue-500/10 px-2 text-sm font-medium text-blue-400"
               >
-                1
+                {currentPage}
               </span>
 
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-black/70 text-blue-400">
+              <button
+                type="button"
+                aria-label="Next page"
+                onClick={() => setCurrentPage((page) => page + 1)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-black/70 text-blue-400 transition-colors hover:bg-muted"
+              >
                 <ChevronRight className="h-4 w-4" />
-              </span>
-
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-black/70 text-blue-400">
-                <MoreVertical className="h-4 w-4 text-blue-400" />
-              </span>
+              </button>
             </div>
           </div>
         </div>
