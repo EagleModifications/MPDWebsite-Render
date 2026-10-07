@@ -4580,83 +4580,65 @@ function GalleryMediaCollage({
   const imageCount = media.filter((entry) => entry.type === "image").length
   const videoCount = media.filter((entry) => entry.type === "video").length
 
-  const mediaLabel = (() => {
-    if (media.length === 1) {
-      return imageCount === 1 ? "Image" : "Video"
-    }
-
-    if (imageCount > 0 && videoCount > 0) {
-      return `${media.length} images/videos`
-    }
-
-    if (imageCount > 0) {
-      return `${media.length} ${media.length === 1 ? "Image" : "Images"}`
-    }
-
-    return `${media.length} ${media.length === 1 ? "Video" : "Videos"}`
-  })()
-
-  const renderMedia = (item: GalleryMedia) => (
+  const renderMedia = (item: GalleryMedia, className = "") => (
     <GalleryMediaCard
       key={item.id}
       media={item}
       title={title}
       showOverlay={false}
+      className={className}
       onClick={() => onClick(item)}
     />
   )
 
+  const layoutClass =
+    visible.length === 1
+      ? "w-full"
+      : visible.length === 2
+        ? "aspect-[2/1] w-full"
+        : visible.length === 3
+          ? "aspect-[4/3] w-full"
+          : "aspect-[4/3] w-full"
+
   return (
-    <div className="relative w-full overflow-hidden bg-black">
+    <div className={`relative overflow-hidden ${layoutClass}`}>
       {visible.length === 1 ? (
-        <div className="flex w-full items-center justify-center bg-black">
+        <div className="w-full overflow-hidden">
           {renderMedia(visible[0])}
         </div>
       ) : visible.length === 2 ? (
-        <div className="grid w-full grid-cols-2 gap-1 bg-black">
+        <div className="grid h-full w-full grid-cols-2 gap-px">
           {visible.map((item) => (
-            <div key={item.id} className="min-w-0 bg-black">
-              {renderMedia(item)}
+            <div key={item.id} className="min-h-0 min-w-0 overflow-hidden">
+              {renderMedia(item, "h-full")}
             </div>
           ))}
         </div>
       ) : visible.length === 3 ? (
-        <div className="grid w-full grid-cols-2 grid-rows-2 gap-1 bg-black">
-          <div className="min-h-0 min-w-0">{renderMedia(visible[0])}</div>
-          <div className="min-h-0 min-w-0">{renderMedia(visible[1])}</div>
-          <div className="col-span-2 min-h-0 min-w-0">{renderMedia(visible[2])}</div>
+        <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-px">
+          <div className="min-h-0 min-w-0 overflow-hidden">{renderMedia(visible[0], "h-full")}</div>
+          <div className="min-h-0 min-w-0 overflow-hidden">{renderMedia(visible[1], "h-full")}</div>
+          <div className="col-span-2 min-h-0 min-w-0 overflow-hidden">{renderMedia(visible[2], "h-full")}</div>
         </div>
       ) : (
-        <div className="grid w-full grid-cols-2 grid-rows-2 gap-1 bg-black">
+        <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-px">
           {visible.map((item, index) => (
-            <div key={item.id} className="group relative min-h-0 min-w-0 bg-black">
-              {renderMedia(item)}
+            <div key={item.id} className="group relative min-h-0 min-w-0 overflow-hidden">
+              {renderMedia(item, "h-full")}
 
               {index === 3 && media.length >= 5 ? (
                 <>
-                  <div className="pointer-events-none absolute inset-0 bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
-                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
-                      <Images className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
+                  <div className="pointer-events-none absolute inset-0 bg-black/35 backdrop-blur-[5px]" />
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-center text-white">
+                    <span className="rounded-md bg-black/65 px-2.5 py-1 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
                       {(() => {
                         const hidden = media.slice(3)
                         const hiddenImages = hidden.filter((entry) => entry.type === "image").length
                         const hiddenVideos = hidden.filter((entry) => entry.type === "video").length
 
-                        if (hiddenImages > 0 && hiddenVideos > 0) {
-                          return `${hidden.length}+ images/videos`
-                        }
-
-                        if (hiddenImages > 0) {
-                          return `${hidden.length}+ images`
-                        }
-
-                        if (hiddenVideos > 0) {
-                          return `${hidden.length}+ videos`
-                        }
-
+                        if (hiddenImages > 0 && hiddenVideos > 0) return `${hidden.length}+ images/videos`
+                        if (hiddenImages > 0) return `${hidden.length}+ images`
+                        if (hiddenVideos > 0) return `${hidden.length}+ videos`
                         return `${hidden.length}+ media`
                       })()}
                     </span>
@@ -4668,8 +4650,8 @@ function GalleryMediaCollage({
         </div>
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 pt-8 text-white">
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/75 via-black/20 to-transparent p-3 pt-8 text-white">
+        <span className="inline-flex items-center gap-1.5 rounded-md bg-black/55 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
           {imageCount > 0 && videoCount > 0 ? (
             <Images className="h-3 w-3" />
           ) : imageCount > 0 ? (
@@ -4677,12 +4659,12 @@ function GalleryMediaCollage({
           ) : (
             <Video className="h-3 w-3" />
           )}
-          {mediaLabel}
+          {imageCount > 0 ? "Image" : "Video"}
         </span>
 
         <button
           type="button"
-          className="pointer-events-auto rounded-md bg-black/60 px-2.5 py-1 text-[10px] font-semibold backdrop-blur-sm transition-colors hover:bg-black/80"
+          className="pointer-events-auto rounded-md bg-black/55 px-2.5 py-1 text-[10px] font-semibold backdrop-blur-sm transition-colors hover:bg-black/80"
           onClick={() => onClick(visible[0])}
           aria-label={`View ${title}`}
         >
@@ -4719,18 +4701,18 @@ function GalleryMediaCard({
   title,
   onClick,
   showOverlay = true,
+  className = "",
 }: {
   media: GalleryMedia
   title: string
   onClick: () => void
   showOverlay?: boolean
+  className?: string
 }) {
   return (
     <button
       type="button"
-      className={[
-        "group relative flex h-auto min-h-0 w-full items-center justify-center overflow-hidden bg-black text-left",
-      ].join(" ")}
+      className={`group relative flex min-h-0 w-full items-center justify-center overflow-hidden text-left ${className}`}
       onClick={onClick}
       aria-label={`View ${title}`}
     >
@@ -4740,17 +4722,21 @@ function GalleryMediaCard({
           title={title}
         />
       ) : media.type === "image" ? (
-        <img
-          src={media.url}
-          alt={title}
-          className="block h-auto max-h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
-        />
+        <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
+          <img src={media.url} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover scale-110 blur-2xl opacity-60" />
+          <img
+            src={media.url}
+            alt={title}
+            className="relative z-[1] block h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+          />
+        </div>
       ) : getMediaThumbnail(media) ? (
-        <div className="relative w-full">
+        <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
+          <img src={getMediaThumbnail(media)} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover scale-110 blur-2xl opacity-60" />
           <img
             src={getMediaThumbnail(media)}
             alt={title}
-            className="block h-auto max-h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+            className="relative z-[1] block h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
           />
         </div>
       ) : isEmbeddableVideo(media) ? (
@@ -4758,7 +4744,7 @@ function GalleryMediaCard({
           src={getVideoEmbedUrl(media.url)}
           title={title}
           tabIndex={-1}
-          className="pointer-events-none aspect-video h-auto min-h-0 w-full border-0"
+          className="pointer-events-none h-full min-h-0 w-full border-0"
           allow="autoplay; encrypted-media; picture-in-picture"
         />
       ) : (
@@ -4769,7 +4755,7 @@ function GalleryMediaCard({
           loop
           playsInline
           preload="auto"
-          className="block h-auto max-h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+          className="block h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
         />
       )}
 
