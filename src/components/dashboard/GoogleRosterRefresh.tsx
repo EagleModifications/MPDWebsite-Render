@@ -27,14 +27,6 @@ export default function GoogleRosterRefresh({
 
     setRefreshing(true)
 
-    const loadingToast = toast.loading(
-      "Refreshing roster data...",
-      {
-        description:
-          "Synchronizing the latest roster information from Google Sheets.",
-      },
-    )
-
     try {
       const response = await fetch(
         "/api/import/google/rosters",
