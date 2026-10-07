@@ -86,16 +86,39 @@ function configureAutoUpdater() {
     return;
   }
 
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  // Updates are never downloaded silently. The user explicitly approves
+  // each update before electron-updater downloads it from GitHub Releases.
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowDowngrade = false;
 
   autoUpdater.on('checking-for-update', () => {
     console.log('[MPD Desktop] Checking for updates...');
   });
 
-  autoUpdater.on('update-available', (info) => {
+  autoUpdater.on('update-available', async (info) => {
     console.log(`[MPD Desktop] Update available: ${info.version}`);
+
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      buttons: ['Download update', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Metro Police Department Update Available',
+      message: `Version ${info.version} is available.`,
+      detail:
+        "The update is hosted on the project's public GitHub Releases. Choose Download update to download it, or Later to leave the current version installed.",
+    });
+
+    if (result.response === 0) {
+      autoUpdater.downloadUpdate().catch((error) => {
+        console.error('[MPD Desktop] Update download failed:', error);
+      });
+    }
   });
 
   autoUpdater.on('update-not-available', (info) => {
