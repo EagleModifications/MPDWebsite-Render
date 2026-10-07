@@ -33,6 +33,7 @@ import { env } from "./config"
 import { getMongoDb } from "../src/lib/mongodb"
 import { GridFSBucket, ObjectId } from "mongodb"
 import { randomUUID } from "node:crypto"
+import { Readable } from "node:stream"
 import youtubeDl from "youtube-dl-exec"
 
 // Gallery uploads use disk-backed temporary storage so large videos are not
@@ -532,16 +533,23 @@ const DEFAULT_GALLERY_TAGS = [
 
 const DEFAULT_GALLERY_CATEGORY_COLORS: Record<string, string> = {
   Community: "#3b82f6",
-  Fleet: "#f59e0b",
+  Fleet: "#ffffff",
 }
 
 const DEFAULT_GALLERY_TAG_COLORS: Record<string, string> = {
   Dept: "#3b82f6",
-  SWAT: "#64748b",
-  "MTF-7": "#0ea5e9",
-  MCD: "#1e3a8a",
-  TRU: "#eab308",
-  SAR: "#ef4444",
+  SWAT: "#ffffff",
+  "MTF-7": "#3b82f6",
+  MCD: "#ffffff",
+  TRU: "#3b82f6",
+  SAR: "#ffffff",
+}
+
+const GALLERY_ALLOWED_COLORS = new Set(["#3b82f6", "#ffffff"])
+
+function normalizeGalleryColor(value: unknown, fallback = "#3b82f6") {
+  const color = typeof value === "string" ? value.trim().toLowerCase() : ""
+  return GALLERY_ALLOWED_COLORS.has(color) ? color : fallback
 }
 
 type GalleryTag = string
@@ -582,6 +590,10 @@ type GalleryDocument = {
   createdBy: string
   createdAt: Date
   updatedAt: Date
+  categories?: string[]
+  tagCategories?: Record<string, string[]>
+  categoryColors?: Record<string, string>
+  tagColors?: Record<string, string>
 
   // Legacy fields are kept optional so existing gallery
   // documents continue to work after this migration.
@@ -590,48 +602,78 @@ type GalleryDocument = {
   thumbnailUrl?: string
 }
 
-type GalleryConfigDocument = {
+type GalleryTagsConfigDocument = {
   _id?: ObjectId
-  _galleryConfig: true
+  key: "default"
   categories: string[]
   tags: string[]
-  tagCategories?: Record<string, string[]>
-  categoryColors?: Record<string, string>
-  tagColors?: Record<string, string>
+  tagCategories: Record<string, string[]>
+  categoryColors: Record<string, string>
+  tagColors: Record<string, string>
   createdAt: Date
   updatedAt: Date
 }
 
 async function getGalleryConfig() {
-  const gallery = await getCollection<GalleryDocument | GalleryConfigDocument>("gallery")
-  const existing = await gallery.findOne({ _galleryConfig: true }) as GalleryConfigDocument | null
+  const tagsCollection = await getCollection<GalleryTagsConfigDocument>("galleryTags")
+  const existing = await tagsCollection.findOne({ key: "default" })
 
   if (existing) {
-    return {
-      categories: existing.categories?.length ? existing.categories : [...DEFAULT_GALLERY_CATEGORIES],
-      tags: existing.tags?.length ? existing.tags : [...DEFAULT_GALLERY_TAGS],
-      tagCategories: existing.tagCategories ?? Object.fromEntries(
-        (existing.categories?.length ? existing.categories : [...DEFAULT_GALLERY_CATEGORIES]).map((category) => [category, existing.tags?.length ? existing.tags : [...DEFAULT_GALLERY_TAGS]]),
-      ),
-      categoryColors: { ...DEFAULT_GALLERY_CATEGORY_COLORS, ...(existing.categoryColors ?? {}) },
-      tagColors: { ...DEFAULT_GALLERY_TAG_COLORS, ...(existing.tagColors ?? {}) },
-    }
+    const categories = existing.categories?.length ? existing.categories : [...DEFAULT_GALLERY_CATEGORIES]
+    const tags = existing.tags?.length ? existing.tags : [...DEFAULT_GALLERY_TAGS]
+    const tagCategories = Object.fromEntries(
+      categories.map((category) => [category, Array.from(new Set((existing.tagCategories?.[category] ?? []).filter((tag) => tags.includes(tag))))]),
+    )
+    const categoryColors = Object.fromEntries(
+      categories.map((category) => [category, normalizeGalleryColor(existing.categoryColors?.[category], category === "Fleet" ? "#ffffff" : "#3b82f6")]),
+    )
+    const tagColors = Object.fromEntries(
+      tags.map((tag, index) => [tag, normalizeGalleryColor(existing.tagColors?.[tag], index % 2 === 0 ? "#3b82f6" : "#ffffff")]),
+    )
+
+    return { categories, tags, tagCategories, categoryColors, tagColors }
   }
+
+  // One-time migration from the old _galleryConfig document that lived in
+  // the gallery collection. From this point forward galleryTags is the
+  // dedicated collection for all Gallery categories, tags and colors.
+  const gallery = await getCollection<GalleryDocument & { _galleryConfig?: boolean }>("gallery")
+  const legacy = await gallery.findOne({ _galleryConfig: true })
+
+  const categories = Array.isArray(legacy?.categories) && legacy.categories.length
+    ? legacy.categories
+    : [...DEFAULT_GALLERY_CATEGORIES]
+  const tags = Array.isArray(legacy?.tags) && legacy.tags.length
+    ? legacy.tags
+    : [...DEFAULT_GALLERY_TAGS]
+  const legacyTagCategories = legacy && typeof legacy.tagCategories === "object" ? legacy.tagCategories : {}
+  const tagCategories = Object.fromEntries(
+    categories.map((category) => [category, Array.from(new Set((legacyTagCategories?.[category] ?? tags).filter((tag: string) => tags.includes(tag))))]),
+  )
+  const categoryColors = Object.fromEntries(
+    categories.map((category) => [category, normalizeGalleryColor(legacy?.categoryColors?.[category], category === "Fleet" ? "#ffffff" : "#3b82f6")]),
+  )
+  const tagColors = Object.fromEntries(
+    tags.map((tag, index) => [tag, normalizeGalleryColor(legacy?.tagColors?.[tag], index % 2 === 0 ? "#3b82f6" : "#ffffff")]),
+  )
 
   const now = new Date()
-  const config: GalleryConfigDocument = {
-    _galleryConfig: true,
-    categories: [...DEFAULT_GALLERY_CATEGORIES],
-    tags: [...DEFAULT_GALLERY_TAGS],
-    tagCategories: Object.fromEntries(DEFAULT_GALLERY_CATEGORIES.map((category) => [category, [...DEFAULT_GALLERY_TAGS]])),
-    categoryColors: { ...DEFAULT_GALLERY_CATEGORY_COLORS },
-    tagColors: { ...DEFAULT_GALLERY_TAG_COLORS },
+  await tagsCollection.insertOne({
+    key: "default",
+    categories,
+    tags,
+    tagCategories,
+    categoryColors,
+    tagColors,
     createdAt: now,
     updatedAt: now,
+  })
+
+  if (legacy?._id) {
+    await gallery.deleteOne({ _id: legacy._id })
   }
 
-  await gallery.insertOne(config as GalleryDocument)
-  return { categories: config.categories, tags: config.tags, tagCategories: config.tagCategories ?? {}, categoryColors: config.categoryColors ?? {}, tagColors: config.tagColors ?? {} }
+  return { categories, tags, tagCategories, categoryColors, tagColors }
 }
 
 function isGalleryMediaType(
@@ -1209,6 +1251,22 @@ async function downloadGalleryUrlToFile(
   } finally {
     await safeUnlinkGalleryTempFile(filePath)
   }
+}
+
+function getYouTubeVideoId(value: string) {
+  try {
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase().replace(/^www\./, "")
+    if (host === "youtu.be") return url.pathname.slice(1).split("/")[0] || null
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      if (url.pathname === "/watch") return url.searchParams.get("v")
+      const parts = url.pathname.split("/").filter(Boolean)
+      if (["shorts", "embed", "live"].includes(parts[0] ?? "")) return parts[1] || null
+    }
+  } catch {
+    return null
+  }
+  return null
 }
 
 function getYouTubeThumbnailForServer(value: string) {
@@ -6356,13 +6414,13 @@ export function createApp() {
       const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
       const value = cleanGalleryString(req.body?.value)
       const category = cleanGalleryString(req.body?.category)
-      const color = cleanGalleryString(req.body?.color) || "#3b82f6"
+      const color = normalizeGalleryColor(req.body?.color)
       if (!type || !value) return res.status(400).json({ success: false, error: "A valid category or tag name is required." })
       if (type === "tag" && !category) return res.status(400).json({ success: false, error: "Select a category for this tag." })
       if (value.length > 40) return res.status(400).json({ success: false, error: "Names must be 40 characters or fewer." })
-      if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ success: false, error: "Color must be a valid hex color." })
+      if (!GALLERY_ALLOWED_COLORS.has(color)) return res.status(400).json({ success: false, error: "Gallery colors must be blue or white." })
 
-      const gallery = await getCollection<GalleryDocument | GalleryConfigDocument>("gallery")
+      const gallery = await getCollection<GalleryTagsConfigDocument>("galleryTags")
       const config = await getGalleryConfig()
       const target = type === "category" ? config.categories : config.tags
       if (target.some((entry) => entry.toLowerCase() === value.toLowerCase())) {
@@ -6380,7 +6438,7 @@ export function createApp() {
       }
 
       await gallery.updateOne(
-        { _galleryConfig: true },
+        { key: "default" },
         { $set: type === "category"
           ? { categories: next, categoryColors: colors, tagCategories, updatedAt: new Date() }
           : { tags: next, tagColors: colors, tagCategories, updatedAt: new Date() } },
@@ -6403,8 +6461,8 @@ export function createApp() {
       const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
       const value = cleanGalleryString(req.body?.value)
       const category = cleanGalleryString(req.body?.category)
-      const color = cleanGalleryString(req.body?.color)
-      if (!type || !value || !/^#[0-9a-fA-F]{6}$/.test(color)) {
+      const color = normalizeGalleryColor(req.body?.color, "#3b82f6")
+      if (!type || !value || !GALLERY_ALLOWED_COLORS.has(color)) {
         return res.status(400).json({ success: false, error: "A valid option and hex color are required." })
       }
 
@@ -6412,7 +6470,7 @@ export function createApp() {
       const exists = (type === "category" ? config.categories : config.tags).some((entry) => entry === value)
       if (!exists) return res.status(404).json({ success: false, error: "Gallery option not found." })
 
-      const gallery = await getCollection<GalleryDocument | GalleryConfigDocument>("gallery")
+      const gallery = await getCollection<GalleryTagsConfigDocument>("galleryTags")
       const colors = type === "category" ? { ...config.categoryColors, [value]: color } : { ...config.tagColors, [value]: color }
       const tagCategories = { ...(config.tagCategories ?? {}) }
       if (type === "tag" && category) {
@@ -6420,7 +6478,7 @@ export function createApp() {
         tagCategories[category] = Array.from(new Set([...(tagCategories[category] ?? []), value]))
       }
       await gallery.updateOne(
-        { _galleryConfig: true },
+        { key: "default" },
         { $set: type === "category" ? { categoryColors: colors, tagCategories, updatedAt: new Date() } : { tagColors: colors, tagCategories, updatedAt: new Date() } },
         { upsert: true },
       )
