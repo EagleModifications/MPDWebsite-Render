@@ -713,6 +713,130 @@ function parseHsl(value: string) {
   return rgbToHex(rgb.r, rgb.g, rgb.b)
 }
 
+function GalleryMultiSelect({
+  id,
+  value,
+  options,
+  optionColors,
+  placeholder,
+  allowEmpty = false,
+  onChange,
+}: {
+  id: string
+  value: string[]
+  options: readonly string[]
+  optionColors?: Record<string, string>
+  placeholder: string
+  allowEmpty?: boolean
+  onChange: (value: string[]) => void
+}) {
+  const dropdown = useContext(DropdownContext)
+
+  if (!dropdown) {
+    throw new Error("GalleryMultiSelect must be used inside DropdownProvider.")
+  }
+
+  const { openDropdown, setOpenDropdown } = dropdown
+  const open = openDropdown === id
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest(`[data-gallery-multi-select="${id}"]`)) {
+        setOpenDropdown(null)
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenDropdown(null)
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [id, open, setOpenDropdown])
+
+  const selectedLabel = value.length === 0
+    ? placeholder
+    : value.length === 1
+      ? value[0]
+      : `${value.length} categories selected`
+
+  function toggle(option: string) {
+    if (value.includes(option)) {
+      onChange(value.filter((entry) => entry !== option))
+    } else {
+      onChange([...value, option])
+    }
+  }
+
+  return (
+    <div className="relative min-w-0" data-gallery-multi-select={id}>
+      <button
+        type="button"
+        aria-label={placeholder}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpenDropdown(open ? null : id)}
+        className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-all hover:border-blue-500/30 hover:bg-muted/40"
+      >
+        <span className="min-w-0 truncate text-left">{selectedLabel}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-[calc(100%+6px)] z-[10070] w-full min-w-[220px] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl ring-1 ring-black/10">
+          <div className="max-h-64 overflow-y-auto p-1.5" role="listbox" aria-multiselectable="true">
+            {options.length === 0 ? (
+              <div className="px-3 py-3 text-xs text-muted-foreground">No categories available.</div>
+            ) : (
+              options.map((option) => {
+                const selected = value.includes(option)
+                const color = optionColors?.[option] ?? "#3b82f6"
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => toggle(option)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/60"
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-border bg-background">
+                      {selected && <Check className="h-3.5 w-3.5 text-blue-500" />}
+                    </span>
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                    <span className="min-w-0 flex-1 truncate">{option}</span>
+                  </button>
+                )
+              })
+            )}
+          </div>
+          <div className="flex items-center justify-between border-t border-border/70 px-2.5 py-2">
+            <span className="text-[11px] text-muted-foreground">
+              {value.length === 0 ? "No categories selected" : `${value.length} selected`}
+            </span>
+            {allowEmpty && value.length > 0 && (
+              <button
+                type="button"
+                className="text-[11px] font-medium text-blue-500 hover:text-blue-400"
+                onClick={() => onChange([])}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function GalleryColorPicker({
   value,
   onChange,
@@ -854,7 +978,7 @@ function GalleryFilterDropdown({
           variant="outline"
           size="sm"
           aria-label={ariaLabel}
-          className="h-10 w-[132px] justify-between gap-2 px-3 text-sm font-medium"
+          className="h-10 w-[132px] shrink-0 justify-between gap-2 px-3 text-sm font-medium"
         >
           <span>{label}</span>
           <ChevronDown className="h-4 w-4 opacity-60" />
@@ -964,8 +1088,8 @@ export default function Gallery() {
   const [newGalleryTag, setNewGalleryTag] =
     useState("")
 
-  const [newGalleryTagCategory, setNewGalleryTagCategory] =
-    useState("Community")
+  const [newGalleryTagCategories, setNewGalleryTagCategories] =
+    useState<string[]>(["Community"])
 
   const [newGalleryCategoryColor, setNewGalleryCategoryColor] =
     useState("#3b82f6")
@@ -1034,7 +1158,7 @@ export default function Gallery() {
     useState<{ type: "category" | "tag"; value: string } | null>(null)
   const [taxonomyEditName, setTaxonomyEditName] = useState("")
   const [taxonomyEditColor, setTaxonomyEditColor] = useState("#3b82f6")
-  const [taxonomyEditCategory, setTaxonomyEditCategory] = useState("")
+  const [taxonomyEditCategories, setTaxonomyEditCategories] = useState<string[]>([])
   const [taxonomyBusy, setTaxonomyBusy] = useState(false)
 
   const fileInputRef =
@@ -1080,6 +1204,7 @@ export default function Gallery() {
       if (event.key !== "Escape") return
       if (taxonomyEdit) {
         setTaxonomyEdit(null)
+        setShowTaxonomyModal(true)
         return
       }
       setShowTaxonomyModal(false)
@@ -1267,7 +1392,7 @@ export default function Gallery() {
           type,
           value,
           color: color || undefined,
-          category: type === "tag" ? newGalleryTagCategory : undefined,
+          categories: type === "tag" ? newGalleryTagCategories : undefined,
         }),
       })
       const data = await response.json().catch(() => ({}))
@@ -1293,6 +1418,9 @@ export default function Gallery() {
   }
 
   function beginTaxonomyEdit(type: "category" | "tag", value: string) {
+    // Close the management modal before opening the edit modal so the edit
+    // dialog can never render behind its parent/backdrop.
+    setShowTaxonomyModal(false)
     setTaxonomyEdit({ type, value })
     setTaxonomyEditName(value)
     setTaxonomyEditColor(
@@ -1301,12 +1429,12 @@ export default function Gallery() {
         : galleryTagColors[value] ?? "#3b82f6",
     )
     if (type === "tag") {
-      const assigned = galleryCategories.find((categoryName) =>
+      const assigned = galleryCategories.filter((categoryName) =>
         (galleryTagCategories[categoryName] ?? []).includes(value),
       )
-      setTaxonomyEditCategory(assigned ?? "")
+      setTaxonomyEditCategories(assigned)
     } else {
-      setTaxonomyEditCategory("")
+      setTaxonomyEditCategories([])
     }
   }
 
@@ -1329,7 +1457,7 @@ export default function Gallery() {
           value: taxonomyEdit.value,
           newValue,
           color: taxonomyEditColor,
-          category: taxonomyEdit.type === "tag" ? taxonomyEditCategory : undefined,
+          categories: taxonomyEdit.type === "tag" ? taxonomyEditCategories : undefined,
         }),
       })
       const data = await response.json().catch(() => ({}))
@@ -1348,8 +1476,10 @@ export default function Gallery() {
         setTagFilters((current) => current.map((item) => item === taxonomyEdit.value ? newValue : item))
       }
 
+      const editedType = taxonomyEdit.type
       setTaxonomyEdit(null)
-      toast.success(`${taxonomyEdit.type === "category" ? "Category" : "Tag"} updated.`)
+      setShowTaxonomyModal(true)
+      toast.success(`${editedType === "category" ? "Category" : "Tag"} updated.`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update gallery option.")
     } finally {
@@ -2835,11 +2965,18 @@ export default function Gallery() {
                     <h3 className="text-sm font-semibold">Sub Tags</h3>
                     <p className="mt-0.5 text-xs text-muted-foreground">Create tags inside a main category. Each tag keeps its own color.</p>
                   </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_180px_auto_auto]">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_220px_auto_auto]">
                     <Input value={newGalleryTag} onChange={(event) => setNewGalleryTag(event.target.value)} placeholder="Create sub tag" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("tag", newGalleryTagColor) }} />
-                    <CustomSelect id="gallery-new-tag-category" value={newGalleryTagCategory} options={galleryCategories} ariaLabel="Tag category" onChange={setNewGalleryTagCategory} />
+                    <GalleryMultiSelect
+                      id="gallery-new-tag-categories"
+                      value={newGalleryTagCategories}
+                      options={galleryCategories}
+                      optionColors={galleryCategoryColors}
+                      placeholder="Assign categories"
+                      onChange={setNewGalleryTagCategories}
+                    />
                     <GalleryColorPicker value={newGalleryTagColor} onChange={setNewGalleryTagColor} ariaLabel="New sub tag color" />
-                    <Button type="button" onClick={() => void addGalleryOption("tag", newGalleryTagColor)}><Plus className="mr-2 h-4 w-4" />Create</Button>
+                    <Button type="button" onClick={() => void addGalleryOption("tag", newGalleryTagColor)} disabled={newGalleryTagCategories.length === 0}><Plus className="mr-2 h-4 w-4" />Create</Button>
                   </div>
                   <div className="mt-3 space-y-3">
                     {galleryCategories.map((categoryName) => {
@@ -2869,6 +3006,31 @@ export default function Gallery() {
                         </div>
                       )
                     })}
+                    {(() => {
+                      const assignedTags = new Set(Object.values(galleryTagCategories).flat())
+                      const unassignedTags = galleryTags.filter((entry) => !assignedTags.has(entry))
+                      if (unassignedTags.length === 0) return null
+                      return (
+                        <div className="rounded-lg border border-border/60 bg-background/30 p-3">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Unassigned</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {unassignedTags.map((entry) => (
+                              <div key={`unassigned-${entry}`} className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide" style={{ borderColor: `${galleryTagColors[entry] ?? "#3b82f6"}55`, backgroundColor: `${galleryTagColors[entry] ?? "#3b82f6"}1a`, color: galleryTagColors[entry] ?? "#3b82f6" }}>
+                                <span>{entry}</span>
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => beginTaxonomyEdit("tag", entry)} disabled={taxonomyBusy} aria-label={`Edit ${entry}`}>
+                                  <Edit3 className="h-3 w-3" />
+                                </Button>
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("tag", entry)} disabled={taxonomyBusy} aria-label={`Delete ${entry}`}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>
@@ -2881,16 +3043,17 @@ export default function Gallery() {
 
       {taxonomyEdit && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onMouseDown={(event) => { if (event.currentTarget === event.target) setTaxonomyEdit(null) }}
+          className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => { if (event.currentTarget === event.target) { setTaxonomyEdit(null); setShowTaxonomyModal(true) } }}
         >
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="taxonomy-edit-title">
+          <DropdownProvider>
+          <div className="relative z-[10051] w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="taxonomy-edit-title">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h3 id="taxonomy-edit-title" className="text-lg font-semibold">Edit {taxonomyEdit.type === "category" ? "Category" : "Sub Tag"}</h3>
                 <p className="mt-1 text-xs text-muted-foreground">Change the name, color, or category assignment.</p>
               </div>
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTaxonomyEdit(null)} aria-label="Close">
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setTaxonomyEdit(null); setShowTaxonomyModal(true) }} aria-label="Close">
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -2902,8 +3065,16 @@ export default function Gallery() {
               {taxonomyEdit.type === "tag" && (
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Category</label>
-                  <CustomSelect id="taxonomy-edit-category" value={taxonomyEditCategory || "Unassigned"} options={["Unassigned", ...galleryCategories]} ariaLabel="Sub tag category" onChange={(value) => setTaxonomyEditCategory(value === "Unassigned" ? "" : value)} />
-                  <p className="mt-1.5 text-xs text-muted-foreground">Choose Unassigned to reset this sub-tag's category assignment.</p>
+                  <GalleryMultiSelect
+                    id="taxonomy-edit-categories"
+                    value={taxonomyEditCategories}
+                    options={galleryCategories}
+                    optionColors={galleryCategoryColors}
+                    placeholder="Assign categories"
+                    allowEmpty
+                    onChange={setTaxonomyEditCategories}
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">Select one or multiple categories. Clear every selection to reset the sub-tag to unassigned.</p>
                 </div>
               )}
               <div>
@@ -2911,13 +3082,14 @@ export default function Gallery() {
                 <GalleryColorPicker value={taxonomyEditColor} onChange={setTaxonomyEditColor} ariaLabel="Edit gallery label color" />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setTaxonomyEdit(null)} disabled={taxonomyBusy}>Cancel</Button>
+                <Button type="button" variant="outline" onClick={() => { setTaxonomyEdit(null); setShowTaxonomyModal(true) }} disabled={taxonomyBusy}>Cancel</Button>
                 <Button type="button" onClick={() => void saveTaxonomyEdit()} disabled={taxonomyBusy || !taxonomyEditName.trim()}>
                   {taxonomyBusy ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </div>
           </div>
+          </DropdownProvider>
         </div>,
         document.body,
       )}
@@ -3486,7 +3658,7 @@ export default function Gallery() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
                 >
-                  Open Original
+                  Open {getMediaLabel(viewer.item.media[viewer.index].type)}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
@@ -4017,13 +4189,13 @@ function GalleryMediaCollage({
   if (visible.length === 0) return null
 
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden bg-black">
+    <div className="relative h-[280px] w-full overflow-hidden bg-black sm:h-[320px]">
       {visible.length === 1 && (
         <GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} />
       )}
 
       {visible.length === 2 && (
-        <div className="grid h-full grid-cols-2 gap-1">
+        <div className="grid h-full min-h-0 grid-cols-2 gap-1 bg-black">
           {visible.map((item) => (
             <GalleryMediaCard key={item.id} media={item} title={title} onClick={() => onClick(item)} />
           ))}
@@ -4031,7 +4203,7 @@ function GalleryMediaCollage({
       )}
 
       {visible.length === 3 && (
-        <div className="grid h-full grid-cols-2 grid-rows-2 gap-1">
+        <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-1 bg-black">
           <div className="min-h-0 min-w-0"><GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} /></div>
           <div className="min-h-0 min-w-0"><GalleryMediaCard media={visible[1]} title={title} onClick={() => onClick(visible[1])} /></div>
           <div className="col-span-2 min-h-0 min-w-0"><GalleryMediaCard media={visible[2]} title={title} onClick={() => onClick(visible[2])} /></div>
@@ -4039,11 +4211,11 @@ function GalleryMediaCollage({
       )}
 
       {visible.length === 4 && (
-        <div className="grid h-full grid-cols-2 grid-rows-2 gap-1">
+        <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-1 bg-black">
           {visible.map((item, index) => (
             <div key={item.id} className="group relative min-h-0 min-w-0">
               <GalleryMediaCard media={item} title={title} onClick={() => onClick(item)} />
-              {index === 3 && (
+              {index === 3 && media.length >= 5 && (
                 <>
                   <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
@@ -4106,8 +4278,8 @@ function GalleryMediaCard({
     <button
       type="button"
       className={[
-        "group relative block w-full overflow-hidden bg-muted/40 text-left",
-        "aspect-auto h-full",
+        "group relative flex h-full w-full items-center justify-center overflow-hidden bg-black text-left",
+        "min-h-0",
       ].join(" ")}
       onClick={onClick}
       aria-label={`View ${title}`}
