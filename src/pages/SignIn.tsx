@@ -7,9 +7,21 @@ export default function SignIn() {
   useEffect(() => {
 
     const params = new URLSearchParams(window.location.search)
-    const message = params.get("error")
+    const code = params.get("error")
 
-    if (message) setError(message)
+    const messages: Record<string, string> = {
+      oauth_verification_failed:
+        "The Discord sign-in could not be verified. Please try again.",
+      authentication_failed:
+        "Discord sign-in could not be completed. Please try again.",
+    }
+
+    if (code) {
+      setError(
+        messages[code] ??
+          "Sign-in could not be completed. Please try again.",
+      )
+    }
   }, [])
 
   const handleSignIn = () => {
