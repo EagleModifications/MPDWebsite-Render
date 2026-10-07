@@ -25,7 +25,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react"
 import { toast } from "sonner"
 
@@ -181,19 +180,6 @@ const formatDateTime = (value: string) => {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(date)
-}
-
-const formatTime = (value: string) => {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown time"
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
   }).format(date)
 }
 
@@ -699,24 +685,6 @@ function TargetIdentity({
     />
   )
 }
-
-function DetailItem({
-  label,
-  children,
-}: {
-  label: string
-  children: ReactNode
-}) {
-  return (
-    <div className="min-w-0 rounded-lg border border-border bg-background/60 px-3 py-2.5">
-      <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        {label}
-      </p>
-      <div className="min-w-0 text-xs">{children}</div>
-    </div>
-  )
-}
-
 
 function FilterDropdown({
   value,
