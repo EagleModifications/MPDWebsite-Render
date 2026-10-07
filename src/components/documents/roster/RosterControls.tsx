@@ -5,6 +5,7 @@ import {
   Copy,
   Filter,
   X,
+  Search,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -129,10 +130,10 @@ export function FilterDropdown({
   )
 }
 
-export function SearchBox({
+export function Box({
   value,
   onChange,
-  placeholder = "Search...",
+  placeholder = "...",
 }: {
   value: string
   onChange: (value: string) => void
