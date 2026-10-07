@@ -4,12 +4,12 @@ import {
 } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 
-import RosterTable from "@/components/roster/RosterTable"
+import RosterTable from "@/components/documents/roster/RosterTable"
 import {
   fetchSheet,
   type RosterColumn,
   type RosterRecord,
-} from "@/components/roster/rosterShared"
+} from "@/components/documents/roster/rosterShared"
 
 type RosterPanelProps = {
   title: string
