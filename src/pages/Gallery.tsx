@@ -8,6 +8,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from "react"
+import { createPortal } from "react-dom"
 import {
   Check,
   ChevronDown,
@@ -28,6 +29,7 @@ import {
   Settings2,
   Gauge,
   PictureInPicture2,
+  Pipette,
   Trash2,
   Upload,
   Video,
@@ -40,6 +42,12 @@ import Footer from "@/components/Footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { getSession, type User } from "@/lib/auth"
 
 type YouTubeQuality = "highres" | "hd2160" | "hd1440" | "hd1080" | "hd720" | "large" | "medium" | "small" | "tiny" | "auto"
@@ -100,8 +108,8 @@ type GalleryMedia = {
   storageId?: string
 }
 
-type GalleryCategory = "Community" | "Fleet"
-type GalleryTag = "Dept" | "SWAT" | "MTF-7" | "MCD" | "TRU" | "SAR"
+type GalleryCategory = string
+type GalleryTag = string
 
 type GalleryItem = {
   id: string
@@ -118,37 +126,27 @@ type GalleryItem = {
 type PendingMedia = GalleryMedia & {
   previewUrl?: string
   file?: File
+  progress?: number
+  processing?: boolean
+  error?: string
 }
 
-type GalleryCategoryFilter = "All" | GalleryCategory
+const DEFAULT_GALLERY_TAGS: readonly GalleryTag[] = []
 
-const GALLERY_TAGS: readonly GalleryTag[] = [
-  "Dept",
-  "SWAT",
-  "MTF-7",
-  "MCD",
-  "TRU",
-  "SAR",
-]
-
-const GALLERY_TAG_CLASSES: Record<GalleryTag, string> = {
-  Dept: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  SWAT: "border-slate-500/40 bg-slate-800/80 text-slate-100 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-100",
-  "MTF-7": "border-sky-500/30 bg-sky-500/10 text-sky-800 dark:text-sky-300",
-  MCD: "border-blue-950/40 bg-blue-950/15 text-blue-950 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200",
-  TRU: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
-  SAR: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
+const DEFAULT_GALLERY_CATEGORY_COLORS: Record<string, string> = {
+  Community: "#3b82f6",
+  Fleet: "#ffffff",
 }
-type GalleryMediaFilter = "All" | "Images" | "Videos"
 
-const GALLERY_CATEGORY_FILTERS: GalleryCategoryFilter[] = [
-  "All",
+const DEFAULT_GALLERY_TAG_COLORS: Record<string, string> = {}
+type GalleryMediaFilter = "Images" | "Videos"
+
+const DEFAULT_GALLERY_CATEGORIES: readonly GalleryCategory[] = [
   "Community",
   "Fleet",
 ]
 
-const GALLERY_MEDIA_FILTERS: GalleryMediaFilter[] = [
-  "All",
+const DEFAULT_GALLERY_MEDIA_FILTERS: readonly GalleryMediaFilter[] = [
   "Images",
   "Videos",
 ]
@@ -263,7 +261,7 @@ function CustomSelect({
                 }}
                 className={[
                   "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
-                  selected ? "bg-blue-500/10 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  selected ? "bg-blue-500/10 text-blue-600 dark:text-blue-300" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 ].join(" ")}
               >
                 <span className="flex min-w-0 items-center gap-2">
@@ -295,12 +293,16 @@ function CustomMultiSelect({
   options,
   onChange,
   ariaLabel,
+  optionColors,
+  optionKind,
 }: {
   id: string
-  value: readonly GalleryTag[]
-  options: readonly GalleryTag[]
-  onChange: (value: GalleryTag[]) => void
+  value: readonly string[]
+  options: readonly string[]
+  onChange: (value: string[]) => void
   ariaLabel: string
+  optionColors?: Record<string, string>
+  optionKind?: "type" | "category" | "tag"
 }) {
   const dropdown = useContext(DropdownContext)
 
@@ -334,12 +336,21 @@ function CustomMultiSelect({
     }
   }, [id, open, setOpenDropdown])
 
+  const filterLabel =
+    id === "gallery-filter-type"
+      ? "Type"
+      : id === "gallery-filter-category"
+        ? "Category"
+        : id === "gallery-filter-tags"
+          ? "Tags"
+          : "Select tags"
+
   const selectedLabel =
     value.length === 0
-      ? "Select tags"
+      ? filterLabel
       : value.length === 1
         ? value[0]
-        : `${value.length} tags selected`
+        : `${value.length} selected`
 
   return (
     <div className="relative" data-custom-select={id}>
@@ -357,10 +368,6 @@ function CustomMultiSelect({
         ].join(" ")}
       >
         <span className="flex min-w-0 items-center gap-2 truncate">
-          <span
-            aria-hidden="true"
-            className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"
-          />
           <span className={value.length === 0 ? "text-muted-foreground" : ""}>
             {selectedLabel}
           </span>
@@ -394,28 +401,19 @@ function CustomMultiSelect({
                 className={[
                   "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
                   selected
-                    ? "bg-muted/70 text-foreground"
+                    ? "bg-blue-500/10 text-blue-400"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 ].join(" ")}
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <span
-                    aria-hidden="true"
-                    className={[
-                      "h-1.5 w-1.5 shrink-0 rounded-full",
-                      option === "Dept"
-                        ? "bg-blue-500"
-                        : option === "SWAT"
-                          ? "bg-slate-500"
-                          : option === "MTF-7"
-                            ? "bg-sky-700"
-                            : option === "MCD"
-                              ? "bg-blue-950 dark:bg-blue-800"
-                              : option === "TRU"
-                                ? "bg-yellow-500"
-                                : "bg-red-500",
-                    ].join(" ")}
-                  />
+                  {optionKind === "category" || optionKind === "tag" ? (
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: optionColors?.[option] ?? "#3b82f6" }}
+                    />
+                  ) : optionKind === "type" ? (
+                    option === "Images" ? <ImageIcon className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />
+                  ) : null}
                   <span>{option}</span>
                 </span>
                 {selected && <Check className="h-4 w-4 text-blue-500" />}
@@ -563,19 +561,6 @@ function isVideoMedia(media: GalleryMedia) {
   return media.type === "video"
 }
 
-function getAspectClass(ratio?: number) {
-  if (!ratio || !Number.isFinite(ratio)) {
-    return "aspect-[4/3]"
-  }
-
-  if (ratio >= 1.85) return "aspect-[16/8]"
-  if (ratio >= 1.35) return "aspect-[4/3]"
-  if (ratio >= 1.05) return "aspect-square"
-  if (ratio >= 0.8) return "aspect-[4/5]"
-
-  return "aspect-[3/4]"
-}
-
 function formatDate(value: string) {
   const date = new Date(value)
 
@@ -642,6 +627,423 @@ function getWrappedLineCount(
   }, 0)
 }
 
+
+function normalizeHexColor(value: string) {
+  const trimmed = value.trim()
+  const short = /^#?([0-9a-fA-F]{3})$/.exec(trimmed)
+  if (short) return `#${short[1].split("").map((char) => char + char).join("")}`.toLowerCase()
+  const full = /^#?([0-9a-fA-F]{6})$/.exec(trimmed)
+  return full ? `#${full[1]}`.toLowerCase() : null
+}
+
+function hexToRgb(hex: string) {
+  const normalized = normalizeHexColor(hex) ?? "#3b82f6"
+  return {
+    r: Number.parseInt(normalized.slice(1, 3), 16),
+    g: Number.parseInt(normalized.slice(3, 5), 16),
+    b: Number.parseInt(normalized.slice(5, 7), 16),
+  }
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+  const clamp = (value: number) => Math.max(0, Math.min(255, Math.round(value)))
+  return `#${[clamp(r), clamp(g), clamp(b)].map((value) => value.toString(16).padStart(2, "0")).join("")}`
+}
+
+function rgbToHsl(r: number, g: number, b: number) {
+  const red = r / 255
+  const green = g / 255
+  const blue = b / 255
+  const max = Math.max(red, green, blue)
+  const min = Math.min(red, green, blue)
+  const delta = max - min
+  let h = 0
+  let s = 0
+  const l = (max + min) / 2
+  if (delta !== 0) {
+    s = delta / (1 - Math.abs(2 * l - 1))
+    if (max === red) h = 60 * (((green - blue) / delta) % 6)
+    else if (max === green) h = 60 * ((blue - red) / delta + 2)
+    else h = 60 * ((red - green) / delta + 4)
+  }
+  if (h < 0) h += 360
+  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) }
+}
+
+function hslToRgb(h: number, s: number, l: number) {
+  const hue = ((h % 360) + 360) % 360 / 360
+  const saturation = Math.max(0, Math.min(100, s)) / 100
+  const lightness = Math.max(0, Math.min(100, l)) / 100
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation
+  const x = chroma * (1 - Math.abs((hue * 6) % 2 - 1))
+  const m = lightness - chroma / 2
+  let r = 0, g = 0, b = 0
+  if (hue < 1 / 6) [r, g, b] = [chroma, x, 0]
+  else if (hue < 2 / 6) [r, g, b] = [x, chroma, 0]
+  else if (hue < 3 / 6) [r, g, b] = [0, chroma, x]
+  else if (hue < 4 / 6) [r, g, b] = [0, x, chroma]
+  else if (hue < 5 / 6) [r, g, b] = [x, 0, chroma]
+  else [r, g, b] = [chroma, 0, x]
+  return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255) }
+}
+
+function parseRgb(value: string) {
+  const match = value.match(/rgba?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*[, ]\s*([\d.]+)/i)
+  return match ? rgbToHex(Number(match[1]), Number(match[2]), Number(match[3])) : null
+}
+
+function parseHsl(value: string) {
+  const match = value.match(/hsla?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)%\s*[, ]\s*([\d.]+)%/i)
+  if (!match) return null
+  const rgb = hslToRgb(Number(match[1]), Number(match[2]), Number(match[3]))
+  return rgbToHex(rgb.r, rgb.g, rgb.b)
+}
+
+function GalleryMultiSelect({
+  id,
+  value,
+  options,
+  optionColors,
+  placeholder,
+  allowEmpty = false,
+  onChange,
+}: {
+  id: string
+  value: string[]
+  options: readonly string[]
+  optionColors?: Record<string, string>
+  placeholder: string
+  allowEmpty?: boolean
+  onChange: (value: string[]) => void
+}) {
+  const dropdown = useContext(DropdownContext)
+
+  if (!dropdown) {
+    throw new Error("GalleryMultiSelect must be used inside DropdownProvider.")
+  }
+
+  const { openDropdown, setOpenDropdown } = dropdown
+  const open = openDropdown === id
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest(`[data-gallery-multi-select="${id}"]`)) {
+        setOpenDropdown(null)
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenDropdown(null)
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [id, open, setOpenDropdown])
+
+  const selectedLabel = value.length === 0
+    ? placeholder
+    : value.length === 1
+      ? value[0]
+      : `${value.length} selected`
+
+  const longestTextLength = Math.max(
+    placeholder.length,
+    selectedLabel.length,
+    ...options.map((option) => option.length),
+  )
+  const dropdownWidth = Math.min(30, Math.max(14, longestTextLength + 5))
+
+  function toggle(option: string) {
+    if (value.includes(option)) {
+      onChange(value.filter((entry) => entry !== option))
+    } else {
+      onChange([...value, option])
+    }
+  }
+
+  return (
+    <div
+      className="relative min-w-0"
+      data-gallery-multi-select={id}
+      style={{ width: `${dropdownWidth}ch` }}
+    >
+      <button
+        type="button"
+        aria-label={placeholder}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpenDropdown(open ? null : id)}
+        className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-all hover:border-blue-500/30 hover:bg-muted/40"
+      >
+        <span className="min-w-0 truncate text-left">{selectedLabel}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-[calc(100%+6px)] z-[10070] w-full min-w-0 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl ring-1 ring-black/10"
+        >
+          <div className="max-h-64 overflow-y-auto p-1.5" role="listbox" aria-multiselectable="true">
+            {options.length === 0 ? (
+              <div className="px-3 py-3 text-xs text-muted-foreground">No categories available.</div>
+            ) : (
+              options.map((option) => {
+                const selected = value.includes(option)
+                const color = optionColors?.[option] ?? "#3b82f6"
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => toggle(option)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/60"
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-border bg-background">
+                      {selected && <Check className="h-3.5 w-3.5 text-blue-500" />}
+                    </span>
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                    <span className="min-w-0 flex-1 truncate">{option}</span>
+                  </button>
+                )
+              })
+            )}
+          </div>
+          <div className="flex items-center justify-between border-t border-border/70 px-2.5 py-2">
+            <span className="text-[11px] text-muted-foreground">
+              {value.length === 0 ? "No categories selected" : `${value.length} selected`}
+            </span>
+            {allowEmpty && value.length > 0 && (
+              <button
+                type="button"
+                className="text-[11px] font-medium text-blue-500 hover:text-blue-400"
+                onClick={() => onChange([])}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GalleryColorPicker({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: string
+  onChange: (value: string) => void
+  ariaLabel: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [format, setFormat] = useState<"HEX" | "RGB" | "HSL">("HEX")
+  const [draft, setDraft] = useState(value)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const normalized = normalizeHexColor(value) ?? "#3b82f6"
+  const rgb = hexToRgb(normalized)
+  const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b)
+
+  useEffect(() => setDraft(value), [value])
+  useEffect(() => {
+    if (!open) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false)
+    }
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [open])
+
+  function commit(next: string) {
+    const hex = normalizeHexColor(next) ?? parseRgb(next) ?? parseHsl(next)
+    if (!hex) return
+    setDraft(hex)
+    onChange(hex)
+  }
+
+  async function pickFromScreen() {
+    const EyeDropperCtor = (window as unknown as { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper
+    if (!EyeDropperCtor) {
+      toast.error("Eyedropper is not supported by this browser.")
+      return
+    }
+    try {
+      const result = await new EyeDropperCtor().open()
+      commit(result.sRGBHex)
+    } catch {
+      // The user cancelled the eyedropper.
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        title={ariaLabel}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-2.5 shadow-sm transition-colors hover:border-blue-500/50 hover:bg-muted/40"
+      >
+        <span className="h-5 w-5 rounded-md border border-white/20 shadow-inner" style={{ backgroundColor: normalized }} />
+        <span className="font-mono text-[11px] uppercase text-muted-foreground">{normalized}</span>
+        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+8px)] z-[320] w-[290px] rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl ring-1 ring-black/10">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold">Color</p>
+              <p className="text-[11px] text-muted-foreground">Choose a color for this gallery label.</p>
+            </div>
+            <button type="button" onClick={() => void pickFromScreen()} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:border-blue-500/50 hover:bg-muted/40" title="Pick a color from your screen">
+              <Pipette className="h-3.5 w-3.5 text-blue-500" />
+              Eyedropper
+            </button>
+          </div>
+
+          <div className="mb-3 grid grid-cols-3 gap-1 rounded-lg border border-border bg-background/70 p-1">
+            {(["HEX", "RGB", "HSL"] as const).map((item) => (
+              <button key={item} type="button" onClick={() => { setFormat(item); if (item === "HEX") setDraft(normalized); if (item === "RGB") setDraft(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`); if (item === "HSL") setDraft(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`) }} className={`rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors ${format === item ? "bg-blue-500/15 text-blue-400" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                {item}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="h-10 w-10 shrink-0 rounded-lg border border-white/15 shadow-inner" style={{ backgroundColor: normalized }} />
+            <Input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { commit(draft); setOpen(false) } }} onBlur={() => commit(draft)} placeholder={format === "HEX" ? "#3b82f6" : format === "RGB" ? "rgb(59, 130, 246)" : "hsl(217, 91%, 60%)"} className="font-mono text-xs" />
+            <input type="color" value={normalized} aria-label={`${ariaLabel} native color picker`} onChange={(event) => commit(event.target.value)} className="h-10 w-10 shrink-0 cursor-pointer rounded-lg border border-border bg-background p-1" />
+          </div>
+
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-border/70 bg-background/50 px-3 py-2">
+            <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="h-4 w-4 rounded border border-white/20 shadow-inner" style={{ backgroundColor: normalized }} />
+              Current
+            </span>
+            <span className="font-mono text-[11px] text-foreground">{normalized}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GalleryFilterDropdown({
+  label,
+  options,
+  value,
+  onChange,
+  ariaLabel,
+  optionColors,
+  optionKind,
+}: {
+  label: string
+  options: readonly string[]
+  value: string[]
+  onChange: (value: string[]) => void
+  ariaLabel: string
+  optionColors?: Record<string, string>
+  optionKind?: "type" | "category" | "tag"
+}) {
+  const allSelected = options.length > 0 && value.length === options.length
+
+  const toggle = (option: string) => {
+    onChange(value.includes(option) ? value.filter((item) => item !== option) : [...value, option])
+  }
+
+  // Keep the trigger and dropdown the same width, based on the longest
+  // piece of text that can actually appear inside the dropdown.
+  const longestTextLength = Math.max(
+    label.length,
+    `All ${label === "Type" ? "Types" : `${label}s`}`.length,
+    ...options.map((option) => option.length),
+  )
+  const dropdownWidth = Math.min(28, Math.max(9, longestTextLength + 4))
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={ariaLabel}
+          style={{ width: `${dropdownWidth}ch` }}
+          className="h-10 shrink-0 justify-between gap-2 px-3 text-sm font-medium"
+        >
+          <span className="truncate">{label}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        align="end"
+        style={{ width: `${dropdownWidth}ch` }}
+        className="z-[120] min-w-0 rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl"
+      >
+        <DropdownMenuItem
+          onSelect={(event) => event.preventDefault()}
+          onClick={() => onChange(allSelected ? [] : [...options])}
+          className="gap-2 rounded-lg px-3 py-2.5"
+        >
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+            {allSelected && <Check className="h-4 w-4 text-blue-500" />}
+          </span>
+          <span className="font-medium">All {label === "Type" ? "Types" : `${label}s`}</span>
+        </DropdownMenuItem>
+        {options.map((option) => {
+          const checked = value.includes(option)
+          return (
+            <DropdownMenuItem
+              key={option}
+              onSelect={(event) => event.preventDefault()}
+              onClick={() => toggle(option)}
+              className={[
+                "gap-2 rounded-lg px-3 py-2.5",
+                checked ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/10 focus:text-blue-400" : "",
+              ].join(" ")}
+            >
+              {optionKind === "type" ? (
+                option === "Images"
+                  ? <ImageIcon className="h-4 w-4 shrink-0 text-blue-500" />
+                  : <Video className="h-4 w-4 shrink-0 text-blue-500" />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: optionColors?.[option] ?? "#3b82f6" }}
+                />
+              )}
+              <span className="min-w-0 flex-1 truncate">{option}</span>
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                {checked && <Check className="h-4 w-4 text-blue-500" />}
+              </span>
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function makePendingFromMedia(
   media: GalleryMedia,
 ): PendingMedia {
@@ -664,11 +1066,50 @@ export default function Gallery() {
   const [canManageGallery, setCanManageGallery] =
     useState(false)
 
-  const [categoryFilter, setCategoryFilter] =
-    useState<GalleryCategoryFilter>("All")
+  const [categoryFilters, setCategoryFilters] =
+    useState<string[]>([])
 
-  const [mediaFilter, setMediaFilter] =
-    useState<GalleryMediaFilter>("All")
+  const [mediaFilters, setMediaFilters] =
+    useState<string[]>([])
+
+  const [tagFilters, setTagFilters] =
+    useState<string[]>([])
+
+  const [galleryCategories, setGalleryCategories] =
+    useState<string[]>([...DEFAULT_GALLERY_CATEGORIES])
+
+  const [galleryTags, setGalleryTags] =
+    useState<string[]>([...DEFAULT_GALLERY_TAGS])
+
+  const [galleryTagCategories, setGalleryTagCategories] =
+    useState<Record<string, string[]>>({
+      Community: [...DEFAULT_GALLERY_TAGS],
+      Fleet: [...DEFAULT_GALLERY_TAGS],
+    })
+
+  const [galleryCategoryColors, setGalleryCategoryColors] =
+    useState<Record<string, string>>(DEFAULT_GALLERY_CATEGORY_COLORS)
+
+  const [galleryTagColors, setGalleryTagColors] =
+    useState<Record<string, string>>(DEFAULT_GALLERY_TAG_COLORS)
+
+  const [showTaxonomyModal, setShowTaxonomyModal] =
+    useState(false)
+
+  const [newGalleryCategory, setNewGalleryCategory] =
+    useState("")
+
+  const [newGalleryTag, setNewGalleryTag] =
+    useState("")
+
+  const [newGalleryTagCategories, setNewGalleryTagCategories] =
+    useState<string[]>(["Community"])
+
+  const [newGalleryCategoryColor, setNewGalleryCategoryColor] =
+    useState("#3b82f6")
+
+  const [newGalleryTagColor, setNewGalleryTagColor] =
+    useState("#3b82f6")
 
   const [showModal, setShowModal] =
     useState(false)
@@ -727,12 +1168,20 @@ export default function Gallery() {
   const [deleteTarget, setDeleteTarget] =
     useState<GalleryItem | null>(null)
 
+  const [taxonomyEdit, setTaxonomyEdit] =
+    useState<{ type: "category" | "tag"; value: string } | null>(null)
+  const [taxonomyEditName, setTaxonomyEditName] = useState("")
+  const [taxonomyEditColor, setTaxonomyEditColor] = useState("#3b82f6")
+  const [taxonomyEditCategories, setTaxonomyEditCategories] = useState<string[]>([])
+  const [taxonomyBusy, setTaxonomyBusy] = useState(false)
+
   const fileInputRef =
     useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     const overlayOpen =
       showModal ||
+      showTaxonomyModal ||
       Boolean(viewer) ||
       Boolean(infoItem) ||
       Boolean(deleteTarget)
@@ -760,7 +1209,24 @@ export default function Gallery() {
       html.style.overflow = previousHtmlOverflow
       body.style.paddingRight = previousBodyPaddingRight
     }
-  }, [showModal, viewer, infoItem, deleteTarget])
+  }, [showModal, showTaxonomyModal, viewer, infoItem, deleteTarget, taxonomyEdit])
+
+  useEffect(() => {
+    if (!showTaxonomyModal && !taxonomyEdit) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      if (taxonomyEdit) {
+        setTaxonomyEdit(null)
+        setShowTaxonomyModal(true)
+        return
+      }
+      setShowTaxonomyModal(false)
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [showTaxonomyModal, taxonomyEdit])
 
   const dragDepthRef =
     useRef(0)
@@ -774,6 +1240,7 @@ export default function Gallery() {
           session,
           galleryResponse,
           permissionResponse,
+          optionsResponse,
         ] = await Promise.all([
           getSession(),
           fetch("/api/gallery", {
@@ -785,6 +1252,9 @@ export default function Gallery() {
               credentials: "include",
             },
           ),
+          fetch("/api/gallery/options", {
+            credentials: "include",
+          }),
         ])
 
         if (!active) {
@@ -811,6 +1281,25 @@ export default function Gallery() {
         setCanManageGallery(
           permissionResponse.ok,
         )
+
+        if (optionsResponse.ok) {
+          const optionsData = await optionsResponse.json()
+          if (Array.isArray(optionsData.categories)) {
+            setGalleryCategories(optionsData.categories.map(String).filter(Boolean))
+          }
+          if (Array.isArray(optionsData.tags)) {
+            setGalleryTags(optionsData.tags.map(String).filter(Boolean))
+          }
+          if (optionsData.tagCategories && typeof optionsData.tagCategories === "object") {
+            setGalleryTagCategories(optionsData.tagCategories)
+          }
+          if (optionsData.categoryColors && typeof optionsData.categoryColors === "object") {
+            setGalleryCategoryColors(optionsData.categoryColors)
+          }
+          if (optionsData.tagColors && typeof optionsData.tagColors === "object") {
+            setGalleryTagColors(optionsData.tagColors)
+          }
+        }
       } catch (error) {
         console.error(error)
 
@@ -835,67 +1324,210 @@ export default function Gallery() {
     }
   }, [])
 
+  const availableFilterTags = useMemo(() => {
+    if (categoryFilters.length === 0) return galleryTags
+    return Array.from(new Set(categoryFilters.flatMap((name) => galleryTagCategories[name] ?? [])))
+  }, [categoryFilters, galleryTagCategories, galleryTags])
+
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       const matchesCategory =
-        categoryFilter === "All" ||
-        (item.category ?? "Community") === categoryFilter
+        categoryFilters.length === 0 ||
+        categoryFilters.includes(item.category ?? "Community")
 
       const matchesMedia =
-        mediaFilter === "All" ||
+        mediaFilters.length === 0 ||
         item.media.some((media) =>
-          mediaFilter === "Images"
-            ? isImageMedia(media)
-            : isVideoMedia(media),
+          mediaFilters.some((filter) =>
+            filter === "Images"
+              ? isImageMedia(media)
+              : isVideoMedia(media),
+          ),
         )
 
-      return matchesCategory && matchesMedia
+      const matchesTags =
+        tagFilters.length === 0 ||
+        tagFilters.some((tag) =>
+          (item.tags ?? []).includes(tag),
+        )
+
+      return matchesCategory && matchesMedia && matchesTags
     })
-  }, [categoryFilter, items, mediaFilter])
+  }, [categoryFilters, items, mediaFilters, tagFilters])
 
   const visibleMediaCount = useMemo(() => {
-    return filteredItems.reduce(
-      (count, item) => {
-        if (mediaFilter === "Images") {
-          return (
-            count +
-            item.media.filter(
-              isImageMedia,
-            ).length
-          )
-        }
-
-        if (mediaFilter === "Videos") {
-          return (
-            count +
-            item.media.filter(
-              isVideoMedia,
-            ).length
-          )
-        }
-
+    return filteredItems.reduce((count, item) => {
+      if (mediaFilters.length === 0) {
         return count + item.media.length
-      },
-      0,
+      }
+
+      return (
+        count +
+        item.media.filter((media) =>
+          mediaFilters.some((filter) =>
+            filter === "Images"
+              ? isImageMedia(media)
+              : isVideoMedia(media),
+          ),
+        ).length
+      )
+    }, 0)
+  }, [filteredItems, mediaFilters])
+
+  function getVisibleMedia(item: GalleryItem) {
+    if (mediaFilters.length === 0) {
+      return item.media
+    }
+
+    return item.media.filter((media) =>
+      mediaFilters.some((filter) =>
+        filter === "Images"
+          ? isImageMedia(media)
+          : isVideoMedia(media),
+      ),
     )
-  }, [filteredItems, mediaFilter])
+  }
 
-  function getVisibleMedia(
-    item: GalleryItem,
-  ) {
-    if (mediaFilter === "Images") {
-      return item.media.filter(
-        isImageMedia,
-      )
+  async function addGalleryOption(type: "category" | "tag", color?: string) {
+    const rawValue = type === "category" ? newGalleryCategory : newGalleryTag
+    const value = rawValue.trim()
+
+    if (!value) {
+      toast.error(`Enter a ${type} name.`)
+      return
     }
 
-    if (mediaFilter === "Videos") {
-      return item.media.filter(
-        isVideoMedia,
+    try {
+      const response = await fetch("/api/gallery/options", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          value,
+          color: color || undefined,
+          categories: type === "tag" ? newGalleryTagCategories : undefined,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || `Failed to create ${type}.`)
+
+      if (type === "category") {
+        setGalleryCategories(Array.isArray(data.categories) ? data.categories : (current => [...current, value]))
+        setNewGalleryCategory("")
+        setNewGalleryCategoryColor("#3b82f6")
+      } else {
+        setGalleryTags(Array.isArray(data.tags) ? data.tags : (current => [...current, value]))
+        setNewGalleryTag("")
+        setNewGalleryTagColor("#3b82f6")
+      }
+      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
+      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
+
+      toast.success(`${type === "category" ? "Category" : "Tag"} created.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `Failed to create ${type}.`)
+    }
+  }
+
+  function beginTaxonomyEdit(type: "category" | "tag", value: string) {
+    // Close the management modal before opening the edit modal so the edit
+    // dialog can never render behind its parent/backdrop.
+    setShowTaxonomyModal(false)
+    setTaxonomyEdit({ type, value })
+    setTaxonomyEditName(value)
+    setTaxonomyEditColor(
+      type === "category"
+        ? galleryCategoryColors[value] ?? "#3b82f6"
+        : galleryTagColors[value] ?? "#3b82f6",
+    )
+    if (type === "tag") {
+      const assigned = galleryCategories.filter((categoryName) =>
+        (galleryTagCategories[categoryName] ?? []).includes(value),
       )
+      setTaxonomyEditCategories(assigned)
+    } else {
+      setTaxonomyEditCategories([])
+    }
+  }
+
+  async function saveTaxonomyEdit() {
+    if (!taxonomyEdit) return
+    const newValue = taxonomyEditName.trim()
+    if (!newValue) {
+      toast.error("Enter a name.")
+      return
     }
 
-    return item.media
+    setTaxonomyBusy(true)
+    try {
+      const response = await fetch("/api/gallery/options", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: taxonomyEdit.type,
+          value: taxonomyEdit.value,
+          newValue,
+          color: taxonomyEditColor,
+          categories: taxonomyEdit.type === "tag" ? taxonomyEditCategories : undefined,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || "Failed to update gallery option.")
+
+      if (Array.isArray(data.categories)) setGalleryCategories(data.categories)
+      if (Array.isArray(data.tags)) setGalleryTags(data.tags)
+      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
+      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
+
+      if (taxonomyEdit.type === "category" && categoryFilters.includes(taxonomyEdit.value)) {
+        setCategoryFilters((current) => current.map((item) => item === taxonomyEdit.value ? newValue : item))
+      }
+      if (taxonomyEdit.type === "tag" && tagFilters.includes(taxonomyEdit.value)) {
+        setTagFilters((current) => current.map((item) => item === taxonomyEdit.value ? newValue : item))
+      }
+
+      const editedType = taxonomyEdit.type
+      setTaxonomyEdit(null)
+      setShowTaxonomyModal(true)
+      toast.success(`${editedType === "category" ? "Category" : "Tag"} updated.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update gallery option.")
+    } finally {
+      setTaxonomyBusy(false)
+    }
+  }
+
+  async function deleteTaxonomyOption(type: "category" | "tag", value: string) {
+    if (!window.confirm(`Delete ${type === "category" ? "category" : "tag"} \"${value}\"?`)) return
+
+    setTaxonomyBusy(true)
+    try {
+      const response = await fetch("/api/gallery/options", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, value }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || "Failed to delete gallery option.")
+
+      if (Array.isArray(data.categories)) setGalleryCategories(data.categories)
+      if (Array.isArray(data.tags)) setGalleryTags(data.tags)
+      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
+      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
+      setCategoryFilters((current) => current.filter((item) => item !== value))
+      setTagFilters((current) => current.filter((item) => item !== value))
+      toast.success(`${type === "category" ? "Category" : "Tag"} deleted.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete gallery option.")
+    } finally {
+      setTaxonomyBusy(false)
+    }
   }
 
   function resetForm() {
@@ -914,7 +1546,7 @@ export default function Gallery() {
 
     setTitle("")
     setDescription("")
-    setCategory("Community")
+    setCategory(galleryCategories[0] ?? "Community")
     setTags([])
     setPendingMedia([])
     setUrlInput("")
@@ -1140,104 +1772,68 @@ export default function Gallery() {
   }
 
   async function uploadPendingFiles() {
-    const files = pendingMedia
-      .filter(
-        (media) =>
-          media.source === "upload" &&
-          media.file,
-      )
-      .map((media) => media.file as File)
+    const uploadItems = pendingMedia.filter((media) => media.source === "upload" && media.file)
+    if (!uploadItems.length) return []
 
-    if (!files.length) {
-      return []
-    }
-
-    const formData = new FormData()
-
-    for (const file of files) {
-      formData.append("files", file, file.name)
-    }
+    const uploaded: GalleryMedia[] = []
 
     setSavingStage("upload")
-    setUploadProgress(0)
 
-    const result = await new Promise<{
-      status: number
-      raw: string
-    }>((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
+    for (let index = 0; index < uploadItems.length; index += 1) {
+      const item = uploadItems[index]
+      const file = item.file as File
 
-      xhr.open("POST", "/api/gallery/upload")
-      xhr.withCredentials = true
-      xhr.timeout = 15 * 60 * 1000
+      setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: true, progress: 0, error: undefined } : media))
 
-      xhr.upload.onprogress = (event) => {
-        if (!event.lengthComputable) return
-        setUploadProgress(
-          Math.min(100, Math.round((event.loaded / event.total) * 100)),
-        )
+      const formData = new FormData()
+      formData.append("files", file, file.name)
+      formData.append("title", title.trim() || "gallery")
+
+      const result = await new Promise<{ status: number; raw: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open("POST", "/api/gallery/upload")
+        xhr.withCredentials = true
+        xhr.timeout = 15 * 60 * 1000
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) return
+          const progress = Math.min(100, Math.round((event.loaded / event.total) * 100))
+          setUploadProgress(progress)
+          setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, progress } : media))
+        }
+        xhr.onload = () => resolve({ status: xhr.status, raw: xhr.responseText || "" })
+        xhr.onerror = () => reject(new Error("Gallery upload failed. Check the server logs and try again."))
+        xhr.ontimeout = () => reject(new Error("Gallery upload timed out after 15 minutes."))
+        xhr.onabort = () => reject(new Error("Gallery upload was cancelled."))
+        xhr.send(formData)
+      })
+
+      let data: { success?: boolean; items?: GalleryMedia[]; error?: string } = {}
+      try { data = result.raw ? JSON.parse(result.raw) : {} } catch { data = {} }
+
+      if (result.status < 200 || result.status >= 300) {
+        const message = result.status === 404
+          ? "Gallery upload API is not deployed. Make sure the updated app.ts is deployed and the server has been restarted."
+          : result.status === 401
+            ? "Your session has expired. Sign in again."
+            : result.status === 403
+              ? "You do not have permission to upload gallery media."
+              : data.error || `Gallery upload failed (${result.status}).`
+        setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: false, error: message } : media))
+        throw new Error(message)
       }
 
-      xhr.onload = () => {
-        setUploadProgress(100)
-        resolve({
-          status: xhr.status,
-          raw: xhr.responseText || "",
-        })
+      if (!Array.isArray(data.items) || !data.items[0]) {
+        const message = "Gallery upload returned an invalid response."
+        setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: false, error: message } : media))
+        throw new Error(message)
       }
 
-      xhr.onerror = () => {
-        reject(new Error("Gallery upload failed. Check the server logs and try again."))
-      }
-
-      xhr.ontimeout = () => {
-        reject(new Error("Gallery upload timed out after 15 minutes."))
-      }
-
-      xhr.onabort = () => {
-        reject(new Error("Gallery upload was cancelled."))
-      }
-
-      xhr.send(formData)
-    })
-
-    let data: {
-      success?: boolean
-      items?: GalleryMedia[]
-      error?: string
-    } = {}
-
-    try {
-      data = result.raw ? JSON.parse(result.raw) : {}
-    } catch {
-      data = {}
+      uploaded.push(data.items[0])
+      setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: false, progress: 100 } : media))
+      setUploadProgress(index === uploadItems.length - 1 ? 100 : 0)
     }
 
-    if (result.status < 200 || result.status >= 300) {
-      if (result.status === 404) {
-        throw new Error(
-          "Gallery upload API is not deployed. Make sure the updated app.ts is deployed and the server has been restarted.",
-        )
-      }
-
-      if (result.status === 401) {
-        throw new Error("Your session has expired. Sign in again.")
-      }
-
-      if (result.status === 403) {
-        throw new Error("You do not have permission to upload gallery media.")
-      }
-
-      throw new Error(
-        data.error || `Gallery upload failed (${result.status}).`,
-      )
-    }
-
-    if (!Array.isArray(data.items)) {
-      throw new Error("Gallery upload returned an invalid response.")
-    }
-
-    return data.items
+    return uploaded
   }
 
   // Description is intentionally optional; only title and media are required.
@@ -1290,45 +1886,42 @@ export default function Gallery() {
           continue
         }
 
-        // YouTube/Vimeo URLs are imported server-side into GridFS before
-        // the gallery document is saved. After this point they are treated
-        // exactly like a normal uploaded video file.
-        if (
-          item.source === "url" &&
-          item.type === "video" &&
-          (Boolean(getYouTubeVideoId(item.url)) ||
-            Boolean(getVimeoVideoId(item.url)))
-        ) {
+        if (item.source === "url") {
           setSavingStage("import")
-          setUploadProgress(0)
+          setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, processing: true, progress: 0, error: undefined } : mediaItem))
 
-          const importResponse = await fetch(
-            "/api/gallery/import-url",
-            {
+          let simulatedProgress = 4
+          const progressTimer = window.setInterval(() => {
+            simulatedProgress = Math.min(92, simulatedProgress + Math.floor(Math.random() * 9) + 4)
+            setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, progress: simulatedProgress } : mediaItem))
+          }, 450)
+
+          try {
+            const importResponse = await fetch("/api/gallery/import-url", {
               method: "POST",
               credentials: "include",
-              headers: {
-                "Content-Type": "application/json",
-              },
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 url: item.url,
+                type: item.type,
+                title: cleanTitle,
+                index: media.length,
               }),
-            },
-          )
-
-          const importData = await importResponse
-            .json()
-            .catch(() => ({}))
-
-          if (!importResponse.ok || !importData.item) {
-            throw new Error(
-              importData.error ||
-                "Failed to import the video URL.",
-            )
+            })
+            const importData = await importResponse.json().catch(() => ({}))
+            if (!importResponse.ok || !importData.item) {
+              throw new Error(importData.error || "Failed to import the media URL.")
+            }
+            media.push(importData.item as GalleryMedia)
+            setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, processing: false, progress: 100 } : mediaItem))
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to import the media URL."
+            setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, processing: false, error: message } : mediaItem))
+            throw error
+          } finally {
+            window.clearInterval(progressTimer)
           }
 
-          media.push(importData.item as GalleryMedia)
-          setUploadProgress(100)
           continue
         }
 
@@ -1631,14 +2224,16 @@ export default function Gallery() {
             </div>
 
             {canManageGallery && (
-              <Button
-                type="button"
-                className="shrink-0"
-                onClick={openAdd}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Media
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="default" className="shrink-0 bg-white text-black hover:bg-white/90" onClick={() => setShowTaxonomyModal(true)}>
+                  <Settings2 className="mr-2 h-4 w-4" />
+                  Add Tags & Categories
+                </Button>
+                <Button type="button" className="shrink-0" onClick={openAdd}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Media
+                </Button>
+              </div>
             )}
           </div>
 
@@ -1657,56 +2252,50 @@ export default function Gallery() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Type:
-                  </span>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {GALLERY_MEDIA_FILTERS.map((item) => (
-                      <button
-                        key={`media-${item}`}
-                        type="button"
-                        onClick={() => setMediaFilter(item)}
-                        className={[
-                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          mediaFilter === item
-                            ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                            : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                        ].join(" ")}
-                      >
-                        {item}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <GalleryFilterDropdown
+                  label="Type"
+                  options={DEFAULT_GALLERY_MEDIA_FILTERS}
+                  value={mediaFilters}
+                  ariaLabel="Filter by media type"
+                  onChange={setMediaFilters}
+                  optionKind="type"
+                />
 
-                <span className="hidden text-xs text-muted-foreground/50 sm:block">
-                  •
-                </span>
+                <GalleryFilterDropdown
+                  label="Category"
+                  options={galleryCategories}
+                  value={categoryFilters}
+                  ariaLabel="Filter by category"
+                  onChange={setCategoryFilters}
+                  optionKind="category"
+                  optionColors={galleryCategoryColors}
+                />
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Category:
-                  </span>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {GALLERY_CATEGORY_FILTERS.map((item) => (
-                      <button
-                        key={`category-${item}`}
-                        type="button"
-                        onClick={() => setCategoryFilter(item)}
-                        className={[
-                          "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          categoryFilter === item
-                            ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                            : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                        ].join(" ")}
-                      >
-                        {item}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <GalleryFilterDropdown
+                  label="Tags"
+                  options={availableFilterTags}
+                  value={tagFilters}
+                  ariaLabel="Filter by tags"
+                  onChange={setTagFilters}
+                  optionKind="tag"
+                  optionColors={galleryTagColors}
+                />
+
+                {(categoryFilters.length > 0 || mediaFilters.length > 0 || tagFilters.length > 0) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-10 px-3 text-xs text-muted-foreground hover:text-blue-400"
+                    onClick={() => {
+                      setCategoryFilters([])
+                      setMediaFilters([])
+                      setTagFilters([])
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -1792,12 +2381,12 @@ export default function Gallery() {
                               >
                                 <div className="mb-1.5 flex flex-col items-start gap-1.5">
                                   <span
-                                    className={[
-                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                                      item.category === "Fleet"
-                                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                                        : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-                                    ].join(" ")}
+                                    className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                    style={{
+                                      borderColor: `${galleryCategoryColors[item.category ?? "Community"] ?? "#3b82f6"}55`,
+                                      backgroundColor: `${galleryCategoryColors[item.category ?? "Community"] ?? "#3b82f6"}1a`,
+                                      color: galleryCategoryColors[item.category ?? "Community"] ?? "#3b82f6",
+                                    }}
                                   >
                                     {item.category ?? "Community"}
                                   </span>
@@ -1807,10 +2396,12 @@ export default function Gallery() {
                                       {(item.tags ?? []).map((tag) => (
                                         <span
                                           key={`${item.id}-tag-${tag}`}
-                                          className={[
-                                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide",
-                                            GALLERY_TAG_CLASSES[tag],
-                                          ].join(" ")}
+                                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide"
+                                          style={{
+                                            borderColor: `${galleryTagColors[tag] ?? "#3b82f6"}55`,
+                                            backgroundColor: `${galleryTagColors[tag] ?? "#3b82f6"}1a`,
+                                            color: galleryTagColors[tag] ?? "#3b82f6",
+                                          }}
                                         >
                                           {tag}
                                         </span>
@@ -1913,26 +2504,15 @@ export default function Gallery() {
                 </span>
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
-                    <span>
-                      Images
+                  {galleryCategories.map((entry) => (
+                    <span key={`legend-${entry}`} className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: galleryCategoryColors[entry] ?? "#3b82f6" }}
+                      />
+                      <span>{entry}</span>
                     </span>
-                  </span>
-
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                    <span>
-                      Videos
-                    </span>
-                  </span>
-
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                    <span>
-                      Fleet
-                    </span>
-                  </span>
+                  ))}
                 </div>
               </div>
 
@@ -1964,13 +2544,16 @@ export default function Gallery() {
                   </p>
                 </div>
 
-                <Button
-                  type="button"
-                  onClick={openAdd}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Media
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" onClick={() => setShowTaxonomyModal(true)}>
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    Add Tags & Categories
+                  </Button>
+                  <Button type="button" onClick={openAdd}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Media
+                  </Button>
+                </div>
               </div>
 
               <div className="grid gap-3 p-4 sm:grid-cols-3">
@@ -2320,6 +2903,211 @@ export default function Gallery() {
         </div>
       )}
 
+      {showTaxonomyModal && canManageGallery && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.currentTarget === event.target) setShowTaxonomyModal(false)
+            }}
+          >
+            <DropdownProvider>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="gallery-taxonomy-title"
+              className="relative z-[9999] flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-2xl"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+            <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
+              <div>
+                <div className="mb-1 flex items-center gap-2 text-xs font-bold text-blue-500">
+                  <Settings2 className="h-3.5 w-3.5" />
+                  GALLERY SETTINGS
+                </div>
+                <h2 id="gallery-taxonomy-title" className="text-lg font-semibold">Add Tags & Categories</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Create categories and sub-tags and choose the color shown throughout the gallery.</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowTaxonomyModal(false)} aria-label="Close">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto p-5">
+              <div className="space-y-5">
+                <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">Categories</h3>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Main gallery categories such as Community and Fleet.</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Input value={newGalleryCategory} onChange={(event) => setNewGalleryCategory(event.target.value)} placeholder="Create category" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("category", newGalleryCategoryColor) }} />
+                    <GalleryColorPicker value={newGalleryCategoryColor} onChange={setNewGalleryCategoryColor} ariaLabel="New category color" />
+                    <Button type="button" onClick={() => void addGalleryOption("category", newGalleryCategoryColor)}><Plus className="mr-2 h-4 w-4" />Create</Button>
+                  </div>
+                  <div className="mt-3 divide-y divide-border/60 rounded-lg border border-border/60">
+                    {galleryCategories.map((entry) => (
+                      <div key={entry} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                        <span
+                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                          style={{
+                            borderColor: `${galleryCategoryColors[entry] ?? "#3b82f6"}55`,
+                            backgroundColor: `${galleryCategoryColors[entry] ?? "#3b82f6"}1a`,
+                            color: galleryCategoryColors[entry] ?? "#3b82f6",
+                          }}
+                        >
+                          {entry}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => beginTaxonomyEdit("category", entry)} disabled={taxonomyBusy}>
+                            <Edit3 className="mr-1.5 h-3.5 w-3.5" />Edit
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("category", entry)} disabled={taxonomyBusy}>
+                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Sub Tags</h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Create tags inside a main category. Each tag keeps its own color.</p>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_220px_auto_auto]">
+                    <Input value={newGalleryTag} onChange={(event) => setNewGalleryTag(event.target.value)} placeholder="Create sub tag" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("tag", newGalleryTagColor) }} />
+                    <GalleryMultiSelect
+                      id="gallery-new-tag-categories"
+                      value={newGalleryTagCategories}
+                      options={galleryCategories}
+                      optionColors={galleryCategoryColors}
+                      placeholder="Assign categories"
+                      onChange={setNewGalleryTagCategories}
+                    />
+                    <GalleryColorPicker value={newGalleryTagColor} onChange={setNewGalleryTagColor} ariaLabel="New sub tag color" />
+                    <Button type="button" onClick={() => void addGalleryOption("tag", newGalleryTagColor)} disabled={newGalleryTagCategories.length === 0}><Plus className="mr-2 h-4 w-4" />Create</Button>
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {galleryCategories.map((categoryName) => {
+                      const categoryTags = Array.isArray(galleryTagCategories[categoryName])
+                        ? galleryTagCategories[categoryName].filter((tag) => galleryTags.includes(tag))
+                        : []
+                      return (
+                        <div key={categoryName} className="rounded-lg border border-border/60 bg-background/30 p-3">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: `${galleryCategoryColors[categoryName] ?? "#3b82f6"}55`, backgroundColor: `${galleryCategoryColors[categoryName] ?? "#3b82f6"}1a`, color: galleryCategoryColors[categoryName] ?? "#3b82f6" }}>{categoryName}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {categoryTags.length ? categoryTags.map((entry) => (
+                              <div key={`${categoryName}-${entry}`} className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide" style={{ borderColor: `${galleryTagColors[entry] ?? "#3b82f6"}55`, backgroundColor: `${galleryTagColors[entry] ?? "#3b82f6"}1a`, color: galleryTagColors[entry] ?? "#3b82f6" }}>
+                                <span>{entry}</span>
+                                <div className="ml-1 flex items-center gap-1">
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => beginTaxonomyEdit("tag", entry)} disabled={taxonomyBusy} aria-label={`Edit ${entry}`}>
+                                    <Edit3 className="h-3 w-3" />
+                                  </Button>
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("tag", entry)} disabled={taxonomyBusy} aria-label={`Delete ${entry}`}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )) : <span className="text-xs text-muted-foreground">No tags yet.</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {(() => {
+                      const assignedTags = new Set(Object.values(galleryTagCategories).flat())
+                      const unassignedTags = galleryTags.filter((entry) => !assignedTags.has(entry))
+                      if (unassignedTags.length === 0) return null
+                      return (
+                        <div className="rounded-lg border border-border/60 bg-background/30 p-3">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Unassigned</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {unassignedTags.map((entry) => (
+                              <div key={`unassigned-${entry}`} className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide" style={{ borderColor: `${galleryTagColors[entry] ?? "#3b82f6"}55`, backgroundColor: `${galleryTagColors[entry] ?? "#3b82f6"}1a`, color: galleryTagColors[entry] ?? "#3b82f6" }}>
+                                <span>{entry}</span>
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => beginTaxonomyEdit("tag", entry)} disabled={taxonomyBusy} aria-label={`Edit ${entry}`}>
+                                  <Edit3 className="h-3 w-3" />
+                                </Button>
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("tag", entry)} disabled={taxonomyBusy} aria-label={`Delete ${entry}`}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+            </div>
+            </DropdownProvider>
+          </div>,
+          document.body,
+        )}
+
+      {taxonomyEdit && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => { if (event.currentTarget === event.target) { setTaxonomyEdit(null); setShowTaxonomyModal(true) } }}
+        >
+          <DropdownProvider>
+          <div className="relative z-[10051] w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="taxonomy-edit-title">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 id="taxonomy-edit-title" className="text-lg font-semibold">Edit {taxonomyEdit.type === "category" ? "Category" : "Sub Tag"}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Change the name, color, or category assignment.</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setTaxonomyEdit(null); setShowTaxonomyModal(true) }} aria-label="Close">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Name</label>
+                <Input value={taxonomyEditName} onChange={(event) => setTaxonomyEditName(event.target.value)} />
+              </div>
+              {taxonomyEdit.type === "tag" && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Category</label>
+                  <GalleryMultiSelect
+                    id="taxonomy-edit-categories"
+                    value={taxonomyEditCategories}
+                    options={galleryCategories}
+                    optionColors={galleryCategoryColors}
+                    placeholder="Assign categories"
+                    allowEmpty
+                    onChange={setTaxonomyEditCategories}
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">Select one or multiple categories. Clear every selection to reset the sub-tag to unassigned.</p>
+                </div>
+              )}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Color</label>
+                <GalleryColorPicker value={taxonomyEditColor} onChange={setTaxonomyEditColor} ariaLabel="Edit gallery label color" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => { setTaxonomyEdit(null); setShowTaxonomyModal(true) }} disabled={taxonomyBusy}>Cancel</Button>
+                <Button type="button" onClick={() => void saveTaxonomyEdit()} disabled={taxonomyBusy || !taxonomyEditName.trim()}>
+                  {taxonomyBusy ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </div>
+          </div>
+          </DropdownProvider>
+        </div>,
+        document.body,
+      )}
+
       {showModal && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center overscroll-contain bg-black/50 p-4 backdrop-blur-sm"
@@ -2383,11 +3171,13 @@ export default function Gallery() {
                   <CustomSelect
                     id="gallery-category"
                     value={category}
-                    options={["Community", "Fleet"]}
+                    options={galleryCategories}
                     ariaLabel="Gallery category"
-                    onChange={(value) =>
-                      setCategory(value as GalleryCategory)
-                    }
+                    onChange={(value) => {
+                      const nextCategory = value as GalleryCategory
+                      setCategory(nextCategory)
+                      setTags((current) => current.filter((tag) => (galleryTagCategories[nextCategory] ?? galleryTags).includes(tag)))
+                    }}
                   />
                 </div>
 
@@ -2399,9 +3189,11 @@ export default function Gallery() {
                   <CustomMultiSelect
                     id="gallery-tags"
                     value={tags}
-                    options={GALLERY_TAGS}
+                    options={galleryTagCategories[category] ?? []}
                     ariaLabel="Gallery tags"
                     onChange={setTags}
+                    optionKind="tag"
+                    optionColors={galleryTagColors}
                   />
                 </div>
 
@@ -2658,7 +3450,19 @@ export default function Gallery() {
                               )}
                             </div>
 
-                            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 px-2 py-1.5 text-[10px] text-white">
+                            {(media.processing || media.progress !== undefined) && (
+                              <div className="absolute inset-x-0 bottom-0 z-10 bg-black/75 px-2.5 py-2 backdrop-blur-sm">
+                                <div className="mb-1 flex items-center justify-between text-[10px] font-medium text-white">
+                                  <span>{media.processing ? "Processing" : "Ready"}</span>
+                                  <span>{media.progress ?? 0}%</span>
+                                </div>
+                                <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
+                                  <div className="h-full rounded-full bg-blue-500 transition-all duration-200" style={{ width: `${Math.max(0, Math.min(100, media.progress ?? 0))}%` }} />
+                                </div>
+                              </div>
+                            )}
+
+                            <div className={`absolute inset-x-0 ${media.processing || media.progress !== undefined ? "bottom-[42px]" : "bottom-0"} flex items-center justify-between bg-black/60 px-2 py-1.5 text-[10px] text-white`}>
                               <span className="flex items-center gap-1">
                                 {media.type ===
                                 "image" ? (
@@ -2868,7 +3672,7 @@ export default function Gallery() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
                 >
-                  Open Original
+                  Open {getMediaLabel(viewer.item.media[viewer.index].type)}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
@@ -3394,68 +4198,62 @@ function GalleryMediaCollage({
   onClick: (media: GalleryMedia) => void
 }) {
   const visible = media.slice(0, 4)
-  const extraCount = Math.max(0, media.length - 3)
+  const hiddenCount = Math.max(0, media.length - 3)
 
   if (visible.length === 0) return null
 
-  if (visible.length === 1) {
-    return (
-      <div className="grid gap-1">
-        <GalleryMediaCard
-          media={visible[0]}
-          title={title}
-          onClick={() => onClick(visible[0])}
-        />
-      </div>
-    )
-  }
-
   return (
-    <div className="grid grid-cols-2 gap-1">
-      <div className="min-w-0">
-        <GalleryMediaCard
-          media={visible[0]}
-          title={title}
-          onClick={() => onClick(visible[0])}
-        />
-      </div>
-      <div className="min-w-0">
-        <GalleryMediaCard
-          media={visible[1]}
-          title={title}
-          onClick={() => onClick(visible[1])}
-        />
-      </div>
-      <div className="col-span-2 min-w-0">
-        {visible.length >= 3 && (
-          <div className={visible.length >= 4 ? "grid grid-cols-2 gap-1" : ""}>
-            <GalleryMediaCard
-              media={visible[2]}
-              title={title}
-              onClick={() => onClick(visible[2])}
-            />
-            {visible.length >= 4 && (
-              <div className="group relative min-w-0">
-                <GalleryMediaCard
-                  media={visible[3]}
-                  title={title}
-                  onClick={() => onClick(visible[3])}
-                />
-                <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
-                    <Images className="h-3.5 w-3.5" />
-                  </span>
+    <div className="relative h-[320px] w-full overflow-hidden bg-black sm:h-[360px]">
+      {visible.length === 1 && (
+        <GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} />
+      )}
 
-                  <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
-                    +{extraCount} {extraCount === 1 ? "image/video" : "images/videos"}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {visible.length === 2 && (
+        <div className="grid h-full min-h-0 grid-cols-2 gap-1 bg-black">
+          {visible.map((item) => (
+            <GalleryMediaCard key={item.id} media={item} title={title} onClick={() => onClick(item)} />
+          ))}
+        </div>
+      )}
+
+      {visible.length === 3 && (
+        <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-1 bg-black">
+          <div className="min-h-0 min-w-0"><GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} /></div>
+          <div className="min-h-0 min-w-0"><GalleryMediaCard media={visible[1]} title={title} onClick={() => onClick(visible[1])} /></div>
+          <div className="col-span-2 min-h-0 min-w-0"><GalleryMediaCard media={visible[2]} title={title} onClick={() => onClick(visible[2])} /></div>
+        </div>
+      )}
+
+      {visible.length === 4 && (
+        <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-1 bg-black">
+          {visible.map((item, index) => (
+            <div key={item.id} className="group relative min-h-0 min-w-0">
+              <GalleryMediaCard media={item} title={title} onClick={() => onClick(item)} />
+              {index === 3 && media.length >= 5 && (
+                <>
+                  <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
+                      <Images className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
+                      +{hiddenCount} {(() => {
+                        const hidden = media.slice(3)
+                        const imageCount = hidden.filter((entry) => entry.type === "image").length
+                        const videoCount = hidden.filter((entry) => entry.type === "video").length
+                        const parts: string[] = []
+                        if (imageCount) parts.push(`${imageCount} image${imageCount === 1 ? "" : "s"}`)
+                        if (videoCount) parts.push(`${videoCount} video${videoCount === 1 ? "" : "s"}`)
+                        return parts.join(" / ") || "media"
+                      })()}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -3490,15 +4288,12 @@ function GalleryMediaCard({
   title: string
   onClick: () => void
 }) {
-  const [ratio, setRatio] =
-    useState<number | undefined>()
-
   return (
     <button
       type="button"
       className={[
-        "group relative block w-full overflow-hidden bg-muted/40 text-left",
-        getAspectClass(ratio),
+        "group relative flex h-full w-full items-center justify-center overflow-hidden bg-black text-left",
+        "min-h-0",
       ].join(" ")}
       onClick={onClick}
       aria-label={`View ${title}`}
@@ -3512,26 +4307,14 @@ function GalleryMediaCard({
         <img
           src={media.url}
           alt={title}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-          onLoad={(event) => {
-            const image = event.currentTarget
-            if (image.naturalHeight > 0) {
-              setRatio(image.naturalWidth / image.naturalHeight)
-            }
-          }}
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
         />
       ) : getMediaThumbnail(media) ? (
         <div className="relative h-full w-full">
           <img
             src={getMediaThumbnail(media)}
             alt={title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-            onLoad={(event) => {
-              const image = event.currentTarget
-              if (image.naturalHeight > 0) {
-                setRatio(image.naturalWidth / image.naturalHeight)
-              }
-            }}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
           />
         </div>
       ) : isEmbeddableVideo(media) ? (
@@ -3550,13 +4333,7 @@ function GalleryMediaCard({
           loop
           playsInline
           preload="auto"
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-          onLoadedMetadata={(event) => {
-            const video = event.currentTarget
-            if (video.videoHeight > 0) {
-              setRatio(video.videoWidth / video.videoHeight)
-            }
-          }}
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
         />
       )}
 
