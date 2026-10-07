@@ -102,6 +102,15 @@ type Option = {
   label: string
 }
 
+type RosterMember = {
+  discordId: string
+  name: string
+  rank?: string
+  callsign?: string
+  badgeNumber?: string
+  avatar?: string | null
+}
+
 const categoryOptions: Option[] = [
   { value: "", label: "All Categories" },
   { value: "roster", label: "Roster" },
@@ -608,10 +617,22 @@ function IdentityCard({
   )
 }
 
-function TargetIdentity({ log }: { log: ActionLog }) {
+function TargetIdentity({
+  log,
+  rosterProfiles,
+}: {
+  log: ActionLog
+  rosterProfiles: Record<string, RosterMember>
+}) {
   const details = log.details ?? {}
 
+  const rosterProfile =
+    log.targetUserId
+      ? rosterProfiles[log.targetUserId]
+      : undefined
+
   const targetName =
+    rosterProfile?.name ||
     log.targetName ||
     String(
       details.targetDisplayName ??
@@ -630,27 +651,34 @@ function TargetIdentity({ log }: { log: ActionLog }) {
     ).trim()
 
   const targetRank =
+    rosterProfile?.rank ||
     log.targetRank ||
     String(details.targetRank ?? "").trim()
 
-  const targetCallsign = String(
-    details.targetCallsign ??
-      details.callsign ??
-      "",
-  ).trim()
+  const targetCallsign =
+    rosterProfile?.callsign ||
+    String(
+      details.targetCallsign ??
+        details.callsign ??
+        "",
+    ).trim()
 
-  const targetBadge = String(
-    details.targetBadgeNumber ??
-      details.badgeNumber ??
-      "",
-  ).trim()
+  const targetBadge =
+    rosterProfile?.badgeNumber ||
+    String(
+      details.targetBadgeNumber ??
+        details.badgeNumber ??
+        "",
+    ).trim()
 
-  const targetAvatar = String(
-    details.targetAvatar ??
-      details.targetAvatarUrl ??
-      details.avatar ??
-      "",
-  ).trim()
+  const targetAvatar =
+    rosterProfile?.avatar ||
+    String(
+      details.targetAvatar ??
+        details.targetAvatarUrl ??
+        details.avatar ??
+        "",
+    ).trim()
 
   if (!targetName && !targetUserId) {
     return (
@@ -779,7 +807,7 @@ export default function PromotionLogs() {
   const [action, setAction] = useState("")
   const [search, setSearch] = useState("")
 
-  const [expanded, setExpanded] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
 
@@ -792,6 +820,11 @@ export default function PromotionLogs() {
 
   const [availableActions, setAvailableActions] =
     useState<string[]>(fallbackActions)
+
+  const [rosterProfiles, setRosterProfiles] =
+    useState<Record<string, RosterMember>>({})
+
+  const rosterLoadingRef = useRef<Set<string>>(new Set())
 
   const hasFilters = Boolean(
     search.trim() ||
@@ -819,6 +852,90 @@ export default function PromotionLogs() {
     return () => {
       mounted = false
     }
+  }, [])
+
+  const loadRosterProfiles = useCallback(async (items: ActionLog[]) => {
+    const requests = new Map<string, { module: string; division: string }>()
+
+    for (const log of items) {
+      if (!log.division || !log.userId && !log.targetUserId) continue
+
+      const key = `${log.module ?? module}:${log.division}`
+      if (!requests.has(key)) {
+        requests.set(key, {
+          module: log.module === "activity" ? "activity" : "promotion",
+          division: log.division,
+        })
+      }
+    }
+
+    const merged: Record<string, RosterMember> = {}
+
+    await Promise.all(
+      Array.from(requests.entries()).map(async ([key, request]) => {
+        if (rosterLoadingRef.current.has(key)) return
+        rosterLoadingRef.current.add(key)
+
+        try {
+          const endpoint =
+            request.module === "activity"
+              ? `/api/activity/roster/${encodeURIComponent(request.division)}`
+              : `/api/promotion/roster/${encodeURIComponent(request.division)}`
+
+          const response = await fetch(endpoint, {
+            credentials: "include",
+            cache: "no-store",
+            headers: { Accept: "application/json" },
+          })
+
+          if (!response.ok) return
+
+          const data = (await response.json()) as {
+            success?: boolean
+            members?: Array<Record<string, unknown>>
+          }
+
+          if (!data.success || !Array.isArray(data.members)) return
+
+          for (const member of data.members) {
+            const discordId = String(member.discordId ?? "").trim()
+            const name = String(member.name ?? "").trim()
+            if (!discordId || !name) continue
+
+            merged[discordId] = {
+              discordId,
+              name,
+              rank: String(member.rank ?? "").trim() || undefined,
+              callsign: String(member.callsign ?? "").trim() || undefined,
+              badgeNumber: String(member.badgeNumber ?? "").trim() || undefined,
+              avatar: typeof member.avatar === "string" ? member.avatar : null,
+            }
+          }
+        } catch {
+          // Stored audit identity remains the fallback if roster lookup fails.
+        } finally {
+          rosterLoadingRef.current.delete(key)
+        }
+      }),
+    )
+
+    if (Object.keys(merged).length) {
+      setRosterProfiles((current) => ({ ...current, ...merged }))
+    }
+  }, [module])
+
+  const toggleExpanded = useCallback((id: string) => {
+    if (!id) return
+
+    setExpanded((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
   }, [])
 
   const loadLogs = useCallback(async () => {
@@ -875,37 +992,15 @@ export default function PromotionLogs() {
         )
       }
 
-      const incoming = Array.isArray(data.logs)
+      const nextLogs = Array.isArray(data.logs)
         ? data.logs
         : []
 
-      const nextLogs: ActionLog[] = []
-
-      for (const log of incoming) {
-        const previous =
-          nextLogs[nextLogs.length - 1]
-
-        const sameEvent =
-          previous &&
-          previous.userId === log.userId &&
-          previous.action === log.action &&
-          previous.category === log.category &&
-          previous.division === log.division &&
-          previous.targetUserId ===
-            log.targetUserId &&
-          previous.targetName === log.targetName &&
-          previous.summary === log.summary &&
-          Math.abs(
-            new Date(previous.createdAt).getTime() -
-              new Date(log.createdAt).getTime(),
-          ) <= 3000
-
-        if (!sameEvent) {
-          nextLogs.push(log)
-        }
-      }
-
+      // Do not deduplicate adjacent entries. Every audit entry returned by
+      // the API must remain visible, even when several actions happened
+      // within the same few seconds.
       setLogs(nextLogs)
+      void loadRosterProfiles(nextLogs)
 
       setPagination(
         data.pagination ?? {
@@ -946,6 +1041,7 @@ export default function PromotionLogs() {
     page,
     pageSize,
     module,
+    loadRosterProfiles,
     search,
     category,
     division,
@@ -969,7 +1065,7 @@ export default function PromotionLogs() {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setExpanded(null)
+        setExpanded(new Set())
       }
     }
 
@@ -995,7 +1091,7 @@ export default function PromotionLogs() {
     setUserId("")
     setAction("")
     setPage(1)
-    setExpanded(null)
+    setExpanded(new Set())
   }
 
   const changeFilter = <T,>(
@@ -1004,13 +1100,13 @@ export default function PromotionLogs() {
   ) => {
     setter(value)
     setPage(1)
-    setExpanded(null)
+    setExpanded(new Set())
   }
 
   const changePageSize = (value: number) => {
     setPageSize(value)
     setPage(1)
-    setExpanded(null)
+    setExpanded(new Set())
   }
 
   const groupedLogs = useMemo(() => {
@@ -1046,7 +1142,7 @@ export default function PromotionLogs() {
 
   return (
     <DashboardLayout>
-      <div className="flex min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
+      <div className="mx-auto flex w-full max-w-[1100px] min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
         {/* Header */}
         <div className="flex shrink-0 flex-col gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1087,7 +1183,7 @@ export default function PromotionLogs() {
           </div>
 
           {/* Log module tabs */}
-          <div className="flex w-fit items-center gap-4">
+          <div className="flex w-fit items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1">
             {([
               ["all", "All"],
               ["promotion", "Promotion Logs"],
@@ -1103,17 +1199,17 @@ export default function PromotionLogs() {
                     if (module === value) return
                     setModule(value)
                     setPage(1)
-                    setExpanded(null)
+                    setExpanded(new Set())
                     setSearch("")
                     setCategory("")
                     setDivision("")
                     setUserId("")
                     setAction("")
                   }}
-                  className={`border-b-2 bg-transparent px-1 py-1.5 text-xs font-medium outline-none transition-colors ${
+                  className={`h-8 rounded-md border px-3 text-xs font-medium outline-none transition-colors ${
                     active
-                      ? "border-blue-500 text-blue-400"
-                      : "border-transparent text-muted-foreground hover:border-blue-500/40 hover:text-blue-400"
+                      ? "border-blue-500/40 bg-blue-500/10 text-blue-400"
+                      : "border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground"
                   }`}
                 >
                   {label}
@@ -1222,7 +1318,7 @@ export default function PromotionLogs() {
                     setUserId("")
                     setAction("")
                     setPage(1)
-                    setExpanded(null)
+                    setExpanded(new Set())
                   }}
                   className="inline-flex items-center gap-1 bg-transparent px-0 text-[10px] text-foreground outline-none transition-colors hover:bg-transparent hover:text-blue-400 focus:bg-transparent focus:text-blue-400"
                 >
@@ -1304,7 +1400,7 @@ export default function PromotionLogs() {
               </div>
 
               <p className="text-sm font-medium">
-                No {module === "promotion" ? "promotion" : "activity"} action logs found
+                No {module === "all" ? "action" : module === "promotion" ? "promotion" : "activity"} logs found
               </p>
 
               <p className="mt-1 text-xs text-muted-foreground">
@@ -1333,15 +1429,22 @@ export default function PromotionLogs() {
                   <div className="space-y-1">
                     {group.logs.map((log, index) => {
                       const isExpanded =
-                        expanded === log.id
+                        expanded.has(log.id)
+
+                      const actorProfile =
+                        log.userId
+                          ? rosterProfiles[log.userId]
+                          : undefined
 
                       const actorName =
+                        actorProfile?.name ||
                         log.userName ||
                         log.username ||
                         log.userId ||
                         "Unknown User"
 
                       const actorAvatar =
+                        actorProfile?.avatar ||
                         log.avatar ||
                         (log.userId && log.userId === sessionUserId
                           ? sessionAvatar
@@ -1377,20 +1480,12 @@ export default function PromotionLogs() {
                             tabIndex={0}
                             className="w-full cursor-pointer text-left outline-none"
                             onClick={() =>
-                              setExpanded(
-                                isExpanded
-                                  ? null
-                                  : log.id,
-                              )
+                              toggleExpanded(log.id)
                             }
                             onKeyDown={(event) => {
                               if (event.key === "Enter" || event.key === " ") {
                                 event.preventDefault()
-                                setExpanded(
-                                  isExpanded
-                                    ? null
-                                    : log.id,
-                                )
+                                toggleExpanded(log.id)
                               }
                             }}
                           >
@@ -1427,7 +1522,7 @@ export default function PromotionLogs() {
                                         className="min-w-0"
                                         onClick={(event) => event.stopPropagation()}
                                       >
-                                        <TargetIdentity log={log} />
+                                        <TargetIdentity log={log} rosterProfiles={rosterProfiles} />
                                       </div>
                                     </>
                                   ) : null}
@@ -1438,9 +1533,9 @@ export default function PromotionLogs() {
                                     name={actorName}
                                     username={log.username}
                                     userId={log.userId}
-                                    rank={log.rank}
-                                    callsign={log.callsign}
-                                    badgeNumber={log.badgeNumber}
+                                    rank={actorProfile?.rank || log.rank}
+                                    callsign={actorProfile?.callsign || log.callsign}
+                                    badgeNumber={actorProfile?.badgeNumber || log.badgeNumber}
                                     avatar={actorAvatar}
                                     compact
                                   />
@@ -1571,7 +1666,7 @@ export default function PromotionLogs() {
                                 </DetailItem>
 
                                 <DetailItem label="Changed">
-                                  <TargetIdentity log={log} />
+                                  <TargetIdentity log={log} rosterProfiles={rosterProfiles} />
 
                                   {log.targetRank ? (
                                     <p className="mt-1 text-[10px] text-muted-foreground">
