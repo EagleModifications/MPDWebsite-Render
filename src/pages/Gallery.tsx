@@ -126,6 +126,9 @@ type GalleryItem = {
 type PendingMedia = GalleryMedia & {
   previewUrl?: string
   file?: File
+  progress?: number
+  processing?: boolean
+  error?: string
 }
 
 const DEFAULT_GALLERY_TAGS: readonly GalleryTag[] = [
@@ -413,6 +416,14 @@ function CustomMultiSelect({
                 ].join(" ")}
               >
                 <span className="flex min-w-0 items-center gap-2">
+                  {optionKind === "category" || optionKind === "tag" ? (
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: optionColors?.[option] ?? "#3b82f6" }}
+                    />
+                  ) : optionKind === "type" ? (
+                    option === "Images" ? <ImageIcon className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />
+                  ) : null}
                   <span>{option}</span>
                 </span>
                 {selected && <Check className="h-4 w-4 text-blue-500" />}
@@ -646,12 +657,16 @@ function GalleryFilterDropdown({
   value,
   onChange,
   ariaLabel,
+  optionColors,
+  optionKind,
 }: {
   label: string
   options: readonly string[]
   value: string[]
   onChange: (value: string[]) => void
   ariaLabel: string
+  optionColors?: Record<string, string>
+  optionKind?: "type" | "category" | "tag"
 }) {
   const allSelected = options.length > 0 && value.length === options.length
 
@@ -673,7 +688,6 @@ function GalleryFilterDropdown({
           aria-label={ariaLabel}
           className="h-9 gap-2 xl:min-w-[150px]"
         >
-          <Filter className="h-4 w-4 text-blue-400" />
           <span>{label}</span>
           {value.length > 0 && (
             <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
@@ -750,6 +764,12 @@ export default function Gallery() {
   const [galleryTags, setGalleryTags] =
     useState<string[]>([...DEFAULT_GALLERY_TAGS])
 
+  const [galleryTagCategories, setGalleryTagCategories] =
+    useState<Record<string, string[]>>({
+      Community: [...DEFAULT_GALLERY_TAGS],
+      Fleet: [...DEFAULT_GALLERY_TAGS],
+    })
+
   const [galleryCategoryColors, setGalleryCategoryColors] =
     useState<Record<string, string>>(DEFAULT_GALLERY_CATEGORY_COLORS)
 
@@ -764,6 +784,9 @@ export default function Gallery() {
 
   const [newGalleryTag, setNewGalleryTag] =
     useState("")
+
+  const [newGalleryTagCategory, setNewGalleryTagCategory] =
+    useState("Community")
 
   const [newGalleryCategoryColor, setNewGalleryCategoryColor] =
     useState("#3b82f6")
@@ -926,6 +949,9 @@ export default function Gallery() {
           if (Array.isArray(optionsData.tags)) {
             setGalleryTags(optionsData.tags.map(String).filter(Boolean))
           }
+          if (optionsData.tagCategories && typeof optionsData.tagCategories === "object") {
+            setGalleryTagCategories(optionsData.tagCategories)
+          }
           if (optionsData.categoryColors && typeof optionsData.categoryColors === "object") {
             setGalleryCategoryColors(optionsData.categoryColors)
           }
@@ -956,6 +982,11 @@ export default function Gallery() {
       active = false
     }
   }, [])
+
+  const availableFilterTags = useMemo(() => {
+    if (categoryFilters.length === 0) return galleryTags
+    return Array.from(new Set(categoryFilters.flatMap((name) => galleryTagCategories[name] ?? [])))
+  }, [categoryFilters, galleryTagCategories, galleryTags])
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -1030,7 +1061,12 @@ export default function Gallery() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, value, color: color || undefined }),
+        body: JSON.stringify({
+          type,
+          value,
+          color: color || undefined,
+          category: type === "tag" ? newGalleryTagCategory : undefined,
+        }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || `Failed to create ${type}.`)
@@ -1046,6 +1082,7 @@ export default function Gallery() {
       }
       if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
       if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
 
       toast.success(`${type === "category" ? "Category" : "Tag"} created.`)
     } catch (error) {
@@ -1053,18 +1090,19 @@ export default function Gallery() {
     }
   }
 
-  async function updateGalleryOptionColor(type: "category" | "tag", value: string, color: string) {
+  async function updateGalleryOptionColor(type: "category" | "tag", value: string, color: string, optionCategory?: string) {
     try {
       const response = await fetch("/api/gallery/options", {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, value, color }),
+        body: JSON.stringify({ type, value, color, category: optionCategory }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || "Failed to update color.")
       if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
       if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
       toast.success(`${type === "category" ? "Category" : "Tag"} color updated.`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update color.")
@@ -1313,104 +1351,68 @@ export default function Gallery() {
   }
 
   async function uploadPendingFiles() {
-    const files = pendingMedia
-      .filter(
-        (media) =>
-          media.source === "upload" &&
-          media.file,
-      )
-      .map((media) => media.file as File)
+    const uploadItems = pendingMedia.filter((media) => media.source === "upload" && media.file)
+    if (!uploadItems.length) return []
 
-    if (!files.length) {
-      return []
-    }
-
-    const formData = new FormData()
-
-    for (const file of files) {
-      formData.append("files", file, file.name)
-    }
+    const uploaded: GalleryMedia[] = []
 
     setSavingStage("upload")
-    setUploadProgress(0)
 
-    const result = await new Promise<{
-      status: number
-      raw: string
-    }>((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
+    for (let index = 0; index < uploadItems.length; index += 1) {
+      const item = uploadItems[index]
+      const file = item.file as File
 
-      xhr.open("POST", "/api/gallery/upload")
-      xhr.withCredentials = true
-      xhr.timeout = 15 * 60 * 1000
+      setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: true, progress: 0, error: undefined } : media))
 
-      xhr.upload.onprogress = (event) => {
-        if (!event.lengthComputable) return
-        setUploadProgress(
-          Math.min(100, Math.round((event.loaded / event.total) * 100)),
-        )
+      const formData = new FormData()
+      formData.append("files", file, file.name)
+      formData.append("title", title.trim() || "gallery")
+
+      const result = await new Promise<{ status: number; raw: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open("POST", "/api/gallery/upload")
+        xhr.withCredentials = true
+        xhr.timeout = 15 * 60 * 1000
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) return
+          const progress = Math.min(100, Math.round((event.loaded / event.total) * 100))
+          setUploadProgress(progress)
+          setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, progress } : media))
+        }
+        xhr.onload = () => resolve({ status: xhr.status, raw: xhr.responseText || "" })
+        xhr.onerror = () => reject(new Error("Gallery upload failed. Check the server logs and try again."))
+        xhr.ontimeout = () => reject(new Error("Gallery upload timed out after 15 minutes."))
+        xhr.onabort = () => reject(new Error("Gallery upload was cancelled."))
+        xhr.send(formData)
+      })
+
+      let data: { success?: boolean; items?: GalleryMedia[]; error?: string } = {}
+      try { data = result.raw ? JSON.parse(result.raw) : {} } catch { data = {} }
+
+      if (result.status < 200 || result.status >= 300) {
+        const message = result.status === 404
+          ? "Gallery upload API is not deployed. Make sure the updated app.ts is deployed and the server has been restarted."
+          : result.status === 401
+            ? "Your session has expired. Sign in again."
+            : result.status === 403
+              ? "You do not have permission to upload gallery media."
+              : data.error || `Gallery upload failed (${result.status}).`
+        setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: false, error: message } : media))
+        throw new Error(message)
       }
 
-      xhr.onload = () => {
-        setUploadProgress(100)
-        resolve({
-          status: xhr.status,
-          raw: xhr.responseText || "",
-        })
+      if (!Array.isArray(data.items) || !data.items[0]) {
+        const message = "Gallery upload returned an invalid response."
+        setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: false, error: message } : media))
+        throw new Error(message)
       }
 
-      xhr.onerror = () => {
-        reject(new Error("Gallery upload failed. Check the server logs and try again."))
-      }
-
-      xhr.ontimeout = () => {
-        reject(new Error("Gallery upload timed out after 15 minutes."))
-      }
-
-      xhr.onabort = () => {
-        reject(new Error("Gallery upload was cancelled."))
-      }
-
-      xhr.send(formData)
-    })
-
-    let data: {
-      success?: boolean
-      items?: GalleryMedia[]
-      error?: string
-    } = {}
-
-    try {
-      data = result.raw ? JSON.parse(result.raw) : {}
-    } catch {
-      data = {}
+      uploaded.push(data.items[0])
+      setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: false, progress: 100 } : media))
+      setUploadProgress(index === uploadItems.length - 1 ? 100 : 0)
     }
 
-    if (result.status < 200 || result.status >= 300) {
-      if (result.status === 404) {
-        throw new Error(
-          "Gallery upload API is not deployed. Make sure the updated app.ts is deployed and the server has been restarted.",
-        )
-      }
-
-      if (result.status === 401) {
-        throw new Error("Your session has expired. Sign in again.")
-      }
-
-      if (result.status === 403) {
-        throw new Error("You do not have permission to upload gallery media.")
-      }
-
-      throw new Error(
-        data.error || `Gallery upload failed (${result.status}).`,
-      )
-    }
-
-    if (!Array.isArray(data.items)) {
-      throw new Error("Gallery upload returned an invalid response.")
-    }
-
-    return data.items
+    return uploaded
   }
 
   // Description is intentionally optional; only title and media are required.
@@ -1463,45 +1465,42 @@ export default function Gallery() {
           continue
         }
 
-        // YouTube/Vimeo URLs are imported server-side into GridFS before
-        // the gallery document is saved. After this point they are treated
-        // exactly like a normal uploaded video file.
-        if (
-          item.source === "url" &&
-          item.type === "video" &&
-          (Boolean(getYouTubeVideoId(item.url)) ||
-            Boolean(getVimeoVideoId(item.url)))
-        ) {
+        if (item.source === "url") {
           setSavingStage("import")
-          setUploadProgress(0)
+          setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, processing: true, progress: 0, error: undefined } : mediaItem))
 
-          const importResponse = await fetch(
-            "/api/gallery/import-url",
-            {
+          let simulatedProgress = 4
+          const progressTimer = window.setInterval(() => {
+            simulatedProgress = Math.min(92, simulatedProgress + Math.floor(Math.random() * 9) + 4)
+            setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, progress: simulatedProgress } : mediaItem))
+          }, 450)
+
+          try {
+            const importResponse = await fetch("/api/gallery/import-url", {
               method: "POST",
               credentials: "include",
-              headers: {
-                "Content-Type": "application/json",
-              },
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 url: item.url,
+                type: item.type,
+                title: cleanTitle,
+                index: media.length,
               }),
-            },
-          )
-
-          const importData = await importResponse
-            .json()
-            .catch(() => ({}))
-
-          if (!importResponse.ok || !importData.item) {
-            throw new Error(
-              importData.error ||
-                "Failed to import the video URL.",
-            )
+            })
+            const importData = await importResponse.json().catch(() => ({}))
+            if (!importResponse.ok || !importData.item) {
+              throw new Error(importData.error || "Failed to import the media URL.")
+            }
+            media.push(importData.item as GalleryMedia)
+            setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, processing: false, progress: 100 } : mediaItem))
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to import the media URL."
+            setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, processing: false, error: message } : mediaItem))
+            throw error
+          } finally {
+            window.clearInterval(progressTimer)
           }
 
-          media.push(importData.item as GalleryMedia)
-          setUploadProgress(100)
           continue
         }
 
@@ -1805,9 +1804,9 @@ export default function Gallery() {
 
             {canManageGallery && (
               <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" className="shrink-0" onClick={() => setShowTaxonomyModal(true)}>
+                <Button type="button" className="shrink-0" onClick={() => setShowTaxonomyModal(true)}>
                   <Settings2 className="mr-2 h-4 w-4" />
-                  Tags & Categories
+                  Add Tags & Categories
                 </Button>
                 <Button type="button" className="shrink-0" onClick={openAdd}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -1847,14 +1846,18 @@ export default function Gallery() {
                   value={categoryFilters}
                   ariaLabel="Filter by category"
                   onChange={setCategoryFilters}
+                  optionKind="category"
+                  optionColors={galleryCategoryColors}
                 />
 
                 <GalleryFilterDropdown
                   label="Tags"
-                  options={galleryTags}
+                  options={availableFilterTags}
                   value={tagFilters}
                   ariaLabel="Filter by tags"
                   onChange={setTagFilters}
+                  optionKind="tag"
+                  optionColors={galleryTagColors}
                 />
 
                 {(categoryFilters.length > 0 || mediaFilters.length > 0 || tagFilters.length > 0) && (
@@ -2120,9 +2123,9 @@ export default function Gallery() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" variant="outline" onClick={() => setShowTaxonomyModal(true)}>
+                  <Button type="button" onClick={() => setShowTaxonomyModal(true)}>
                     <Settings2 className="mr-2 h-4 w-4" />
-                    Tags & Categories
+                    Add Tags & Categories
                   </Button>
                   <Button type="button" onClick={openAdd}>
                     <Plus className="mr-2 h-4 w-4" />
@@ -2492,7 +2495,7 @@ export default function Gallery() {
                   <Settings2 className="h-3.5 w-3.5" />
                   GALLERY SETTINGS
                 </div>
-                <h2 className="text-lg font-semibold">Tags & Categories</h2>
+                <h2 className="text-lg font-semibold">Add Tags & Categories</h2>
                 <p className="mt-1 text-xs text-muted-foreground">Create categories and sub-tags and choose the color shown throughout the gallery.</p>
               </div>
               <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowTaxonomyModal(false)} aria-label="Close">
@@ -2517,10 +2520,16 @@ export default function Gallery() {
                   <div className="mt-3 divide-y divide-border/60 rounded-lg border border-border/60">
                     {galleryCategories.map((entry) => (
                       <div key={entry} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: galleryCategoryColors[entry] ?? "#3b82f6" }} />
-                          <span className="truncate text-sm">{entry}</span>
-                        </div>
+                        <span
+                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                          style={{
+                            borderColor: `${galleryCategoryColors[entry] ?? "#3b82f6"}55`,
+                            backgroundColor: `${galleryCategoryColors[entry] ?? "#3b82f6"}1a`,
+                            color: galleryCategoryColors[entry] ?? "#3b82f6",
+                          }}
+                        >
+                          {entry}
+                        </span>
                         <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                           <span>Color</span>
                           <input
@@ -2543,36 +2552,33 @@ export default function Gallery() {
                 <div className="rounded-xl border border-border/70 bg-background/40 p-4">
                   <div>
                     <h3 className="text-sm font-semibold">Sub Tags</h3>
-                    <p className="mt-0.5 text-xs text-muted-foreground">More specific tags such as Dept, SWAT, MTF-7, MCD, TRU, and SAR.</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Create tags inside a main category. Each tag keeps its own color.</p>
                   </div>
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_180px_auto_auto]">
                     <Input value={newGalleryTag} onChange={(event) => setNewGalleryTag(event.target.value)} placeholder="Create sub tag" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("tag", newGalleryTagColor) }} />
+                    <CustomSelect id="gallery-new-tag-category" value={newGalleryTagCategory} options={galleryCategories} ariaLabel="Tag category" onChange={setNewGalleryTagCategory} />
                     <input type="color" value={newGalleryTagColor} onChange={(event) => setNewGalleryTagColor(event.target.value)} className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-transparent p-1" aria-label="New sub tag color" />
                     <Button type="button" onClick={() => void addGalleryOption("tag", newGalleryTagColor)}><Plus className="mr-2 h-4 w-4" />Create</Button>
                   </div>
-                  <div className="mt-3 divide-y divide-border/60 rounded-lg border border-border/60">
-                    {galleryTags.map((entry) => (
-                      <div key={entry} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: galleryTagColors[entry] ?? "#3b82f6" }} />
-                          <span className="truncate text-sm">{entry}</span>
+                  <div className="mt-3 space-y-3">
+                    {galleryCategories.map((categoryName) => {
+                      const categoryTags = galleryTagCategories[categoryName] ?? []
+                      return (
+                        <div key={categoryName} className="rounded-lg border border-border/60 bg-background/30 p-3">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: `${galleryCategoryColors[categoryName] ?? "#3b82f6"}55`, backgroundColor: `${galleryCategoryColors[categoryName] ?? "#3b82f6"}1a`, color: galleryCategoryColors[categoryName] ?? "#3b82f6" }}>{categoryName}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {categoryTags.length ? categoryTags.map((entry) => (
+                              <div key={`${categoryName}-${entry}`} className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide" style={{ borderColor: `${galleryTagColors[entry] ?? "#3b82f6"}55`, backgroundColor: `${galleryTagColors[entry] ?? "#3b82f6"}1a`, color: galleryTagColors[entry] ?? "#3b82f6" }}>
+                                <span>{entry}</span>
+                                <input type="color" value={galleryTagColors[entry] ?? "#3b82f6"} onChange={(event) => { const color = event.target.value; setGalleryTagColors((current) => ({ ...current, [entry]: color })); void updateGalleryOptionColor("tag", entry, color, categoryName) }} className="h-4 w-5 cursor-pointer rounded border-0 bg-transparent p-0" aria-label={`Set ${entry} tag color`} />
+                              </div>
+                            )) : <span className="text-xs text-muted-foreground">No tags yet.</span>}
+                          </div>
                         </div>
-                        <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                          <span>Color</span>
-                          <input
-                            type="color"
-                            value={galleryTagColors[entry] ?? "#3b82f6"}
-                            onChange={(event) => {
-                              const color = event.target.value
-                              setGalleryTagColors((current) => ({ ...current, [entry]: color }))
-                              void updateGalleryOptionColor("tag", entry, color)
-                            }}
-                            className="h-8 w-10 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
-                            aria-label={`Set ${entry} tag color`}
-                          />
-                        </label>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               </div>
@@ -2646,9 +2652,11 @@ export default function Gallery() {
                     value={category}
                     options={galleryCategories}
                     ariaLabel="Gallery category"
-                    onChange={(value) =>
-                      setCategory(value as GalleryCategory)
-                    }
+                    onChange={(value) => {
+                      const nextCategory = value as GalleryCategory
+                      setCategory(nextCategory)
+                      setTags((current) => current.filter((tag) => (galleryTagCategories[nextCategory] ?? galleryTags).includes(tag)))
+                    }}
                   />
                 </div>
 
@@ -2919,7 +2927,19 @@ export default function Gallery() {
                               )}
                             </div>
 
-                            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 px-2 py-1.5 text-[10px] text-white">
+                            {(media.processing || media.progress !== undefined) && (
+                              <div className="absolute inset-x-0 bottom-0 z-10 bg-black/75 px-2.5 py-2 backdrop-blur-sm">
+                                <div className="mb-1 flex items-center justify-between text-[10px] font-medium text-white">
+                                  <span>{media.processing ? "Processing" : "Ready"}</span>
+                                  <span>{media.progress ?? 0}%</span>
+                                </div>
+                                <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
+                                  <div className="h-full rounded-full bg-blue-500 transition-all duration-200" style={{ width: `${Math.max(0, Math.min(100, media.progress ?? 0))}%` }} />
+                                </div>
+                              </div>
+                            )}
+
+                            <div className={`absolute inset-x-0 ${media.processing || media.progress !== undefined ? "bottom-[42px]" : "bottom-0"} flex items-center justify-between bg-black/60 px-2 py-1.5 text-[10px] text-white`}>
                               <span className="flex items-center gap-1">
                                 {media.type ===
                                 "image" ? (
@@ -3655,68 +3675,62 @@ function GalleryMediaCollage({
   onClick: (media: GalleryMedia) => void
 }) {
   const visible = media.slice(0, 4)
-  const extraCount = Math.max(0, media.length - 3)
+  const hiddenCount = Math.max(0, media.length - 3)
 
   if (visible.length === 0) return null
 
-  if (visible.length === 1) {
-    return (
-      <div className="grid gap-1">
-        <GalleryMediaCard
-          media={visible[0]}
-          title={title}
-          onClick={() => onClick(visible[0])}
-        />
-      </div>
-    )
-  }
-
   return (
-    <div className="grid grid-cols-2 gap-1">
-      <div className="min-w-0">
-        <GalleryMediaCard
-          media={visible[0]}
-          title={title}
-          onClick={() => onClick(visible[0])}
-        />
-      </div>
-      <div className="min-w-0">
-        <GalleryMediaCard
-          media={visible[1]}
-          title={title}
-          onClick={() => onClick(visible[1])}
-        />
-      </div>
-      <div className="col-span-2 min-w-0">
-        {visible.length >= 3 && (
-          <div className={visible.length >= 4 ? "grid grid-cols-2 gap-1" : ""}>
-            <GalleryMediaCard
-              media={visible[2]}
-              title={title}
-              onClick={() => onClick(visible[2])}
-            />
-            {visible.length >= 4 && (
-              <div className="group relative min-w-0">
-                <GalleryMediaCard
-                  media={visible[3]}
-                  title={title}
-                  onClick={() => onClick(visible[3])}
-                />
-                <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
-                    <Images className="h-3.5 w-3.5" />
-                  </span>
+    <div className="relative aspect-[4/3] w-full overflow-hidden bg-black">
+      {visible.length === 1 && (
+        <GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} />
+      )}
 
-                  <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
-                    +{extraCount} {extraCount === 1 ? "image/video" : "images/videos"}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {visible.length === 2 && (
+        <div className="grid h-full grid-cols-2 gap-1">
+          {visible.map((item) => (
+            <GalleryMediaCard key={item.id} media={item} title={title} onClick={() => onClick(item)} />
+          ))}
+        </div>
+      )}
+
+      {visible.length === 3 && (
+        <div className="grid h-full grid-cols-2 grid-rows-2 gap-1">
+          <div className="min-h-0 min-w-0"><GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} /></div>
+          <div className="min-h-0 min-w-0"><GalleryMediaCard media={visible[1]} title={title} onClick={() => onClick(visible[1])} /></div>
+          <div className="col-span-2 min-h-0 min-w-0"><GalleryMediaCard media={visible[2]} title={title} onClick={() => onClick(visible[2])} /></div>
+        </div>
+      )}
+
+      {visible.length === 4 && (
+        <div className="grid h-full grid-cols-2 grid-rows-2 gap-1">
+          {visible.map((item, index) => (
+            <div key={item.id} className="group relative min-h-0 min-w-0">
+              <GalleryMediaCard media={item} title={title} onClick={() => onClick(item)} />
+              {index === 3 && (
+                <>
+                  <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
+                      <Images className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
+                      +{hiddenCount} {(() => {
+                        const hidden = media.slice(3)
+                        const imageCount = hidden.filter((entry) => entry.type === "image").length
+                        const videoCount = hidden.filter((entry) => entry.type === "video").length
+                        const parts: string[] = []
+                        if (imageCount) parts.push(`${imageCount} image${imageCount === 1 ? "" : "s"}`)
+                        if (videoCount) parts.push(`${videoCount} video${videoCount === 1 ? "" : "s"}`)
+                        return parts.join(" / ") || "media"
+                      })()}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -3751,15 +3765,12 @@ function GalleryMediaCard({
   title: string
   onClick: () => void
 }) {
-  const [ratio, setRatio] =
-    useState<number | undefined>()
-
   return (
     <button
       type="button"
       className={[
         "group relative block w-full overflow-hidden bg-muted/40 text-left",
-        getAspectClass(ratio),
+        "aspect-auto h-full",
       ].join(" ")}
       onClick={onClick}
       aria-label={`View ${title}`}
@@ -3773,26 +3784,14 @@ function GalleryMediaCard({
         <img
           src={media.url}
           alt={title}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-          onLoad={(event) => {
-            const image = event.currentTarget
-            if (image.naturalHeight > 0) {
-              setRatio(image.naturalWidth / image.naturalHeight)
-            }
-          }}
+          className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
         />
       ) : getMediaThumbnail(media) ? (
         <div className="relative h-full w-full">
           <img
             src={getMediaThumbnail(media)}
             alt={title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-            onLoad={(event) => {
-              const image = event.currentTarget
-              if (image.naturalHeight > 0) {
-                setRatio(image.naturalWidth / image.naturalHeight)
-              }
-            }}
+            className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
           />
         </div>
       ) : isEmbeddableVideo(media) ? (
@@ -3811,13 +3810,7 @@ function GalleryMediaCard({
           loop
           playsInline
           preload="auto"
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-          onLoadedMetadata={(event) => {
-            const video = event.currentTarget
-            if (video.videoHeight > 0) {
-              setRatio(video.videoWidth / video.videoHeight)
-            }
-          }}
+          className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
         />
       )}
 
