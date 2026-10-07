@@ -8,6 +8,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from "react"
+import { createPortal } from "react-dom"
 import {
   Check,
   ChevronDown,
@@ -2653,21 +2654,29 @@ export default function Gallery() {
         </div>
       )}
 
-      {showTaxonomyModal && canManageGallery && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) setShowTaxonomyModal(false)
-          }}
-        >
-          <div className="relative z-10 flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+      {showTaxonomyModal && canManageGallery && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.currentTarget === event.target) setShowTaxonomyModal(false)
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="gallery-taxonomy-title"
+              className="relative z-[9999] flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-2xl"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
             <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
               <div>
                 <div className="mb-1 flex items-center gap-2 text-xs font-bold text-blue-500">
                   <Settings2 className="h-3.5 w-3.5" />
                   GALLERY SETTINGS
                 </div>
-                <h2 className="text-lg font-semibold">Add Tags & Categories</h2>
+                <h2 id="gallery-taxonomy-title" className="text-lg font-semibold">Add Tags & Categories</h2>
                 <p className="mt-1 text-xs text-muted-foreground">Create categories and sub-tags and choose the color shown throughout the gallery.</p>
               </div>
               <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowTaxonomyModal(false)} aria-label="Close">
@@ -2724,7 +2733,9 @@ export default function Gallery() {
                   </div>
                   <div className="mt-3 space-y-3">
                     {galleryCategories.map((categoryName) => {
-                      const categoryTags = galleryTagCategories[categoryName] ?? []
+                      const categoryTags = Array.isArray(galleryTagCategories[categoryName])
+                        ? galleryTagCategories[categoryName]
+                        : []
                       return (
                         <div key={categoryName} className="rounded-lg border border-border/60 bg-background/30 p-3">
                           <div className="mb-2 flex items-center gap-2">
@@ -2745,9 +2756,10 @@ export default function Gallery() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {showModal && (
         <div
