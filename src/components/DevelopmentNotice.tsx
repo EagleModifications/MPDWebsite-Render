@@ -30,6 +30,10 @@ export default function DevelopmentNotice({
           This site is still in development. Some features may be
           incomplete or subject to change.
         </p>
+
+        <AlertTriangle
+          className="h-4 w-4 shrink-0 text-yellow-400"
+        />
       </div>
     </div>
   )
