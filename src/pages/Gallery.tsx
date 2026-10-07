@@ -12,7 +12,6 @@ import { createPortal } from "react-dom"
 import {
   Check,
   Copy,
-  Copy,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -44,12 +43,6 @@ import Footer from "@/components/Footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { getSession, type User } from "@/lib/auth"
 
 type YouTubeQuality = "highres" | "hd2160" | "hd1440" | "hd1080" | "hd720" | "large" | "medium" | "small" | "tiny" | "auto"
@@ -116,7 +109,6 @@ type GalleryTag = string
 type GalleryItem = {
   id: string
   slug?: string
-  slug?: string
   title: string
   description: string
   category?: GalleryCategory
@@ -134,6 +126,17 @@ type PendingMedia = GalleryMedia & {
   processing?: boolean
   error?: string
   uploadedMedia?: GalleryMedia
+}
+
+function makePendingFromMedia(media: GalleryMedia): PendingMedia {
+  return {
+    ...media,
+    previewUrl: media.thumbnailUrl || media.url,
+    progress: 100,
+    processing: false,
+    error: undefined,
+    uploadedMedia: media,
+  }
 }
 
 const DEFAULT_GALLERY_TAGS: readonly GalleryTag[] = []
