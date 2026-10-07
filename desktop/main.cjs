@@ -4,6 +4,7 @@ const { autoUpdater } = require('electron-updater');
 
 const WEBSITE_URL = 'https://metropd-calirp.com';
 const WEBSITE_ORIGIN = new URL(WEBSITE_URL).origin;
+const UPDATE_FEED_URL = `${WEBSITE_URL}/api/desktop-updates/`;
 const APP_ICON = path.join(__dirname, 'icon.png');
 
 let mainWindow = null;
@@ -86,8 +87,16 @@ function configureAutoUpdater() {
     return;
   }
 
+  // Keep the GitHub repository private. electron-updater uses the public
+  // MPD server as its generic update provider; the server proxies the
+  // private GitHub release metadata and assets using its server-side token.
+  autoUpdater.setFeedURL({
+    provider: 'generic',
+    url: UPDATE_FEED_URL,
+  });
+
   // Updates are never downloaded silently. The user explicitly approves
-  // each update before electron-updater downloads it from GitHub Releases.
+  // each update before electron-updater downloads it through the MPD server.
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowDowngrade = false;
@@ -111,7 +120,7 @@ function configureAutoUpdater() {
       title: 'Metro Police Department Update Available',
       message: `Version ${info.version} is available.`,
       detail:
-        "The update is hosted on the project's public GitHub Releases. Choose Download update to download it, or Later to leave the current version installed.",
+        'The update is downloaded securely through the Metro Police Department website. Choose Download update to install it, or Later to keep the current version installed.',
     });
 
     if (result.response === 0) {
