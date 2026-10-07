@@ -1615,6 +1615,67 @@ export default function Home() {
         </div>
 
         {/* ========================================================= */}
+        {/* JOIN THE DEPARTMENT CTA                                     */}
+        {/* ========================================================= */}
+        <section className="relative isolate overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.055),transparent_55%)]" />
+
+          {visibleDots.slice(0, 32).map((dot, index) => (
+            <span
+              key={`join-cta-dot-${index}`}
+              className="absolute rounded-full bg-blue-300 mpd-star-twinkle"
+              style={
+                {
+                  left: dot.left,
+                  top: dot.top,
+                  width: dot.size,
+                  height: dot.size,
+                  opacity: dot.opacity * 0.8,
+                  filter: `blur(${dot.blur})`,
+                  animationDelay: `${index * 0.18}s`,
+                  animationDuration: `${2.2 + (index % 7) * 0.35}s`,
+                } as React.CSSProperties
+              }
+            />
+          ))}
+
+          <div className="relative mx-auto flex min-h-[430px] w-full max-w-6xl items-center justify-center px-6 py-24 text-center">
+            <div className="max-w-4xl">
+              <h2 className="text-4xl font-black uppercase leading-[0.92] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+                <span className="text-foreground">
+                  READY TO JOIN THE
+                  <br />
+                  METRO POLICE
+                </span>
+
+                <span className="block bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent">
+                  DEPARTMENT?
+                </span>
+              </h2>
+
+              <p className="mx-auto mt-7 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+                Take the next step, join our community, and begin your career with the Metro Police Department.
+              </p>
+
+              <div className="mt-9 flex justify-center">
+                <a
+                  href="https://discord.gg/metropd"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
+                >
+                  <span>Join Metro PD</span>
+
+                  <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-blue-500/20" />
+        </section>
+
+        {/* ========================================================= */}
         {/* FINAL DISCORD CTA                                           */}
         {/* ========================================================= */}
         <section className="relative isolate overflow-hidden">
