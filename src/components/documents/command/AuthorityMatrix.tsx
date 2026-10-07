@@ -1,44 +1,262 @@
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   Check,
   ChevronDown,
+  FileSpreadsheet,
   Filter,
   RefreshCw,
   Search,
+  Shield,
   X,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-
-const GOOGLE_SHEET_URL =
+const SHEET_URL =
   "https://docs.google.com/spreadsheets/d/18Io5OdkKsZ9aVDh8I5nsAPjBUISGGM77461K06ziALU/edit"
 
 /*
  * IMPORTANT:
- * This must be the NAME OF THE TAB at the bottom of Google Sheets,
- * not necessarily the name of the spreadsheet.
+ * This must be the exact name of the bottom tab in Google Sheets.
  */
 const SHEET_NAME = "Authority Matrix"
 
-const AUTO_REFRESH_MS = 60_000
+type GroupName =
+  | "OFFICERS"
+  | "SUPERVISORS"
+  | "LOW COMMAND"
+  | "TRIAL HIGH COMMAND"
+  | "HIGH COMMAND"
+  | "OTHER"
+
+type RankColumn = {
+  column: number
+  rank: string
+  group: GroupName
+}
+
+type MatrixEntry = {
+  id: string
+  section: "PRIMARY RESPONSIBILITY" | "AUTHORITY"
+  name: string
+  permissions: Record<string, boolean>
+}
+
+type ParsedMatrix = {
+  ranks: RankColumn[]
+  entries: MatrixEntry[]
+}
+
+const GROUP_ORDER: GroupName[] = [
+  "OFFICERS",
+  "SUPERVISORS",
+  "LOW COMMAND",
+  "TRIAL HIGH COMMAND",
+  "HIGH COMMAND",
+  "OTHER",
+]
+
+const RANK_GROUPS: Record<string, GroupName> = {
+  OFFICER: "OFFICERS",
+  "OFFICER 1": "OFFICERS",
+  "OFFICER 2": "OFFICERS",
+  "OFFICER 3": "OFFICERS",
+
+  LCPL: "SUPERVISORS",
+  CPL: "SUPERVISORS",
+  SGT: "SUPERVISORS",
+  SSGT: "SUPERVISORS",
+  MSGT: "SUPERVISORS",
+
+  "2LT": "LOW COMMAND",
+  "1LT": "LOW COMMAND",
+  CPT: "LOW COMMAND",
+  MAJ: "LOW COMMAND",
+
+  LTCOL: "TRIAL HIGH COMMAND",
+  "LT COL": "TRIAL HIGH COMMAND",
+  "LIEUTENANT COLONEL": "TRIAL HIGH COMMAND",
+
+  COL: "HIGH COMMAND",
+  "CHIEF OF STAFF": "HIGH COMMAND",
+  "ASSISTANT CHIEF": "HIGH COMMAND",
+  "DEPUTY CHIEF": "HIGH COMMAND",
+  CHIEF: "HIGH COMMAND",
+}
+
+const RANK_ALIASES: Record<string, string> = {
+  OFFICER: "Officer",
+  "OFFICER 1": "Officer",
+  "OFFICER 2": "Officer 2",
+  "OFFICER 3": "Officer 3",
+
+  LCPL: "LCPL",
+  CPL: "CPL",
+  SGT: "SGT",
+  SSGT: "SSGT",
+  MSGT: "MSGT",
+
+  "2LT": "2LT",
+  "1LT": "1LT",
+  CPT: "CPT",
+  MAJ: "MAJ",
+
+  LTCOL: "LTCOL",
+  "LT COL": "LTCOL",
+  "LIEUTENANT COLONEL": "LTCOL",
+
+  COL: "COL",
+  "CHIEF OF STAFF": "Chief Of Staff",
+  "ASSISTANT CHIEF": "Assistant Chief",
+  "DEPUTY CHIEF": "Deputy Chief",
+  CHIEF: "Chief",
+}
+
+const GROUP_ALIASES: Record<string, GroupName> = {
+  OFFICERS: "OFFICERS",
+  OFFICER: "OFFICERS",
+
+  SUPERVISORS: "SUPERVISORS",
+  SUPERVISOR: "SUPERVISORS",
+
+  "LOW COMMAND": "LOW COMMAND",
+  "LOWER COMMAND": "LOW COMMAND",
+
+  "TRIAL HIGH COMMAND": "TRIAL HIGH COMMAND",
+
+  "HIGH COMMAND": "HIGH COMMAND",
+}
+
+function normalise(value: unknown): string {
+  return String(value ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase()
+}
+
+function cleanLabel(value: unknown): string {
+  return String(value ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\*+/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function getCellValue(
+  row: GvizRow,
+  column: number,
+): string {
+  const cell = row.c?.[column]
+
+  if (!cell) {
+    return ""
+  }
+
+  if (cell.v !== undefined && cell.v !== null) {
+    return String(cell.v)
+  }
+
+  if (cell.f !== undefined && cell.f !== null) {
+    return String(cell.f)
+  }
+
+  return ""
+}
+
+function getRankGroup(rank: string): GroupName {
+  return (
+    RANK_GROUPS[normalise(rank)] ??
+    "OTHER"
+  )
+}
+
+function getCanonicalRank(rank: string): string {
+  const key = normalise(rank)
+
+  return (
+    RANK_ALIASES[key] ??
+    cleanLabel(rank)
+  )
+}
+
+function isRankLabel(value: string): boolean {
+  const key = normalise(value)
+
+  return Boolean(
+    RANK_ALIASES[key] ||
+      RANK_GROUPS[key],
+  )
+}
+
+function isGroupLabel(value: string): boolean {
+  return Boolean(
+    GROUP_ALIASES[normalise(value)],
+  )
+}
+
+function isSection(value: string):
+  | "PRIMARY RESPONSIBILITY"
+  | "AUTHORITY"
+  | null {
+  const key = normalise(value)
+
+  if (
+    key === "PRIMARY RESPONSIBILITY" ||
+    key === "PRIMARY RESPONSIBILITIES"
+  ) {
+    return "PRIMARY RESPONSIBILITY"
+  }
+
+  if (key === "AUTHORITY") {
+    return "AUTHORITY"
+  }
+
+  return null
+}
+
+function isIgnoredRow(values: string[]): boolean {
+  const combined = normalise(values.join(" "))
+
+  if (!combined) {
+    return true
+  }
+
+  const ignoredPhrases = [
+    "THIS DOCUMENT SUPERCEDES",
+    "TAKES PRECEDENT",
+    "RESTRICTIONS APPLY",
+    "DETERMINED BY RANK IN FTD",
+    "LAST UPDATED",
+  ]
+
+  return ignoredPhrases.some((phrase) =>
+    combined.includes(phrase),
+  )
+}
+
+function parsePermission(value: string): boolean {
+  const key = normalise(value)
+
+  if (
+    key === "TRUE" ||
+    key === "YES" ||
+    key === "Y" ||
+    key === "1" ||
+    key === "X" ||
+    key === "✓" ||
+    key === "✔" ||
+    key === "CHECK" ||
+    key === "CHECKED"
+  ) {
+    return true
+  }
+
+  return false
+}
 
 type GvizCell = {
   v?: unknown
-  f?: string
+  f?: unknown
 }
 
 type GvizRow = {
@@ -47,1531 +265,941 @@ type GvizRow = {
 
 type GvizResponse = {
   table?: {
+    cols?: Array<{
+      id?: string
+      label?: string
+      type?: string
+    }>
     rows?: GvizRow[]
   }
+  status?: string
+  errors?: Array<{
+    message?: string
+    detailed_message?: string
+  }>
 }
 
-type Group = {
-  id: string
-  label: string
-}
+function parseGvizResponse(raw: string): GvizResponse {
+  const start = raw.indexOf("{")
+  const end = raw.lastIndexOf("}")
 
-type Rank = {
-  id: string
-  label: string
-  groupId: string
-  sourceColumn: number
-}
-
-type MatrixEntry = {
-  id: string
-  section: string
-  name: string
-  permissions: Record<string, boolean>
-}
-
-type MatrixData = {
-  groups: Group[]
-  ranks: Rank[]
-  entries: MatrixEntry[]
-}
-
-const KNOWN_GROUPS = [
-  "OFFICERS",
-  "SUPERVISORS",
-  "LOW COMMAND",
-  "TRIAL HIGH COMMAND",
-]
-
-function text(value: unknown): string {
-  return String(value ?? "")
-    .replace(/\*+/g, "")
-    .replace(/\r?\n/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-function upper(value: unknown): string {
-  return text(value).toUpperCase()
-}
-
-function cell(
-  row: GvizRow | undefined,
-  index: number,
-): string {
-  if (!row?.c?.[index]) {
-    return ""
-  }
-
-  const item = row.c[index]
-
-  return text(
-    item?.v ??
-      item?.f ??
-      "",
-  )
-}
-
-function detectGroup(
-  value: string,
-): string | null {
-  const valueUpper = upper(value)
-
-  if (
-    valueUpper === "OFFICERS" ||
-    valueUpper === "OFFICER"
-  ) {
-    return "OFFICERS"
-  }
-
-  if (
-    valueUpper === "SUPERVISORS" ||
-    valueUpper === "SUPERVISOR"
-  ) {
-    return "SUPERVISORS"
-  }
-
-  if (valueUpper === "LOW COMMAND") {
-    return "LOW COMMAND"
-  }
-
-  if (
-    valueUpper === "TRIAL HIGH COMMAND" ||
-    valueUpper === "TRIAL HIGH COMMANDS"
-  ) {
-    return "TRIAL HIGH COMMAND"
-  }
-
-  return null
-}
-
-function permission(value: string): boolean {
-  const normalised =
-    text(value).toLowerCase()
-
-  return [
-    "true",
-    "yes",
-    "y",
-    "1",
-    "x",
-    "✓",
-    "✔",
-    "check",
-    "checked",
-  ].includes(normalised)
-}
-
-function ignoredDocumentText(
-  value: string,
-): boolean {
-  const lower =
-    value.toLowerCase()
-
-  return (
-    lower.includes(
-      "this document supersedes",
-    ) ||
-    lower.includes(
-      "takes precedent over any other document",
-    ) ||
-    lower.includes(
-      "takes precedence over any other document",
-    ) ||
-    lower.includes(
-      "restrictions apply based on the rank",
-    ) ||
-    lower.includes(
-      "determined by rank in ftd",
-    ) ||
-    lower.includes(
-      "last updated",
-    ) ||
-    /^\d{1,2}\/\d{1,2}\/\d{4}/.test(
-      lower,
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error(
+      "Google Sheets returned an invalid response.",
     )
-  )
+  }
+
+  return JSON.parse(
+    raw.slice(start, end + 1),
+  ) as GvizResponse
 }
 
-/*
- * Find the row containing the rank groups.
- *
- * Google Sheets often returns merged cells with the value
- * only in the first cell of the merged area, so we only
- * need to find one or more recognised groups.
- */
-function findGroupRow(
+function findRankHeaderRow(
   rows: GvizRow[],
 ): number {
-  let bestIndex = -1
-  let bestScore = 0
+  let bestRow = -1
+  let bestMatches = 0
 
-  const limit = Math.min(
-    rows.length,
-    20,
-  )
+  const limit = Math.min(rows.length, 15)
 
-  for (
-    let rowIndex = 0;
-    rowIndex < limit;
-    rowIndex++
-  ) {
-    let score = 0
+  for (let rowIndex = 0; rowIndex < limit; rowIndex += 1) {
+    const row = rows[rowIndex]
+    const values = row.c ?? []
 
-    for (
-      let columnIndex = 0;
-      columnIndex < 40;
-      columnIndex++
-    ) {
-      const value =
-        cell(
-          rows[rowIndex],
-          columnIndex,
-        )
+    let matches = 0
 
-      if (detectGroup(value)) {
-        score++
+    for (const cell of values) {
+      const value = String(
+        cell?.v ?? cell?.f ?? "",
+      ).trim()
+
+      if (isRankLabel(value)) {
+        matches += 1
       }
     }
 
-    if (score > bestScore) {
-      bestScore = score
-      bestIndex = rowIndex
+    if (matches > bestMatches) {
+      bestMatches = matches
+      bestRow = rowIndex
     }
   }
 
-  return bestIndex
+  return bestMatches >= 2 ? bestRow : -1
 }
 
-/*
- * If Google has stripped the merged group cells completely,
- * infer the groups from the rank labels.
- *
- * This is only a fallback. Normally the group headings from
- * the sheet are used.
- */
-function inferGroupFromRank(
-  value: string,
-): string | null {
-  const rank = upper(value)
+function findGroupHeaderRow(
+  rows: GvizRow[],
+  rankHeaderRow: number,
+): number {
+  let bestRow = -1
+  let bestMatches = 0
 
-  if (
-    rank === "OFFICER" ||
-    /^OFFICER\s*[123]$/.test(rank)
-  ) {
-    return "OFFICERS"
+  const limit = Math.min(
+    rankHeaderRow === -1
+      ? rows.length
+      : rankHeaderRow,
+    15,
+  )
+
+  for (let rowIndex = 0; rowIndex < limit; rowIndex += 1) {
+    const values = rows[rowIndex]?.c ?? []
+
+    let matches = 0
+
+    for (const cell of values) {
+      const value = String(
+        cell?.v ?? cell?.f ?? "",
+      ).trim()
+
+      if (isGroupLabel(value)) {
+        matches += 1
+      }
+    }
+
+    if (matches > bestMatches) {
+      bestMatches = matches
+      bestRow = rowIndex
+    }
   }
 
-  if (
-    [
-      "LCPL",
-      "CPL",
-      "SGT",
-      "SSGT",
-      "MSGT",
-    ].includes(rank)
-  ) {
-    return "SUPERVISORS"
-  }
-
-  if (
-    [
-      "2LT",
-      "1LT",
-      "CPT",
-      "MAJ",
-    ].includes(rank)
-  ) {
-    return "LOW COMMAND"
-  }
-
-  if (
-    rank.includes("LTCOL") ||
-    rank.includes("LIEUTENANT COLONEL")
-  ) {
-    return "TRIAL HIGH COMMAND"
-  }
-
-  return null
+  return bestMatches > 0 ? bestRow : -1
 }
 
 function parseGviz(
-  raw: string,
-): MatrixData {
-  const start =
-    raw.indexOf("{")
+  response: GvizResponse,
+): ParsedMatrix {
+  const rows = response.table?.rows ?? []
 
-  const end =
-    raw.lastIndexOf("}")
-
-  if (
-    start === -1 ||
-    end === -1
-  ) {
+  if (rows.length === 0) {
     throw new Error(
-      "Google Sheets did not return readable sheet data.",
+      "The Google Sheet did not return any rows.",
     )
   }
 
-  const json =
-    JSON.parse(
-      raw.slice(
-        start,
-        end + 1,
-      ),
-    ) as GvizResponse
+  const rankHeaderRow = findRankHeaderRow(rows)
+  const groupHeaderRow = findGroupHeaderRow(
+    rows,
+    rankHeaderRow,
+  )
 
-  const rows =
-    json.table?.rows ?? []
-
-  if (!rows.length) {
+  if (rankHeaderRow === -1) {
     throw new Error(
-      `The "${SHEET_NAME}" tab returned no rows.`,
+      `Could not find the rank columns in the "${SHEET_NAME}" tab.`,
     )
   }
 
-  /*
-   * Work out the widest row.
-   */
-  const width =
-    Math.max(
-      ...rows.map(
-        (row) =>
-          row.c?.length ?? 0,
-      ),
-    )
-
+  const rankRow = rows[rankHeaderRow]?.c ?? []
   const groupRow =
-    findGroupRow(rows)
+    groupHeaderRow >= 0
+      ? rows[groupHeaderRow]?.c ?? []
+      : []
 
-  /*
-   * Build group information.
-   */
-  const groupsByColumn =
-    new Map<
-      number,
-      string
-    >()
-
-  if (groupRow >= 0) {
-    let currentGroup:
-      | string
-      | null = null
-
-    for (
-      let column = 0;
-      column < width;
-      column++
-    ) {
-      const value =
-        cell(
-          rows[groupRow],
-          column,
-        )
-
-      const detected =
-        detectGroup(value)
-
-      if (detected) {
-        currentGroup = detected
-      }
-
-      if (currentGroup) {
-        groupsByColumn.set(
-          column,
-          currentGroup,
-        )
-      }
-    }
-  }
-
-  /*
-   * Find the rank/header row.
-   *
-   * Normally this is immediately beneath the group row.
-   * We inspect the next few rows and choose the one containing
-   * the greatest number of non-boolean labels.
-   */
-  let rankRow = -1
-
-  if (groupRow >= 0) {
-    let bestScore = 0
-
-    for (
-      let candidate =
-        groupRow + 1;
-      candidate <
-        Math.min(
-          rows.length,
-          groupRow + 6,
-        );
-      candidate++
-    ) {
-      let score = 0
-
-      for (
-        let column = 0;
-        column < width;
-        column++
-      ) {
-        if (
-          !groupsByColumn.has(
-            column,
-          )
-        ) {
-          continue
-        }
-
-        const value =
-          cell(
-            rows[candidate],
-            column,
-          )
-
-        const lower =
-          value.toLowerCase()
-
-        if (
-          value &&
-          lower !== "true" &&
-          lower !== "false"
-        ) {
-          score++
-        }
-      }
-
-      if (score > bestScore) {
-        bestScore = score
-        rankRow = candidate
-      }
-    }
-  }
-
-  /*
-   * If the group row wasn't found, inspect the first few rows
-   * for likely rank headers and use their labels to construct
-   * the columns.
-   */
-  if (rankRow === -1) {
-    for (
-      let candidate = 0;
-      candidate <
-        Math.min(
-          rows.length,
-          10,
-        );
-      candidate++
-    ) {
-      let score = 0
-
-      for (
-        let column = 0;
-        column < width;
-        column++
-      ) {
-        const value =
-          cell(
-            rows[candidate],
-            column,
-          )
-
-        if (
-          inferGroupFromRank(
-            value,
-          )
-        ) {
-          score++
-        }
-      }
-
-      if (score >= 2) {
-        rankRow = candidate
-        break
-      }
-    }
-  }
-
-  if (rankRow === -1) {
-    throw new Error(
-      `Could not identify the rank header row in "${SHEET_NAME}".`,
-    )
-  }
-
-  /*
-   * Build ranks.
-   */
-  const ranks: Rank[] = []
-
-  let currentFallbackGroup:
-    | string
-    | null = null
+  const ranks: RankColumn[] = []
 
   for (
     let column = 0;
-    column < width;
-    column++
+    column < rankRow.length;
+    column += 1
   ) {
-    const rankLabel =
-      cell(
-        rows[rankRow],
-        column,
+    const rawRank = getCellValue(
+      rows[rankHeaderRow],
+      column,
+    )
+
+    if (!isRankLabel(rawRank)) {
+      continue
+    }
+
+    const rank = getCanonicalRank(rawRank)
+
+    let group: GroupName | undefined
+
+    /*
+     * First try the group header directly above the
+     * rank column.
+     */
+    for (
+      let groupColumn = column;
+      groupColumn >= 0;
+      groupColumn -= 1
+    ) {
+      const groupValue = getCellValue(
+        {
+          c: groupRow,
+        },
+        groupColumn,
       )
 
-    if (!rankLabel) {
-      continue
+      if (isGroupLabel(groupValue)) {
+        group = GROUP_ALIASES[
+          normalise(groupValue)
+        ]
+        break
+      }
     }
-
-    const lower =
-      rankLabel.toLowerCase()
 
     /*
-     * Don't turn TRUE/FALSE into rank names.
+     * If the sheet uses merged cells and GViz does not
+     * expose the merged value beside the rank, fall back
+     * to the known rank grouping.
      */
-    if (
-      lower === "true" ||
-      lower === "false"
-    ) {
-      continue
+    if (!group) {
+      group = getRankGroup(rank)
     }
-
-    let groupId =
-      groupsByColumn.get(
-        column,
-      ) ?? null
-
-    /*
-     * If the merged group header wasn't returned,
-     * infer it from the actual rank name.
-     */
-    if (!groupId) {
-      groupId =
-        inferGroupFromRank(
-          rankLabel,
-        )
-    }
-
-    if (!groupId) {
-      continue
-    }
-
-    currentFallbackGroup =
-      groupId
 
     ranks.push({
-      id: `${groupId}-${column}`,
-      label: rankLabel,
-      groupId,
-      sourceColumn: column,
+      column,
+      rank,
+      group,
     })
   }
 
-  /*
-   * If only the first merged column carried the group name,
-   * fill the group across any rank columns that didn't receive
-   * a group.
-   */
-  if (
-    ranks.length === 0 &&
-    groupRow >= 0
-  ) {
+  if (ranks.length === 0) {
     throw new Error(
-      `The "${SHEET_NAME}" tab was read, but no rank columns were found.`,
+      `Could not find any rank columns in the "${SHEET_NAME}" tab.`,
     )
   }
 
   /*
-   * Remove duplicate columns.
+   * Column A = section
+   * Column B = responsibility / authority name
+   * Remaining columns = rank permissions
    */
-  const uniqueRanks =
-    ranks.filter(
-      (rank, index, array) =>
-        array.findIndex(
-          (other) =>
-            other.sourceColumn ===
-            rank.sourceColumn,
-        ) === index,
-    )
+  const entries: MatrixEntry[] = []
 
-  /*
-   * Build group list in the correct order.
-   */
-  const groups: Group[] =
-    KNOWN_GROUPS
-      .filter(
-        (id) =>
-          uniqueRanks.some(
-            (rank) =>
-              rank.groupId ===
-              id,
-          ),
-      )
-      .map((id) => ({
-        id,
-        label: id,
-      }))
-
-  /*
-   * Find the first data row.
-   */
-  const firstDataRow =
-    rankRow + 1
-
-  const entries: MatrixEntry[] =
-    []
-
-  let currentSection = ""
+  let currentSection:
+    | "PRIMARY RESPONSIBILITY"
+    | "AUTHORITY"
+    | null = null
 
   for (
-    let rowIndex =
-      firstDataRow;
+    let rowIndex = rankHeaderRow + 1;
     rowIndex < rows.length;
-    rowIndex++
+    rowIndex += 1
   ) {
-    const row =
-      rows[rowIndex]
+    const row = rows[rowIndex]
 
-    const columnA =
-      cell(row, 0)
-
-    const columnB =
-      cell(row, 1)
-
-    /*
-     * Remove all unwanted footer/document information.
-     */
-    if (
-      ignoredDocumentText(
-        columnA,
-      ) ||
-      ignoredDocumentText(
-        columnB,
-      )
-    ) {
+    if (!row) {
       continue
     }
 
-    const sectionValue =
-      upper(columnA)
+    const allValues = (row.c ?? []).map(
+      (cell) =>
+        String(
+          cell?.v ?? cell?.f ?? "",
+        ).trim(),
+    )
 
-    if (
-      sectionValue ===
-      "PRIMARY RESPONSIBILITY"
-    ) {
-      currentSection =
-        "PRIMARY RESPONSIBILITY"
-    } else if (
-      sectionValue === "AUTHORITY"
-    ) {
-      currentSection =
-        "AUTHORITY"
+    if (isIgnoredRow(allValues)) {
+      continue
+    }
+
+    const sectionCell = getCellValue(row, 0)
+    const detectedSection =
+      isSection(sectionCell)
+
+    if (detectedSection) {
+      currentSection = detectedSection
+      continue
     }
 
     /*
-     * Some sheets put the responsibility directly in Column A
-     * and the permissions immediately after it. Support that too.
+     * Some Google Sheets layouts may put the section
+     * label in another visible cell. Check the first
+     * few cells as a fallback.
      */
-    let name = columnB
-    let nameColumn = 1
+    if (!currentSection) {
+      for (
+        let column = 0;
+        column < Math.min(allValues.length, 3);
+        column += 1
+      ) {
+        const possibleSection = isSection(
+          allValues[column],
+        )
 
-    if (!name) {
-      name = columnA
-      nameColumn = 0
-    }
-
-    if (!name) {
-      continue
-    }
-
-    if (
-      upper(name) ===
-        "PRIMARY RESPONSIBILITY" ||
-      upper(name) === "AUTHORITY"
-    ) {
-      continue
+        if (possibleSection) {
+          currentSection = possibleSection
+          break
+        }
+      }
     }
 
     if (!currentSection) {
       continue
     }
 
+    const name = cleanLabel(
+      getCellValue(row, 1),
+    )
+
+    if (!name) {
+      continue
+    }
+
+    const upperName = normalise(name)
+
     if (
-      ignoredDocumentText(
-        name,
-      )
+      upperName === "PRIMARY RESPONSIBILITY" ||
+      upperName === "AUTHORITY"
     ) {
       continue
     }
 
-    const permissions:
-      Record<
-        string,
-        boolean
-      > = {}
+    if (
+      upperName.includes("THIS DOCUMENT") ||
+      upperName.includes("LAST UPDATED") ||
+      upperName.includes("RESTRICTIONS APPLY")
+    ) {
+      continue
+    }
 
-    for (const rank of uniqueRanks) {
-      /*
-       * If the responsibility is in Column A,
-       * permissions still start from the original rank columns.
-       *
-       * If the responsibility is in Column B,
-       * the rank columns remain unchanged.
-       */
-      void nameColumn
+    const permissions: Record<string, boolean> = {}
 
-      permissions[
-        rank.id
-      ] = permission(
-        cell(
-          row,
-          rank.sourceColumn,
-        ),
+    for (const rank of ranks) {
+      permissions[rank.rank] = parsePermission(
+        getCellValue(row, rank.column),
       )
     }
 
     entries.push({
-      id: `${rowIndex}-${name}`,
-      section:
-        currentSection,
+      id: `${currentSection}-${rowIndex}-${name}`,
+      section: currentSection,
       name,
       permissions,
     })
   }
 
-  if (!entries.length) {
+  if (entries.length === 0) {
     throw new Error(
-      `The "${SHEET_NAME}" tab was found, but no responsibility/authority entries could be read.`,
+      `The "${SHEET_NAME}" tab was found, but no Authority Matrix entries could be read.`,
     )
   }
 
   return {
-    groups,
-    ranks: uniqueRanks,
+    ranks,
     entries,
   }
 }
 
-function groupStyle(
-  group: string,
-) {
+function getSheetId(): string {
+  const match = SHEET_URL.match(
+    /\/spreadsheets\/d\/([^/]+)/,
+  )
+
+  if (!match) {
+    throw new Error(
+      "Invalid Google Sheets URL.",
+    )
+  }
+
+  return match[1]
+}
+
+function getGroupClasses(
+  group: GroupName,
+): string {
   switch (group) {
     case "OFFICERS":
-      return {
-        header:
-          "bg-blue-500/[0.08] text-blue-300",
-        cell:
-          "bg-blue-500/[0.015]",
-      }
+      return "text-sky-400"
 
     case "SUPERVISORS":
-      return {
-        header:
-          "bg-violet-500/[0.08] text-violet-300",
-        cell:
-          "bg-violet-500/[0.015]",
-      }
+      return "text-emerald-400"
 
     case "LOW COMMAND":
-      return {
-        header:
-          "bg-amber-500/[0.08] text-amber-300",
-        cell:
-          "bg-amber-500/[0.015]",
-      }
+      return "text-amber-400"
 
     case "TRIAL HIGH COMMAND":
-      return {
-        header:
-          "bg-red-500/[0.08] text-red-300",
-        cell:
-          "bg-red-500/[0.015]",
-      }
+      return "text-orange-400"
+
+    case "HIGH COMMAND":
+      return "text-red-400"
 
     default:
-      return {
-        header:
-          "bg-muted/20 text-muted-foreground",
-        cell:
-          "bg-transparent",
-      }
+      return "text-muted-foreground"
   }
 }
 
 export default function AuthorityMatrix() {
-  const [data, setData] =
-    useState<MatrixData | null>(
-      null,
-    )
-
-  const [search, setSearch] =
-    useState("")
-
-  const [hiddenSections, setHiddenSections] =
-    useState<string[]>([])
-
-  const [hiddenGroups, setHiddenGroups] =
-    useState<string[]>([])
+  const [matrix, setMatrix] =
+    useState<ParsedMatrix | null>(null)
 
   const [loading, setLoading] =
     useState(true)
 
+  const [error, setError] =
+    useState<string | null>(null)
+
+  const [search, setSearch] =
+    useState("")
+
+  const [sectionFilter, setSectionFilter] =
+    useState("ALL")
+
+  const [rankFilter, setRankFilter] =
+    useState("ALL")
+
   const [refreshing, setRefreshing] =
     useState(false)
 
-  const [error, setError] =
-    useState("")
-
-  const load =
-    useCallback(
-      async (
-        manual = false,
-      ) => {
-        if (manual) {
+  const loadMatrix = useCallback(
+    async (showRefresh = false) => {
+      try {
+        if (showRefresh) {
           setRefreshing(true)
+        } else {
+          setLoading(true)
         }
 
-        try {
-          setError("")
+        setError(null)
 
-          const match =
-            GOOGLE_SHEET_URL.match(
-              /\/spreadsheets\/d\/([^/]+)/,
-            )
+        const sheetId = getSheetId()
 
-          if (!match?.[1]) {
-            throw new Error(
-              "The Google Sheet URL is invalid.",
-            )
-          }
+        const url =
+          `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq` +
+          `?sheet=${encodeURIComponent(SHEET_NAME)}` +
+          `&headers=0` +
+          `&tqx=out:json` +
+          `&cacheBust=${Date.now()}`
 
-          const sheetId =
-            match[1]
+        const response = await fetch(url, {
+          cache: "no-store",
+        })
 
-          /*
-           * No GID.
-           * No API key.
-           * The tab is selected by its name.
-           */
-          const url =
-            `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq` +
-            `?sheet=${encodeURIComponent(
-              SHEET_NAME,
-            )}` +
-            `&headers=0` +
-            `&tqx=out:json` +
-            `&cacheBust=${Date.now()}`
-
-          const response =
-            await fetch(url, {
-              method: "GET",
-              cache: "no-store",
-            })
-
-          if (!response.ok) {
-            throw new Error(
-              `Google Sheets returned HTTP ${response.status}.`,
-            )
-          }
-
-          const raw =
-            await response.text()
-
-          const parsed =
-            parseGviz(raw)
-
-          setData(parsed)
-        } catch (reason) {
-          setError(
-            reason instanceof Error
-              ? reason.message
-              : "Unable to load the Authority Matrix.",
+        if (!response.ok) {
+          throw new Error(
+            `Google Sheets returned HTTP ${response.status}.`,
           )
-        } finally {
-          setLoading(false)
-          setRefreshing(false)
         }
-      },
-      [],
-    )
+
+        const raw = await response.text()
+
+        if (
+          raw.includes("<html") ||
+          raw.includes("<!DOCTYPE")
+        ) {
+          throw new Error(
+            "Google Sheets did not return spreadsheet data. Make sure the sheet is publicly viewable.",
+          )
+        }
+
+        const parsed =
+          parseGvizResponse(raw)
+
+        if (
+          parsed.errors &&
+          parsed.errors.length > 0
+        ) {
+          const message =
+            parsed.errors[0]?.detailed_message ??
+            parsed.errors[0]?.message ??
+            "Google Sheets returned an error."
+
+          throw new Error(message)
+        }
+
+        if (
+          parsed.status &&
+          parsed.status !== "ok"
+        ) {
+          throw new Error(
+            `Google Sheets returned status "${parsed.status}".`,
+          )
+        }
+
+        setMatrix(
+          parseGviz(parsed),
+        )
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Unable to load Authority Matrix."
+
+        setError(message)
+        setMatrix(null)
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
-    void load()
+    void loadMatrix()
 
-    const interval =
-      window.setInterval(
-        () => {
-          void load()
-        },
-        AUTO_REFRESH_MS,
-      )
+    const interval = window.setInterval(() => {
+      void loadMatrix()
+    }, 60_000)
 
-    return () =>
-      window.clearInterval(
-        interval,
-      )
-  }, [load])
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [loadMatrix])
 
-  const sections =
+  const filteredEntries =
     useMemo(() => {
-      if (!data) {
+      if (!matrix) {
         return []
       }
 
-      return Array.from(
-        new Set(
-          data.entries.map(
-            (entry) =>
-              entry.section,
-          ),
-        ),
-      )
-    }, [data])
+      const searchValue =
+        normalise(search)
 
-  const visibleGroups =
-    useMemo(() => {
-      if (!data) {
-        return []
-      }
-
-      return data.groups.filter(
-        (group) =>
-          !hiddenGroups.includes(
-            group.id,
-          ),
-      )
-    }, [data, hiddenGroups])
-
-  const visibleRanks =
-    useMemo(() => {
-      if (!data) {
-        return []
-      }
-
-      return data.ranks.filter(
-        (rank) =>
-          !hiddenGroups.includes(
-            rank.groupId,
-          ),
-      )
-    }, [data, hiddenGroups])
-
-  const filtered =
-    useMemo(() => {
-      if (!data) {
-        return []
-      }
-
-      const query =
-        search
-          .trim()
-          .toLowerCase()
-
-      return data.entries.filter(
+      return matrix.entries.filter(
         (entry) => {
-          if (
-            hiddenSections.includes(
-              entry.section,
-            )
-          ) {
-            return false
-          }
+          const matchesSearch =
+            !searchValue ||
+            normalise(
+              entry.name,
+            ).includes(searchValue)
 
-          if (!query) {
-            return true
-          }
+          const matchesSection =
+            sectionFilter === "ALL" ||
+            entry.section === sectionFilter
+
+          const matchesRank =
+            rankFilter === "ALL" ||
+            entry.permissions[rankFilter] !==
+              undefined
 
           return (
-            entry.name
-              .toLowerCase()
-              .includes(query) ||
-            entry.section
-              .toLowerCase()
-              .includes(query)
+            matchesSearch &&
+            matchesSection &&
+            matchesRank
           )
         },
       )
     }, [
-      data,
-      hiddenSections,
+      matrix,
       search,
+      sectionFilter,
+      rankFilter,
     ])
 
-  const bySection =
+  const visibleRanks =
     useMemo(() => {
-      const map =
-        new Map<
-          string,
-          MatrixEntry[]
-        >()
-
-      for (const entry of filtered) {
-        const list =
-          map.get(
-            entry.section,
-          ) ?? []
-
-        list.push(entry)
-
-        map.set(
-          entry.section,
-          list,
-        )
+      if (!matrix) {
+        return []
       }
 
-      return map
-    }, [filtered])
+      if (rankFilter === "ALL") {
+        return matrix.ranks
+      }
 
-  const orderedSections =
+      return matrix.ranks.filter(
+        (rank) =>
+          rank.rank === rankFilter,
+      )
+    }, [matrix, rankFilter])
+
+  const groupedRanks =
     useMemo(() => {
-      const preferred = [
-        "PRIMARY RESPONSIBILITY",
-        "AUTHORITY",
-      ]
+      const groups = new Map<
+        GroupName,
+        RankColumn[]
+      >()
 
-      const existing =
-        Array.from(
-          bySection.keys(),
+      for (const rank of visibleRanks) {
+        const existing =
+          groups.get(rank.group) ?? []
+
+        existing.push(rank)
+        groups.set(rank.group, existing)
+      }
+
+      return GROUP_ORDER
+        .filter((group) =>
+          groups.has(group),
         )
-
-      return [
-        ...preferred.filter(
-          (section) =>
-            existing.includes(
-              section,
-            ),
-        ),
-        ...existing.filter(
-          (section) =>
-            !preferred.includes(
-              section,
-            ),
-        ),
-      ]
-    }, [bySection])
-
-  const toggleSection = (
-    value: string,
-  ) => {
-    setHiddenSections(
-      (current) =>
-        current.includes(value)
-          ? current.filter(
-              (item) =>
-                item !== value,
-            )
-          : [
-              ...current,
-              value,
-            ],
-    )
-  }
-
-  const toggleGroup = (
-    value: string,
-  ) => {
-    setHiddenGroups(
-      (current) =>
-        current.includes(value)
-          ? current.filter(
-              (item) =>
-                item !== value,
-            )
-          : [
-              ...current,
-              value,
-            ],
-    )
-  }
+        .map((group) => ({
+          group,
+          ranks:
+            groups.get(group) ?? [],
+        }))
+    }, [visibleRanks])
 
   const clearFilters = () => {
     setSearch("")
-    setHiddenSections([])
-    setHiddenGroups([])
-  }
-
-  const hasFilters =
-    Boolean(search.trim()) ||
-    hiddenSections.length > 0 ||
-    hiddenGroups.length > 0
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-border bg-card">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <RefreshCw className="h-4 w-4 animate-spin" />
-          Loading Authority Matrix...
-        </div>
-      </div>
-    )
-  }
-
-  if (!data) {
-    return (
-      <div className="rounded-xl border border-red-500/30 bg-red-500/[0.025] p-6">
-        <p className="text-sm font-semibold text-red-300">
-          Unable to load Authority Matrix
-        </p>
-
-        <p className="mt-2 text-sm text-muted-foreground">
-          {error}
-        </p>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-4"
-          onClick={() =>
-            void load(true)
-          }
-        >
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Retry
-        </Button>
-      </div>
-    )
+    setSectionFilter("ALL")
+    setRankFilter("ALL")
   }
 
   return (
-    <div className="w-full min-w-0 overflow-hidden rounded-xl border border-border bg-card">
-      {/* FILTER BAR */}
-      <div className="border-b border-border px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-0 flex-1 sm:min-w-[220px]">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="w-full min-w-0">
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm">
+        {/* Header */}
+        <div className="border-b border-border/70 px-4 py-4 sm:px-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-500">
+                <FileSpreadsheet className="h-5 w-5" />
+              </div>
 
-            <input
-              value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value,
-                )
-              }
-              placeholder="Search responsibilities..."
-              className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold">
+                  Authority Matrix
+                </h2>
 
-          {/* SECTION */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              asChild
-            >
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-              >
-                <Filter className="mr-2 h-3.5 w-3.5" />
-                Section
-                <ChevronDown className="ml-2 h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent
-              align="end"
-              className="w-64"
-            >
-              <DropdownMenuLabel>
-                Section
-              </DropdownMenuLabel>
-
-              <DropdownMenuSeparator />
-
-              {sections.map(
-                (section) => (
-                  <DropdownMenuCheckboxItem
-                    key={section}
-                    checked={
-                      !hiddenSections.includes(
-                        section,
-                      )
-                    }
-                    onCheckedChange={() =>
-                      toggleSection(
-                        section,
-                      )
-                    }
-                  >
-                    {section}
-                  </DropdownMenuCheckboxItem>
-                ),
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* RANK */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              asChild
-            >
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-              >
-                <Filter className="mr-2 h-3.5 w-3.5" />
-                Rank
-                <ChevronDown className="ml-2 h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent
-              align="end"
-              className="w-56"
-            >
-              <DropdownMenuLabel>
-                Rank Groups
-              </DropdownMenuLabel>
-
-              <DropdownMenuSeparator />
-
-              {data.groups.map(
-                (group) => (
-                  <DropdownMenuCheckboxItem
-                    key={group.id}
-                    checked={
-                      !hiddenGroups.includes(
-                        group.id,
-                      )
-                    }
-                    onCheckedChange={() =>
-                      toggleGroup(
-                        group.id,
-                      )
-                    }
-                  >
-                    {group.label}
-                  </DropdownMenuCheckboxItem>
-                ),
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9"
-            disabled={refreshing}
-            onClick={() =>
-              void load(true)
-            }
-          >
-            <RefreshCw
-              className={`mr-2 h-3.5 w-3.5 ${
-                refreshing
-                  ? "animate-spin"
-                  : ""
-              }`}
-            />
-            Refresh
-          </Button>
-        </div>
-
-        {hasFilters && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[11px] text-muted-foreground">
-              Filters:
-            </span>
-
-            {search.trim() && (
-              <button
-                type="button"
-                onClick={() =>
-                  setSearch("")
-                }
-                className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
-              >
-                Search: {search}
-                <X className="h-3 w-3" />
-              </button>
-            )}
-
-            {hiddenSections.map(
-              (section) => (
-                <button
-                  key={section}
-                  type="button"
-                  onClick={() =>
-                    toggleSection(
-                      section,
-                    )
-                  }
-                  className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
-                >
-                  Hidden: {section}
-                  <X className="h-3 w-3" />
-                </button>
-              ),
-            )}
-
-            {hiddenGroups.map(
-              (group) => (
-                <button
-                  key={group}
-                  type="button"
-                  onClick={() =>
-                    toggleGroup(group)
-                  }
-                  className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
-                >
-                  Hidden: {group}
-                  <X className="h-3 w-3" />
-                </button>
-              ),
-            )}
+                <p className="text-xs text-muted-foreground">
+                  Command authority and responsibilities by rank.
+                </p>
+              </div>
+            </div>
 
             <button
               type="button"
-              onClick={
-                clearFilters
+              onClick={() =>
+                void loadMatrix(true)
               }
-              className="ml-1 text-[11px] font-medium text-blue-400 hover:text-blue-300"
+              disabled={refreshing}
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
             >
-              Clear filters
+              <RefreshCw
+                className={`h-4 w-4 ${
+                  refreshing
+                    ? "animate-spin"
+                    : ""
+                }`}
+              />
+              Refresh
             </button>
           </div>
-        )}
 
-        {error && (
-          <div className="mt-2 text-[11px] text-amber-400">
-            Refresh failed. Showing the last successfully
-            loaded version.
+          {/* Filters */}
+          {!loading && !error && matrix && (
+            <div className="mt-4 flex flex-col gap-2.5 lg:flex-row">
+              {/* Search */}
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) =>
+                    setSearch(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Search responsibilities..."
+                  className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
+                />
+              </div>
+
+              {/* Section */}
+              <div className="relative">
+                <Filter className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+
+                <select
+                  value={sectionFilter}
+                  onChange={(event) =>
+                    setSectionFilter(
+                      event.target.value,
+                    )
+                  }
+                  className="h-9 w-full min-w-[190px] appearance-none rounded-lg border border-border bg-background pl-9 pr-9 text-sm outline-none transition-colors focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
+                >
+                  <option value="ALL">
+                    All Sections
+                  </option>
+                  <option value="PRIMARY RESPONSIBILITY">
+                    Primary Responsibility
+                  </option>
+                  <option value="AUTHORITY">
+                    Authority
+                  </option>
+                </select>
+
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </div>
+
+              {/* Rank */}
+              <div className="relative">
+                <Shield className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+
+                <select
+                  value={rankFilter}
+                  onChange={(event) =>
+                    setRankFilter(
+                      event.target.value,
+                    )
+                  }
+                  className="h-9 w-full min-w-[160px] appearance-none rounded-lg border border-border bg-background pl-9 pr-9 text-sm outline-none transition-colors focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
+                >
+                  <option value="ALL">
+                    All Ranks
+                  </option>
+
+                  {matrix.ranks.map(
+                    (rank) => (
+                      <option
+                        key={rank.rank}
+                        value={rank.rank}
+                      >
+                        {rank.rank}
+                      </option>
+                    ),
+                  )}
+                </select>
+
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </div>
+
+              {(search ||
+                sectionFilter !==
+                  "ALL" ||
+                rankFilter !==
+                  "ALL") && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-muted"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Loading */}
+        {loading && (
+          <div className="flex min-h-[300px] items-center justify-center">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Loading Authority Matrix...
+            </div>
           </div>
         )}
-      </div>
 
-      {/* MATRIX */}
-      <div className="w-full overflow-hidden">
-        <table className="w-full table-fixed border-collapse">
-          <colgroup>
-            <col className="w-[30%]" />
+        {/* Error */}
+        {!loading && error && (
+          <div className="p-5">
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-400">
+                  <FileSpreadsheet className="h-4 w-4" />
+                </div>
 
-            {visibleRanks.map(
-              (rank) => (
-                <col
-                  key={rank.id}
-                  style={{
-                    width: `${
-                      70 /
-                      Math.max(
-                        visibleRanks.length,
-                        1,
-                      )
-                    }%`,
-                  }}
-                />
-              ),
-            )}
-          </colgroup>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-red-400">
+                    Unable to load Authority Matrix
+                  </h3>
 
-          <thead>
-            <tr>
-              <th
-                rowSpan={2}
-                className="border-b border-r border-border bg-background px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-              >
-                Responsibility / Authority
-              </th>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {error}
+                  </p>
 
-              {visibleGroups.map(
-                (group) => {
-                  const ranks =
-                    visibleRanks.filter(
-                      (rank) =>
-                        rank.groupId ===
-                        group.id,
-                    )
-
-                  if (!ranks.length) {
-                    return null
-                  }
-
-                  const styles =
-                    groupStyle(
-                      group.id,
-                    )
-
-                  return (
-                    <th
-                      key={group.id}
-                      colSpan={
-                        ranks.length
-                      }
-                      className={`border-b border-r border-border px-1 py-2 text-center text-[9px] font-bold uppercase tracking-wider ${styles.header}`}
-                    >
-                      {group.label}
-                    </th>
-                  )
-                },
-              )}
-            </tr>
-
-            <tr>
-              {visibleRanks.map(
-                (rank) => {
-                  const styles =
-                    groupStyle(
-                      rank.groupId,
-                    )
-
-                  return (
-                    <th
-                      key={rank.id}
-                      title={rank.label}
-                      className={`border-b border-r border-border px-1 py-2 text-center text-[9px] font-semibold ${styles.header}`}
-                    >
-                      <span className="block truncate">
-                        {rank.label}
-                      </span>
-                    </th>
-                  )
-                },
-              )}
-            </tr>
-          </thead>
-
-          <tbody>
-            {orderedSections.map(
-              (section) => {
-                const entries =
-                  bySection.get(
-                    section,
-                  ) ?? []
-
-                if (!entries.length) {
-                  return null
-                }
-
-                return (
-                  <Fragment
-                    key={section}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void loadMatrix(true)
+                    }
+                    className="mt-4 inline-flex h-8 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted"
                   >
-                    <tr>
-                      <td
-                        colSpan={
-                          1 +
-                          visibleRanks.length
-                        }
-                        className={`border-b border-border px-3 py-2 ${
-                          section ===
-                          "AUTHORITY"
-                            ? "border-t-2 border-t-blue-500/30 bg-blue-500/[0.025]"
-                            : "bg-muted/[0.015]"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          {section ===
-                            "AUTHORITY" && (
-                            <div className="h-px flex-1 bg-border" />
-                          )}
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-                          <span
-                            className={`text-[9px] font-bold uppercase tracking-[0.18em] ${
+        {/* Matrix */}
+        {!loading &&
+          !error &&
+          matrix && (
+            <div className="w-full overflow-hidden">
+              <table className="w-full table-fixed border-collapse">
+                <colgroup>
+                  <col className="w-[34%]" />
+
+                  {visibleRanks.map(
+                    (rank) => (
+                      <col
+                        key={rank.rank}
+                      />
+                    ),
+                  )}
+                </colgroup>
+
+                <thead>
+                  {/* Group row */}
+                  <tr className="border-b border-border/70 bg-muted/20">
+                    <th
+                      rowSpan={2}
+                      className="border-r border-border/70 px-3 py-3 text-left align-middle text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground sm:px-4"
+                    >
+                      Responsibility / Authority
+                    </th>
+
+                    {groupedRanks.map(
+                      ({
+                        group,
+                        ranks,
+                      }) => (
+                        <th
+                          key={group}
+                          colSpan={
+                            ranks.length
+                          }
+                          className={`border-r border-border/50 px-1 py-2 text-center text-[9px] font-bold uppercase tracking-[0.08em] last:border-r-0 ${getGroupClasses(
+                            group,
+                          )}`}
+                        >
+                          {group}
+                        </th>
+                      ),
+                    )}
+                  </tr>
+
+                  {/* Rank row */}
+                  <tr className="border-b border-border/70 bg-muted/10">
+                    {visibleRanks.map(
+                      (rank) => (
+                        <th
+                          key={rank.rank}
+                          title={rank.rank}
+                          className="border-r border-border/50 px-0.5 py-2 text-center text-[9px] font-semibold text-muted-foreground last:border-r-0 sm:text-[10px]"
+                        >
+                          {rank.rank}
+                        </th>
+                      ),
+                    )}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {(
+                    [
+                      "PRIMARY RESPONSIBILITY",
+                      "AUTHORITY",
+                    ] as const
+                  ).map((section) => {
+                    const sectionEntries =
+                      filteredEntries.filter(
+                        (entry) =>
+                          entry.section ===
+                          section,
+                      )
+
+                    if (
+                      sectionEntries.length ===
+                      0
+                    ) {
+                      return null
+                    }
+
+                    return (
+                      <tbody
+                        key={section}
+                      >
+                        <tr>
+                          <td
+                            colSpan={
+                              visibleRanks.length +
+                              1
+                            }
+                            className={`border-b border-border/70 bg-muted/20 px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-blue-400 sm:px-4 ${
                               section ===
                               "AUTHORITY"
-                                ? "text-blue-400"
-                                : "text-muted-foreground"
+                                ? "border-t-2 border-t-blue-500/20"
+                                : ""
                             }`}
                           >
                             {section}
-                          </span>
-
-                          {section ===
-                            "AUTHORITY" && (
-                            <div className="h-px flex-1 bg-border" />
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-
-                    {entries.map(
-                      (entry) => (
-                        <tr
-                          key={
-                            entry.id
-                          }
-                          className="transition hover:bg-white/[0.02]"
-                        >
-                          <td className="border-b border-r border-border bg-background px-3 py-2">
-                            <span
-                              title={
-                                entry.name
-                              }
-                              className="block truncate text-[12px] font-medium text-foreground"
-                            >
-                              {
-                                entry.name
-                              }
-                            </span>
                           </td>
-
-                          {visibleRanks.map(
-                            (rank) => {
-                              const styles =
-                                groupStyle(
-                                  rank.groupId,
-                                )
-
-                              const allowed =
-                                entry
-                                  .permissions[
-                                  rank.id
-                                ]
-
-                              return (
-                                <td
-                                  key={
-                                    rank.id
-                                  }
-                                  className={`border-b border-r border-border px-1 py-1.5 text-center ${styles.cell}`}
-                                >
-                                  {allowed ? (
-                                    <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-blue-500/15">
-                                      <Check className="h-3 w-3 text-blue-400" />
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] text-muted-foreground/20">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
-                              )
-                            },
-                          )}
                         </tr>
-                      ),
-                    )}
-                  </Fragment>
-                )
-              },
-            )}
-          </tbody>
-        </table>
 
-        {!filtered.length && (
-          <div className="border-t border-border px-4 py-10 text-center">
-            <p className="text-sm font-medium">
-              No results found
-            </p>
+                        {sectionEntries.map(
+                          (entry) => (
+                            <tr
+                              key={entry.id}
+                              className="border-b border-border/50 last:border-b-0 hover:bg-muted/10"
+                            >
+                              <td className="border-r border-border/50 px-3 py-2.5 text-left text-[11px] font-medium leading-4 text-foreground sm:px-4 sm:text-xs">
+                                {entry.name}
+                              </td>
 
-            <p className="mt-1 text-xs text-muted-foreground">
-              Try changing your search or filters.
-            </p>
-          </div>
-        )}
-      </div>
+                              {visibleRanks.map(
+                                (rank) => {
+                                  const allowed =
+                                    Boolean(
+                                      entry
+                                        .permissions[
+                                        rank.rank
+                                      ],
+                                    )
 
-      <div className="border-t border-border px-4 py-2">
-        <span className="text-[10px] text-muted-foreground">
-          {filtered.length}{" "}
-          {filtered.length ===
-          1
-            ? "entry"
-            : "entries"}
-        </span>
+                                  return (
+                                    <td
+                                      key={`${entry.id}-${rank.rank}`}
+                                      className="border-r border-border/50 px-0.5 py-2.5 text-center last:border-r-0"
+                                    >
+                                      {allowed ? (
+                                        <span
+                                          title={`${rank.rank}: Allowed`}
+                                          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400"
+                                        >
+                                          <Check className="h-3 w-3" />
+                                        </span>
+                                      ) : (
+                                        <span
+                                          title={`${rank.rank}: Not allowed`}
+                                          className="text-[11px] text-muted-foreground/30"
+                                        >
+                                          —
+                                        </span>
+                                      )}
+                                    </td>
+                                  )
+                                },
+                              )}
+                            </tr>
+                          ),
+                        )}
+                      </tbody>
+                    )
+                  })}
+                </tbody>
+              </table>
+
+              {filteredEntries.length ===
+                0 && (
+                <div className="border-t border-border/70 px-4 py-10 text-center">
+                  <Search className="mx-auto h-5 w-5 text-muted-foreground/50" />
+
+                  <p className="mt-2 text-sm font-medium">
+                    No results found
+                  </p>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Try changing your search or filters.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+        {/* Result count */}
+        {!loading &&
+          !error &&
+          matrix && (
+            <div className="border-t border-border/70 px-4 py-2.5 text-xs text-muted-foreground">
+              Showing{" "}
+              <span className="font-medium text-foreground">
+                {filteredEntries.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-medium text-foreground">
+                {matrix.entries.length}
+              </span>{" "}
+              entries
+            </div>
+          )}
       </div>
     </div>
   )
