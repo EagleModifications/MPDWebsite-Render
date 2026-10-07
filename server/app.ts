@@ -545,11 +545,9 @@ const DEFAULT_GALLERY_TAG_COLORS: Record<string, string> = {
   SAR: "#ffffff",
 }
 
-const GALLERY_ALLOWED_COLORS = new Set(["#3b82f6", "#ffffff"])
-
 function normalizeGalleryColor(value: unknown, fallback = "#3b82f6") {
   const color = typeof value === "string" ? value.trim().toLowerCase() : ""
-  return GALLERY_ALLOWED_COLORS.has(color) ? color : fallback
+  return /^#[0-9a-f]{6}$/.test(color) ? color : fallback
 }
 
 type GalleryTag = string
@@ -6418,7 +6416,6 @@ export function createApp() {
       if (!type || !value) return res.status(400).json({ success: false, error: "A valid category or tag name is required." })
       if (type === "tag" && !category) return res.status(400).json({ success: false, error: "Select a category for this tag." })
       if (value.length > 40) return res.status(400).json({ success: false, error: "Names must be 40 characters or fewer." })
-      if (!GALLERY_ALLOWED_COLORS.has(color)) return res.status(400).json({ success: false, error: "Gallery colors must be blue or white." })
 
       const gallery = await getCollection<GalleryTagsConfigDocument>("galleryTags")
       const config = await getGalleryConfig()
@@ -6460,26 +6457,71 @@ export function createApp() {
 
       const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
       const value = cleanGalleryString(req.body?.value)
+      const newValue = cleanGalleryString(req.body?.newValue || value)
       const category = cleanGalleryString(req.body?.category)
       const color = normalizeGalleryColor(req.body?.color, "#3b82f6")
-      if (!type || !value || !GALLERY_ALLOWED_COLORS.has(color)) {
-        return res.status(400).json({ success: false, error: "A valid option and hex color are required." })
-      }
+      if (!type || !value || !newValue) return res.status(400).json({ success: false, error: "A valid option name is required." })
+      if (newValue.length > 40) return res.status(400).json({ success: false, error: "Names must be 40 characters or fewer." })
+      if (!/^#[0-9a-f]{6}$/i.test(color)) return res.status(400).json({ success: false, error: "Enter a valid 6-digit hex color." })
 
       const config = await getGalleryConfig()
-      const exists = (type === "category" ? config.categories : config.tags).some((entry) => entry === value)
-      if (!exists) return res.status(404).json({ success: false, error: "Gallery option not found." })
+      const source = type === "category" ? config.categories : config.tags
+      if (!source.includes(value)) return res.status(404).json({ success: false, error: "Gallery option not found." })
+      if (source.some((entry) => entry !== value && entry.toLowerCase() === newValue.toLowerCase())) {
+        return res.status(409).json({ success: false, error: `${type === "category" ? "Category" : "Tag"} already exists.` })
+      }
 
       const gallery = await getCollection<GalleryTagsConfigDocument>("galleryTags")
-      const colors = type === "category" ? { ...config.categoryColors, [value]: color } : { ...config.tagColors, [value]: color }
-      const tagCategories = { ...(config.tagCategories ?? {}) }
-      if (type === "tag" && category) {
-        for (const key of Object.keys(tagCategories)) tagCategories[key] = (tagCategories[key] ?? []).filter((tag) => tag !== value)
-        tagCategories[category] = Array.from(new Set([...(tagCategories[category] ?? []), value]))
+      const tagCategories = Object.fromEntries(
+        Object.entries(config.tagCategories ?? {}).map(([key, tags]) => [key, [...(tags ?? [])]]),
+      )
+      let categories = [...config.categories]
+      let tags = [...config.tags]
+      let categoryColors = { ...config.categoryColors }
+      let tagColors = { ...config.tagColors }
+
+      if (type === "category") {
+        categories = categories.map((entry) => entry === value ? newValue : entry)
+        const assignedTags = tagCategories[value] ?? []
+        delete tagCategories[value]
+        tagCategories[newValue] = assignedTags
+        categoryColors[newValue] = color
+        delete categoryColors[value]
+
+        const fallbackCategory = categories[0] ?? newValue
+        const galleryItems = await getCollection<GalleryDocument>("gallery")
+        await galleryItems.updateMany({ category: value }, { $set: { category: newValue } })
+        if (fallbackCategory !== value) {
+          await galleryItems.updateMany({ _galleryConfig: true, category: value }, { $set: { category: fallbackCategory } })
+        }
+      } else {
+        tags = tags.map((entry) => entry === value ? newValue : entry)
+        for (const key of Object.keys(tagCategories)) {
+          tagCategories[key] = (tagCategories[key] ?? []).map((entry) => entry === value ? newValue : entry)
+        }
+        tagColors[newValue] = color
+        delete tagColors[value]
+
+        const galleryItems = await getCollection<GalleryDocument>("gallery")
+        await galleryItems.updateMany(
+          { tags: value },
+          { $set: { "tags.$[tag]": newValue } },
+          { arrayFilters: [{ tag: value }] },
+        )
       }
+
+      if (type === "tag") {
+        for (const key of Object.keys(tagCategories)) {
+          tagCategories[key] = (tagCategories[key] ?? []).filter((tag) => tag !== newValue && tag !== value)
+        }
+        if (category && categories.includes(category)) {
+          tagCategories[category] = Array.from(new Set([...(tagCategories[category] ?? []), newValue]))
+        }
+      }
+
       await gallery.updateOne(
         { key: "default" },
-        { $set: type === "category" ? { categoryColors: colors, tagCategories, updatedAt: new Date() } : { tagColors: colors, tagCategories, updatedAt: new Date() } },
+        { $set: { categories, tags, categoryColors, tagColors, tagCategories, updatedAt: new Date() } },
         { upsert: true },
       )
 
@@ -6487,6 +6529,68 @@ export function createApp() {
     } catch (error) {
       console.error("PUT /api/gallery/options failed:", error)
       return res.status(500).json({ success: false, error: "Failed to update gallery option" })
+    }
+  })
+
+  app.delete("/api/gallery/options", async (req, res) => {
+    try {
+      const user = await getRequestUser(req)
+      if (!user) return res.status(401).json({ success: false, error: "Not authenticated" })
+      if (!hasPermission(user, "gallery")) return res.status(403).json({ success: false, error: "You do not have permission to manage the gallery" })
+
+      const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
+      const value = cleanGalleryString(req.body?.value)
+      if (!type || !value) return res.status(400).json({ success: false, error: "A valid option is required." })
+
+      const config = await getGalleryConfig()
+      const source = type === "category" ? config.categories : config.tags
+      if (!source.includes(value)) return res.status(404).json({ success: false, error: "Gallery option not found." })
+
+      if (type === "category" && config.categories.length <= 1) {
+        return res.status(400).json({ success: false, error: "At least one gallery category must remain." })
+      }
+
+      const categories = type === "category" ? config.categories.filter((entry) => entry !== value) : [...config.categories]
+      const tags = type === "tag" ? config.tags.filter((entry) => entry !== value) : [...config.tags]
+      const categoryColors = { ...config.categoryColors }
+      const tagColors = { ...config.tagColors }
+      delete categoryColors[value]
+      delete tagColors[value]
+
+      const tagCategories = Object.fromEntries(
+        Object.entries(config.tagCategories ?? {}).map(([key, values]) => [
+          key, (values ?? []).filter((tag) => tag !== value),
+        ]),
+      )
+
+      if (type === "category") {
+        delete tagCategories[value]
+      }
+
+      const galleryItems = await getCollection<GalleryDocument>("gallery")
+      if (type === "tag") {
+        await galleryItems.updateMany(
+          { tags: value },
+          { $pull: { tags: value } },
+        )
+      } else {
+        const fallbackCategory = categories[0]
+        if (fallbackCategory) {
+          await galleryItems.updateMany({ category: value }, { $set: { category: fallbackCategory } })
+        }
+      }
+
+      const gallery = await getCollection<GalleryTagsConfigDocument>("galleryTags")
+      await gallery.updateOne(
+        { key: "default" },
+        { $set: { categories, tags, categoryColors, tagColors, tagCategories, updatedAt: new Date() } },
+        { upsert: true },
+      )
+
+      return res.json({ success: true, ...(await getGalleryConfig()) })
+    } catch (error) {
+      console.error("DELETE /api/gallery/options failed:", error)
+      return res.status(500).json({ success: false, error: "Failed to delete gallery option" })
     }
   })
 
