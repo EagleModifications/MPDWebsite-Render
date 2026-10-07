@@ -16,10 +16,6 @@ import {
 import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
 
-const GITHUB_RELEASES_API =
-  "https://api.github.com/repos/EagleModifications/MPDWebsite-Render/releases"
-
-
 type ReleaseAsset = {
   id: number
   name: string
@@ -34,6 +30,7 @@ type GitHubRelease = {
   tag_name: string
   body: string | null
   html_url: string
+  checksum_url: string | null
   published_at: string | null
   created_at: string
   draft: boolean
@@ -198,7 +195,6 @@ function ReleaseAssetButton({
           ? "h-9 min-w-[118px] px-3"
           : "h-10 flex-1 px-3 sm:px-4",
       ].join(" ")}
-      download
     >
       <PlatformIcon platform={platform} className="h-3.5 w-3.5" />
       {compact
@@ -504,7 +500,8 @@ function ReleaseModal({
 
                       <a
                         href={asset.browser_download_url}
-                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-500/15"
                       >
                         <DownloadIcon className="h-3.5 w-3.5" />
@@ -518,10 +515,32 @@ function ReleaseModal({
           </section>
         </div>
 
-        <div className="border-t border-border/70 px-5 py-3 sm:px-6">
+        <div className="flex flex-col gap-2 border-t border-border/70 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span className="text-xs text-muted-foreground">
             {release.tag_name} • Metro Police Department Desktop
           </span>
+          <div className="flex flex-wrap items-center gap-3">
+            {release.checksum_url && (
+              <a
+                href={release.checksum_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >
+                SHA-256 checksums
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            <a
+              href={release.html_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300"
+            >
+              View this release on GitHub
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
         </div>
       </div>
     </div>
@@ -546,18 +565,16 @@ export default function Download() {
 
       setError("")
 
-      const response = await fetch(
-        `${GITHUB_RELEASES_API}?per_page=20`,
-        {
-          headers: {
-            Accept: "application/vnd.github+json",
-          },
+      const response = await fetch("/api/releases", {
+        headers: {
+          Accept: "application/json",
         },
-      )
+        cache: "no-store",
+      })
 
       if (!response.ok) {
         throw new Error(
-          `GitHub returned HTTP ${response.status}.`,
+          `The release service returned HTTP ${response.status}.`,
         )
       }
 
@@ -614,9 +631,10 @@ export default function Download() {
                 Download
               </h1>
 
-              <p className="mt-1 text-sm text-muted-foreground">
-                Download the Metro Police Department desktop
-                application for your computer.
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                Download the Metro Police Department desktop application from
+                its public GitHub release. Downloads are provided directly by
+                GitHub and are only started when you choose a release asset.
               </p>
             </div>
 
@@ -635,6 +653,31 @@ export default function Download() {
               {refreshing ? "Refreshing..." : "Refresh releases"}
             </button>
           </div>
+
+          <section className="mb-5 rounded-2xl border border-blue-500/20 bg-blue-500/5 px-4 py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">
+                  MPD community download
+                </p>
+                <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
+                  This is a community roleplay project and is not affiliated with
+                  any real police department, government agency, or law-enforcement
+                  organisation. This page links to the project's public GitHub Releases.
+                  The desktop application is optional and is not required to use the website.
+                </p>
+              </div>
+              <a
+                href="https://github.com/EagleModifications/MPDWebsite-Render"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-500/30 px-3 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-500/10"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                View source on GitHub
+              </a>
+            </div>
+          </section>
 
           {error && (
             <div className="mb-5 rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-4">
