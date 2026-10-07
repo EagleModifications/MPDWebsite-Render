@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Search,
   Settings2,
-  Shield,
   Trash2,
   X,
 } from "lucide-react"
