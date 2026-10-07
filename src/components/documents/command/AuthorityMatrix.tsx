@@ -42,6 +42,10 @@ type GvizRow = {
 
 type GvizResponse = {
   table?: {
+    cols?: Array<{
+      id?: string
+      label?: string
+    }>
     rows?: GvizRow[]
   }
 }
@@ -71,78 +75,88 @@ type MatrixData = {
   rows: MatrixRow[]
 }
 
-const GROUP_ORDER = [
+const GROUPS = [
   "OFFICERS",
   "SUPERVISORS",
   "LOW COMMAND",
   "TRIAL HIGH COMMAND",
 ]
 
-function cleanText(value: unknown): string {
+function clean(value: unknown): string {
   return String(value ?? "")
     .replace(/\*+/g, "")
     .replace(/\s+/g, " ")
     .trim()
 }
 
-/*
- * IMPORTANT:
- * Only recognise actual group-header text.
- *
- * Do NOT use includes("OFFICER") here because rows such as:
- * "Send Officer Off Duty"
- * would incorrectly become an OFFICERS header.
- */
-function getExactGroupId(value: unknown): string | null {
-  const text = cleanText(value).toUpperCase()
+function upper(value: unknown): string {
+  return clean(value).toUpperCase()
+}
 
-  if (!text) {
-    return null
+function getCell(
+  row: GvizRow | undefined,
+  index: number,
+): string {
+  if (!row?.c?.[index]) {
+    return ""
+  }
+
+  return clean(
+    row.c[index]?.v ??
+      row.c[index]?.f ??
+      "",
+  )
+}
+
+function getGroup(value: unknown): string | null {
+  const valueUpper = upper(value)
+
+  if (
+    valueUpper === "OFFICERS" ||
+    valueUpper === "OFFICER"
+  ) {
+    return "OFFICERS"
   }
 
   if (
-    text === "TRIAL HIGH COMMAND" ||
-    text === "TRIAL HIGH COMMANDS"
+    valueUpper === "SUPERVISORS" ||
+    valueUpper === "SUPERVISOR"
   ) {
-    return "TRIAL HIGH COMMAND"
-  }
-
-  if (text === "LOW COMMAND") {
-    return "LOW COMMAND"
-  }
-
-  if (text === "SUPERVISORS" || text === "SUPERVISOR") {
     return "SUPERVISORS"
   }
 
-  if (text === "OFFICERS" || text === "OFFICER") {
-    return "OFFICERS"
+  if (valueUpper === "LOW COMMAND") {
+    return "LOW COMMAND"
+  }
+
+  if (
+    valueUpper === "TRIAL HIGH COMMAND" ||
+    valueUpper === "TRIAL HIGH COMMANDS"
+  ) {
+    return "TRIAL HIGH COMMAND"
   }
 
   return null
 }
 
-function normalizeSection(value: unknown): string {
-  const text = cleanText(value)
-  const upper = text.toUpperCase()
+function getSection(value: unknown): string {
+  const valueUpper = upper(value)
 
-  if (upper === "PRIMARY RESPONSIBILITY") {
+  if (
+    valueUpper === "PRIMARY RESPONSIBILITY"
+  ) {
     return "PRIMARY RESPONSIBILITY"
   }
 
-  if (upper === "AUTHORITY") {
+  if (valueUpper === "AUTHORITY") {
     return "AUTHORITY"
   }
 
-  return text
+  return clean(value)
 }
 
-function isChecked(value: unknown): boolean {
-  if (typeof value === "boolean") {
-    return value
-  }
-
-  const text = cleanText(value).toLowerCase()
+function isPermission(value: unknown): boolean {
+  const text = clean(value).toLowerCase()
 
   return [
     "true",
@@ -157,18 +171,10 @@ function isChecked(value: unknown): boolean {
   ].includes(text)
 }
 
-function getCellValue(
-  row: GvizRow | undefined,
-  index: number,
-): unknown {
-  return row?.c?.[index]?.v ?? row?.c?.[index]?.f ?? ""
-}
-
-/*
- * These are document notes, not authority-matrix entries.
- */
-function isExcludedDocumentText(value: string): boolean {
-  const text = cleanText(value).toLowerCase()
+function isDocumentNote(
+  value: string,
+): boolean {
+  const text = value.toLowerCase()
 
   if (!text) {
     return false
@@ -176,21 +182,433 @@ function isExcludedDocumentText(value: string): boolean {
 
   return (
     text.includes(
-      "this document supersedes and takes precedent",
+      "this document supersedes",
     ) ||
     text.includes(
-      "this document supersedes and takes precedence",
+      "takes precedent over any other document",
     ) ||
-    text.includes("restrictions apply based on the rank") ||
-    text.includes("determined by rank in ftd") ||
+    text.includes(
+      "takes precedence over any other document",
+    ) ||
+    text.includes(
+      "restrictions apply based on the rank",
+    ) ||
+    text.includes(
+      "determined by rank in ftd",
+    ) ||
     text.includes("last updated") ||
-    /^\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}:\d{2}/.test(
+    /^\d{1,2}\/\d{1,2}\/\d{4}/.test(
       text,
     )
   )
 }
 
-function getGroupStyles(groupId: string) {
+/*
+ * Google Sheets can return the merged group heading in
+ * different rows depending on how the sheet was created.
+ *
+ * This function searches the first several rows and finds
+ * the row with the greatest number of recognisable group
+ * headings.
+ */
+function findGroupRow(
+  rows: GvizRow[],
+  maxColumns: number,
+): number {
+  let bestRow = -1
+  let bestCount = 0
+
+  const rowsToCheck = Math.min(
+    rows.length,
+    15,
+  )
+
+  for (
+    let rowIndex = 0;
+    rowIndex < rowsToCheck;
+    rowIndex += 1
+  ) {
+    let count = 0
+
+    for (
+      let columnIndex = 0;
+      columnIndex < maxColumns;
+      columnIndex += 1
+    ) {
+      if (
+        getGroup(
+          getCell(
+            rows[rowIndex],
+            columnIndex,
+          ),
+        )
+      ) {
+        count += 1
+      }
+    }
+
+    if (count > bestCount) {
+      bestCount = count
+      bestRow = rowIndex
+    }
+  }
+
+  return bestRow
+}
+
+function parseSheet(
+  responseText: string,
+): MatrixData {
+  const jsonStart =
+    responseText.indexOf("{")
+
+  const jsonEnd =
+    responseText.lastIndexOf("}")
+
+  if (
+    jsonStart === -1 ||
+    jsonEnd === -1
+  ) {
+    throw new Error(
+      "Google Sheets returned an invalid response.",
+    )
+  }
+
+  const response =
+    JSON.parse(
+      responseText.slice(
+        jsonStart,
+        jsonEnd + 1,
+      ),
+    ) as GvizResponse
+
+  const rows =
+    response.table?.rows ?? []
+
+  if (!rows.length) {
+    throw new Error(
+      `No data was found in "${SHEET_NAME}".`,
+    )
+  }
+
+  const maxColumns = Math.max(
+    ...rows.map(
+      (row) =>
+        row.c?.length ?? 0,
+    ),
+  )
+
+  /*
+   * Find the row containing the command groups.
+   */
+  const groupRowIndex =
+    findGroupRow(
+      rows,
+      maxColumns,
+    )
+
+  if (groupRowIndex === -1) {
+    /*
+     * Do not fail immediately.
+     *
+     * Some versions of GViz return the first row as
+     * column metadata instead of a normal row. We therefore
+     * try to infer the groups from the first rows.
+     */
+    const possibleRows =
+      rows.slice(0, 10)
+
+    let found = false
+
+    for (const row of possibleRows) {
+      for (
+        let i = 0;
+        i < maxColumns;
+        i += 1
+      ) {
+        if (
+          getGroup(
+            getCell(row, i),
+          )
+        ) {
+          found = true
+          break
+        }
+      }
+
+      if (found) {
+        break
+      }
+    }
+
+    if (!found) {
+      throw new Error(
+        `Could not find the "${SHEET_NAME}" table structure.`,
+      )
+    }
+  }
+
+  const actualGroupRow =
+    groupRowIndex === -1
+      ? 0
+      : groupRowIndex
+
+  /*
+   * Carry merged group headings across columns.
+   */
+  const groupsAtColumn: Record<
+    number,
+    string
+  > = {}
+
+  let currentGroup: string | null =
+    null
+
+  for (
+    let columnIndex = 0;
+    columnIndex < maxColumns;
+    columnIndex += 1
+  ) {
+    const detected =
+      getGroup(
+        getCell(
+          rows[actualGroupRow],
+          columnIndex,
+        ),
+      )
+
+    if (detected) {
+      currentGroup = detected
+    }
+
+    if (currentGroup) {
+      groupsAtColumn[
+        columnIndex
+      ] = currentGroup
+    }
+  }
+
+  /*
+   * The next row is normally the actual rank row.
+   *
+   * If the next row contains TRUE/FALSE instead,
+   * search the following few rows for the real rank row.
+   */
+  let rankRowIndex =
+    actualGroupRow + 1
+
+  for (
+    let attempt = 0;
+    attempt < 4 &&
+    rankRowIndex < rows.length;
+    attempt += 1
+  ) {
+    let usefulLabels = 0
+
+    for (
+      let columnIndex = 0;
+      columnIndex < maxColumns;
+      columnIndex += 1
+    ) {
+      if (
+        !groupsAtColumn[
+          columnIndex
+        ]
+      ) {
+        continue
+      }
+
+      const label =
+        getCell(
+          rows[rankRowIndex],
+          columnIndex,
+        )
+
+      const lower =
+        label.toLowerCase()
+
+      if (
+        label &&
+        lower !== "true" &&
+        lower !== "false"
+      ) {
+        usefulLabels += 1
+      }
+    }
+
+    if (usefulLabels >= 2) {
+      break
+    }
+
+    rankRowIndex += 1
+  }
+
+  const columns: RankColumn[] = []
+
+  for (
+    let columnIndex = 0;
+    columnIndex < maxColumns;
+    columnIndex += 1
+  ) {
+    const groupId =
+      groupsAtColumn[
+        columnIndex
+      ]
+
+    if (!groupId) {
+      continue
+    }
+
+    const label =
+      getCell(
+        rows[rankRowIndex],
+        columnIndex,
+      )
+
+    if (!label) {
+      continue
+    }
+
+    const lower =
+      label.toLowerCase()
+
+    if (
+      lower === "true" ||
+      lower === "false" ||
+      lower === "yes" ||
+      lower === "no"
+    ) {
+      continue
+    }
+
+    columns.push({
+      id: `${groupId}-${columnIndex}`,
+      label,
+      groupId,
+      sourceIndex: columnIndex,
+    })
+  }
+
+  if (!columns.length) {
+    throw new Error(
+      "No rank columns could be read from the sheet.",
+    )
+  }
+
+  const groups: RankGroup[] =
+    GROUPS
+      .filter(
+        (group) =>
+          columns.some(
+            (column) =>
+              column.groupId ===
+              group,
+          ),
+      )
+      .map((group) => ({
+        id: group,
+        label: group,
+      }))
+
+  const matrixRows: MatrixRow[] =
+    []
+
+  let currentSection = ""
+
+  /*
+   * Everything after the rank header is table data.
+   */
+  for (
+    let rowIndex =
+      rankRowIndex + 1;
+    rowIndex < rows.length;
+    rowIndex += 1
+  ) {
+    const row =
+      rows[rowIndex]
+
+    const columnA =
+      getSection(
+        getCell(row, 0),
+      )
+
+    const name =
+      getCell(row, 1)
+
+    /*
+     * Ignore the document notes and timestamp rows.
+     */
+    if (
+      isDocumentNote(
+        columnA,
+      ) ||
+      isDocumentNote(name)
+    ) {
+      continue
+    }
+
+    /*
+     * Column A controls the section.
+     */
+    if (
+      columnA ===
+      "PRIMARY RESPONSIBILITY"
+    ) {
+      currentSection =
+        "PRIMARY RESPONSIBILITY"
+    } else if (
+      columnA === "AUTHORITY"
+    ) {
+      currentSection =
+        "AUTHORITY"
+    }
+
+    /*
+     * Empty Column B rows are section/header rows,
+     * not actual entries.
+     */
+    if (!name) {
+      continue
+    }
+
+    if (!currentSection) {
+      continue
+    }
+
+    const permissions: Record<
+      string,
+      boolean
+    > = {}
+
+    for (const column of columns) {
+      permissions[
+        column.id
+      ] = isPermission(
+        getCell(
+          row,
+          column.sourceIndex,
+        ),
+      )
+    }
+
+    matrixRows.push({
+      id: `${rowIndex}-${name}`,
+      section: currentSection,
+      name,
+      permissions,
+    })
+  }
+
+  return {
+    groups,
+    columns,
+    rows: matrixRows,
+  }
+}
+
+function groupClasses(
+  groupId: string,
+) {
   switch (groupId) {
     case "OFFICERS":
       return {
@@ -234,334 +652,6 @@ function getGroupStyles(groupId: string) {
   }
 }
 
-function parseSheet(text: string): MatrixData {
-  const start = text.indexOf("{")
-  const end = text.lastIndexOf("}")
-
-  if (start === -1 || end === -1) {
-    throw new Error(
-      "Google Sheets returned an invalid response.",
-    )
-  }
-
-  const json = JSON.parse(
-    text.slice(start, end + 1),
-  ) as GvizResponse
-
-  const rows = json.table?.rows ?? []
-
-  if (!rows.length) {
-    throw new Error(
-      `No rows were found in "${SHEET_NAME}".`,
-    )
-  }
-
-  const maxColumns = Math.max(
-    ...rows.map(
-      (row) => row.c?.length ?? 0,
-    ),
-  )
-
-  /*
-   * Find the REAL group-header row.
-   *
-   * The previous version used partial matching and therefore
-   * accidentally detected "Send Officer Off Duty" as OFFICERS.
-   *
-   * This version requires the cell itself to equal the group name.
-   */
-  let groupHeaderIndex = -1
-
-  for (
-    let rowIndex = 0;
-    rowIndex < rows.length;
-    rowIndex += 1
-  ) {
-    let groupCount = 0
-
-    for (
-      let columnIndex = 0;
-      columnIndex < maxColumns;
-      columnIndex += 1
-    ) {
-      if (
-        getExactGroupId(
-          getCellValue(
-            rows[rowIndex],
-            columnIndex,
-          ),
-        )
-      ) {
-        groupCount += 1
-      }
-    }
-
-    if (groupCount > 0) {
-      groupHeaderIndex = rowIndex
-      break
-    }
-  }
-
-  if (groupHeaderIndex === -1) {
-    throw new Error(
-      "Could not find the rank group headers.",
-    )
-  }
-
-  /*
-   * Google Sheets merged cells normally only return the value
-   * in the first cell. Carry the group across blank cells.
-   */
-  const groupAtColumn: Record<
-    number,
-    string
-  > = {}
-
-  let currentGroup: string | null = null
-
-  for (
-    let columnIndex = 0;
-    columnIndex < maxColumns;
-    columnIndex += 1
-  ) {
-    const exactGroup = getExactGroupId(
-      getCellValue(
-        rows[groupHeaderIndex],
-        columnIndex,
-      ),
-    )
-
-    if (exactGroup) {
-      currentGroup = exactGroup
-    }
-
-    if (currentGroup) {
-      groupAtColumn[columnIndex] =
-        currentGroup
-    }
-  }
-
-  /*
-   * The row immediately underneath the group row contains
-   * the actual rank names.
-   */
-  const rankHeaderIndex =
-    groupHeaderIndex + 1
-
-  const rankHeader =
-    rows[rankHeaderIndex]
-
-  if (!rankHeader) {
-    throw new Error(
-      "Could not find the rank names.",
-    )
-  }
-
-  const columns: RankColumn[] = []
-
-  for (
-    let columnIndex = 0;
-    columnIndex < maxColumns;
-    columnIndex += 1
-  ) {
-    const groupId =
-      groupAtColumn[columnIndex]
-
-    if (!groupId) {
-      continue
-    }
-
-    const label = cleanText(
-      getCellValue(
-        rankHeader,
-        columnIndex,
-      ),
-    )
-
-    /*
-     * A rank header must actually look like a rank.
-     * Prevent data such as TRUE/FALSE from becoming a rank.
-     */
-    const lowerLabel = label.toLowerCase()
-
-    if (
-      !label ||
-      lowerLabel === "true" ||
-      lowerLabel === "false" ||
-      lowerLabel === "yes" ||
-      lowerLabel === "no" ||
-      isExcludedDocumentText(label)
-    ) {
-      continue
-    }
-
-    columns.push({
-      id: `${groupId}-${columnIndex}`,
-      label,
-      groupId,
-      sourceIndex: columnIndex,
-    })
-  }
-
-  if (!columns.length) {
-    throw new Error(
-      "No rank columns were found in the Google Sheet.",
-    )
-  }
-
-  const groups = GROUP_ORDER
-    .filter((groupId) =>
-      columns.some(
-        (column) =>
-          column.groupId === groupId,
-      ),
-    )
-    .map((groupId) => ({
-      id: groupId,
-      label: groupId,
-    }))
-
-  const additionalGroups = Array.from(
-    new Set(
-      columns.map(
-        (column) => column.groupId,
-      ),
-    ),
-  )
-    .filter(
-      (groupId) =>
-        !GROUP_ORDER.includes(groupId),
-    )
-    .map((groupId) => ({
-      id: groupId,
-      label: groupId,
-    }))
-
-  const allGroups = [
-    ...groups,
-    ...additionalGroups,
-  ]
-
-  const matrixRows: MatrixRow[] = []
-
-  let currentSection = ""
-
-  for (
-    let rowIndex =
-      rankHeaderIndex + 1;
-    rowIndex < rows.length;
-    rowIndex += 1
-  ) {
-    const row = rows[rowIndex]
-
-    const columnA = normalizeSection(
-      getCellValue(row, 0),
-    )
-
-    const columnB = cleanText(
-      getCellValue(row, 1),
-    )
-
-    /*
-     * Remove document notes and timestamp rows
-     * before they ever reach the table.
-     */
-    if (
-      isExcludedDocumentText(
-        columnA,
-      ) ||
-      isExcludedDocumentText(
-        columnB,
-      )
-    ) {
-      continue
-    }
-
-    if (
-      columnA ===
-      "PRIMARY RESPONSIBILITY"
-    ) {
-      currentSection =
-        "PRIMARY RESPONSIBILITY"
-    } else if (
-      columnA === "AUTHORITY"
-    ) {
-      currentSection = "AUTHORITY"
-    } else if (columnA) {
-      /*
-       * Only treat Column A as a new section if
-       * it is not a normal data row.
-       */
-      if (
-        columnA !==
-          "PRIMARY RESPONSIBILITY" &&
-        columnA !== "AUTHORITY"
-      ) {
-        /*
-         * Most rows use Column A as the section and
-         * Column B as the responsibility.
-         *
-         * If Column A contains an ordinary row value,
-         * retain the previous section.
-         */
-        if (
-          !columnB &&
-          (
-            columnA
-              .toUpperCase()
-              .includes("RESPONSIBILITY") ||
-            columnA
-              .toUpperCase()
-              .includes("AUTHORITY")
-          )
-        ) {
-          currentSection =
-            columnA
-        }
-      }
-    }
-
-    /*
-     * Column B is the actual responsibility/authority name.
-     */
-    if (!columnB) {
-      continue
-    }
-
-    if (!currentSection) {
-      continue
-    }
-
-    const permissions: Record<
-      string,
-      boolean
-    > = {}
-
-    for (const column of columns) {
-      permissions[column.id] =
-        isChecked(
-          getCellValue(
-            row,
-            column.sourceIndex,
-          ),
-        )
-    }
-
-    matrixRows.push({
-      id: `${rowIndex}-${columnB}`,
-      section: currentSection,
-      name: columnB,
-      permissions,
-    })
-  }
-
-  return {
-    groups: allGroups,
-    columns,
-    rows: matrixRows,
-  }
-}
-
 export default function AuthorityMatrix() {
   const [data, setData] =
     useState<MatrixData | null>(null)
@@ -584,68 +674,72 @@ export default function AuthorityMatrix() {
   const [error, setError] =
     useState("")
 
-  const loadSheet = useCallback(
-    async (manual = false) => {
-      if (manual) {
-        setRefreshing(true)
-      }
-
-      try {
-        setError("")
-
-        const match =
-          GOOGLE_SHEET_URL.match(
-            /\/spreadsheets\/d\/([^/]+)/,
-          )
-
-        if (!match?.[1]) {
-          throw new Error(
-            "Invalid Google Sheet URL.",
-          )
+  const loadSheet =
+    useCallback(
+      async (
+        manual = false,
+      ) => {
+        if (manual) {
+          setRefreshing(true)
         }
 
-        const sheetId = match[1]
+        try {
+          setError("")
 
-        const url =
-          `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq` +
-          `?sheet=${encodeURIComponent(
-            SHEET_NAME,
-          )}` +
-          `&headers=0` +
-          `&tqx=out:json` +
-          `&cacheBust=${Date.now()}`
+          const match =
+            GOOGLE_SHEET_URL.match(
+              /\/spreadsheets\/d\/([^/]+)/,
+            )
 
-        const response =
-          await fetch(url, {
-            cache: "no-store",
-          })
+          if (!match?.[1]) {
+            throw new Error(
+              "Invalid Google Sheet URL.",
+            )
+          }
 
-        if (!response.ok) {
-          throw new Error(
-            `Google Sheets returned ${response.status}.`,
+          const sheetId =
+            match[1]
+
+          const url =
+            `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq` +
+            `?sheet=${encodeURIComponent(
+              SHEET_NAME,
+            )}` +
+            `&headers=0` +
+            `&tqx=out:json` +
+            `&cacheBust=${Date.now()}`
+
+          const response =
+            await fetch(url, {
+              cache: "no-store",
+            })
+
+          if (!response.ok) {
+            throw new Error(
+              `Google Sheets returned ${response.status}.`,
+            )
+          }
+
+          const text =
+            await response.text()
+
+          const parsed =
+            parseSheet(text)
+
+          setData(parsed)
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load the Google Sheet.",
           )
+        } finally {
+          setLoading(false)
+          setRefreshing(false)
         }
-
-        const text =
-          await response.text()
-
-        const parsed =
-          parseSheet(text)
-
-        setData(parsed)
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load the Google Sheet.",
-        )
-      } finally {
-        setLoading(false)
-        setRefreshing(false)
-      }
-    },
-    [],
-  )
+      },
+      [],
+    )
 
   useEffect(() => {
     void loadSheet()
@@ -672,12 +766,10 @@ export default function AuthorityMatrix() {
 
       return Array.from(
         new Set(
-          data.rows
-            .map(
-              (row) =>
-                row.section,
-            )
-            .filter(Boolean),
+          data.rows.map(
+            (row) =>
+              row.section,
+          ),
         ),
       )
     }, [data])
@@ -717,7 +809,9 @@ export default function AuthorityMatrix() {
       }
 
       const query =
-        search.trim().toLowerCase()
+        search
+          .trim()
+          .toLowerCase()
 
       return data.rows.filter(
         (row) => {
@@ -751,27 +845,27 @@ export default function AuthorityMatrix() {
 
   const rowsBySection =
     useMemo(() => {
-      const sections =
+      const result =
         new Map<
           string,
           MatrixRow[]
         >()
 
       for (const row of filteredRows) {
-        const current =
-          sections.get(
+        const rows =
+          result.get(
             row.section,
           ) ?? []
 
-        current.push(row)
+        rows.push(row)
 
-        sections.set(
+        result.set(
           row.section,
-          current,
+          rows,
         )
       }
 
-      return sections
+      return result
     }, [filteredRows])
 
   const orderedSections =
@@ -803,7 +897,7 @@ export default function AuthorityMatrix() {
     }, [rowsBySection])
 
   const hasFilters =
-    search.trim().length > 0 ||
+    search.trim() !== "" ||
     hiddenSections.length > 0 ||
     hiddenGroups.length > 0
 
@@ -849,7 +943,7 @@ export default function AuthorityMatrix() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center rounded-xl border border-border bg-card">
+      <div className="flex min-h-[380px] items-center justify-center rounded-xl border border-border bg-card">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <RefreshCw className="h-4 w-4 animate-spin" />
           Loading Authority Matrix...
@@ -860,7 +954,7 @@ export default function AuthorityMatrix() {
 
   if (!data) {
     return (
-      <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6">
+      <div className="rounded-xl border border-red-500/30 bg-red-500/[0.03] p-6">
         <h3 className="text-sm font-semibold text-red-300">
           Unable to load Authority Matrix
         </h3>
@@ -890,8 +984,8 @@ export default function AuthorityMatrix() {
       {/* Header */}
       <div className="border-b border-border px-5 py-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold">
               Authority Matrix
             </h2>
 
@@ -901,7 +995,6 @@ export default function AuthorityMatrix() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Search */}
             <div className="relative w-full sm:w-[240px]">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
@@ -913,11 +1006,11 @@ export default function AuthorityMatrix() {
                   )
                 }
                 placeholder="Search..."
-                className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
 
-            {/* Section */}
+            {/* SECTION FILTER */}
             <DropdownMenu>
               <DropdownMenuTrigger
                 asChild
@@ -966,7 +1059,7 @@ export default function AuthorityMatrix() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Rank */}
+            {/* RANK FILTER */}
             <DropdownMenu>
               <DropdownMenuTrigger
                 asChild
@@ -1015,7 +1108,6 @@ export default function AuthorityMatrix() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Refresh */}
             <Button
               type="button"
               variant="outline"
@@ -1038,10 +1130,9 @@ export default function AuthorityMatrix() {
           </div>
         </div>
 
-        {/* Active filters */}
         {hasFilters && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Filters:
             </span>
 
@@ -1105,14 +1196,14 @@ export default function AuthorityMatrix() {
         )}
 
         {error && (
-          <div className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
-            The latest sheet refresh failed. Showing the
-            previous data.
+          <div className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/[0.03] px-3 py-2 text-xs text-amber-300">
+            Latest Google Sheet refresh failed. Showing the
+            last successfully loaded data.
           </div>
         )}
       </div>
 
-      {/* Table */}
+      {/* MATRIX */}
       <div className="w-full overflow-hidden">
         <table className="w-full table-fixed border-collapse">
           <colgroup>
@@ -1137,32 +1228,30 @@ export default function AuthorityMatrix() {
           </colgroup>
 
           <thead>
-            {/* Group header */}
+            {/* GROUPS */}
             <tr>
               <th
                 rowSpan={2}
-                className="border-b border-r border-border bg-background px-4 py-3 text-left align-middle text-[11px] font-bold uppercase tracking-wide text-muted-foreground"
+                className="border-b border-r border-border bg-background px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground"
               >
                 Responsibility / Authority
               </th>
 
               {visibleGroups.map(
                 (group) => {
-                  const groupColumns =
+                  const columns =
                     visibleColumns.filter(
                       (column) =>
                         column.groupId ===
                         group.id,
                     )
 
-                  if (
-                    !groupColumns.length
-                  ) {
+                  if (!columns.length) {
                     return null
                   }
 
                   const styles =
-                    getGroupStyles(
+                    groupClasses(
                       group.id,
                     )
 
@@ -1170,9 +1259,9 @@ export default function AuthorityMatrix() {
                     <th
                       key={group.id}
                       colSpan={
-                        groupColumns.length
+                        columns.length
                       }
-                      className={`border-b border-r border-border px-2 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider ${styles.header}`}
+                      className={`border-b border-r border-border px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider ${styles.header}`}
                     >
                       {group.label}
                     </th>
@@ -1181,20 +1270,20 @@ export default function AuthorityMatrix() {
               )}
             </tr>
 
-            {/* Rank names */}
+            {/* RANKS */}
             <tr>
               {visibleColumns.map(
                 (column) => {
                   const styles =
-                    getGroupStyles(
+                    groupClasses(
                       column.groupId,
                     )
 
                   return (
                     <th
                       key={column.id}
-                      className={`border-b border-r border-border px-1 py-2 text-center text-[10px] font-semibold ${styles.header}`}
                       title={column.label}
+                      className={`border-b border-r border-border px-1 py-2 text-center text-[10px] font-semibold ${styles.header}`}
                     >
                       <span className="block truncate">
                         {column.label}
@@ -1209,14 +1298,12 @@ export default function AuthorityMatrix() {
           <tbody>
             {orderedSections.map(
               (section) => {
-                const sectionRows =
+                const rows =
                   rowsBySection.get(
                     section,
                   ) ?? []
 
-                if (
-                  !sectionRows.length
-                ) {
+                if (!rows.length) {
                   return null
                 }
 
@@ -1224,7 +1311,7 @@ export default function AuthorityMatrix() {
                   <Fragment
                     key={section}
                   >
-                    {/* Primary Responsibility label */}
+                    {/* PRIMARY RESPONSIBILITY */}
                     {section ===
                       "PRIMARY RESPONSIBILITY" && (
                       <tr>
@@ -1242,7 +1329,7 @@ export default function AuthorityMatrix() {
                       </tr>
                     )}
 
-                    {/* Authority separator */}
+                    {/* AUTHORITY */}
                     {section ===
                       "AUTHORITY" && (
                       <tr>
@@ -1266,18 +1353,16 @@ export default function AuthorityMatrix() {
                       </tr>
                     )}
 
-                    {sectionRows.map(
+                    {rows.map(
                       (row) => (
                         <tr
                           key={row.id}
-                          className="transition-colors hover:bg-white/[0.02]"
+                          className="hover:bg-white/[0.02]"
                         >
-                          <td className="border-b border-r border-border bg-background px-4 py-2.5 align-middle">
+                          <td className="border-b border-r border-border bg-background px-4 py-2.5">
                             <span
-                              className="block truncate text-xs font-medium text-foreground sm:text-[13px]"
-                              title={
-                                row.name
-                              }
+                              className="block truncate text-[13px] font-medium text-foreground"
+                              title={row.name}
                             >
                               {
                                 row.name
@@ -1290,7 +1375,7 @@ export default function AuthorityMatrix() {
                               column,
                             ) => {
                               const styles =
-                                getGroupStyles(
+                                groupClasses(
                                   column.groupId,
                                 )
 
@@ -1330,22 +1415,19 @@ export default function AuthorityMatrix() {
           </tbody>
         </table>
 
-        {filteredRows.length ===
-          0 && (
+        {!filteredRows.length && (
           <div className="border-t border-border px-4 py-10 text-center">
             <p className="text-sm font-medium">
               No results found
             </p>
 
             <p className="mt-1 text-xs text-muted-foreground">
-              Try changing your search or
-              filters.
+              Try changing your search or filters.
             </p>
           </div>
         )}
       </div>
 
-      {/* Simple footer */}
       <div className="border-t border-border px-4 py-2.5">
         <span className="text-[11px] text-muted-foreground">
           {filteredRows.length}{" "}
