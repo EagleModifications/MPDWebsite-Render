@@ -98,6 +98,7 @@ type GalleryMedia = {
   thumbnailUrl: string
   source: "upload" | "url"
   storageId?: string
+  extension?: string
 }
 
 type GalleryCategory = "Community" | "Fleet"
@@ -984,7 +985,7 @@ export default function Gallery() {
     const url = urlInput.trim()
 
     if (!url) {
-      toast.error("Enter a media URL.")
+      toast.error("Enter a media link.")
       return
     }
 
@@ -1290,15 +1291,10 @@ export default function Gallery() {
           continue
         }
 
-        // YouTube/Vimeo URLs are imported server-side into GridFS before
-        // the gallery document is saved. After this point they are treated
-        // exactly like a normal uploaded video file.
-        if (
-          item.source === "url" &&
-          item.type === "video" &&
-          (Boolean(getYouTubeVideoId(item.url)) ||
-            Boolean(getVimeoVideoId(item.url)))
-        ) {
+        // Every URL is downloaded/extracted server-side and then treated
+        // exactly like a normal uploaded file. No external media URL is
+        // stored in the gallery document.
+        if (item.source === "url") {
           setSavingStage("import")
           setUploadProgress(0)
 
@@ -1312,6 +1308,7 @@ export default function Gallery() {
               },
               body: JSON.stringify({
                 url: item.url,
+                type: item.type,
               }),
             },
           )
@@ -1323,7 +1320,7 @@ export default function Gallery() {
           if (!importResponse.ok || !importData.item) {
             throw new Error(
               importData.error ||
-                "Failed to import the video URL.",
+                "Failed to import the media URL.",
             )
           }
 
@@ -2501,12 +2498,11 @@ export default function Gallery() {
                 <div className="sm:col-span-2 rounded-xl border border-border bg-background/40 p-4">
                   <div className="mb-3">
                     <h3 className="text-sm font-semibold">
-                      Add Media URL <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
+                      Add Media Link <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
                     </h3>
 
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      URLs can be mixed with uploaded
-                      files.
+                      The media is downloaded from the URL and stored with the gallery entry.
                     </p>
                   </div>
 
@@ -2868,7 +2864,7 @@ export default function Gallery() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
                 >
-                  Open Original
+                  Open {getMediaLabel(viewer.item.media[viewer.index].type)}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
