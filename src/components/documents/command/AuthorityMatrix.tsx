@@ -572,7 +572,7 @@ export default function AuthorityMatrix() {
             <table className="w-full table-fixed border-collapse">
 
               <colgroup>
-                <col className="w-[34%]" />
+                <col className="w-[28%]" />
                 {visibleRanks.map((rank) => (
                   <col key={rank.rank} />
                 ))}
@@ -582,7 +582,7 @@ export default function AuthorityMatrix() {
                 <tr className="border-b border-border/70 bg-muted/20">
                   <th
                     rowSpan={2}
-                    className="border-r border-border/70 bg-background/30 px-3 py-3.5 text-left align-middle text-[9px] font-bold uppercase tracking-[0.08em] text-muted-foreground sm:px-4 sm:text-[10px]"
+                    className="border-r border-border/70 bg-background/30 px-2.5 py-3 text-left align-middle text-[8px] font-bold uppercase tracking-[0.06em] text-muted-foreground sm:px-3 sm:text-[9px] whitespace-nowrap"
                   >
                     Responsibility / Authority
                   </th>
@@ -590,7 +590,7 @@ export default function AuthorityMatrix() {
                     <th
                       key={group}
                       colSpan={ranks.length}
-                      className={`border-r border-border/50 bg-background/40 px-1 py-2.5 text-center text-[8px] font-bold uppercase tracking-[0.05em] last:border-r-0 sm:text-[9px] ${groupText(group)}`}
+                      className={`border-r border-border/50 bg-background/40 px-0.5 py-2 text-center text-[7px] font-bold uppercase tracking-[0.01em] whitespace-nowrap last:border-r-0 sm:text-[8px] ${groupText(group)}`}
                     >
                       {group}
                     </th>
@@ -602,7 +602,7 @@ export default function AuthorityMatrix() {
                     <th
                       key={rank.rank}
                       title={rank.rank}
-                      className="h-[60px] border-r border-border/50 bg-background/20 px-0.5 py-1.5 text-center text-[7px] font-semibold leading-[1.05] text-muted-foreground last:border-r-0 sm:text-[8px]"
+                      className="h-[44px] overflow-hidden border-r border-border/50 bg-background/20 px-0.5 py-1 text-center text-[6px] font-semibold leading-none text-muted-foreground whitespace-nowrap last:border-r-0 sm:text-[7px]"
                     >
                       <span className="mx-auto block max-w-[38px] break-words">
                         {rank.rank}
