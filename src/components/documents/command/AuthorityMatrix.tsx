@@ -29,7 +29,6 @@ const rankColumns: RankColumn[] = [
 ]
 
 const allRanks = Object.fromEntries(rankColumns.map(({ id }) => [id, true]))
-const noRanks = Object.fromEntries(rankColumns.map(({ id }) => [id, false]))
 const from = (...ids: string[]) =>
   Object.fromEntries(rankColumns.map(({ id }) => [id, ids.includes(id)]))
 
