@@ -7641,12 +7641,12 @@ export function createApp() {
             ? requestedCategory
             : "Community"
 
-        const requestedTags =
+        const createGalleryTags =
           req.body?.tags
 
         if (
-          requestedTags !== undefined &&
-          !Array.isArray(requestedTags)
+          createGalleryTags !== undefined &&
+          !Array.isArray(createGalleryTags)
         ) {
           return res.status(400).json({
             success: false,
@@ -7655,12 +7655,12 @@ export function createApp() {
         }
 
         const tags = normalizeGalleryTags(
-          requestedTags,
+          createGalleryTags,
         )
 
         if (
-          Array.isArray(requestedTags) &&
-          requestedTags.some(
+          Array.isArray(createGalleryTags) &&
+          createGalleryTags.some(
             (tag) => !isGalleryTag(tag),
           )
         ) {
@@ -7891,12 +7891,12 @@ export function createApp() {
         const requestedCategory =
           req.body?.category
 
-        const requestedTags =
+        const updateGalleryTags =
           req.body?.tags
 
         if (
-          requestedTags !== undefined &&
-          !Array.isArray(requestedTags)
+          updateGalleryTags !== undefined &&
+          !Array.isArray(updateGalleryTags)
         ) {
           return res.status(400).json({
             success: false,
@@ -7905,8 +7905,8 @@ export function createApp() {
         }
 
         if (
-          Array.isArray(requestedTags) &&
-          requestedTags.some(
+          Array.isArray(updateGalleryTags) &&
+          updateGalleryTags.some(
             (tag) => !isGalleryTag(tag),
           )
         ) {
@@ -7954,9 +7954,9 @@ export function createApp() {
             : existing.category ?? "Community"
 
         const tags =
-          requestedTags === undefined
+          updateGalleryTags === undefined
             ? normalizeGalleryTags(existing.tags)
-            : normalizeGalleryTags(requestedTags)
+            : normalizeGalleryTags(updateGalleryTags)
 
         const rawMedia = req.body?.media
 
