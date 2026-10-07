@@ -618,6 +618,20 @@ export default function Gallery() {
   const [mediaFilter, setMediaFilter] =
     useState<GalleryMediaFilter>("All")
 
+  const [galleryLayout, setGalleryLayout] =
+    useState<"masonry" | "home">(() => {
+      try {
+        return window.localStorage.getItem("mpd-gallery-layout") === "home"
+          ? "home"
+          : "masonry"
+      } catch {
+        return "masonry"
+      }
+    })
+
+  const [layoutSettingsOpen, setLayoutSettingsOpen] =
+    useState(false)
+
   const [showModal, setShowModal] =
     useState(false)
 
@@ -677,6 +691,27 @@ export default function Gallery() {
 
   const fileInputRef =
     useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("mpd-gallery-layout", galleryLayout)
+    } catch {
+      // Ignore storage failures (private browsing / blocked storage).
+    }
+  }, [galleryLayout])
+
+  useEffect(() => {
+    if (!layoutSettingsOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setLayoutSettingsOpen(false)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [layoutSettingsOpen])
 
   useEffect(() => {
     const overlayOpen =
@@ -1699,7 +1734,116 @@ export default function Gallery() {
               </div>
             ) : (
               <div className="h-auto p-3 sm:p-4">
-                <div className="columns-1 gap-3 sm:columns-2 lg:columns-4">
+                {galleryLayout === "home" ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {filteredItems.map((item) => {
+                      const mediaList = getVisibleMedia(item)
+                      const previewMedia = mediaList[0]
+                      const previewUrl = previewMedia
+                        ? getMediaThumbnail(previewMedia) || getGalleryMediaUrl(previewMedia)
+                        : ""
+
+                      return (
+                        <article
+                          key={item.id}
+                          className="group overflow-hidden rounded-xl border border-border/70 bg-background/60 transition-all hover:-translate-y-0.5 hover:border-blue-500/40 hover:bg-blue-500/[0.02]"
+                        >
+                          <div className="relative aspect-[16/10] overflow-hidden bg-black/30">
+                            {previewUrl && previewMedia ? (
+                              isVideoMedia(previewMedia) ? (
+                                <video
+                                  src={previewUrl}
+                                  muted
+                                  playsInline
+                                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                              ) : (
+                                <img
+                                  src={previewUrl}
+                                  alt={item.title}
+                                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                  onError={(event) => {
+                                    const image = event.currentTarget
+                                    const fallback = previewMedia?.thumbnailUrl
+                                      ? getGalleryMediaUrl({ ...previewMedia, url: previewMedia.thumbnailUrl })
+                                      : ""
+                                    if (fallback && image.src !== fallback) {
+                                      image.src = fallback
+                                    } else {
+                                      image.style.display = "none"
+                                    }
+                                  }}
+                                  onClick={() => previewMedia && openViewer(item, previewMedia)}
+                                />
+                              )
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-muted-foreground">
+                                <ImageIcon className="h-8 w-8" />
+                              </div>
+                            )}
+
+                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+
+                            {item.category && (
+                              <span
+                                className={[
+                                  "absolute left-3 top-3 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                  item.category === "Fleet"
+                                    ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                                    : "border-blue-500/30 bg-blue-500/10 text-blue-300",
+                                ].join(" ")}
+                              >
+                                {item.category}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="p-4">
+                            <h3 className="truncate text-sm font-semibold">{item.title}</h3>
+
+                            {item.description && (
+                              <p className="mt-2 line-clamp-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
+                                {item.description}
+                              </p>
+                            )}
+
+                            <p className="mt-2 truncate text-[10px] text-muted-foreground">
+                              {mediaList.length} {mediaList.length === 1 ? "item" : "items"}
+                              {item.createdAt ? ` · ${formatDate(item.createdAt)}` : ""}
+                            </p>
+
+                            {canManageGallery && (
+                              <div className="mt-3 flex justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openEdit(item)}
+                                  aria-label={`Edit ${item.title}`}
+                                >
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  disabled={deletingId === item.id}
+                                  onClick={() => requestDeleteGallery(item)}
+                                  aria-label={`Delete ${item.title}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="columns-1 gap-3 sm:columns-2 lg:columns-4">
                   {filteredItems.map(
                     (item) => {
                       const mediaList =
@@ -1843,7 +1987,8 @@ export default function Gallery() {
                       )
                     },
                   )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1886,6 +2031,95 @@ export default function Gallery() {
               </span>
             </div>
           </section>
+
+          {layoutSettingsOpen && (
+            <div
+              className="fixed inset-0 z-[70] bg-black/30 backdrop-blur-[1px]"
+              onClick={() => setLayoutSettingsOpen(false)}
+              aria-hidden="true"
+            />
+          )}
+
+          <aside
+            className={[
+              "fixed right-0 top-0 z-[80] h-full w-[min(360px,90vw)] border-l border-border/70 bg-background/95 shadow-2xl backdrop-blur-xl transition-transform duration-300",
+              layoutSettingsOpen ? "translate-x-0" : "translate-x-full",
+            ].join(" ")}
+            aria-hidden={!layoutSettingsOpen}
+          >
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
+                <div>
+                  <h2 className="text-sm font-semibold">Gallery settings</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Choose how the gallery is displayed.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLayoutSettingsOpen(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Close gallery settings"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 p-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGalleryLayout("masonry")
+                    setLayoutSettingsOpen(false)
+                  }}
+                  className={[
+                    "w-full rounded-xl border p-3 text-left transition-colors",
+                    galleryLayout === "masonry"
+                      ? "border-blue-500/40 bg-blue-500/10"
+                      : "border-border/70 bg-card/60 hover:bg-muted/60",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">4-Column Masonry</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Compact cards with minimal vertical gaps.</p>
+                    </div>
+                    {galleryLayout === "masonry" && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGalleryLayout("home")
+                    setLayoutSettingsOpen(false)
+                  }}
+                  className={[
+                    "w-full rounded-xl border p-3 text-left transition-colors",
+                    galleryLayout === "home"
+                      ? "border-blue-500/40 bg-blue-500/10"
+                      : "border-border/70 bg-card/60 hover:bg-muted/60",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">Home Style</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Large image cards in a clean 4-column grid.</p>
+                    </div>
+                    {galleryLayout === "home" && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
+                  </div>
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          <button
+            type="button"
+            onClick={() => setLayoutSettingsOpen(true)}
+            className="fixed bottom-5 right-5 z-[60] flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-card/95 text-muted-foreground shadow-xl backdrop-blur transition-all hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-500"
+            aria-label="Gallery layout settings"
+            title="Gallery settings"
+          >
+            <Settings2 className="h-5 w-5" />
+          </button>
 
           {canManageGallery && (
             <section className="mt-6 overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur">
