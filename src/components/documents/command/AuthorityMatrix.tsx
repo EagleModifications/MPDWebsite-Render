@@ -618,7 +618,7 @@ export default function AuthorityMatrix() {
   return (
     <div className="w-full min-w-0">
       <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm">
-        <div className="border-b border-border/70 px-4 py-4 sm:px-5">
+        <div className="sticky top-20 z-40 border-b border-border/70 bg-card/95 px-4 py-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85 sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-500">
@@ -755,7 +755,7 @@ export default function AuthorityMatrix() {
               </colgroup>
 
               <thead>
-                <tr className="border-b border-border/70 bg-muted/20">
+                <tr className="sticky top-[190px] z-30 border-b border-border/70 bg-background/95">
                   <th
                     rowSpan={2}
                     className="border-r border-border/70 bg-background/30 px-3 py-3 text-left align-middle text-[8px] font-bold uppercase tracking-[0.04em] text-muted-foreground whitespace-nowrap"
@@ -773,7 +773,7 @@ export default function AuthorityMatrix() {
                   ))}
                 </tr>
 
-                <tr className="border-b border-border/70 bg-muted/10">
+                <tr className="sticky top-[228px] z-30 border-b border-border/70 bg-background/95">
                   {visibleRanks.map((rank) => (
                     <th
                       key={rank.rank}
