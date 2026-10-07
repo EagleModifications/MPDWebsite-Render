@@ -28,7 +28,7 @@ import {
 } from "react"
 import { toast } from "sonner"
 
-import { getSession } from "@/lib/auth"
+import { getSession, hasPermission as checkPermission, type User } from "@/lib/auth"
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -264,6 +264,152 @@ const getChangePair = (value: Record<string, unknown>) => {
   return { from: value.before, to: value.after }
 }
 
+
+const getDetailValue = (log: ActionLog, keys: string[]) => {
+  const details = isRecord(log.details) ? log.details : {}
+
+  for (const key of keys) {
+    const value = details[key]
+    if (value !== undefined && value !== null && value !== "") {
+      return value
+    }
+  }
+
+  return undefined
+}
+
+const getEntryTitle = (log: ActionLog) => {
+  const action = log.action.toLowerCase()
+  const target = log.targetName?.trim()
+  const rank =
+    log.targetRank?.trim() ||
+    String(getDetailValue(log, ["rank", "targetRank", "selectedRank"]) ?? "").trim()
+
+  if (action.includes("select-rank") || action.includes("select rank")) {
+    return rank ? `Selected rank ${rank}` : "Selected rank"
+  }
+
+  if (action.includes("select-member") || action.includes("select member")) {
+    return target ? `Selected Member → ${target}` : "Selected Member"
+  }
+
+  if (action.includes("deselect-member") || action.includes("deselect member")) {
+    return target ? `Deselected Member → ${target}` : "Deselected Member"
+  }
+
+  if (action.includes("select-all-visible")) {
+    return "Selected All Visible"
+  }
+
+  if (action.includes("deselect-all-visible")) {
+    return "Deselected All Visible"
+  }
+
+  if (
+    action.includes("update-requirements") ||
+    action.includes("save-requirements") ||
+    action.includes("edit-requirements") ||
+    action.includes("reset-requirements")
+  ) {
+    if (rank) {
+      if (action.includes("reset")) return `Reset Requirements for ${rank}`
+      return `Updated Requirements for ${rank}`
+    }
+
+    return action.includes("reset")
+      ? "Reset Requirements"
+      : "Updated Requirements"
+  }
+
+  if (action.includes("change-division") || action.includes("change division")) {
+    const division =
+      log.division ||
+      String(getDetailValue(log, ["division", "to", "new"]) ?? "").trim()
+
+    return division
+      ? `Changed Division to ${divisionLabel(division)}`
+      : "Changed Division"
+  }
+
+  if (action.includes("promote-member") || action.includes("promote member")) {
+    return target
+      ? `Promoted ${target}${rank ? ` to ${rank}` : ""}`
+      : `Promoted Member${rank ? ` to ${rank}` : ""}`
+  }
+
+  if (action.includes("demote-member") || action.includes("demote member")) {
+    return target
+      ? `Demoted ${target}${rank ? ` to ${rank}` : ""}`
+      : `Demoted Member${rank ? ` to ${rank}` : ""}`
+  }
+
+  if (action.includes("copy-selected")) {
+    return "Copied Selected Members"
+  }
+
+  if (action.includes("copy-roster")) {
+    return "Copied Roster"
+  }
+
+  if (action.includes("copy-discord-id")) {
+    return target ? `Copied Discord ID for ${target}` : "Copied Discord ID"
+  }
+
+  if (action.includes("copy-name")) {
+    return target ? `Copied Name for ${target}` : "Copied Name"
+  }
+
+  if (action.includes("copy-callsign")) {
+    return target ? `Copied Callsign for ${target}` : "Copied Callsign"
+  }
+
+  if (action.includes("copy-badge-number")) {
+    return target ? `Copied Badge Number for ${target}` : "Copied Badge Number"
+  }
+
+  if (action.includes("import-promotion")) {
+    return target ? `Imported Promotion for ${target}` : "Imported Promotion"
+  }
+
+  if (action.includes("create-promotion-list")) {
+    return "Created Promotion List"
+  }
+
+  if (action.includes("submit-promotion-list")) {
+    return "Submitted Promotion List"
+  }
+
+  if (action.includes("delete-promotion-list")) {
+    return "Deleted Promotion List"
+  }
+
+  if (action.includes("refresh-roster")) {
+    return "Refreshed Roster"
+  }
+
+  if (action.includes("search-roster")) {
+    return "Searched Roster"
+  }
+
+  if (action.includes("filter-status")) {
+    return "Filtered Roster by Status"
+  }
+
+  if (action.includes("filter-rank")) {
+    return "Filtered Roster by Rank"
+  }
+
+  if (action.includes("clear-filters")) {
+    return "Cleared Filters"
+  }
+
+  if (action.includes("edit") || action.includes("update") || action.includes("change")) {
+    return actionLabel(log.action)
+  }
+
+  return actionLabel(log.action)
+}
+
 const formatSimpleValue = (value: unknown): string => {
   if (value === null || value === undefined || value === "") return "—"
   if (typeof value === "boolean") return value ? "Yes" : "No"
@@ -328,150 +474,210 @@ type DetailEntry = {
   }
 }
 
+const requirementKeys = [
+  "code",
+  "hours",
+  "requiredHours",
+  "promotionHours",
+  "timeInRankDays",
+  "requiredTimeInRankDays",
+  "trainingLogs",
+  "requiredTrainingLogs",
+  "recruitmentLogs",
+  "requiredRecruitmentLogs",
+  "requiredLogs",
+  "rank",
+]
+
+const isRequirementsLog = (log: ActionLog) =>
+  log.category === "requirements" ||
+  log.action.toLowerCase().includes("requirement")
+
+const requirementKeyOrder = (key: string) => {
+  const index = requirementKeys.indexOf(key)
+  return index === -1 ? 999 : index
+}
+
+const addRequirementChange = (
+  output: DetailEntry[],
+  key: string,
+  from: unknown,
+  to: unknown,
+) => {
+  // Never render metadata or unchanged values as requirement changes.
+  if (
+    key === "changedRanks" ||
+    key === "totalRanks" ||
+    key === "count" ||
+    key === "status" ||
+    key === "division" ||
+    key === "category" ||
+    key === "action"
+  ) {
+    return
+  }
+
+  if (from === undefined && to === undefined) return
+  if (Object.is(from, to)) return
+
+  output.push({
+    key,
+    value: { from, to },
+    change: { from, to },
+  })
+}
+
+const collectRequirementChanges = (
+  value: unknown,
+  output: DetailEntry[],
+  fallbackBefore?: Record<string, unknown> | null,
+) => {
+  if (!isRecord(value)) return
+
+  for (const [key, rawValue] of Object.entries(value)) {
+    if (rawValue === undefined || rawValue === null) continue
+
+    if (isChangePair(rawValue)) {
+      const pair = getChangePair(rawValue)
+      addRequirementChange(output, key, pair.from, pair.to)
+      continue
+    }
+
+    if (isRecord(rawValue)) {
+      collectRequirementChanges(rawValue, output, fallbackBefore)
+      continue
+    }
+
+    // Some older requirement logs stored the old value at the top level
+    // and the new value inside `changes`. Pair those values here.
+    const previous = fallbackBefore?.[key]
+    if (previous !== undefined && !Object.is(previous, rawValue)) {
+      addRequirementChange(output, key, previous, rawValue)
+    }
+  }
+}
+
 const getDetailEntries = (log: ActionLog): DetailEntry[] => {
   const details = log.details ?? {}
   const entries = Object.entries(details).filter(
     ([, value]) => value !== undefined && value !== null,
   )
 
-  const isRequirementsLog =
-    log.category === "requirements" ||
-    log.action.toLowerCase().includes("requirement")
-
-  if (!isRequirementsLog) {
-    return entries.map(([key, value]) => ({ key, value }))
+  if (!isRequirementsLog(log)) {
+    return entries
+      .filter(([key]) => key !== "before" && key !== "after")
+      .map(([key, value]) => ({ key, value }))
   }
-
-  const requirementOrder = [
-    "code",
-    "hours",
-    "requiredHours",
-    "promotionHours",
-    "timeInRankDays",
-    "requiredTimeInRankDays",
-    "trainingLogs",
-    "requiredTrainingLogs",
-    "recruitmentLogs",
-    "requiredRecruitmentLogs",
-    "requiredLogs",
-    "count",
-    "rank",
-    "division",
-    "status",
-  ]
 
   const output: DetailEntry[] = []
-
-  const pushEntry = (key: string, value: unknown) => {
-    if (isChangePair(value)) {
-      output.push({ key, value, change: getChangePair(value) })
-      return
-    }
-
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        if (item === undefined || item === null) continue
-
-        if (isRecord(item)) {
-          if (isChangePair(item)) {
-            output.push({ key, value: item, change: getChangePair(item) })
-            continue
-          }
-
-          for (const [nestedKey, nestedValue] of Object.entries(item)) {
-            if (nestedValue === undefined || nestedValue === null) continue
-            pushEntry(nestedKey, nestedValue)
-          }
-          continue
-        }
-
-        output.push({ key, value: item })
-      }
-      return
-    }
-
-    if (isRecord(value)) {
-      // Handle nested requirement payloads without ever displaying raw JSON.
-      for (const [nestedKey, nestedValue] of Object.entries(value)) {
-        if (nestedValue === undefined || nestedValue === null) continue
-        pushEntry(nestedKey, nestedValue)
-      }
-      return
-    }
-
-    output.push({ key, value })
-  }
-
-  for (const [key, value] of entries) {
-    if (key === "changes" && (isRecord(value) || Array.isArray(value))) {
-      if (Array.isArray(value)) {
-        value.forEach((item) => {
-          if (isRecord(item)) {
-            for (const [changedKey, changedValue] of Object.entries(item)) {
-              if (changedValue === undefined || changedValue === null) continue
-              pushEntry(changedKey, changedValue)
-            }
-          } else {
-            pushEntry("changes", item)
-          }
-        })
-      } else {
-        for (const [changedKey, changedValue] of Object.entries(value)) {
-          if (changedValue === undefined || changedValue === null) continue
-          pushEntry(changedKey, changedValue)
-        }
-      }
-      continue
-    }
-
-    if (key === "before" || key === "after") {
-      // If the API stores a complete before/after object, pair the fields by key.
-      continue
-    }
-
-    pushEntry(key, value)
-  }
-
   const before = isRecord(details.before) ? details.before : null
   const after = isRecord(details.after) ? details.after : null
+  const changes = details.changes
 
+  // Preferred format: compare the complete before/after requirement objects.
+  // This naturally removes fields that were not changed.
   if (before || after) {
     const keys = new Set([
       ...(before ? Object.keys(before) : []),
       ...(after ? Object.keys(after) : []),
     ])
 
-    const beforeAfterEntries: DetailEntry[] = []
-
     for (const key of keys) {
-      const from = before?.[key]
-      const to = after?.[key]
-
-      if (from === undefined && to === undefined) continue
-      if (Object.is(from, to)) continue
-
-      beforeAfterEntries.push({
+      addRequirementChange(
+        output,
         key,
-        value: { from, to },
-        change: { from, to },
-      })
-    }
-
-    // Prefer the clean before/after rows when they are available.
-    if (beforeAfterEntries.length > 0) {
-      return beforeAfterEntries.sort((a, b) => {
-        const ai = requirementOrder.indexOf(a.key)
-        const bi = requirementOrder.indexOf(b.key)
-        return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
-      })
+        before?.[key],
+        after?.[key],
+      )
     }
   }
 
-  return output.sort((a, b) => {
-    const ai = requirementOrder.indexOf(a.key)
-    const bi = requirementOrder.indexOf(b.key)
-    return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
-  })
+  // Newer/older payloads may instead provide `changes` as a map of new values.
+  if (isRecord(changes)) {
+    collectRequirementChanges(changes, output, before)
+
+    // If the old value was stored directly on details, pair it with the value
+    // from `changes` rather than displaying two separate rows.
+    for (const [key, newValue] of Object.entries(changes)) {
+      if (newValue === undefined || newValue === null) continue
+      if (isRecord(newValue) || Array.isArray(newValue)) continue
+
+      const oldValue = details[key]
+      if (
+        oldValue !== undefined &&
+        !isRecord(oldValue) &&
+        !Array.isArray(oldValue) &&
+        !Object.is(oldValue, newValue)
+      ) {
+        addRequirementChange(output, key, oldValue, newValue)
+      }
+    }
+  } else if (Array.isArray(changes)) {
+    for (const item of changes) {
+      if (!isRecord(item)) continue
+
+      // A change item may contain { field, from, to }.
+      const field =
+        typeof item.field === "string"
+          ? item.field
+          : typeof item.key === "string"
+            ? item.key
+            : null
+
+      if (field) {
+        if (isChangePair(item)) {
+          const pair = getChangePair(item)
+          addRequirementChange(output, field, pair.from, pair.to)
+        } else if (item.to !== undefined) {
+          addRequirementChange(output, field, item.from, item.to)
+        }
+        continue
+      }
+
+      collectRequirementChanges(item, output, before)
+    }
+  }
+
+  // Last-resort support for the old payload shown in the existing UI where
+  // a scalar old value and a scalar new value were both flattened into details.
+  for (const key of requirementKeys) {
+    const oldValue = details[`old${key.charAt(0).toUpperCase()}${key.slice(1)}`]
+    const newValue = details[`new${key.charAt(0).toUpperCase()}${key.slice(1)}`]
+    if (oldValue !== undefined || newValue !== undefined) {
+      addRequirementChange(output, key, oldValue, newValue)
+    }
+  }
+
+  // De-duplicate the same field when the API supplied it in more than one format.
+  const unique = new Map<string, DetailEntry>()
+  for (const entry of output) {
+    const existing = unique.get(entry.key)
+    if (!existing) {
+      unique.set(entry.key, entry)
+      continue
+    }
+
+    const existingFrom = existing.change?.from
+    const existingTo = existing.change?.to
+    const newFrom = entry.change?.from
+    const newTo = entry.change?.to
+
+    if (
+      (existingFrom === undefined || existingFrom === null) &&
+      newFrom !== undefined
+    ) {
+      unique.set(entry.key, entry)
+    } else if (
+      Object.is(existingFrom, newFrom) &&
+      Object.is(existingTo, newTo)
+    ) {
+      continue
+    }
+  }
+
+  return Array.from(unique.values()).sort(
+    (a, b) => requirementKeyOrder(a.key) - requirementKeyOrder(b.key),
+  )
 }
 
 const getInitials = (value: string) =>
@@ -1002,6 +1208,7 @@ function FilterDropdown({
 }) {
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
   const selectable = options.filter((option) => option.value !== "")
   const selected = values.filter((value) =>
     selectable.some((option) => option.value === value),
@@ -1025,14 +1232,20 @@ function FilterDropdown({
     const next = selected.includes(value)
       ? selected.filter((item) => item !== value)
       : [...selected, value]
+
     onChange(next)
   }
 
+  const allLabel =
+    placeholder === "Anyone"
+      ? "All Users"
+      : placeholder
+
   const buttonLabel =
     selected.length === 0
-      ? placeholder
+      ? allLabel
       : selected.length === selectable.length
-        ? `All ${placeholder.replace(/^All /i, "")}`
+        ? allLabel
         : `${selected.length} selected`
 
   return (
@@ -1045,7 +1258,9 @@ function FilterDropdown({
       >
         <span className="truncate">{buttonLabel}</span>
         <ChevronDown
-          className={`ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          className={`ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
         />
       </button>
 
@@ -1053,42 +1268,40 @@ function FilterDropdown({
         <div className="absolute left-0 top-[calc(100%+4px)] z-[300] max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl">
           <button
             type="button"
-            className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] text-foreground transition-colors hover:bg-accent"
+            className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${
+              selected.length === 0
+                ? "bg-blue-500/10 text-blue-400"
+                : "text-foreground hover:bg-accent"
+            }`}
             onClick={() => onChange([])}
           >
-            <span>All</span>
-            {selected.length === 0 ? <Check className="h-3.5 w-3.5 text-blue-400" /> : null}
+            <span>{allLabel}</span>
+            {selected.length === 0 ? (
+              <Check className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+            ) : null}
           </button>
-
-          <div className="my-1 border-t border-border" />
 
           {selectable.map((option) => {
             const active = selected.includes(option.value)
+
             return (
               <button
                 key={`${option.value}-${option.label}`}
                 type="button"
-                className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${active ? "bg-blue-500/10 text-blue-400" : "text-foreground hover:bg-accent"}`}
+                className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${
+                  active
+                    ? "bg-blue-500/10 text-blue-400"
+                    : "text-foreground hover:bg-accent"
+                }`}
                 onClick={() => toggle(option.value)}
               >
                 <span className="truncate">{option.label}</span>
-                {active ? <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-blue-400" /> : null}
+                {active ? (
+                  <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-blue-400" />
+                ) : null}
               </button>
             )
           })}
-
-          {selected.length > 0 ? (
-            <>
-              <div className="my-1 border-t border-border" />
-              <button
-                type="button"
-                className="flex w-full items-center justify-center rounded-md px-2.5 py-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-transparent hover:text-blue-400"
-                onClick={() => onChange([])}
-              >
-                Clear selection
-              </button>
-            </>
-          ) : null}
         </div>
       ) : null}
     </div>
@@ -1170,6 +1383,8 @@ function SingleSelectDropdown({
 
 export default function PromotionLogs() {
   const [module, setModule] = useState<LogModule>("all")
+  const [sessionUser, setSessionUser] = useState<User | null>(null)
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false)
   const [sessionUserId, setSessionUserId] = useState("")
   const [sessionAvatar, setSessionAvatar] = useState<string | null>(null)
 
@@ -1212,22 +1427,109 @@ export default function PromotionLogs() {
   useEffect(() => {
     let mounted = true
 
+    setPermissionsLoaded(false)
+
     getSession()
       .then((session) => {
-        if (!mounted || !session) return
-        setSessionUserId(String(session.discordId ?? ""))
-        setSessionAvatar(session.avatar ?? null)
+        if (!mounted) return
+
+        setSessionUser(session ?? null)
+        setSessionUserId(String(session?.discordId ?? ""))
+        setSessionAvatar(session?.avatar ?? null)
+        setPermissionsLoaded(true)
       })
       .catch(() => {
         if (!mounted) return
+
+        setSessionUser(null)
         setSessionUserId("")
         setSessionAvatar(null)
+        setPermissionsLoaded(true)
       })
 
     return () => {
       mounted = false
     }
   }, [])
+
+  const canViewPromotionLogs = checkPermission(
+    sessionUser,
+    "promotionlogs",
+  )
+
+  const canViewActivityLogs = checkPermission(
+    sessionUser,
+    "activitylogs",
+  )
+
+  const canViewAllLogs =
+    canViewPromotionLogs && canViewActivityLogs
+
+  const availableLogTabs = useMemo(() => {
+    const tabs: Array<[LogModule, string]> = []
+
+    if (canViewAllLogs) {
+      tabs.push(["all", "All"])
+    }
+
+    if (canViewPromotionLogs) {
+      tabs.push(["promotion", "Promotion Logs"])
+    }
+
+    if (canViewActivityLogs) {
+      tabs.push(["activity", "Activity Logs"])
+    }
+
+    return tabs
+  }, [canViewAllLogs, canViewPromotionLogs, canViewActivityLogs])
+
+  const hasAnyLogPermission =
+    canViewPromotionLogs || canViewActivityLogs
+
+  /*
+   * Pick the first tab the user is actually allowed to view.
+   *
+   * - Both permissions -> All is the default.
+   * - Promotion only -> Promotion Logs is the default.
+   * - Activity only -> Activity Logs is the default.
+   * - Neither -> keep the state stable and show the access message below.
+   */
+  useEffect(() => {
+    if (!permissionsLoaded) return
+
+    const allowedModules = new Set(
+      availableLogTabs.map(([value]) => value),
+    )
+
+    if (allowedModules.has(module)) {
+      return
+    }
+
+    const fallbackModule =
+      canViewAllLogs
+        ? "all"
+        : canViewPromotionLogs
+          ? "promotion"
+          : canViewActivityLogs
+            ? "activity"
+            : "all"
+
+    setModule(fallbackModule)
+    setPage(1)
+    setExpanded(null)
+    setSearch("")
+    setCategories([])
+    setDivisions([])
+    setUserIds([])
+    setActions([])
+  }, [
+    permissionsLoaded,
+    availableLogTabs,
+    module,
+    canViewAllLogs,
+    canViewPromotionLogs,
+    canViewActivityLogs,
+  ])
 
   const loadRosterProfiles = useCallback(async (items: ActionLog[]) => {
     const requests = new Map<string, { module: string; division: string }>()
@@ -1429,6 +1731,10 @@ export default function PromotionLogs() {
   ])
 
   useEffect(() => {
+    if (!permissionsLoaded || !hasAnyLogPermission) {
+      return
+    }
+
     const timer = window.setTimeout(
       () => {
         void loadLogs()
@@ -1439,7 +1745,12 @@ export default function PromotionLogs() {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [loadLogs, search])
+  }, [
+    permissionsLoaded,
+    hasAnyLogPermission,
+    loadLogs,
+    search,
+  ])
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -1497,6 +1808,40 @@ export default function PromotionLogs() {
     setExpanded(null)
   }
 
+  const removeFilterTag = (
+    type: "search" | "category" | "division" | "user" | "action",
+    value?: string,
+  ) => {
+    if (type === "search") {
+      clearSearch()
+      return
+    }
+
+    if (!value) return
+
+    if (type === "category") {
+      changeFilter(
+        setCategories,
+        categories.filter((item) => item !== value),
+      )
+    } else if (type === "division") {
+      changeFilter(
+        setDivisions,
+        divisions.filter((item) => item !== value),
+      )
+    } else if (type === "user") {
+      changeFilter(
+        setUserIds,
+        userIds.filter((item) => item !== value),
+      )
+    } else {
+      changeFilter(
+        setActions,
+        actions.filter((item) => item !== value),
+      )
+    }
+  }
+
   const groupedLogs = useMemo(() => {
     const groups: Array<{
       key: string
@@ -1528,9 +1873,38 @@ export default function PromotionLogs() {
     return groups
   }, [logs])
 
+  const pageTitle =
+    module === "all"
+      ? "All Logs"
+      : module === "promotion"
+        ? "Promotion Logs"
+        : "Activity Logs"
+
+  const pageDescription =
+    module === "all"
+      ? "View promotion and activity management audit history and changes."
+      : module === "promotion"
+        ? "View promotion management audit history and changes."
+        : "View activity management audit history and changes."
+
   return (
     <DashboardLayout>
       <div className="mx-auto flex w-full max-w-[1100px] min-w-0 flex-col gap-4 p-3 sm:gap-5 sm:p-5">
+        {!permissionsLoaded ? (
+          <div className="flex min-h-52 items-center justify-center rounded-xl border border-border bg-card text-sm text-muted-foreground">
+            Loading permissions...
+          </div>
+        ) : !hasAnyLogPermission ? (
+          <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/5 px-4 text-center">
+            <p className="text-sm font-medium text-red-400">
+              You do not have permission to view logs.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              You need the Promotion Logs or Activity Logs permission.
+            </p>
+          </div>
+        ) : (
+          <>
         {/* Header */}
         <div className="flex shrink-0 flex-col gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1541,10 +1915,10 @@ export default function PromotionLogs() {
 
               <div className="min-w-0">
                 <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                  Promotion Logs
+                  {pageTitle}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  View promotion management audit history and changes.
+                  {pageDescription}
                 </p>
               </div>
             </div>
@@ -1564,11 +1938,7 @@ export default function PromotionLogs() {
 
           {/* Log module tabs */}
           <div className="flex w-fit items-center gap-2">
-            {([
-              ["all", "All"],
-              ["promotion", "Promotion Logs"],
-              ["activity", "Activity Logs"],
-            ] as const).map(([value, label]) => {
+            {availableLogTabs.map(([value, label]) => {
               const active = module === value
 
               return (
@@ -1577,6 +1947,7 @@ export default function PromotionLogs() {
                   type="button"
                   onClick={() => {
                     if (module === value) return
+
                     setModule(value)
                     setPage(1)
                     setExpanded(null)
@@ -1636,9 +2007,9 @@ export default function PromotionLogs() {
 
                 <FilterDropdown
                   values={userIds}
-                  placeholder="Anyone"
+                  placeholder="All Users"
                   options={[
-                    { value: "", label: "Anyone" },
+                    { value: "", label: "All Users" },
                     ...Array.from(
                       new Map<string, Option>(
                         logs
@@ -1683,29 +2054,74 @@ export default function PromotionLogs() {
                 ) : (
                   <>
                     {search.trim() ? (
-                      <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                        Search: {search.trim()}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeFilterTag("search")}
+                        className="inline-flex max-w-full items-center gap-1 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400 outline-none transition-colors hover:border-blue-400/40 hover:bg-blue-500/15 hover:text-blue-300"
+                        title="Remove search filter"
+                      >
+                        <span className="max-w-56 truncate">
+                          Search: {search.trim()}
+                        </span>
+                        <X className="h-3 w-3 shrink-0" />
+                      </button>
                     ) : null}
+
                     {categories.map((value) => (
-                      <span key={`category-${value}`} className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                        Category: {categoryLabel(value)}
-                      </span>
+                      <button
+                        key={`category-${value}`}
+                        type="button"
+                        onClick={() => removeFilterTag("category", value)}
+                        className="inline-flex items-center gap-1 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400 outline-none transition-colors hover:border-blue-400/40 hover:bg-blue-500/15 hover:text-blue-300"
+                        title={`Remove ${categoryLabel(value)} filter`}
+                      >
+                        <span>Category: {categoryLabel(value)}</span>
+                        <X className="h-3 w-3 shrink-0" />
+                      </button>
                     ))}
+
                     {divisions.map((value) => (
-                      <span key={`division-${value}`} className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                        Division: {divisionLabel(value)}
-                      </span>
+                      <button
+                        key={`division-${value}`}
+                        type="button"
+                        onClick={() => removeFilterTag("division", value)}
+                        className="inline-flex items-center gap-1 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400 outline-none transition-colors hover:border-blue-400/40 hover:bg-blue-500/15 hover:text-blue-300"
+                        title={`Remove ${divisionLabel(value)} filter`}
+                      >
+                        <span>Division: {divisionLabel(value)}</span>
+                        <X className="h-3 w-3 shrink-0" />
+                      </button>
                     ))}
-                    {userIds.map((value) => (
-                      <span key={`user-${value}`} className="max-w-48 truncate rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                        User: {logs.find((log) => log.userId === value)?.userName || logs.find((log) => log.userId === value)?.username || value}
-                      </span>
-                    ))}
+
+                    {userIds.map((value) => {
+                      const user = logs.find((log) => log.userId === value)
+                      const label = user?.userName || user?.username || value
+
+                      return (
+                        <button
+                          key={`user-${value}`}
+                          type="button"
+                          onClick={() => removeFilterTag("user", value)}
+                          className="inline-flex max-w-56 items-center gap-1 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400 outline-none transition-colors hover:border-blue-400/40 hover:bg-blue-500/15 hover:text-blue-300"
+                          title={`Remove ${label} filter`}
+                        >
+                          <span className="truncate">User: {label}</span>
+                          <X className="h-3 w-3 shrink-0" />
+                        </button>
+                      )
+                    })}
+
                     {actions.map((value) => (
-                      <span key={`action-${value}`} className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                        Action: {actionLabel(value)}
-                      </span>
+                      <button
+                        key={`action-${value}`}
+                        type="button"
+                        onClick={() => removeFilterTag("action", value)}
+                        className="inline-flex items-center gap-1 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400 outline-none transition-colors hover:border-blue-400/40 hover:bg-blue-500/15 hover:text-blue-300"
+                        title={`Remove ${actionLabel(value)} filter`}
+                      >
+                        <span>Action: {actionLabel(value)}</span>
+                        <X className="h-3 w-3 shrink-0" />
+                      </button>
                     ))}
                   </>
                 )}
@@ -1874,7 +2290,7 @@ export default function PromotionLogs() {
                               <div className="min-w-0 flex-1">
                                 <div className="flex min-w-0 items-center gap-2">
                                   <span className="truncate text-[13px] font-semibold text-foreground sm:text-sm">
-                                    {actionLabel(log.action)}
+                                    {getEntryTitle(log)}
                                   </span>
 
                                   {log.targetName || log.targetUserId ? (
@@ -1889,9 +2305,9 @@ export default function PromotionLogs() {
                                         }
                                       >
                                         <TargetIdentity
-                                          log={log}
-                                          rosterProfiles={rosterProfiles}
-                                        />
+                                        log={log}
+                                        rosterProfiles={rosterProfiles}
+                                      />
                                       </div>
                                     </>
                                   ) : null}
@@ -1918,7 +2334,7 @@ export default function PromotionLogs() {
                                   <span>{formatDateTime(log.createdAt).split(",")[0]}</span>
 
                                   <span>·</span>
-                                  <span>{categoryLabel(log.category)}</span>
+                                  <span>{resolveLogModule(log) === "activity" ? "Activity" : "Promotion"}</span>
 
                                   {log.division ? (
                                     <>
@@ -1952,6 +2368,25 @@ export default function PromotionLogs() {
                           {/* Expanded entry — readable rows for every log type. */}
                           {isExpanded ? (
                             <div className="border-t border-border px-4 py-3 sm:px-7 sm:py-4">
+                              {(log.targetName || log.targetUserId) ? (
+                                <div className="mb-3 grid grid-cols-[minmax(110px,180px)_1fr] items-center gap-5 border-b border-border pb-3">
+                                  <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
+                                    {log.action.toLowerCase().includes("select")
+                                      ? "Selected Member"
+                                      : "Target"}
+                                  </span>
+                                  <div
+                                    className="min-w-0"
+                                    onClick={(event) => event.stopPropagation()}
+                                  >
+                                    <TargetIdentity
+                                      log={log}
+                                      rosterProfiles={rosterProfiles}
+                                    />
+                                  </div>
+                                </div>
+                              ) : null}
+
                               {detailEntries.length > 0 ? (
                                 <div className="divide-y divide-border">
                                   {detailEntries.map(({ key, value, change }) => (
@@ -2081,6 +2516,8 @@ export default function PromotionLogs() {
             </div>
           </div>
         ) : null}
+          </>
+        )}
       </div>
     </DashboardLayout>
   )
