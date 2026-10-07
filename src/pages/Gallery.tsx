@@ -4612,14 +4612,25 @@ function GalleryMediaCollage({
                       <Images className="h-3.5 w-3.5" />
                     </span>
                     <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
-                      +{hiddenCount} {(() => {
+                      {(() => {
                         const hidden = media.slice(3)
                         const imageCount = hidden.filter((entry) => entry.type === "image").length
                         const videoCount = hidden.filter((entry) => entry.type === "video").length
-                        const parts: string[] = []
-                        if (imageCount) parts.push(`${imageCount} image${imageCount === 1 ? "" : "s"}`)
-                        if (videoCount) parts.push(`${videoCount} video${videoCount === 1 ? "" : "s"}`)
-                        return parts.join(" / ") || "media"
+                        const hiddenCount = hidden.length
+
+                        if (imageCount > 0 && videoCount > 0) {
+                          return `${hiddenCount}+ images/videos`
+                        }
+
+                        if (imageCount > 0) {
+                          return `${hiddenCount}+ images`
+                        }
+
+                        if (videoCount > 0) {
+                          return `${hiddenCount}+ videos`
+                        }
+
+                        return `${hiddenCount}+ media`
                       })()}
                     </span>
                   </div>
