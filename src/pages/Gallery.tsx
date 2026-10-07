@@ -911,10 +911,14 @@ function GalleryColorPicker({
         aria-label={ariaLabel}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className="flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-2.5 shadow-sm transition-colors hover:border-blue-500/50 hover:bg-muted/40"
+        className="flex h-10 items-center gap-2 rounded-lg border border-border bg-background pl-3 pr-1.5 shadow-sm transition-colors hover:border-blue-500/50 hover:bg-muted/40"
       >
-        <span className="h-5 w-5 rounded-md border border-white/20 shadow-inner" style={{ backgroundColor: normalized }} />
         <span className="font-mono text-[11px] uppercase text-muted-foreground">{normalized}</span>
+        <span
+          className="h-8 w-8 shrink-0 rounded-md border border-white/20 shadow-inner"
+          style={{ backgroundColor: normalized }}
+          aria-hidden="true"
+        />
         <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
@@ -940,17 +944,20 @@ function GalleryColorPicker({
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="h-10 w-10 shrink-0 rounded-lg border border-white/15 shadow-inner" style={{ backgroundColor: normalized }} />
             <Input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { commit(draft); setOpen(false) } }} onBlur={() => commit(draft)} placeholder={format === "HEX" ? "#3b82f6" : format === "RGB" ? "rgb(59, 130, 246)" : "hsl(217, 91%, 60%)"} className="font-mono text-xs" />
-            <input type="color" value={normalized} aria-label={`${ariaLabel} native color picker`} onChange={(event) => commit(event.target.value)} className="h-10 w-10 shrink-0 cursor-pointer rounded-lg border border-border bg-background p-1" />
-          </div>
-
-          <div className="mt-3 flex items-center justify-between rounded-lg border border-border/70 bg-background/50 px-3 py-2">
-            <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <span className="h-4 w-4 rounded border border-white/20 shadow-inner" style={{ backgroundColor: normalized }} />
-              Current
-            </span>
-            <span className="font-mono text-[11px] text-foreground">{normalized}</span>
+            <label
+              className="relative h-10 w-10 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-white/15 shadow-inner"
+              style={{ backgroundColor: normalized }}
+              title="Choose color"
+            >
+              <input
+                type="color"
+                value={normalized}
+                aria-label={`${ariaLabel} native color picker`}
+                onChange={(event) => commit(event.target.value)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
           </div>
         </div>
       )}
