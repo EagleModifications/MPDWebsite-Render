@@ -1751,7 +1751,7 @@ export default function Gallery() {
               </div>
             ) : (
               <div className="h-auto p-3 sm:p-4">
-                  <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 2xl:columns-4">
+                  <div className="columns-1 gap-3 sm:columns-2 lg:columns-3">
                   {filteredItems.map(
                     (item) => {
                       const mediaList =
@@ -1830,9 +1830,16 @@ export default function Gallery() {
                                     </p>
 
                                     {getWrappedLineCount(item.description, 35) > 3 && (
-                                      <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
+                                      <button
+                                        type="button"
+                                        className="mt-0.5 block text-[11px] font-medium text-blue-500 transition-colors hover:text-blue-400"
+                                        onClick={(event) => {
+                                          event.stopPropagation()
+                                          openInfo(item)
+                                        }}
+                                      >
                                         Show more...
-                                      </span>
+                                      </button>
                                     )}
                                   </div>
                                 )}
