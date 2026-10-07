@@ -242,7 +242,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const hasOwn = (value: Record<string, unknown>, key: string) =>
   Object.prototype.hasOwnProperty.call(value, key)
 
-const isChangePair = (value: unknown): value is Record<string, unknown> => {
+const isChangePair = (value: unknown): boolean => {
   if (!isRecord(value)) return false
 
   return (
@@ -552,12 +552,19 @@ const collectRequirementChanges = (
 
     if (isChangePair(rawValue)) {
       const pair = getChangePair(rawValue)
-      addRequirementChange(output, key, pair.from, pair.to)
+      addRequirementChange(output, normalizeRequirementKey(key), pair.from, pair.to)
       continue
     }
 
     if (isRecord(rawValue)) {
-      collectRequirementChanges(rawValue, output, fallbackBefore)
+      const nestedBefore = rawValue.before ?? rawValue.old ?? rawValue.previous
+      const nestedAfter = rawValue.after ?? rawValue.new ?? rawValue.current
+
+      if (isRecord(nestedBefore) && isRecord(nestedAfter)) {
+        collectBeforeAfterChanges(nestedBefore, nestedAfter, output)
+      } else {
+        collectRequirementChanges(rawValue, output, fallbackBefore)
+      }
       continue
     }
 
@@ -568,6 +575,66 @@ const collectRequirementChanges = (
       addRequirementChange(output, key, previous, rawValue)
     }
   }
+}
+
+
+const normalizeRequirementKey = (key: string): string => {
+  const normalized = key
+    .replace(/^(required|promotion|activity|current|previous|old|new|from|to)/i, "")
+    .replace(/^[._-]+/, "")
+
+  const lower = normalized.toLowerCase()
+
+  if (lower === "code" || lower === "requirementcode") return "code"
+  if (lower === "hours" || lower === "hour") return "hours"
+  if (lower === "timeinrankdays" || lower === "timeinrank" || lower === "tir") return "timeInRankDays"
+  if (lower === "traininglogs" || lower === "traininglog") return "trainingLogs"
+  if (lower === "recruitmentlogs" || lower === "recruitmentlog") return "recruitmentLogs"
+
+  return key
+}
+
+const collectBeforeAfterChanges = (
+  before: unknown,
+  after: unknown,
+  output: DetailEntry[],
+) => {
+  if (!isRecord(before) || !isRecord(after)) return
+
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)])
+  for (const key of keys) {
+    const oldValue = before[key]
+    const newValue = after[key]
+    const normalizedKey = normalizeRequirementKey(key)
+
+    if (isRecord(oldValue) && isRecord(newValue)) {
+      collectBeforeAfterChanges(oldValue, newValue, output)
+      continue
+    }
+
+    addRequirementChange(output, normalizedKey, oldValue, newValue)
+  }
+}
+
+const addSummaryRequirementChange = (
+  log: ActionLog,
+  output: DetailEntry[],
+) => {
+  if (output.length > 0) return
+
+  const summary = String(log.summary ?? "")
+  const match = summary.match(/(?:→|->)\s*([\d,.]+)\s*(hours?|days?)/i)
+  if (!match) return
+
+  const unit = match[2].toLowerCase()
+  const key = unit.startsWith("hour") ? "hours" : "timeInRankDays"
+  const newValue = Number(match[1].replace(/,/g, ""))
+
+  if (!Number.isFinite(newValue)) return
+
+  // Some older logs only stored the new value in the summary. Keep the old
+  // side as unavailable rather than inventing a value.
+  addRequirementChange(output, key, undefined, newValue)
 }
 
 const getDetailEntries = (log: ActionLog): DetailEntry[] => {
@@ -588,17 +655,17 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
   const changes = details.changes
 
   // Preferred format: compare the complete before/after requirement objects.
-  // This naturally removes fields that were not changed.
-  if (before || after) {
-    const keys = new Set([
-      ...(before ? Object.keys(before) : []),
-      ...(after ? Object.keys(after) : []),
-    ])
-
-    for (const key of keys) {
+  // This naturally removes fields that were not changed and also handles
+  // nested requirement payloads.
+  if (before && after) {
+    collectBeforeAfterChanges(before, after, output)
+  } else if (before || after) {
+    const source = before ?? after
+    for (const [key, value] of Object.entries(source ?? {})) {
+      if (isRecord(value)) continue
       addRequirementChange(
         output,
-        key,
+        normalizeRequirementKey(key),
         before?.[key],
         after?.[key],
       )
@@ -622,7 +689,7 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
         !Array.isArray(oldValue) &&
         !Object.is(oldValue, newValue)
       ) {
-        addRequirementChange(output, key, oldValue, newValue)
+        addRequirementChange(output, normalizeRequirementKey(key), oldValue, newValue)
       }
     }
   } else if (Array.isArray(changes)) {
@@ -641,7 +708,7 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
         const pair = getChangePair(item)
 
         if (pair.to !== undefined) {
-          addRequirementChange(output, field, pair.from, pair.to)
+          addRequirementChange(output, normalizeRequirementKey(field), pair.from, pair.to)
         }
 
         continue
@@ -657,9 +724,34 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
     const oldValue = details[`old${key.charAt(0).toUpperCase()}${key.slice(1)}`]
     const newValue = details[`new${key.charAt(0).toUpperCase()}${key.slice(1)}`]
     if (oldValue !== undefined || newValue !== undefined) {
-      addRequirementChange(output, key, oldValue, newValue)
+      addRequirementChange(output, normalizeRequirementKey(key), oldValue, newValue)
     }
   }
+
+
+  // Handle flattened payloads such as oldHours/newHours, previousHours/currentHours,
+  // or fromHours/toHours that some older API entries used.
+  const flattenedPairs: Array<[string, string, string]> = [
+    ["hours", "oldHours", "newHours"],
+    ["hours", "previousHours", "currentHours"],
+    ["hours", "fromHours", "toHours"],
+    ["timeInRankDays", "oldTimeInRankDays", "newTimeInRankDays"],
+    ["timeInRankDays", "previousTimeInRankDays", "currentTimeInRankDays"],
+    ["trainingLogs", "oldTrainingLogs", "newTrainingLogs"],
+    ["trainingLogs", "previousTrainingLogs", "currentTrainingLogs"],
+    ["recruitmentLogs", "oldRecruitmentLogs", "newRecruitmentLogs"],
+    ["recruitmentLogs", "previousRecruitmentLogs", "currentRecruitmentLogs"],
+  ]
+
+  for (const [field, oldKey, newKey] of flattenedPairs) {
+    const oldValue = details[oldKey]
+    const newValue = details[newKey]
+    if (oldValue !== undefined || newValue !== undefined) {
+      addRequirementChange(output, field, oldValue, newValue)
+    }
+  }
+
+  addSummaryRequirementChange(log, output)
 
   // De-duplicate the same field when the API supplied it in more than one format.
   const unique = new Map<string, DetailEntry>()
@@ -1271,7 +1363,7 @@ function FilterDropdown({
       ? allLabel
       : selected.length === selectable.length
         ? allLabel
-        : `${selected.length} ${filterName}${selected.length === 1 ? "" : "s"} selected`
+        : `${selected.length} ${filterName}${selected.length === 1 ? "" : "s"} Selected`
 
   return (
     <div ref={dropdownRef} className={`relative ${width}`}>
@@ -2452,7 +2544,7 @@ export default function PromotionLogs() {
                                 </div>
                               ) : null}
 
-                              {log.summary ? (
+                              {log.summary && (!isRequirementsLog(log) || detailEntries.length === 0) ? (
                                 <div className={`${detailEntries.length > 0 ? "mt-3 border-t border-border pt-3" : ""}`}>
                                   <p className="text-[11px] leading-5 text-muted-foreground sm:text-xs">
                                     {log.summary}
