@@ -1,7 +1,7 @@
 import { Car } from "lucide-react"
 import { useMemo } from "react"
 
-import RosterPanel from "@/components/roster/RosterPanel"
+import RosterPanel from "@/components/documents/roster/RosterPanel"
 import {
   findHeaderRow,
   getRowValue,
@@ -9,7 +9,7 @@ import {
   makeId,
   type RosterColumn,
   type RosterRecord,
-} from "@/components/roster/rosterShared"
+} from "@/components/documents/roster/rosterShared"
 
 const HEADERS = [
   "Rank",
