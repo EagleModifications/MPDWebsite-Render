@@ -4175,7 +4175,7 @@ function GalleryMediaCollage({
   if (visible.length === 0) return null
 
   return (
-    <div className="relative h-[320px] w-full overflow-hidden bg-black sm:h-[360px]">
+    <div className="relative h-[340px] w-full overflow-hidden bg-black sm:h-[380px]">
       {visible.length === 1 && (
         <GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} />
       )}
@@ -4279,14 +4279,14 @@ function GalleryMediaCard({
         <img
           src={media.url}
           alt={title}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+          className="h-full w-full object-contain transition duration-300"
         />
       ) : getMediaThumbnail(media) ? (
         <div className="relative h-full w-full">
           <img
             src={getMediaThumbnail(media)}
             alt={title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+            className="h-full w-full object-contain transition duration-300"
           />
         </div>
       ) : isEmbeddableVideo(media) ? (
@@ -4305,7 +4305,7 @@ function GalleryMediaCard({
           loop
           playsInline
           preload="auto"
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+          className="h-full w-full object-contain transition duration-300"
         />
       )}
 
