@@ -593,6 +593,7 @@ type GalleryDocument = {
   createdBy: string
   createdAt: Date
   updatedAt: Date
+  slug?: string
 
   // Legacy fields are kept optional so existing gallery
   // documents continue to work after this migration.
@@ -723,17 +724,32 @@ const APP_ORIGIN =
     .trim()
     .replace(/\/+$/, "")
 
+function slugifyGalleryTitle(value: string) {
+  const slug = String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+
+  return slug || "gallery"
+}
+
 function getGalleryPublicMediaUrl(
   media: GalleryMedia,
+  title = "Gallery",
 ) {
   const storageId = cleanGalleryString(media.storageId)
 
   if (storageId && ObjectId.isValid(storageId)) {
-    const extension = cleanGalleryString(media.extension) || "bin"
-    return `/gallery/${media.type}/${storageId}.${extension}`
+    const extension =
+      cleanGalleryString(media.extension) ||
+      (media.url.match(/\.([a-z0-9]+)(?:[?#].*)?$/i)?.[1] ??
+        (media.type === "video" ? "mp4" : "jpg"))
+
+    return `/gallery/${media.type}/${slugifyGalleryTitle(title)}.${extension.toLowerCase()}`
   }
 
-  // Legacy external records are returned as-is for backwards compatibility.
   return cleanGalleryString(media.url)
 }
 
@@ -747,7 +763,7 @@ function serializeGalleryItem(
     category: item.category ?? "Community",
     tags: normalizeGalleryTags(item.tags),
     media: getGalleryMedia(item).map((media) => {
-      const publicUrl = getGalleryPublicMediaUrl(media)
+      const publicUrl = getGalleryPublicMediaUrl(media, item.title)
 
       return {
         ...media,
@@ -4394,6 +4410,13 @@ async function ensureGalleryIndexes() {
       name: "gallery_type_createdAt",
     },
   )
+
+  await gallery.createIndex(
+    { slug: 1, createdAt: -1 },
+    {
+      name: "gallery_slug_createdAt",
+    },
+  )
 }
 
 export function createApp() {
@@ -4450,6 +4473,12 @@ export function createApp() {
   // Serve the production Vite build from the same Express service.
   // This keeps the React app and /api/* on the same origin in production.
   const clientDist = path.join(process.cwd(), "dist")
+
+  // Keep the MPD logo as the browser tab icon even when a gallery media
+  // URL is opened directly instead of through the React page.
+  app.get("/favicon.ico", (_req, res) => {
+    return res.sendFile(path.join(clientDist, "logo.png"))
+  })
   app.use(express.static(clientDist))
 
   /* ─────────────────────────────────────────
@@ -6292,41 +6321,127 @@ export function createApp() {
     },
   )
 
+  async function streamGalleryFile(
+    req: express.Request,
+    res: express.Response,
+    fileId: ObjectId,
+    contentTypeOverride?: string,
+  ) {
+    const bucket = await getGalleryBucket()
+    const files = await bucket
+      .find({ _id: fileId })
+      .limit(1)
+      .toArray()
+
+    const file = files[0]
+
+    if (!file) {
+      return res.status(404).json({
+        success: false,
+        error: "Gallery file not found",
+      })
+    }
+
+    const metadata =
+      (file.metadata as {
+        contentType?: unknown
+        mediaType?: unknown
+      } | undefined) ?? {}
+
+    const contentType =
+      contentTypeOverride ||
+      getGalleryContentType(
+        typeof file.contentType === "string"
+          ? file.contentType
+          : "",
+        typeof file.filename === "string"
+          ? file.filename
+          : "",
+        metadata.mediaType === "video" ? "video" : "image",
+      )
+
+    const totalLength = Number(file.length)
+    const range = req.headers.range
+
+    res.setHeader("Content-Type", contentType)
+    res.setHeader("Content-Disposition", "inline")
+    res.setHeader("Accept-Ranges", "bytes")
+    res.setHeader(
+      "Cache-Control",
+      "public, max-age=31536000, immutable",
+    )
+
+    if (!range) {
+      res.status(200)
+      res.setHeader("Content-Length", String(totalLength))
+
+      const stream = bucket.openDownloadStream(fileId)
+      stream.once("error", (error) => {
+        console.error("Gallery file stream failed:", error)
+        if (!res.headersSent) res.status(500).end()
+        else res.end()
+      })
+      stream.pipe(res)
+      return
+    }
+
+    const match = /^bytes=(\d*)-(\d*)$/i.exec(range.trim())
+
+    if (!match) {
+      res.setHeader("Content-Range", `bytes */${totalLength}`)
+      return res.status(416).end()
+    }
+
+    const requestedStart = match[1] ? Number(match[1]) : null
+    const requestedEnd = match[2] ? Number(match[2]) : null
+
+    let start: number
+    let end: number
+
+    if (requestedStart === null) {
+      const suffixLength = requestedEnd ?? 0
+      if (suffixLength <= 0) {
+        res.setHeader("Content-Range", `bytes */${totalLength}`)
+        return res.status(416).end()
+      }
+      start = Math.max(0, totalLength - suffixLength)
+      end = totalLength - 1
+    } else {
+      start = requestedStart
+      end = requestedEnd ?? totalLength - 1
+    }
+
+    if (start < 0 || start >= totalLength || end < start) {
+      res.setHeader("Content-Range", `bytes */${totalLength}`)
+      return res.status(416).end()
+    }
+
+    end = Math.min(end, totalLength - 1)
+    const length = end - start + 1
+
+    res.status(206)
+    res.setHeader("Content-Range", `bytes ${start}-${end}/${totalLength}`)
+    res.setHeader("Content-Length", String(length))
+
+    const stream = bucket.openDownloadStream(fileId, {
+      start,
+      end: end + 1,
+    })
+
+    stream.once("error", (error) => {
+      console.error("Gallery ranged stream failed:", error)
+      if (!res.headersSent) res.status(500).end()
+      else res.end()
+    })
+
+    stream.pipe(res)
+  }
+
   app.get(
     "/api/gallery/file/:id",
     async (req, res) => {
       try {
-        if (!ObjectId.isValid(req.params.id)) {
-          return res.status(400).json({ success: false, error: "Invalid gallery file ID" })
-        }
-        const bucket = await getGalleryBucket()
-        const files = await bucket.find({ _id: new ObjectId(req.params.id) }).limit(1).toArray()
-        const file = files[0]
-        if (!file) return res.status(404).json({ success: false, error: "Gallery file not found" })
-        const metadata = (file.metadata as { mediaType?: unknown } | undefined) ?? {}
-        const type = metadata.mediaType === "video" ? "video" : "image"
-        const extension = path.extname(String(file.filename || "")).replace(/^\./, "").toLowerCase() || "bin"
-        return res.redirect(302, `/gallery/${type}/${req.params.id}.${extension}`)
-      } catch {
-        return res.status(500).json({ success: false, error: "Failed to resolve gallery file" })
-      }
-    },
-  )
-
-  app.get(
-    "/gallery/:type/:id.:extension",
-    async (req, res) => {
-      try {
-        // Public media endpoint: guests must be able to render gallery media.
         const id = req.params.id
-        const requestedType = req.params.type
-
-        if (requestedType !== "image" && requestedType !== "video") {
-          return res.status(400).json({
-            success: false,
-            error: "Invalid gallery media type",
-          })
-        }
 
         if (!ObjectId.isValid(id)) {
           return res.status(400).json({
@@ -6335,13 +6450,28 @@ export function createApp() {
           })
         }
 
-        const objectId = new ObjectId(id)
-        const bucket = await getGalleryBucket()
-        const files = await bucket
-          .find({ _id: objectId })
-          .limit(1)
-          .toArray()
+        const gallery = await getCollection<GalleryDocument>("gallery")
+        const mediaDocument = await gallery.findOne({
+          "media.storageId": id,
+        })
 
+        const media = mediaDocument
+          ? getGalleryMedia(mediaDocument).find((entry) => entry.storageId === id)
+          : undefined
+
+        if (mediaDocument && media) {
+          const extension =
+            cleanGalleryString(media.extension) ||
+            (media.url.match(/\.([a-z0-9]+)(?:[?#].*)?$/i)?.[1] ??
+              (media.type === "video" ? "mp4" : "jpg"))
+
+          return res.redirect(302, `/gallery/${media.type}/${slugifyGalleryTitle(mediaDocument.title)}.${extension}`)
+        }
+
+        // Legacy files which are not yet attached to a gallery document still
+        // remain accessible through their GridFS ID.
+        const bucket = await getGalleryBucket()
+        const files = await bucket.find({ _id: new ObjectId(id) }).limit(1).toArray()
         const file = files[0]
 
         if (!file) {
@@ -6351,124 +6481,85 @@ export function createApp() {
           })
         }
 
-        const metadata =
-          (file.metadata as {
-            contentType?: unknown
-            mediaType?: unknown
-          } | undefined) ?? {}
+        const metadata = (file.metadata as { mediaType?: unknown } | undefined) ?? {}
+        const type = metadata.mediaType === "video" ? "video" : "image"
+        const extension = path.extname(String(file.filename || "")).replace(/^\./, "").toLowerCase() || (type === "video" ? "mp4" : "jpg")
 
-        const contentType = getGalleryContentType(
-          typeof file.contentType === "string"
-            ? file.contentType
-            : "",
-          typeof file.filename === "string"
-            ? file.filename
-            : "",
-          metadata.mediaType === "video" ? "video" : "image",
-        )
-
-        const totalLength = Number(file.length)
-        const range = req.headers.range
-
-        res.setHeader("Content-Type", contentType)
-        res.setHeader("Content-Disposition", "inline")
-        res.setHeader("Accept-Ranges", "bytes")
-        res.setHeader(
-          "Cache-Control",
-          "public, max-age=31536000, immutable",
-        )
-
-        if (!range) {
-          res.status(200)
-          res.setHeader("Content-Length", String(totalLength))
-
-          const stream = bucket.openDownloadStream(objectId)
-          stream.once("error", (error) => {
-            console.error("Gallery file stream failed:", error)
-            if (!res.headersSent) res.status(500).end()
-            else res.end()
-          })
-          stream.pipe(res)
-          return
-        }
-
-        const match = /^bytes=(\d*)-(\d*)$/i.exec(
-          range.trim(),
-        )
-
-        if (!match) {
-          res.setHeader("Content-Range", `bytes */${totalLength}`)
-          return res.status(416).end()
-        }
-
-        const requestedStart = match[1]
-          ? Number(match[1])
-          : null
-        const requestedEnd = match[2]
-          ? Number(match[2])
-          : null
-
-        let start: number
-        let end: number
-
-        if (requestedStart === null) {
-          const suffixLength = requestedEnd ?? 0
-
-          if (suffixLength <= 0) {
-            res.setHeader("Content-Range", `bytes */${totalLength}`)
-            return res.status(416).end()
-          }
-
-          start = Math.max(0, totalLength - suffixLength)
-          end = totalLength - 1
-        } else {
-          start = requestedStart
-          end = requestedEnd ?? totalLength - 1
-        }
-
-        if (
-          start < 0 ||
-          start >= totalLength ||
-          end < start
-        ) {
-          res.setHeader("Content-Range", `bytes */${totalLength}`)
-          return res.status(416).end()
-        }
-
-        end = Math.min(end, totalLength - 1)
-
-        const length = end - start + 1
-
-        res.status(206)
-        res.setHeader(
-          "Content-Range",
-          `bytes ${start}-${end}/${totalLength}`,
-        )
-        res.setHeader("Content-Length", String(length))
-
-        const stream = bucket.openDownloadStream(objectId, {
-          start,
-          end: end + 1,
-        })
-
-        stream.once("error", (error) => {
-          console.error("Gallery ranged stream failed:", error)
-          if (!res.headersSent) res.status(500).end()
-          else res.end()
-        })
-
-        stream.pipe(res)
-        return
+        return res.redirect(302, `/gallery/${type}/${id}.${extension}`)
       } catch (error) {
-        console.error(
-          "GET /api/gallery/file/:id failed:",
-          error,
-        )
-
+        console.error("GET /api/gallery/file/:id failed:", error)
         return res.status(500).json({
           success: false,
-          error: "Failed to load gallery file",
+          error: "Failed to resolve gallery file",
         })
+      }
+    },
+  )
+
+  app.get(
+    "/gallery/:type/:filename",
+    async (req, res) => {
+      try {
+        const requestedType = req.params.type
+        const filename = req.params.filename
+        const match = /^(.+)\.([a-z0-9]+)$/i.exec(filename)
+
+        if (requestedType !== "image" && requestedType !== "video") {
+          return res.status(404).json({ success: false, error: "Gallery media not found" })
+        }
+
+        if (!match) {
+          return res.status(404).json({ success: false, error: "Gallery media not found" })
+        }
+
+        const requestedSlug = decodeURIComponent(match[1]).toLowerCase()
+        const requestedExtension = match[2].toLowerCase()
+        const gallery = await getCollection<GalleryDocument>("gallery")
+        let document = await gallery.findOne({ slug: requestedSlug })
+
+        // Older gallery documents may not have a slug field. Resolve them by
+        // their title so their media can be opened using the new URL format.
+        if (!document) {
+          const candidates = await gallery.find({}).sort({ createdAt: -1 }).toArray()
+          document = candidates.find((entry) => slugifyGalleryTitle(entry.title) === requestedSlug)
+        }
+
+        if (!document) {
+          return res.status(404).json({ success: false, error: "Gallery media not found" })
+        }
+
+        const media = getGalleryMedia(document).find((entry) => {
+          if (entry.type !== requestedType || !entry.storageId) return false
+          const extension =
+            cleanGalleryString(entry.extension) ||
+            (entry.url.match(/\.([a-z0-9]+)(?:[?#].*)?$/i)?.[1] ?? "").toLowerCase()
+          return !extension || extension === requestedExtension
+        })
+
+        if (!media?.storageId || !ObjectId.isValid(media.storageId)) {
+          return res.status(404).json({ success: false, error: "Gallery media not found" })
+        }
+
+        // A normal browser navigation sends Accept: text/html. In that case
+        // provide a tiny media page so the direct URL has the MPD tab logo.
+        // <img>/<video> requests still receive the raw binary below.
+        const accept = String(req.headers.accept || "")
+        if (accept.includes("text/html") && !req.headers.range) {
+          const mediaUrl = `/gallery/${requestedType}/${filename}`
+          const title = String(document.title || "Gallery").replace(/[&<>\"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '\"': "&quot;" } as Record<string, string>)[char])
+          const html = requestedType === "video"
+            ? `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="icon" href="/logo.png"></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh"><video src="${mediaUrl}" controls autoplay style="max-width:100vw;max-height:100vh"></video></body></html>`
+            : `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="icon" href="/logo.png"></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${mediaUrl}" alt="${title}" style="max-width:100vw;max-height:100vh;object-fit:contain"></body></html>`
+
+          res.setHeader("Content-Type", "text/html; charset=utf-8")
+          res.setHeader("Cache-Control", "no-cache")
+          return res.status(200).send(html)
+        }
+
+        return streamGalleryFile(req, res, new ObjectId(media.storageId))
+      } catch (error) {
+        console.error("GET /gallery/:type/:filename failed:", error)
+        return res.status(500).json({ success: false, error: "Failed to load gallery media" })
       }
     },
   )
@@ -6682,6 +6773,7 @@ export function createApp() {
 
         const item: GalleryDocument = {
           title,
+          slug: slugifyGalleryTitle(title),
           description,
           category,
           tags,
@@ -6981,6 +7073,7 @@ export function createApp() {
           {
             $set: {
               title,
+              slug: slugifyGalleryTitle(title),
               description,
               category,
               tags,
