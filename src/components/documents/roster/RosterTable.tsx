@@ -8,7 +8,7 @@ import { toast } from "sonner"
 
 import {
   CopyMenu,
-} from "@/components/roster/RosterControls"
+} from "@/components/documents/roster/RosterControls"
 import {
   displayRank,
   isChecked,
@@ -16,7 +16,7 @@ import {
   sectionLabel,
   type RosterColumn,
   type RosterRecord,
-} from "@/components/roster/rosterShared"
+} from "@/components/documents/roster/rosterShared"
 
 type RosterTableProps = {
   columns: RosterColumn[]
