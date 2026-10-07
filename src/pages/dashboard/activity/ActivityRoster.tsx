@@ -268,6 +268,13 @@ export default function ActivityRoster() {
   const shiftSelectingRef =
     useRef(false)
 
+  /*
+   * Keeps the last normally selected row so Shift-click can select
+   * a contiguous range in the current filtered/sorted roster.
+   */
+  const selectionAnchorRef =
+    useRef<string | null>(null)
+
   /* ─────────────────────────────────────────────
      Load Roster
   ───────────────────────────────────────────── */
@@ -390,6 +397,7 @@ export default function ActivityRoster() {
 
         setSelectedIds([])
         setSelectedCopied(false)
+        selectionAnchorRef.current = null
       } catch (err) {
         const message =
           err instanceof Error
@@ -553,55 +561,69 @@ export default function ActivityRoster() {
 
     setSelectedIds((current) =>
       current.includes(discordId)
-        ? current.filter(
-            (id) => id !== discordId,
-          )
+        ? current.filter((id) => id !== discordId)
         : [...current, discordId],
     )
 
+    selectionAnchorRef.current = discordId
     setSelectedCopied(false)
-    void logAction({ module: "activity", action: selectedIds.includes(discordId) ? "deselect-member" : "select-member", category: "roster", division, targetUserId: discordId, summary: `${selectedIds.includes(discordId) ? "Deselected" : "Selected"} a member on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
+
+    void logAction({
+      module: "activity",
+      action: selectedIds.includes(discordId) ? "deselect-member" : "select-member",
+      category: "roster",
+      division,
+      targetUserId: discordId,
+      summary: `${selectedIds.includes(discordId) ? "Deselected" : "Selected"} a member on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`,
+    })
   }
 
-  const selectRankMembers = (
-    member: ActivityRosterMember,
-  ) => {
-    const memberRank =
-      normalizeRank(member.rank)
-
-    if (
-      !memberRank ||
-      !member.discordId
-    ) {
+  const selectRange = (member: ActivityRosterMember) => {
+    if (!member.discordId) {
       return
     }
 
-    const rankIds = filteredMembers
-      .filter(
-        (item) =>
-          normalizeRank(item.rank) ===
-            memberRank &&
-          item.discordId,
-      )
-      .map(
-        (item) => item.discordId,
-      )
+    const anchorId = selectionAnchorRef.current
+    const currentIndex = filteredMembers.findIndex(
+      (item) => item.discordId === member.discordId,
+    )
+    const anchorIndex = anchorId
+      ? filteredMembers.findIndex((item) => item.discordId === anchorId)
+      : -1
 
-    if (!rankIds.length) {
+    if (currentIndex < 0 || anchorIndex < 0) {
+      toggleMember(member.discordId)
+      return
+    }
+
+    const startIndex = Math.min(anchorIndex, currentIndex)
+    const endIndex = Math.max(anchorIndex, currentIndex)
+    const rangeIds = filteredMembers
+      .slice(startIndex, endIndex + 1)
+      .map((item) => item.discordId)
+      .filter(Boolean)
+
+    if (!rangeIds.length) {
       return
     }
 
     setSelectedIds((current) =>
-      Array.from(
-        new Set([
-          ...current,
-          ...rankIds,
-        ]),
-      ),
+      Array.from(new Set([...current, ...rangeIds])),
     )
-
     setSelectedCopied(false)
-    void logAction({ module: "activity", action: "select-rank", category: "roster", division, targetRank: member.rank, summary: `Selected all visible ${member.rank} members on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`, details: { count: rankIds.length } })
+
+    void logAction({
+      module: "activity",
+      action: "select-range",
+      category: "roster",
+      division,
+      summary: `Selected ${rangeIds.length} members from ${filteredMembers[anchorIndex]?.callsign ?? "anchor"} to ${member.callsign} on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`,
+      details: {
+        count: rangeIds.length,
+        anchorUserId: anchorId,
+        targetUserId: member.discordId,
+      },
+    })
   }
 
   const handleMemberSelection = (
@@ -613,7 +635,7 @@ export default function ActivityRoster() {
     }
 
     if (shiftKey) {
-      selectRankMembers(member)
+      selectRange(member)
       return
     }
 
@@ -656,7 +678,18 @@ export default function ActivityRoster() {
     }
 
     setSelectedCopied(false)
-    void logAction({ module: "activity", action: allSelected ? "deselect-all-visible" : "select-all-visible", category: "roster", division, summary: `${allSelected ? "Deselected" : "Selected"} all visible members on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`, details: { count: visibleIds.length } })
+    selectionAnchorRef.current = visibleIds.length
+      ? visibleIds[visibleIds.length - 1]
+      : null
+
+    void logAction({
+      module: "activity",
+      action: allSelected ? "deselect-all-visible" : "select-all-visible",
+      category: "roster",
+      division,
+      summary: `${allSelected ? "Deselected" : "Selected"} all visible members on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`,
+      details: { count: visibleIds.length },
+    })
   }
 
   /* ─────────────────────────────────────────────
@@ -938,6 +971,7 @@ export default function ActivityRoster() {
     )
 
     setSelectedCopied(false)
+    selectionAnchorRef.current = null
     void logAction({ module: "activity", action: "filter-status", category: "roster", division, summary: `Toggled ${getStatusLabel(status)} status filter on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`, details: { status } })
   }
 
@@ -984,6 +1018,7 @@ export default function ActivityRoster() {
     })
 
     setSelectedCopied(false)
+    selectionAnchorRef.current = null
     void logAction({ module: "activity", action: "filter-rank", category: "roster", division, targetRank: rank, summary: `Toggled ${rank} rank filter on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
   }
 
@@ -1007,10 +1042,12 @@ export default function ActivityRoster() {
     setStatusFilters([])
     setRankFilters([])
     setSelectedCopied(false)
+    selectionAnchorRef.current = null
     void logAction({ module: "activity", action: "clear-filters", category: "roster", division, summary: `Cleared all status and rank filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
   }
 
   const resetFilters = () => {
+    selectionAnchorRef.current = null
     setStatusFilters(
       statusOptions.map((status) => status.id),
     )
@@ -1051,9 +1088,22 @@ export default function ActivityRoster() {
       ),
     )
 
+  /*
+   * All selected means no filtering is being applied, so the
+   * Active Filters row should display "None" in the default state.
+   */
+  const statusFilterIsActive =
+    statusFilters.length > 0 &&
+    statusFilters.length < statusOptions.length
+
+  const rankFilterIsActive =
+    rankOptions.length > 0 &&
+    rankFilters.length > 0 &&
+    rankFilters.length < rankOptions.length
+
   const hasFilterSelection =
-    statusFilters.length > 0 ||
-    rankFilters.length > 0
+    statusFilterIsActive ||
+    rankFilterIsActive
 
   const hasFilterChanges =
     !filtersAreDefault
@@ -1079,10 +1129,10 @@ export default function ActivityRoster() {
       rankFilters.length < rankOptions.length)
 
   const selectedStatusCount =
-    statusFilters.length
+    statusFilterIsActive ? statusFilters.length : 0
 
   const selectedRankCount =
-    rankFilters.length
+    rankFilterIsActive ? rankFilters.length : 0
 
   /* ─────────────────────────────────────────────
      Render
@@ -1138,6 +1188,7 @@ export default function ActivityRoster() {
                     setSearch("")
                     setSelectedIds([])
                     setSelectedCopied(false)
+                    selectionAnchorRef.current = null
                     setError(null)
                   }}
                   className={
@@ -1817,19 +1868,20 @@ export default function ActivityRoster() {
 
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
             <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Filter className="h-3.5 w-3.5" />
+              <Filter className="h-3.5 w-3.5 text-blue-500" />
 
               Active filters:
             </div>
 
-            {statusFilters.length === 0 &&
-            rankFilters.length === 0 ? (
+            {!statusFilterIsActive &&
+            !rankFilterIsActive ? (
               <span className="text-xs text-muted-foreground">
                 None
               </span>
             ) : (
               <>
-                {statusFilters.map(
+                {statusFilterIsActive &&
+                  statusFilters.map(
                   (status) => {
                     const Icon =
                       getStatusIcon(status)
@@ -1859,7 +1911,8 @@ export default function ActivityRoster() {
                   },
                 )}
 
-                {rankFilters.map(
+                {rankFilterIsActive &&
+                  rankFilters.map(
                   (rank) => (
                     <button
                       key={`rank-${rank}`}
@@ -2085,17 +2138,21 @@ export default function ActivityRoster() {
                                 shiftSelectingRef.current =
                                   event.shiftKey
                               }}
-                              onCheckedChange={() => {
+                              onClick={(event) => {
                                 const shiftKey =
+                                  event.shiftKey ||
                                   shiftSelectingRef.current
 
-                                shiftSelectingRef.current =
-                                  false
+                                shiftSelectingRef.current = false
+                                event.preventDefault()
 
                                 handleMemberSelection(
                                   member,
                                   shiftKey,
                                 )
+                              }}
+                              onCheckedChange={() => {
+                                // Selection is handled by onClick.
                               }}
                             />
                           </td>
@@ -2209,10 +2266,18 @@ export default function ActivityRoster() {
                           onPointerDown={(event) => {
                             shiftSelectingRef.current = event.shiftKey
                           }}
-                          onCheckedChange={() => {
-                            const shiftKey = shiftSelectingRef.current
+                          onClick={(event) => {
+                            const shiftKey =
+                              event.shiftKey ||
+                              shiftSelectingRef.current
+
                             shiftSelectingRef.current = false
+                            event.preventDefault()
+
                             handleMemberSelection(member, shiftKey)
+                          }}
+                          onCheckedChange={() => {
+                            // Selection is handled by onClick.
                           }}
                         />
                       </div>
