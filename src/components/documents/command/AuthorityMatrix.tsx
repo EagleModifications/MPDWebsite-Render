@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Check,
   ChevronDown,
@@ -274,14 +274,171 @@ function groupText(group: GroupName): string {
   }
 }
 
+type FilterDropdownProps = {
+  label: string
+  icon: typeof Filter
+  options: string[]
+  selected: string[]
+  onChange: (next: string[]) => void
+  open: boolean
+  onToggle: () => void
+  onClose: () => void
+  displayOption?: (value: string) => string
+  itemIcon?: typeof Shield
+}
+
+function FilterDropdown({
+  label,
+  icon: Icon,
+  options,
+  selected,
+  onChange,
+  open,
+  onToggle,
+  onClose,
+  displayOption = (value) => value,
+  itemIcon: ItemIcon,
+}: FilterDropdownProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const allSelected = selected.length === 0
+  const selectedCount = allSelected ? options.length : selected.length
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) onClose()
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose()
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [open, onClose])
+
+  const toggleOption = (option: string) => {
+    if (allSelected) {
+      onChange(options.filter((value) => value !== option))
+      return
+    }
+
+    const next = selected.includes(option)
+      ? selected.filter((value) => value !== option)
+      : [...selected, option]
+
+    onChange(next.length === options.length ? [] : next)
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative min-w-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={`flex h-9 w-full items-center gap-2 rounded-lg border bg-background px-3 text-sm font-medium outline-none transition-colors ${
+          open
+            ? "border-blue-500/70 ring-2 ring-blue-500/10"
+            : "border-border hover:border-blue-500/40"
+        }`}
+      >
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 truncate">{label}</span>
+        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-blue-400">
+          {selectedCount}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-[80] w-[260px] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl shadow-black/40">
+          <div className="max-h-[330px] overflow-y-auto p-1.5">
+            <button
+              type="button"
+              onClick={() => onChange([])}
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium transition-colors hover:bg-muted/70"
+            >
+              <span
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                  allSelected
+                    ? "border-blue-500 bg-blue-500 text-white"
+                    : "border-border bg-background"
+                }`}
+              >
+                {allSelected && <Check className="h-3 w-3 stroke-[3]" />}
+              </span>
+              <Icon className="h-4 w-4 shrink-0 text-blue-400" />
+              <span className="truncate">{label}</span>
+            </button>
+
+            <div className="my-1 border-t border-border/70" />
+
+            {options.map((option) => {
+              const checked = allSelected || selected.includes(option)
+              const OptionIcon = ItemIcon
+
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => toggleOption(option)}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/70"
+                >
+                  <span
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                      checked
+                        ? "border-blue-500 bg-blue-500 text-white"
+                        : "border-border bg-background"
+                    }`}
+                  >
+                    {checked && <Check className="h-3 w-3 stroke-[3]" />}
+                  </span>
+                  {OptionIcon ? (
+                    <OptionIcon className="h-4 w-4 shrink-0 text-blue-400" />
+                  ) : null}
+                  <span className="min-w-0 truncate">{displayOption(option)}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {!allSelected && (
+            <div className="border-t border-border/70 p-1.5">
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+                Clear {label}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AuthorityMatrix() {
   const [data, setData] = useState<MatrixData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
-  const [sectionFilter, setSectionFilter] = useState("ALL")
-  const [rankFilter, setRankFilter] = useState("ALL")
+  const [sectionFilter, setSectionFilter] = useState<string[]>([])
+  const [rankFilter, setRankFilter] = useState<string[]>([])
+  const [openFilter, setOpenFilter] = useState<"section" | "rank" | null>(null)
 
   const loadMatrix = useCallback(async (manualRefresh = false) => {
     try {
@@ -354,10 +511,12 @@ export default function AuthorityMatrix() {
     return () => window.clearInterval(interval)
   }, [loadMatrix])
 
+  const sectionOptions: Section[] = ["PRIMARY RESPONSIBILITY", "AUTHORITY"]
+
   const visibleRanks = useMemo(() => {
     if (!data) return []
-    if (rankFilter === "ALL") return data.ranks
-    return data.ranks.filter((rank) => rank.rank === rankFilter)
+    if (rankFilter.length === 0) return data.ranks
+    return data.ranks.filter((rank) => rankFilter.includes(rank.rank))
   }, [data, rankFilter])
 
   const filteredEntries = useMemo(() => {
@@ -368,9 +527,11 @@ export default function AuthorityMatrix() {
     return data.entries.filter((entry) => {
       const matchesSearch = !searchText || key(entry.name).includes(searchText)
       const matchesSection =
-        sectionFilter === "ALL" || entry.section === sectionFilter
+        sectionFilter.length === 0 || sectionFilter.includes(entry.section)
+      const selectedRanks =
+        rankFilter.length === 0 ? data.ranks : data.ranks.filter((rank) => rankFilter.includes(rank.rank))
       const matchesRank =
-        rankFilter === "ALL" || entry.permissions[rankFilter] === true
+        selectedRanks.length === 0 || selectedRanks.some((rank) => entry.permissions[rank.rank] === true)
 
       return matchesSearch && matchesSection && matchesRank
     })
@@ -391,8 +552,9 @@ export default function AuthorityMatrix() {
 
   const clearFilters = () => {
     setSearch("")
-    setSectionFilter("ALL")
-    setRankFilter("ALL")
+    setSectionFilter([])
+    setRankFilter([])
+    setOpenFilter(null)
   }
 
   const renderEntries = () => {
@@ -491,7 +653,7 @@ export default function AuthorityMatrix() {
           </div>
 
           {!loading && !error && data && (
-            <div className="mt-4 grid grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_190px_180px_auto]">
+            <div className="mt-4 grid grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_190px_190px_auto]">
               <div className="relative min-w-0">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
@@ -502,38 +664,44 @@ export default function AuthorityMatrix() {
                 />
               </div>
 
-              <div className="relative">
-                <Filter className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <select
-                  value={sectionFilter}
-                  onChange={(event) => setSectionFilter(event.target.value)}
-                  className="h-9 w-full appearance-none rounded-lg border border-border bg-background pl-9 pr-9 text-sm outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
-                >
-                  <option value="ALL">All Sections</option>
-                  <option value="PRIMARY RESPONSIBILITY">Primary Responsibility</option>
-                  <option value="AUTHORITY">Authority</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              </div>
+              <FilterDropdown
+                label="All Sections"
+                icon={Filter}
+                options={sectionOptions}
+                selected={sectionFilter}
+                onChange={setSectionFilter}
+                open={openFilter === "section"}
+                onToggle={() =>
+                  setOpenFilter((current) =>
+                    current === "section" ? null : "section",
+                  )
+                }
+                onClose={() => setOpenFilter(null)}
+                displayOption={(value) =>
+                  value === "PRIMARY RESPONSIBILITY"
+                    ? "Primary Responsibility"
+                    : "Authority"
+                }
+              />
 
-              <div className="relative">
-                <Shield className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <select
-                  value={rankFilter}
-                  onChange={(event) => setRankFilter(event.target.value)}
-                  className="h-9 w-full appearance-none rounded-lg border border-border bg-background pl-9 pr-9 text-sm outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
-                >
-                  <option value="ALL">All Ranks</option>
-                  {data.ranks.map((rank) => (
-                    <option key={rank.rank} value={rank.rank}>
-                      {rank.rank}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              </div>
+              <FilterDropdown
+                label="All Ranks"
+                icon={Shield}
+                options={data.ranks.map((rank) => rank.rank)}
+                selected={rankFilter}
+                onChange={setRankFilter}
+                open={openFilter === "rank"}
+                onToggle={() =>
+                  setOpenFilter((current) =>
+                    current === "rank" ? null : "rank",
+                  )
+                }
+                onClose={() => setOpenFilter(null)}
+                displayOption={displayRank}
+                itemIcon={Shield}
+              />
 
-              {(search || sectionFilter !== "ALL" || rankFilter !== "ALL") && (
+              {(search || sectionFilter.length > 0 || rankFilter.length > 0) && (
                 <button
                   type="button"
                   onClick={clearFilters}
