@@ -269,9 +269,39 @@ const formatSimpleValue = (value: unknown): string => {
   if (typeof value === "boolean") return value ? "Yes" : "No"
   if (typeof value === "number") return value.toLocaleString()
   if (typeof value === "string") return value
+
   if (Array.isArray(value)) {
-    return value.map((item) => formatSimpleValue(item)).join(", ")
+    return value
+      .map((item) => {
+        if (isChangePair(item)) {
+          const pair = getChangePair(item)
+          return `${formatSimpleValue(pair.from)} → ${formatSimpleValue(pair.to)}`
+        }
+
+        if (isRecord(item)) {
+          return Object.entries(item)
+            .filter(([, nested]) => nested !== undefined && nested !== null)
+            .map(([key, nested]) => `${detailLabel(key)}: ${formatSimpleValue(nested)}`)
+            .join(" · ")
+        }
+
+        return formatSimpleValue(item)
+      })
+      .join(", ")
   }
+
+  if (isRecord(value)) {
+    if (isChangePair(value)) {
+      const pair = getChangePair(value)
+      return `${formatSimpleValue(pair.from)} → ${formatSimpleValue(pair.to)}`
+    }
+
+    return Object.entries(value)
+      .filter(([, nested]) => nested !== undefined && nested !== null)
+      .map(([key, nested]) => `${detailLabel(key)}: ${formatSimpleValue(nested)}`)
+      .join(" · ")
+  }
+
   return String(value)
 }
 
@@ -335,22 +365,61 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
   const pushEntry = (key: string, value: unknown) => {
     if (isChangePair(value)) {
       output.push({ key, value, change: getChangePair(value) })
-    } else if (isRecord(value)) {
+      return
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item === undefined || item === null) continue
+
+        if (isRecord(item)) {
+          if (isChangePair(item)) {
+            output.push({ key, value: item, change: getChangePair(item) })
+            continue
+          }
+
+          for (const [nestedKey, nestedValue] of Object.entries(item)) {
+            if (nestedValue === undefined || nestedValue === null) continue
+            pushEntry(nestedKey, nestedValue)
+          }
+          continue
+        }
+
+        output.push({ key, value: item })
+      }
+      return
+    }
+
+    if (isRecord(value)) {
       // Handle nested requirement payloads without ever displaying raw JSON.
       for (const [nestedKey, nestedValue] of Object.entries(value)) {
         if (nestedValue === undefined || nestedValue === null) continue
         pushEntry(nestedKey, nestedValue)
       }
-    } else {
-      output.push({ key, value })
+      return
     }
+
+    output.push({ key, value })
   }
 
   for (const [key, value] of entries) {
-    if (key === "changes" && isRecord(value)) {
-      for (const [changedKey, changedValue] of Object.entries(value)) {
-        if (changedValue === undefined || changedValue === null) continue
-        pushEntry(changedKey, changedValue)
+    if (key === "changes" && (isRecord(value) || Array.isArray(value))) {
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (isRecord(item)) {
+            for (const [changedKey, changedValue] of Object.entries(item)) {
+              if (changedValue === undefined || changedValue === null) continue
+              pushEntry(changedKey, changedValue)
+            }
+          } else {
+            pushEntry("changes", item)
+          }
+        })
+      } else {
+        for (const [changedKey, changedValue] of Object.entries(value)) {
+          if (changedValue === undefined || changedValue === null) continue
+          pushEntry(changedKey, changedValue)
+        }
       }
       continue
     }
@@ -457,6 +526,46 @@ const getAvatarUrl = (
   }
 
   return `https://cdn.discordapp.com/avatars/${discordId}/${hash}.png?size=256`
+}
+
+const resolveLogModule = (log: ActionLog): "promotion" | "activity" => {
+  const details = log.details ?? {}
+  const detailText = Object.entries(details)
+    .map(([key, value]) => `${key} ${formatSimpleValue(value)}`)
+    .join(" ")
+
+  const text = [
+    log.module,
+    log.action,
+    log.category,
+    log.summary,
+    log.path,
+    detailText,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+
+  // The human-readable context is authoritative for historical records.
+  // In particular, several older roster entries were stored with
+  // module=promotion even though their summary clearly says activity roster.
+  if (/(activity\s+(roster|requirements|list|management|logs?)|activity\s+hours)/i.test(text)) {
+    return "activity"
+  }
+
+  if (/(promotion\s+(roster|requirements|list|management|logs?)|promotion\s+hours)/i.test(text)) {
+    return "promotion"
+  }
+
+  if (/(^|[/\s_-])activity([/\s_-]|$)/i.test(String(log.path ?? ""))) {
+    return "activity"
+  }
+
+  if (/(^|[/\s_-])promotion([/\s_-]|$)/i.test(String(log.path ?? ""))) {
+    return "promotion"
+  }
+
+  return log.module === "activity" ? "activity" : "promotion"
 }
 
 const getActionIcon = (log: ActionLog) => {
@@ -754,9 +863,12 @@ function IdentityCard({
 
       <DropdownMenuContent
         align="start"
+        side="bottom"
         sideOffset={4}
-        avoidCollisions={false}
-        className="z-[300] w-[285px] max-h-80 overflow-y-auto p-1"
+        avoidCollisions
+        collisionPadding={12}
+        sticky="partial"
+        className="z-[300] w-[285px] max-h-[min(28rem,calc(100vh-24px))] overflow-y-auto p-1"
         onClick={(event) => event.stopPropagation()}
       >
         {item("discord", "Copy Discord ID", !userId)}
@@ -938,7 +1050,7 @@ function FilterDropdown({
       </button>
 
       {open ? (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-[100] max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl">
+        <div className="absolute left-0 top-[calc(100%+4px)] z-[300] max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl">
           <button
             type="button"
             className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] text-foreground transition-colors hover:bg-accent"
@@ -1057,7 +1169,7 @@ function SingleSelectDropdown({
 }
 
 export default function PromotionLogs() {
-  const [module, setModule] = useState<LogModule>("promotion")
+  const [module, setModule] = useState<LogModule>("all")
   const [sessionUserId, setSessionUserId] = useState("")
   const [sessionAvatar, setSessionAvatar] = useState<string | null>(null)
 
@@ -1197,69 +1309,93 @@ export default function PromotionLogs() {
     setError(null)
 
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(pageSize),
+      const baseParams = new URLSearchParams({
+        page: "1",
+        limit: "100",
       })
 
-      if (module !== "all") {
-        params.set("module", module)
-      }
-
       if (search.trim()) {
-        params.set("search", search.trim())
+        baseParams.set("search", search.trim())
       }
 
-      categories.forEach((value) => params.append("category", value))
-      divisions.forEach((value) => params.append("division", value))
-      userIds.forEach((value) => params.append("userId", value))
-      actions.forEach((value) => params.append("action", value))
+      categories.forEach((value) => baseParams.append("category", value))
+      divisions.forEach((value) => baseParams.append("division", value))
+      userIds.forEach((value) => baseParams.append("userId", value))
+      actions.forEach((value) => baseParams.append("action", value))
 
-      const response = await fetch(
-        `/api/action-logs?${params.toString()}`,
-        {
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            Accept: "application/json",
+      const collected: ActionLog[] = []
+      let apiPage = 1
+      let apiPages = 1
+
+      do {
+        const params = new URLSearchParams(baseParams)
+        params.set("page", String(apiPage))
+
+        const response = await fetch(
+          `/api/action-logs?${params.toString()}`,
+          {
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              Accept: "application/json",
+            },
           },
-        },
-      )
-
-      const data = await readApiResponse(response)
-
-      if (!response.ok || data.success !== true) {
-        throw new Error(
-          data.error ||
-            `Failed to load ${module} action logs (${response.status}).`,
         )
-      }
 
-      const nextLogs = Array.isArray(data.logs)
-        ? data.logs
-        : []
+        const data = await readApiResponse(response)
 
-      // Do not deduplicate adjacent entries. Every audit entry returned by
-      // the API must remain visible, even when several actions happened
-      // within the same few seconds.
-      setLogs(nextLogs)
-      void loadRosterProfiles(nextLogs)
+        if (!response.ok || data.success !== true) {
+          throw new Error(
+            data.error ||
+              `Failed to load action logs (${response.status}).`,
+          )
+        }
 
-      setPagination(
-        data.pagination ?? {
-          page,
-          limit: pageSize,
-          total: nextLogs.length,
-          pages: 1,
-        },
+        if (Array.isArray(data.logs)) {
+          collected.push(...data.logs)
+        }
+
+        apiPages = Math.max(1, data.pagination?.pages ?? 1)
+        apiPage += 1
+      } while (apiPage <= apiPages)
+
+      // Historical entries can contain an incorrect module value. Determine
+      // the module from the action's actual context before applying the
+      // Promotion/Activity tab filter. This keeps old activity entries out
+      // of Promotion Logs (and vice versa) without deleting audit history.
+      const normalizedLogs = collected.map((log) => ({
+        ...log,
+        module: resolveLogModule(log),
+      }))
+
+      const visibleLogs = normalizedLogs.filter((log) =>
+        module === "all" ? true : log.module === module,
       )
+
+      const totalPages = Math.max(1, Math.ceil(visibleLogs.length / pageSize))
+      const safePage = Math.min(page, totalPages)
+      if (safePage !== page) {
+        setPage(safePage)
+      }
+      const start = (safePage - 1) * pageSize
+      const pageLogs = visibleLogs.slice(start, start + pageSize)
+
+      setLogs(pageLogs)
+      void loadRosterProfiles(pageLogs)
+
+      setPagination({
+        page: safePage,
+        limit: pageSize,
+        total: visibleLogs.length,
+        pages: totalPages,
+      })
 
       setAvailableActions((current) =>
         Array.from(
           new Set([
             ...fallbackActions,
             ...current,
-            ...nextLogs.map((log) => log.action),
+            ...normalizedLogs.map((log) => log.action),
           ]),
         ).sort(),
       )
@@ -1400,15 +1536,15 @@ export default function PromotionLogs() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
-                <Activity className="h-5 w-5 text-blue-500" />
+                <History className="h-5 w-5 text-blue-500" />
               </div>
 
               <div className="min-w-0">
                 <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                  All Logs
+                  Promotion Logs
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  View promotion and activity management audit history and changes.
+                  View promotion management audit history and changes.
                 </p>
               </div>
             </div>
@@ -1470,7 +1606,7 @@ export default function PromotionLogs() {
               </span>
             </div>
 
-            <div className="rounded-lg border border-border bg-card p-2.5">
+            <div className="relative z-20 rounded-lg border border-border bg-card p-2.5">
               <div className="grid w-full grid-cols-1 gap-2 lg:grid-cols-[minmax(260px,1fr)_170px_170px_170px_180px]">
                 <div className="relative min-w-0">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -1622,7 +1758,7 @@ export default function PromotionLogs() {
         ) : null}
 
         {/* Log timeline */}
-        <div className="mx-auto w-full max-w-[1100px] min-w-0">
+        <div className="relative z-0 mx-auto w-full max-w-[1100px] min-w-0">
           {loading ? (
             <div className="space-y-2">
               {Array.from({ length: 7 }).map((_, index) => (
