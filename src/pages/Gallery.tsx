@@ -12,7 +12,6 @@ import { createPortal } from "react-dom"
 import {
   Check,
   Copy,
-  Copy,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -115,7 +114,6 @@ type GalleryTag = string
 
 type GalleryItem = {
   id: string
-  slug?: string
   slug?: string
   title: string
   description: string
@@ -1040,6 +1038,15 @@ function GalleryFilterDropdown({
       </DropdownMenuContent>
     </DropdownMenu>
   )
+}
+
+function makePendingFromMedia(
+  media: GalleryMedia,
+): PendingMedia {
+  return {
+    ...media,
+    previewUrl: media.url,
+  }
 }
 
 export default function Gallery() {
@@ -4341,6 +4348,27 @@ function GalleryMediaCollage({
           View
         </button>
       </div>
+    </div>
+  )
+}
+
+function YouTubeGalleryPreview({
+  videoId,
+  title,
+}: {
+  videoId: string
+  title: string
+}) {
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-black">
+      <iframe
+        src={`https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&mute=1&controls=0&disablekb=1&fs=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&enablejsapi=1`}
+        title={title}
+        tabIndex={-1}
+        className="pointer-events-none absolute inset-0 h-full w-full border-0"
+        allow="autoplay; encrypted-media; picture-in-picture"
+      />
+      <div className="pointer-events-none absolute inset-0" />
     </div>
   )
 }
