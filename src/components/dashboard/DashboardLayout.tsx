@@ -10,6 +10,8 @@ import DashboardSidebar from "@/components/dashboard/Sidebar"
 import DashboardNavbar from "@/components/dashboard/Navbar"
 import DashboardFooter from "@/components/dashboard/Footer"
 
+import DevelopmentNotice from "@/components/DevelopmentNotice"
+
 interface DashboardLayoutProps {
   children: ReactNode
 }
@@ -24,6 +26,8 @@ export default function DashboardLayout({
 
         <SidebarInset className="min-w-0">
           <DashboardNavbar />
+
+          <DevelopmentNotice dashboard />
 
           <main className="min-h-[calc(100vh-4rem)] pb-16">
             <div className="flex flex-col gap-4 p-4">
