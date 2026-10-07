@@ -590,6 +590,58 @@ function formatDate(value: string) {
   })
 }
 
+/**
+ * Estimates the number of lines needed when text is wrapped at roughly
+ * 35 characters per line. It is used only to decide whether "Show more..."
+ * should be displayed.
+ */
+function getWrappedLineCount(
+  value: string,
+  maxCharsPerLine = 35,
+) {
+  return value.split(/\r?\n/).reduce((total, rawLine) => {
+    const line = rawLine.trim()
+
+    if (!line) {
+      return total + 1
+    }
+
+    let currentLength = 0
+    let lines = 1
+
+    for (const word of line.split(/\s+/)) {
+      if (!word) continue
+
+      if (word.length > maxCharsPerLine) {
+        if (currentLength > 0) {
+          lines += Math.ceil(word.length / maxCharsPerLine)
+          currentLength = word.length % maxCharsPerLine
+          if (currentLength === 0) currentLength = maxCharsPerLine
+        } else {
+          lines += Math.floor((word.length - 1) / maxCharsPerLine)
+          currentLength = word.length % maxCharsPerLine
+          if (currentLength === 0) currentLength = maxCharsPerLine
+        }
+        continue
+      }
+
+      const requiredLength =
+        currentLength === 0
+          ? word.length
+          : currentLength + 1 + word.length
+
+      if (requiredLength <= maxCharsPerLine) {
+        currentLength = requiredLength
+      } else {
+        lines += 1
+        currentLength = word.length
+      }
+    }
+
+    return total + lines
+  }, 0)
+}
+
 function makePendingFromMedia(
   media: GalleryMedia,
 ): PendingMedia {
@@ -1799,12 +1851,22 @@ export default function Gallery() {
                           </div>
 
                           <div className="p-4">
-                            <h3 className="truncate text-sm font-semibold">{item.title}</h3>
+                            <h3 className="line-clamp-2 max-w-[35ch] whitespace-pre-line text-sm font-semibold">
+                              {item.title}
+                            </h3>
 
                             {item.description && (
-                              <p className="mt-2 line-clamp-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
-                                {item.description}
-                              </p>
+                              <div className="mt-2 max-w-[35ch]">
+                                <p className="line-clamp-3 whitespace-pre-line text-xs leading-5 text-muted-foreground">
+                                  {item.description}
+                                </p>
+
+                                {getWrappedLineCount(item.description, 35) > 3 && (
+                                  <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
+                                    Show more...
+                                  </span>
+                                )}
+                              </div>
                             )}
 
                             <p className="mt-2 truncate text-[10px] text-muted-foreground">
@@ -1911,18 +1973,17 @@ export default function Gallery() {
                                   )}
                                 </div>
 
-                                <h3 className="truncate text-sm font-semibold">
+                                <h3 className="line-clamp-2 max-w-[35ch] whitespace-pre-line text-sm font-semibold">
                                   {item.title}
                                 </h3>
 
                                 {item.description && (
-                                  <div className="mt-1">
-                                    <p className="line-clamp-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
+                                  <div className="mt-1 max-w-[35ch]">
+                                    <p className="line-clamp-3 whitespace-pre-line text-xs leading-5 text-muted-foreground">
                                       {item.description}
                                     </p>
 
-                                    {(item.description.length > 120 ||
-                                      item.description.split(/\r?\n/).length > 2) && (
+                                    {getWrappedLineCount(item.description, 35) > 3 && (
                                       <span className="mt-1 inline-block text-[11px] font-medium text-blue-500">
                                         Show more...
                                       </span>
