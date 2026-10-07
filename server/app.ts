@@ -574,7 +574,6 @@ type GalleryDocument = {
   createdBy: string
   createdAt: Date
   updatedAt: Date
-  slug?: string
   categories?: string[]
   tagCategories?: Record<string, string[]>
   categoryColors?: Record<string, string>
@@ -605,25 +604,28 @@ async function getGalleryConfig() {
 
   if (existing) {
     const categories = existing.categories?.length ? existing.categories : [...DEFAULT_GALLERY_CATEGORIES]
-    const legacyDefaultTags = new Set(["Dept", "SWAT", "MTF-7", "MCD", "TRU", "SAR"])
-    const existingTags = Array.isArray(existing.tags) ? existing.tags : []
-    const tags = existingTags.filter((tag) => !legacyDefaultTags.has(tag))
+    // Tags are fully database-managed. Do not silently remove names such as
+    // Dept/SWAT/etc. if they were created or stored in MongoDB.
+    const tags = Array.isArray(existing.tags)
+      ? Array.from(new Set(existing.tags.map((tag) => cleanGalleryString(tag)).filter(Boolean)))
+      : []
+
+    // Keep every configured tag assignment that still exists. Also preserve
+    // tags that are stored but currently unassigned so the UI can show them
+    // under "Unassigned" and they can be assigned later.
     const tagCategories = Object.fromEntries(
-      categories.map((category) => [category, Array.from(new Set((existing.tagCategories?.[category] ?? []).filter((tag) => tags.includes(tag))))]),
+      categories.map((category) => [
+        category,
+        Array.from(
+          new Set(
+            (existing.tagCategories?.[category] ?? [])
+              .map((tag) => cleanGalleryString(tag))
+              .filter((tag) => tags.includes(tag)),
+          ),
+        ),
+      ]),
     )
 
-    // Remove the old built-in tags from the persisted galleryTags document as
-    // well, so they do not come back after a refresh or deployment.
-    if (tags.length !== existingTags.length) {
-      const tagsCollection = await getCollection<GalleryTagsConfigDocument>("galleryTags")
-      const tagColors = Object.fromEntries(
-        Object.entries(existing.tagColors ?? {}).filter(([tag]) => tags.includes(tag)),
-      )
-      await tagsCollection.updateOne(
-        { key: "default" },
-        { $set: { tags, tagCategories, tagColors, updatedAt: new Date() } },
-      )
-    }
     const categoryColors = Object.fromEntries(
       categories.map((category) => [category, normalizeGalleryColor(existing.categoryColors?.[category], category === "Fleet" ? "#ffffff" : "#3b82f6")]),
     )
@@ -644,11 +646,20 @@ async function getGalleryConfig() {
     ? legacy.categories
     : [...DEFAULT_GALLERY_CATEGORIES]
   const tags = Array.isArray(legacy?.tags) && legacy.tags.length
-    ? legacy.tags.filter((tag) => !["Dept", "SWAT", "MTF-7", "MCD", "TRU", "SAR"].includes(tag))
+    ? Array.from(new Set(legacy.tags.map((tag) => cleanGalleryString(tag)).filter(Boolean)))
     : [...DEFAULT_GALLERY_TAGS]
   const legacyTagCategories = legacy && typeof legacy.tagCategories === "object" ? legacy.tagCategories : {}
   const tagCategories = Object.fromEntries(
-    categories.map((category) => [category, Array.from(new Set((legacyTagCategories?.[category] ?? tags).filter((tag: string) => tags.includes(tag))))]),
+    categories.map((category) => [
+      category,
+      Array.from(
+        new Set(
+          (legacyTagCategories?.[category] ?? [])
+            .map((tag: string) => cleanGalleryString(tag))
+            .filter((tag: string) => tags.includes(tag)),
+        ),
+      ),
+    ]),
   )
   const categoryColors = Object.fromEntries(
     categories.map((category) => [category, normalizeGalleryColor(legacy?.categoryColors?.[category], category === "Fleet" ? "#ffffff" : "#3b82f6")]),
@@ -731,9 +742,6 @@ function normalizeGalleryMedia(
           item.storageId,
         )
 
-      const extension = cleanGalleryString(item.extension)
-      const publicSlug = cleanGalleryString(item.publicSlug)
-
       return {
         id:
           cleanGalleryString(item.id) ||
@@ -748,8 +756,6 @@ function normalizeGalleryMedia(
         ...(storageId
           ? { storageId }
           : {}),
-        ...(extension ? { extension } : {}),
-        ...(publicSlug ? { publicSlug } : {}),
       }
     })
     .filter(
@@ -848,7 +854,6 @@ function serializeGalleryItem(
 ) {
   return {
     id: item._id?.toString() ?? "",
-    slug: item.slug || slugifyGalleryTitle(item.title),
     title: item.title,
     description: item.description,
     category: item.category ?? "Community",
@@ -7670,7 +7675,7 @@ export function createApp() {
           return res.status(400).json({
             success: false,
             error:
-              "Gallery tags must be configured Gallery sub tags.",
+              "Gallery tags must be Dept, SWAT, MTF-7, MCD, TRU, or SAR.",
           })
         }
 
@@ -7773,7 +7778,6 @@ export function createApp() {
 
         const item: GalleryDocument = {
           title,
-          slug: slugifyGalleryTitle(title),
           description,
           category,
           tags,
@@ -7917,7 +7921,7 @@ export function createApp() {
           return res.status(400).json({
             success: false,
             error:
-              "Gallery tags must be configured Gallery sub tags.",
+              "Gallery tags must be Dept, SWAT, MTF-7, MCD, TRU, or SAR.",
           })
         }
 
@@ -8073,7 +8077,6 @@ export function createApp() {
           {
             $set: {
               title,
-              slug: slugifyGalleryTitle(title),
               description,
               category,
               tags,
