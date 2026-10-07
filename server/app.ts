@@ -530,6 +530,20 @@ const DEFAULT_GALLERY_TAGS = [
   "SAR",
 ] as const
 
+const DEFAULT_GALLERY_CATEGORY_COLORS: Record<string, string> = {
+  Community: "#3b82f6",
+  Fleet: "#f59e0b",
+}
+
+const DEFAULT_GALLERY_TAG_COLORS: Record<string, string> = {
+  Dept: "#3b82f6",
+  SWAT: "#64748b",
+  "MTF-7": "#0ea5e9",
+  MCD: "#1e3a8a",
+  TRU: "#eab308",
+  SAR: "#ef4444",
+}
+
 type GalleryTag = string
 type GalleryCategory = string
 
@@ -579,6 +593,8 @@ type GalleryConfigDocument = {
   _galleryConfig: true
   categories: string[]
   tags: string[]
+  categoryColors?: Record<string, string>
+  tagColors?: Record<string, string>
   createdAt: Date
   updatedAt: Date
 }
@@ -591,6 +607,8 @@ async function getGalleryConfig() {
     return {
       categories: existing.categories?.length ? existing.categories : [...DEFAULT_GALLERY_CATEGORIES],
       tags: existing.tags?.length ? existing.tags : [...DEFAULT_GALLERY_TAGS],
+      categoryColors: { ...DEFAULT_GALLERY_CATEGORY_COLORS, ...(existing.categoryColors ?? {}) },
+      tagColors: { ...DEFAULT_GALLERY_TAG_COLORS, ...(existing.tagColors ?? {}) },
     }
   }
 
@@ -599,6 +617,8 @@ async function getGalleryConfig() {
     _galleryConfig: true,
     categories: [...DEFAULT_GALLERY_CATEGORIES],
     tags: [...DEFAULT_GALLERY_TAGS],
+    categoryColors: { ...DEFAULT_GALLERY_CATEGORY_COLORS },
+    tagColors: { ...DEFAULT_GALLERY_TAG_COLORS },
     createdAt: now,
     updatedAt: now,
   }
@@ -6051,27 +6071,64 @@ export function createApp() {
 
       const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
       const value = cleanGalleryString(req.body?.value)
+      const color = cleanGalleryString(req.body?.color) || "#3b82f6"
       if (!type || !value) return res.status(400).json({ success: false, error: "A valid category or tag name is required." })
       if (value.length > 40) return res.status(400).json({ success: false, error: "Names must be 40 characters or fewer." })
+      if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ success: false, error: "Color must be a valid hex color." })
 
       const gallery = await getCollection<GalleryDocument | GalleryConfigDocument>("gallery")
       const config = await getGalleryConfig()
       const target = type === "category" ? config.categories : config.tags
-      const exists = target.some((entry) => entry.toLowerCase() === value.toLowerCase())
-      if (exists) return res.status(409).json({ success: false, error: `${type === "category" ? "Category" : "Tag"} already exists.` })
+      if (target.some((entry) => entry.toLowerCase() === value.toLowerCase())) {
+        return res.status(409).json({ success: false, error: `${type === "category" ? "Category" : "Tag"} already exists.` })
+      }
 
       const next = [...target, value]
+      const colors = type === "category" ? { ...config.categoryColors, [value]: color } : { ...config.tagColors, [value]: color }
       await gallery.updateOne(
         { _galleryConfig: true },
-        { $set: type === "category" ? { categories: next, updatedAt: new Date() } : { tags: next, updatedAt: new Date() } },
+        { $set: type === "category"
+          ? { categories: next, categoryColors: colors, updatedAt: new Date() }
+          : { tags: next, tagColors: colors, updatedAt: new Date() } },
         { upsert: true },
       )
 
-      const updated = await getGalleryConfig()
-      return res.status(201).json({ success: true, ...updated })
+      return res.status(201).json({ success: true, ...(await getGalleryConfig()) })
     } catch (error) {
       console.error("POST /api/gallery/options failed:", error)
       return res.status(500).json({ success: false, error: "Failed to create gallery option" })
+    }
+  })
+
+  app.put("/api/gallery/options", async (req, res) => {
+    try {
+      const user = await getRequestUser(req)
+      if (!user) return res.status(401).json({ success: false, error: "Not authenticated" })
+      if (!hasPermission(user, "gallery")) return res.status(403).json({ success: false, error: "You do not have permission to manage the gallery" })
+
+      const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
+      const value = cleanGalleryString(req.body?.value)
+      const color = cleanGalleryString(req.body?.color)
+      if (!type || !value || !/^#[0-9a-fA-F]{6}$/.test(color)) {
+        return res.status(400).json({ success: false, error: "A valid option and hex color are required." })
+      }
+
+      const config = await getGalleryConfig()
+      const exists = (type === "category" ? config.categories : config.tags).some((entry) => entry === value)
+      if (!exists) return res.status(404).json({ success: false, error: "Gallery option not found." })
+
+      const gallery = await getCollection<GalleryDocument | GalleryConfigDocument>("gallery")
+      const colors = type === "category" ? { ...config.categoryColors, [value]: color } : { ...config.tagColors, [value]: color }
+      await gallery.updateOne(
+        { _galleryConfig: true },
+        { $set: type === "category" ? { categoryColors: colors, updatedAt: new Date() } : { tagColors: colors, updatedAt: new Date() } },
+        { upsert: true },
+      )
+
+      return res.json({ success: true, ...(await getGalleryConfig()) })
+    } catch (error) {
+      console.error("PUT /api/gallery/options failed:", error)
+      return res.status(500).json({ success: false, error: "Failed to update gallery option" })
     }
   })
 
