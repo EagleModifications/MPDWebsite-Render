@@ -3390,7 +3390,19 @@ function GalleryMediaCollage({
   onClick: (media: GalleryMedia) => void
 }) {
   const visible = media.slice(0, 4)
-  const extraCount = Math.max(0, media.length - 3)
+  const hiddenMedia = media.slice(3)
+  const extraImageCount = hiddenMedia.filter(isImageMedia).length
+  const extraVideoCount = hiddenMedia.filter(isVideoMedia).length
+  const extraCountLabel = [
+    extraImageCount > 0
+      ? `${extraImageCount} ${extraImageCount === 1 ? "image" : "images"}`
+      : "",
+    extraVideoCount > 0
+      ? `${extraVideoCount} ${extraVideoCount === 1 ? "video" : "videos"}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" / ")
 
   if (visible.length === 0) return null
 
@@ -3437,16 +3449,20 @@ function GalleryMediaCollage({
                   title={title}
                   onClick={() => onClick(visible[3])}
                 />
-                <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
-                    <Images className="h-3.5 w-3.5" />
-                  </span>
+                {media.length >= 5 && (
+                  <>
+                    <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
+                        <Images className="h-3.5 w-3.5" />
+                      </span>
 
-                  <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
-                    +{extraCount} {extraCount === 1 ? "image/video" : "images/videos"}
-                  </span>
-                </div>
+                      <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
+                        +{extraCountLabel}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
