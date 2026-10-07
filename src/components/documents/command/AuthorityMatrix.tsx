@@ -15,7 +15,6 @@ const SHEET_URL =
 
 const SHEET_NAME = "Authority Matrix"
 
-const REFRESH_INTERVAL = 60_000
 
 type Section = "PRIMARY RESPONSIBILITY" | "AUTHORITY"
 
@@ -191,7 +190,7 @@ function parseMatrix(response: GvizResponse): MatrixData {
     throw new Error(`The "${SHEET_NAME}" tab returned no data.`)
   }
 
-  const ranks = RANK_COLUMNS
+  const ranks = [...RANK_COLUMNS].reverse()
   const entries: MatrixEntry[] = []
   let currentSection: Section | null = null
 
@@ -503,12 +502,6 @@ export default function AuthorityMatrix() {
 
   useEffect(() => {
     void loadMatrix()
-
-    const interval = window.setInterval(() => {
-      void loadMatrix()
-    }, REFRESH_INTERVAL)
-
-    return () => window.clearInterval(interval)
   }, [loadMatrix])
 
   const sectionOptions: Section[] = ["PRIMARY RESPONSIBILITY", "AUTHORITY"]
