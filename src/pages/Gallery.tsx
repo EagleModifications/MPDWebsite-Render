@@ -955,112 +955,165 @@ function GalleryFilterDropdown({
   optionColors?: Record<string, string>
   optionKind?: "type" | "category" | "tag"
 }) {
-  const allSelected = options.length > 0 && value.length === options.length
-  const selectedCount = value.length
-  const showCount = selectedCount > 0 && !allSelected
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+
+  // PromotionLogs behaviour:
+  // [] means "All", while a non-empty array contains only the selected values.
+  // Existing saved state that contains every option is also treated as "All".
+  const allSelected =
+    options.length === 0 ||
+    value.length === 0 ||
+    value.length === options.length
+
+  const selected = allSelected
+    ? []
+    : options.filter((option) => value.includes(option))
+
+  const selectedCount = selected.length
+  const showCount = !allSelected && selectedCount > 0
+
+  useEffect(() => {
+    if (!open) return
+
+    const close = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (target && !dropdownRef.current?.contains(target)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener("pointerdown", close)
+    return () => document.removeEventListener("pointerdown", close)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener("keydown", closeOnEscape)
+    return () => document.removeEventListener("keydown", closeOnEscape)
+  }, [open])
 
   const toggle = (option: string) => {
-    onChange(
-      value.includes(option)
-        ? value.filter((item) => item !== option)
-        : [...value, option],
-    )
+    // If everything is currently selected, choosing one starts a specific
+    // multi-select filter containing only that option.
+    if (allSelected) {
+      onChange([option])
+      return
+    }
+
+    if (value.includes(option)) {
+      const next = value.filter((item) => item !== option)
+      // PromotionLogs treats no selected values as "All".
+      onChange(next)
+      return
+    }
+
+    const next = [...value, option]
+
+    // Once every option is selected, collapse the state back to "All".
+    onChange(next.length === options.length ? [] : next)
   }
 
-  const clearToAll = () => onChange([...options])
+  const selectAll = () => {
+    onChange([])
+  }
 
-  const displayLabel = showCount ? label : label
+  const allLabel = `All ${label === "Type" ? "Types" : `${label}s`}`
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={ariaLabel}
-          className="h-10 w-fit min-w-0 shrink-0 justify-between gap-2 whitespace-nowrap px-3 text-sm font-medium"
-        >
-          <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
-            <span>{displayLabel}</span>
-            {showCount && (
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500/15 px-1 text-[10px] font-semibold leading-none text-blue-400">
-                {selectedCount}
-              </span>
-            )}
-          </span>
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
-        </Button>
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent
-        align="end"
-        className="z-[120] w-max min-w-[100%] max-w-[min(360px,calc(100vw-24px))] rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl"
+    <div ref={dropdownRef} className="relative shrink-0">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="h-10 w-max min-w-0 shrink-0 justify-between gap-2 whitespace-nowrap px-3 text-sm font-medium"
       >
-        <DropdownMenuItem
-          onSelect={(event) => event.preventDefault()}
-          onClick={clearToAll}
-          className={[
-            "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 whitespace-nowrap",
-            allSelected
-              ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/10 focus:text-blue-400"
-              : "text-foreground hover:bg-accent",
-          ].join(" ")}
-        >
-          <span className="font-medium">
-            All {label === "Type" ? "Types" : `${label}s`}
-          </span>
-          {allSelected && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
-        </DropdownMenuItem>
+        <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+          <span>{label}</span>
+          {showCount ? (
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500/15 px-1 text-[10px] font-semibold leading-none text-blue-400">
+              {selectedCount}
+            </span>
+          ) : null}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 opacity-60 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </Button>
 
-        {options.map((option) => {
-          const checked = value.includes(option)
+      {open ? (
+        <div className="absolute left-0 top-[calc(100%+4px)] z-[320] max-h-72 w-max min-w-full max-w-[min(360px,calc(100vw-24px))] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-popover p-1.5 shadow-xl">
+          <button
+            type="button"
+            onClick={selectAll}
+            className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm whitespace-nowrap transition-colors ${
+              allSelected
+                ? "bg-blue-500/10 text-blue-400"
+                : "text-foreground hover:bg-accent"
+            }`}
+          >
+            <span className="font-medium">{allLabel}</span>
+            {allSelected ? (
+              <Check className="h-4 w-4 shrink-0 text-blue-500" />
+            ) : null}
+          </button>
 
-          return (
-            <DropdownMenuItem
-              key={option}
-              onSelect={(event) => event.preventDefault()}
-              onClick={() => toggle(option)}
-              className={[
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 whitespace-nowrap",
-                checked
-                  ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/10 focus:text-blue-400"
-                  : "text-foreground hover:bg-accent",
-              ].join(" ")}
-            >
-              <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-                {optionKind === "type" ? (
-                  option === "Images" ? (
-                    <ImageIcon className="h-4 w-4 shrink-0 text-blue-500" />
+          {options.map((option) => {
+            const checked = allSelected || value.includes(option)
+
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => toggle(option)}
+                className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm whitespace-nowrap transition-colors ${
+                  checked
+                    ? "bg-blue-500/10 text-blue-400"
+                    : "text-foreground hover:bg-accent"
+                }`}
+              >
+                <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                  {optionKind === "type" ? (
+                    option === "Images" ? (
+                      <ImageIcon className="h-4 w-4 shrink-0 text-blue-500" />
+                    ) : (
+                      <Video className="h-4 w-4 shrink-0 text-blue-500" />
+                    )
                   ) : (
-                    <Video className="h-4 w-4 shrink-0 text-blue-500" />
-                  )
-                ) : (
-                  <span
-                    aria-hidden="true"
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: optionColors?.[option] ?? "#3b82f6" }}
-                  />
-                )}
-                <span>{option}</span>
-              </span>
+                    <span
+                      aria-hidden="true"
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor:
+                          optionColors?.[option] ?? "#3b82f6",
+                      }}
+                    />
+                  )}
+                  <span>{option}</span>
+                </span>
 
-              {checked && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
-            </DropdownMenuItem>
-          )
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+                {checked ? (
+                  <Check className="h-4 w-4 shrink-0 text-blue-500" />
+                ) : null}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
   )
-}
-
-function makePendingFromMedia(
-  media: GalleryMedia,
-): PendingMedia {
-  return {
-    ...media,
-    previewUrl: media.url,
-  }
 }
 
 export default function Gallery() {
@@ -1077,13 +1130,13 @@ export default function Gallery() {
     useState(false)
 
   const [categoryFilters, setCategoryFilters] =
-    useState<string[]>([...DEFAULT_GALLERY_CATEGORIES])
+    useState<string[]>([])
 
   const [mediaFilters, setMediaFilters] =
-    useState<string[]>([...DEFAULT_GALLERY_MEDIA_FILTERS])
+    useState<string[]>([])
 
   const [tagFilters, setTagFilters] =
-    useState<string[]>([...DEFAULT_GALLERY_TAGS])
+    useState<string[]>([])
 
   const [galleryCategories, setGalleryCategories] =
     useState<string[]>([...DEFAULT_GALLERY_CATEGORIES])
@@ -2371,9 +2424,9 @@ export default function Gallery() {
                     variant="ghost"
                     className="h-10 px-3 text-xs text-muted-foreground hover:text-blue-400"
                     onClick={() => {
-                      setCategoryFilters([...galleryCategories])
-                      setMediaFilters([...DEFAULT_GALLERY_MEDIA_FILTERS])
-                      setTagFilters([...galleryTags])
+                      setCategoryFilters([])
+                      setMediaFilters([])
+                      setTagFilters([])
                     }}
                   >
                     Clear Filters
