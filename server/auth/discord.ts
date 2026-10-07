@@ -1,12 +1,13 @@
 import type { DiscordUser } from "../types"
 import { env } from "../config"
 
-export function getDiscordLoginUrl(): string {
+export function getDiscordLoginUrl(state: string): string {
   const params = new URLSearchParams({
     client_id: env.discordClientId,
     redirect_uri: env.discordRedirectUri,
     response_type: "code",
-    scope: "identify"
+    scope: "identify",
+    state,
   })
 
   return `https://discord.com/oauth2/authorize?${params.toString()}`
