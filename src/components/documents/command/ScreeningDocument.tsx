@@ -28,9 +28,17 @@ export default function ScreeningDocument({
     [url],
   )
 
-  const embedUrl = presentationId
-    ? `https://docs.google.com/presentation/d/${presentationId}/embed?start=false&loop=false&delayms=3000&slide=${currentPage}`
-    : url
+  const getEmbedUrl = (page: number) =>
+    presentationId
+      ? `https://docs.google.com/presentation/d/${presentationId}/embed?start=false&loop=false&delayms=3000#slide=${page}`
+      : url
+
+  // Keep the current slide plus the two adjacent slides loaded.
+  // This makes the arrow navigation switch to an already-loaded iframe
+  // instead of reloading the whole Google Slides presentation on every click.
+  const nearbyPages = [currentPage - 1, currentPage, currentPage + 1].filter(
+    (page) => page >= 1,
+  )
 
   return (
     <div className="w-full min-w-0">
@@ -60,16 +68,24 @@ export default function ScreeningDocument({
         </div>
 
         <div className="relative w-full overflow-hidden bg-background">
-          <iframe
-            key={refreshKey}
-            src={embedUrl}
-            title={title}
-            className="block h-[800px] w-full border-0"
-            loading="lazy"
-            allowFullScreen
-          />
+          {nearbyPages.map((page) => (
+            <iframe
+              key={`${refreshKey}-${page}`}
+              src={getEmbedUrl(page)}
+              title={`${title} - Page ${page}`}
+              className={`absolute inset-0 h-[800px] w-full border-0 transition-opacity duration-75 ${
+                page === currentPage
+                  ? "z-10 opacity-100"
+                  : "pointer-events-none z-0 opacity-0"
+              }`}
+              loading="eager"
+              allowFullScreen
+            />
+          ))}
 
-          <div className="absolute inset-x-0 bottom-0 z-20 flex h-11 items-center border-t border-border/70 bg-background/95 px-3 backdrop-blur-sm">
+          <div className="h-[800px] w-full" aria-hidden="true" />
+
+          <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex h-11 items-center border-t border-border/70 bg-background/95 px-3 backdrop-blur-sm">
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
