@@ -522,28 +522,14 @@ const DEFAULT_GALLERY_CATEGORIES = [
   "Fleet",
 ] as const
 
-const DEFAULT_GALLERY_TAGS = [
-  "Dept",
-  "SWAT",
-  "MTF-7",
-  "MCD",
-  "TRU",
-  "SAR",
-] as const
+const DEFAULT_GALLERY_TAGS = [] as const
 
 const DEFAULT_GALLERY_CATEGORY_COLORS: Record<string, string> = {
   Community: "#3b82f6",
   Fleet: "#ffffff",
 }
 
-const DEFAULT_GALLERY_TAG_COLORS: Record<string, string> = {
-  Dept: "#3b82f6",
-  SWAT: "#ffffff",
-  "MTF-7": "#3b82f6",
-  MCD: "#ffffff",
-  TRU: "#3b82f6",
-  SAR: "#ffffff",
-}
+const DEFAULT_GALLERY_TAG_COLORS: Record<string, string> = {}
 
 function normalizeGalleryColor(value: unknown, fallback = "#3b82f6") {
   const color = typeof value === "string" ? value.trim().toLowerCase() : ""
@@ -618,10 +604,25 @@ async function getGalleryConfig() {
 
   if (existing) {
     const categories = existing.categories?.length ? existing.categories : [...DEFAULT_GALLERY_CATEGORIES]
-    const tags = existing.tags?.length ? existing.tags : [...DEFAULT_GALLERY_TAGS]
+    const legacyDefaultTags = new Set(["Dept", "SWAT", "MTF-7", "MCD", "TRU", "SAR"])
+    const existingTags = Array.isArray(existing.tags) ? existing.tags : []
+    const tags = existingTags.filter((tag) => !legacyDefaultTags.has(tag))
     const tagCategories = Object.fromEntries(
       categories.map((category) => [category, Array.from(new Set((existing.tagCategories?.[category] ?? []).filter((tag) => tags.includes(tag))))]),
     )
+
+    // Remove the old built-in tags from the persisted galleryTags document as
+    // well, so they do not come back after a refresh or deployment.
+    if (tags.length !== existingTags.length) {
+      const tagsCollection = await getCollection<GalleryTagsConfigDocument>("galleryTags")
+      const tagColors = Object.fromEntries(
+        Object.entries(existing.tagColors ?? {}).filter(([tag]) => tags.includes(tag)),
+      )
+      await tagsCollection.updateOne(
+        { key: "default" },
+        { $set: { tags, tagCategories, tagColors, updatedAt: new Date() } },
+      )
+    }
     const categoryColors = Object.fromEntries(
       categories.map((category) => [category, normalizeGalleryColor(existing.categoryColors?.[category], category === "Fleet" ? "#ffffff" : "#3b82f6")]),
     )
@@ -642,7 +643,7 @@ async function getGalleryConfig() {
     ? legacy.categories
     : [...DEFAULT_GALLERY_CATEGORIES]
   const tags = Array.isArray(legacy?.tags) && legacy.tags.length
-    ? legacy.tags
+    ? legacy.tags.filter((tag) => !["Dept", "SWAT", "MTF-7", "MCD", "TRU", "SAR"].includes(tag))
     : [...DEFAULT_GALLERY_TAGS]
   const legacyTagCategories = legacy && typeof legacy.tagCategories === "object" ? legacy.tagCategories : {}
   const tagCategories = Object.fromEntries(
