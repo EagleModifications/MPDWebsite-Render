@@ -32,7 +32,7 @@ import Events from "@/pages/Events"
 import Gallery from "@/pages/Gallery"
 import Download from "@/pages/Download"
 
-import MainRoster from "@/pages/documents/MainRoster"
+import MetroRoster from "@/pages/documents/MetroRoster"
 import SWATRoster from "@/pages/documents/SWATRoster"
 import MCDRoster from "@/pages/documents/MCDRoster"
 import TRURoster from "@/pages/documents/TRURoster"
@@ -392,7 +392,7 @@ export default function App() {
 
           <Route
             path="/documents/rosters/metro-rosters"
-            element={<MainRoster />}
+            element={<MetroRoster />}
           />
 
           <Route
