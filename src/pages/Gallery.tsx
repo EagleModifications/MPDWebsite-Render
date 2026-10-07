@@ -1916,7 +1916,6 @@ export default function Gallery() {
                     </span>
                   </span>
                 </div>
-              </div>
 
               <span className="shrink-0 font-medium text-foreground/70">
                 {filteredItems.length}{" "}
