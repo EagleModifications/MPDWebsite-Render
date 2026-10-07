@@ -131,28 +131,14 @@ type PendingMedia = GalleryMedia & {
   error?: string
 }
 
-const DEFAULT_GALLERY_TAGS: readonly GalleryTag[] = [
-  "Dept",
-  "SWAT",
-  "MTF-7",
-  "MCD",
-  "TRU",
-  "SAR",
-]
+const DEFAULT_GALLERY_TAGS: readonly GalleryTag[] = []
 
 const DEFAULT_GALLERY_CATEGORY_COLORS: Record<string, string> = {
   Community: "#3b82f6",
   Fleet: "#ffffff",
 }
 
-const DEFAULT_GALLERY_TAG_COLORS: Record<string, string> = {
-  Dept: "#3b82f6",
-  SWAT: "#ffffff",
-  "MTF-7": "#3b82f6",
-  MCD: "#ffffff",
-  TRU: "#3b82f6",
-  SAR: "#ffffff",
-}
+const DEFAULT_GALLERY_TAG_COLORS: Record<string, string> = {}
 type GalleryMediaFilter = "Images" | "Videos"
 
 const DEFAULT_GALLERY_CATEGORIES: readonly GalleryCategory[] = [
@@ -4189,7 +4175,7 @@ function GalleryMediaCollage({
   if (visible.length === 0) return null
 
   return (
-    <div className="relative h-[280px] w-full overflow-hidden bg-black sm:h-[320px]">
+    <div className="relative h-[320px] w-full overflow-hidden bg-black sm:h-[360px]">
       {visible.length === 1 && (
         <GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} />
       )}
@@ -4293,14 +4279,14 @@ function GalleryMediaCard({
         <img
           src={media.url}
           alt={title}
-          className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
         />
       ) : getMediaThumbnail(media) ? (
         <div className="relative h-full w-full">
           <img
             src={getMediaThumbnail(media)}
             alt={title}
-            className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
           />
         </div>
       ) : isEmbeddableVideo(media) ? (
@@ -4319,7 +4305,7 @@ function GalleryMediaCard({
           loop
           playsInline
           preload="auto"
-          className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
         />
       )}
 
