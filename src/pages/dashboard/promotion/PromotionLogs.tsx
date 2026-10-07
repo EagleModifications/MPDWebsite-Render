@@ -1411,7 +1411,7 @@ export default function PromotionLogs() {
                     </span>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {group.logs.map((log, index) => {
                       const isExpanded =
                         expanded.has(log.id)
@@ -1454,7 +1454,7 @@ export default function PromotionLogs() {
                             log.id ||
                             `${log.createdAt}-${log.userId}-${index}`
                           }
-                          className={`overflow-visible rounded-xl border bg-card/70 transition-all ${
+                          className={`overflow-visible rounded-xl border bg-card transition-all ${
                             isExpanded
                               ? "border-blue-500/30 shadow-sm shadow-blue-950/20"
                               : "border-border hover:border-blue-500/20"
@@ -1578,11 +1578,17 @@ export default function PromotionLogs() {
                               </div>
                             </div>
 
+                            {/* Entry summary — present on every entry, matching the reference layout. */}
+                            <div className="border-t border-border px-3 py-2.5 sm:px-4">
+                              <p className="pl-[4.25rem] text-[10px] leading-5 text-muted-foreground sm:pl-[4.75rem] sm:text-[11px]">
+                                {log.summary || "No summary available."}
+                              </p>
+                            </div>
                           </div>
 
                           {/* Expanded details */}
                           {isExpanded ? (
-                            <div className="border-t border-border bg-muted/[0.035] px-3 py-3">
+                            <div className="border-t border-border px-3 py-3 sm:px-4">
                               <div className="mb-3 flex items-center justify-between gap-3">
                                 <div>
                                   <p className="text-xs font-semibold">
