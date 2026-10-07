@@ -811,7 +811,10 @@ function GalleryColorPicker({
           </div>
 
           <div className="mt-3 flex items-center justify-between rounded-lg border border-border/70 bg-background/50 px-3 py-2">
-            <span className="text-[11px] text-muted-foreground">Current</span>
+            <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="h-4 w-4 rounded border border-white/20 shadow-inner" style={{ backgroundColor: normalized }} />
+              Current
+            </span>
             <span className="font-mono text-[11px] text-foreground">{normalized}</span>
           </div>
         </div>
@@ -851,14 +854,14 @@ function GalleryFilterDropdown({
           variant="outline"
           size="sm"
           aria-label={ariaLabel}
-          className="h-10 min-w-[128px] justify-between gap-2 px-3 text-sm font-medium"
+          className="h-10 w-[132px] justify-between gap-2 px-3 text-sm font-medium"
         >
           <span>{label}</span>
           <ChevronDown className="h-4 w-4 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="z-[120] w-56 rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl">
+      <DropdownMenuContent align="end" className="z-[120] w-[220px] rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl">
         <DropdownMenuItem
           onSelect={(event) => event.preventDefault()}
           onClick={() => onChange(allSelected ? [] : [...options])}
@@ -1027,6 +1030,13 @@ export default function Gallery() {
   const [deleteTarget, setDeleteTarget] =
     useState<GalleryItem | null>(null)
 
+  const [taxonomyEdit, setTaxonomyEdit] =
+    useState<{ type: "category" | "tag"; value: string } | null>(null)
+  const [taxonomyEditName, setTaxonomyEditName] = useState("")
+  const [taxonomyEditColor, setTaxonomyEditColor] = useState("#3b82f6")
+  const [taxonomyEditCategory, setTaxonomyEditCategory] = useState("")
+  const [taxonomyBusy, setTaxonomyBusy] = useState(false)
+
   const fileInputRef =
     useRef<HTMLInputElement | null>(null)
 
@@ -1061,7 +1071,23 @@ export default function Gallery() {
       html.style.overflow = previousHtmlOverflow
       body.style.paddingRight = previousBodyPaddingRight
     }
-  }, [showModal, showTaxonomyModal, viewer, infoItem, deleteTarget])
+  }, [showModal, showTaxonomyModal, viewer, infoItem, deleteTarget, taxonomyEdit])
+
+  useEffect(() => {
+    if (!showTaxonomyModal && !taxonomyEdit) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      if (taxonomyEdit) {
+        setTaxonomyEdit(null)
+        return
+      }
+      setShowTaxonomyModal(false)
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [showTaxonomyModal, taxonomyEdit])
 
   const dragDepthRef =
     useRef(0)
@@ -1282,6 +1308,100 @@ export default function Gallery() {
       toast.success(`${type === "category" ? "Category" : "Tag"} color updated.`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update color.")
+    }
+  }
+
+  function beginTaxonomyEdit(type: "category" | "tag", value: string) {
+    setTaxonomyEdit({ type, value })
+    setTaxonomyEditName(value)
+    setTaxonomyEditColor(
+      type === "category"
+        ? galleryCategoryColors[value] ?? "#3b82f6"
+        : galleryTagColors[value] ?? "#3b82f6",
+    )
+    if (type === "tag") {
+      const assigned = galleryCategories.find((categoryName) =>
+        (galleryTagCategories[categoryName] ?? []).includes(value),
+      )
+      setTaxonomyEditCategory(assigned ?? "")
+    } else {
+      setTaxonomyEditCategory("")
+    }
+  }
+
+  async function saveTaxonomyEdit() {
+    if (!taxonomyEdit) return
+    const newValue = taxonomyEditName.trim()
+    if (!newValue) {
+      toast.error("Enter a name.")
+      return
+    }
+
+    setTaxonomyBusy(true)
+    try {
+      const response = await fetch("/api/gallery/options", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: taxonomyEdit.type,
+          value: taxonomyEdit.value,
+          newValue,
+          color: taxonomyEditColor,
+          category: taxonomyEdit.type === "tag" ? taxonomyEditCategory : undefined,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || "Failed to update gallery option.")
+
+      if (Array.isArray(data.categories)) setGalleryCategories(data.categories)
+      if (Array.isArray(data.tags)) setGalleryTags(data.tags)
+      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
+      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
+
+      if (taxonomyEdit.type === "category" && categoryFilters.includes(taxonomyEdit.value)) {
+        setCategoryFilters((current) => current.map((item) => item === taxonomyEdit.value ? newValue : item))
+      }
+      if (taxonomyEdit.type === "tag" && tagFilters.includes(taxonomyEdit.value)) {
+        setTagFilters((current) => current.map((item) => item === taxonomyEdit.value ? newValue : item))
+      }
+
+      setTaxonomyEdit(null)
+      toast.success(`${taxonomyEdit.type === "category" ? "Category" : "Tag"} updated.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update gallery option.")
+    } finally {
+      setTaxonomyBusy(false)
+    }
+  }
+
+  async function deleteTaxonomyOption(type: "category" | "tag", value: string) {
+    if (!window.confirm(`Delete ${type === "category" ? "category" : "tag"} \"${value}\"?`)) return
+
+    setTaxonomyBusy(true)
+    try {
+      const response = await fetch("/api/gallery/options", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, value }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || "Failed to delete gallery option.")
+
+      if (Array.isArray(data.categories)) setGalleryCategories(data.categories)
+      if (Array.isArray(data.tags)) setGalleryTags(data.tags)
+      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
+      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
+      setCategoryFilters((current) => current.filter((item) => item !== value))
+      setTagFilters((current) => current.filter((item) => item !== value))
+      toast.success(`${type === "category" ? "Category" : "Tag"} deleted.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete gallery option.")
+    } finally {
+      setTaxonomyBusy(false)
     }
   }
 
@@ -2716,10 +2836,14 @@ export default function Gallery() {
                         >
                           {entry}
                         </span>
-                        <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                          <span>Color</span>
-                          <GalleryColorPicker value={galleryCategoryColors[entry] ?? "#3b82f6"} onChange={(color) => { setGalleryCategoryColors((current) => ({ ...current, [entry]: color })); void updateGalleryOptionColor("category", entry, color) }} ariaLabel={`Set ${entry} category color`} />
-                        </label>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => beginTaxonomyEdit("category", entry)} disabled={taxonomyBusy}>
+                            <Edit3 className="mr-1.5 h-3.5 w-3.5" />Edit
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("category", entry)} disabled={taxonomyBusy}>
+                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2750,7 +2874,14 @@ export default function Gallery() {
                             {categoryTags.length ? categoryTags.map((entry) => (
                               <div key={`${categoryName}-${entry}`} className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide" style={{ borderColor: `${galleryTagColors[entry] ?? "#3b82f6"}55`, backgroundColor: `${galleryTagColors[entry] ?? "#3b82f6"}1a`, color: galleryTagColors[entry] ?? "#3b82f6" }}>
                                 <span>{entry}</span>
-                                <GalleryColorPicker value={galleryTagColors[entry] ?? "#3b82f6"} onChange={(color) => { setGalleryTagColors((current) => ({ ...current, [entry]: color })); void updateGalleryOptionColor("tag", entry, color, categoryName) }} ariaLabel={`Set ${entry} tag color`} />
+                                <div className="ml-1 flex items-center gap-1">
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => beginTaxonomyEdit("tag", entry)} disabled={taxonomyBusy} aria-label={`Edit ${entry}`}>
+                                    <Edit3 className="h-3 w-3" />
+                                  </Button>
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("tag", entry)} disabled={taxonomyBusy} aria-label={`Delete ${entry}`}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
                               </div>
                             )) : <span className="text-xs text-muted-foreground">No tags yet.</span>}
                           </div>
@@ -2766,6 +2897,49 @@ export default function Gallery() {
           </div>,
           document.body,
         )}
+
+      {taxonomyEdit && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => { if (event.currentTarget === event.target) setTaxonomyEdit(null) }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="taxonomy-edit-title">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 id="taxonomy-edit-title" className="text-lg font-semibold">Edit {taxonomyEdit.type === "category" ? "Category" : "Sub Tag"}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Change the name, color, or category assignment.</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTaxonomyEdit(null)} aria-label="Close">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Name</label>
+                <Input value={taxonomyEditName} onChange={(event) => setTaxonomyEditName(event.target.value)} />
+              </div>
+              {taxonomyEdit.type === "tag" && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Category</label>
+                  <CustomSelect id="taxonomy-edit-category" value={taxonomyEditCategory || "Unassigned"} options={["Unassigned", ...galleryCategories]} ariaLabel="Sub tag category" onChange={(value) => setTaxonomyEditCategory(value === "Unassigned" ? "" : value)} />
+                  <p className="mt-1.5 text-xs text-muted-foreground">Choose Unassigned to reset this sub-tag's category assignment.</p>
+                </div>
+              )}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Color</label>
+                <GalleryColorPicker value={taxonomyEditColor} onChange={setTaxonomyEditColor} ariaLabel="Edit gallery label color" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setTaxonomyEdit(null)} disabled={taxonomyBusy}>Cancel</Button>
+                <Button type="button" onClick={() => void saveTaxonomyEdit()} disabled={taxonomyBusy || !taxonomyEditName.trim()}>
+                  {taxonomyBusy ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {showModal && (
         <div
