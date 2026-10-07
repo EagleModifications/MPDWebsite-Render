@@ -4,7 +4,6 @@ import {
   Filter,
   RefreshCw,
   Search,
-  X,
 } from "lucide-react"
 
 const SHEET_URL =
@@ -273,9 +272,6 @@ export default function PunishmentGuidelines() {
 
     return groups
   }, [filteredRows])
-
-  const rowsForSection = (section: Section) =>
-    groupedRows.find((group) => group.section === section)?.rows ?? []
 
 
   return (
