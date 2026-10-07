@@ -470,7 +470,7 @@ export default function PunishmentGuidelines() {
         )}
 
         {!loading && !error && (
-          <div className="overflow-x-hidden">
+          <div className="overflow-visible">
             <table className="w-full table-fixed border-collapse">
               <colgroup>
                 <col className="w-[30%]" />
@@ -480,7 +480,7 @@ export default function PunishmentGuidelines() {
                 <col className="w-[17.5%]" />
               </colgroup>
 
-              <thead className="sticky top-0 z-30">
+              <thead className="sticky top-0 z-40">
                 <tr className="border-b border-border/70 bg-card">
                   {DISPLAY_HEADERS.map((header) => (
                     <th
