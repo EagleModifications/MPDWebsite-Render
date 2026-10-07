@@ -11,7 +11,6 @@ import {
 import { createPortal } from "react-dom"
 import {
   Check,
-  Copy,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -43,6 +42,12 @@ import Footer from "@/components/Footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { getSession, type User } from "@/lib/auth"
 
 type YouTubeQuality = "highres" | "hd2160" | "hd1440" | "hd1080" | "hd720" | "large" | "medium" | "small" | "tiny" | "auto"
@@ -108,7 +113,6 @@ type GalleryTag = string
 
 type GalleryItem = {
   id: string
-  slug?: string
   title: string
   description: string
   category?: GalleryCategory
@@ -125,18 +129,6 @@ type PendingMedia = GalleryMedia & {
   progress?: number
   processing?: boolean
   error?: string
-  uploadedMedia?: GalleryMedia
-}
-
-function makePendingFromMedia(media: GalleryMedia): PendingMedia {
-  return {
-    ...media,
-    previewUrl: media.thumbnailUrl || media.url,
-    progress: 100,
-    processing: false,
-    error: undefined,
-    uploadedMedia: media,
-  }
 }
 
 const DEFAULT_GALLERY_TAGS: readonly GalleryTag[] = []
@@ -958,165 +950,132 @@ function GalleryFilterDropdown({
   optionColors?: Record<string, string>
   optionKind?: "type" | "category" | "tag"
 }) {
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  const [open, setOpen] = useState(false)
+  // An empty array is the ONLY representation of "All".
+  // Selecting every option manually must remain a real multi-selection and
+  // must therefore never turn the filter back into "All".
+  const allSelected = value.length === 0
+  const selectedCount = value.length
 
-  // PromotionLogs behaviour:
-  // [] means "All", while a non-empty array contains only the selected values.
-  // Existing saved state that contains every option is also treated as "All".
-  const allSelected =
-    options.length === 0 ||
-    value.length === 0 ||
-    value.length === options.length
+  const allLabel =
+    label === "Type" ? "All Types" : label === "Category" ? "All Categories" : "All Tags"
 
-  const selected = allSelected
-    ? []
-    : options.filter((option) => value.includes(option))
-
-  const selectedCount = selected.length
-  const showCount = !allSelected && selectedCount > 0
-
-  useEffect(() => {
-    if (!open) return
-
-    const close = (event: PointerEvent) => {
-      const target = event.target as Node | null
-      if (target && !dropdownRef.current?.contains(target)) {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener("pointerdown", close)
-    return () => document.removeEventListener("pointerdown", close)
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener("keydown", closeOnEscape)
-    return () => document.removeEventListener("keydown", closeOnEscape)
-  }, [open])
+  // Keep the trigger and menu the same width. The width is based on the
+  // longest visible option rather than using one fixed width for every filter.
+  const longestLabel = Math.max(
+    allLabel.length,
+    label.length,
+    ...options.map((option) => option.length),
+  )
+  const dropdownWidth = Math.min(
+    360,
+    Math.max(132, Math.ceil(longestLabel * 7.2 + 72)),
+  )
 
   const toggle = (option: string) => {
-    // If everything is currently selected, choosing one starts a specific
-    // multi-select filter containing only that option.
-    if (allSelected) {
-      onChange([option])
-      return
-    }
-
     if (value.includes(option)) {
-      const next = value.filter((item) => item !== option)
-      // PromotionLogs treats no selected values as "All".
-      onChange(next)
+      onChange(value.filter((item) => item !== option))
       return
     }
 
-    const next = [...value, option]
-
-    // Once every option is selected, collapse the state back to "All".
-    onChange(next.length === options.length ? [] : next)
+    onChange([...value, option])
   }
-
-  const selectAll = () => {
-    onChange([])
-  }
-
-  const allLabel = `All ${label === "Type" ? "Types" : `${label}s`}`
 
   return (
-    <div ref={dropdownRef} className="relative shrink-0">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        aria-label={ariaLabel}
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className="h-10 w-max min-w-0 shrink-0 justify-between gap-2 whitespace-nowrap px-3 text-sm font-medium"
-      >
-        <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
-          <span>{label}</span>
-          {showCount ? (
-            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500/15 px-1 text-[10px] font-semibold leading-none text-blue-400">
-              {selectedCount}
-            </span>
-          ) : null}
-        </span>
-        <ChevronDown
-          className={`h-4 w-4 shrink-0 opacity-60 transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
-        />
-      </Button>
-
-      {open ? (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-[320] max-h-72 w-max min-w-full max-w-[min(360px,calc(100vw-24px))] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-popover p-1.5 shadow-xl">
-          <button
-            type="button"
-            onClick={selectAll}
-            className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm whitespace-nowrap transition-colors ${
-              allSelected
-                ? "bg-blue-500/10 text-blue-400"
-                : "text-foreground hover:bg-accent"
-            }`}
-          >
-            <span className="font-medium">{allLabel}</span>
-            {allSelected ? (
-              <Check className="h-4 w-4 shrink-0 text-blue-500" />
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={ariaLabel}
+          style={{ width: `${dropdownWidth}px` }}
+          className="h-10 shrink-0 justify-between gap-2 px-3 text-sm font-medium"
+        >
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate">{label}</span>
+            {selectedCount > 0 ? (
+              <span className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-blue-500/15 px-1 text-[10px] font-semibold leading-none text-blue-400">
+                {selectedCount}
+              </span>
             ) : null}
-          </button>
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
 
-          {options.map((option) => {
-            const checked = allSelected || value.includes(option)
+      <DropdownMenuContent
+        align="end"
+        style={{ width: `${dropdownWidth}px` }}
+        className="z-[120] max-w-[calc(100vw-24px)] rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl"
+      >
+        <DropdownMenuItem
+          onSelect={(event) => event.preventDefault()}
+          onClick={() => onChange([])}
+          className={`gap-2 rounded-lg px-3 py-2.5 ${
+            allSelected
+              ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/10 focus:text-blue-400"
+              : ""
+          }`}
+        >
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+            {allSelected ? <Check className="h-4 w-4 text-blue-500" /> : null}
+          </span>
+          <span className="truncate font-medium">{allLabel}</span>
+        </DropdownMenuItem>
 
-            return (
-              <button
-                key={option}
-                type="button"
-                onClick={() => toggle(option)}
-                className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm whitespace-nowrap transition-colors ${
-                  checked
-                    ? "bg-blue-500/10 text-blue-400"
-                    : "text-foreground hover:bg-accent"
-                }`}
-              >
-                <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-                  {optionKind === "type" ? (
-                    option === "Images" ? (
-                      <ImageIcon className="h-4 w-4 shrink-0 text-blue-500" />
-                    ) : (
-                      <Video className="h-4 w-4 shrink-0 text-blue-500" />
-                    )
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{
-                        backgroundColor:
-                          optionColors?.[option] ?? "#3b82f6",
-                      }}
-                    />
-                  )}
-                  <span>{option}</span>
-                </span>
+        <div className="my-1 h-px bg-border" />
 
-                {checked ? (
-                  <Check className="h-4 w-4 shrink-0 text-blue-500" />
-                ) : null}
-              </button>
-            )
-          })}
-        </div>
-      ) : null}
-    </div>
+        {options.map((option) => {
+          const checked = value.includes(option)
+
+          return (
+            <DropdownMenuItem
+              key={option}
+              onSelect={(event) => event.preventDefault()}
+              onClick={() => toggle(option)}
+              className={[
+                "gap-2 rounded-lg px-3 py-2.5",
+                checked
+                  ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/10 focus:text-blue-400"
+                  : "",
+              ].join(" ")}
+            >
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                {checked ? <Check className="h-4 w-4 text-blue-500" /> : null}
+              </span>
+
+              {optionKind === "type" ? (
+                option === "Images" ? (
+                  <ImageIcon className="h-4 w-4 shrink-0" />
+                ) : (
+                  <Video className="h-4 w-4 shrink-0" />
+                )
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: optionColors?.[option] ?? "#3b82f6",
+                  }}
+                />
+              )}
+
+              <span className="min-w-0 truncate">{option}</span>
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
+}
+
+function makePendingFromMedia(
+  media: GalleryMedia,
+): PendingMedia {
+  return {
+    ...media,
+    previewUrl: media.url,
+  }
 }
 
 export default function Gallery() {
@@ -1221,6 +1180,12 @@ export default function Gallery() {
 
   const [saving, setSaving] =
     useState(false)
+
+  const [uploadProgress, setUploadProgress] =
+    useState<number | null>(null)
+
+  const [savingStage, setSavingStage] =
+    useState<"upload" | "import" | "save" | null>(null)
 
   const [deletingId, setDeletingId] =
     useState<string | null>(null)
@@ -1332,28 +1297,11 @@ export default function Gallery() {
         const data =
           await galleryResponse.json()
 
-        const loadedItems: GalleryItem[] =
+        setItems(
           Array.isArray(data.items)
             ? data.items
-            : []
-
-        setItems(loadedItems)
-
-        const requestedGallery =
-          new URLSearchParams(window.location.search).get("gallery")
-
-        if (requestedGallery) {
-          const requestedItem = loadedItems.find(
-            (item) =>
-              item.id === requestedGallery ||
-              item.slug === requestedGallery ||
-              item.title === requestedGallery,
-          )
-
-          if (requestedItem) {
-            setInfoItem(requestedItem)
-          }
-        }
+            : [],
+        )
 
         setCanManageGallery(
           permissionResponse.ok,
@@ -1362,16 +1310,11 @@ export default function Gallery() {
         if (optionsResponse.ok) {
           const optionsData = await optionsResponse.json()
           if (Array.isArray(optionsData.categories)) {
-            const categories = optionsData.categories.map(String).filter(Boolean)
-            setGalleryCategories(categories)
-            setCategoryFilters(categories)
+            setGalleryCategories(optionsData.categories.map(String).filter(Boolean))
           }
           if (Array.isArray(optionsData.tags)) {
-            const tags = optionsData.tags.map(String).filter(Boolean)
-            setGalleryTags(tags)
-            setTagFilters(tags)
+            setGalleryTags(optionsData.tags.map(String).filter(Boolean))
           }
-          setMediaFilters([...DEFAULT_GALLERY_MEDIA_FILTERS])
           if (optionsData.tagCategories && typeof optionsData.tagCategories === "object") {
             setGalleryTagCategories(optionsData.tagCategories)
           }
@@ -1612,6 +1555,10 @@ export default function Gallery() {
     }
   }
 
+  const mediaStillProcessing = pendingMedia.some((media) => media.processing)
+  const mediaHasErrors = pendingMedia.some((media) => Boolean(media.error))
+  const canCreateGallery = pendingMedia.length > 0 && !mediaStillProcessing && !mediaHasErrors && !saving
+
   function resetForm() {
     for (const media of pendingMedia) {
       if (
@@ -1669,23 +1616,6 @@ export default function Gallery() {
     setShowModal(true)
   }
 
-  function retryPendingMedia(item: PendingMedia) {
-    if (item.processing) return
-
-    if (item.source === "upload" && item.file) {
-      void uploadSinglePendingFile(item).catch(() => {
-        toast.error(`Failed to upload ${item.file?.name || "file"}.`)
-      })
-      return
-    }
-
-    if (item.source === "url") {
-      void importSinglePendingUrl(item).catch(() => {
-        toast.error("Failed to import the media URL.")
-      })
-    }
-  }
-
   function removePendingMedia(
     id: string,
   ) {
@@ -1709,150 +1639,6 @@ export default function Gallery() {
         (item) => item.id !== id,
       )
     })
-  }
-
-  function updatePendingMedia(id: string, update: Partial<PendingMedia>) {
-    setPendingMedia((current) =>
-      current.map((media) =>
-        media.id === id
-          ? { ...media, ...update }
-          : media,
-      ),
-    )
-  }
-
-  async function uploadSinglePendingFile(item: PendingMedia) {
-    if (!item.file) return
-
-    const file = item.file
-    updatePendingMedia(item.id, {
-      processing: true,
-      progress: 0,
-      error: undefined,
-    })
-
-    const formData = new FormData()
-    formData.append("files", file, file.name)
-    formData.append("title", title.trim() || "gallery")
-
-    try {
-      const result = await new Promise<{ status: number; raw: string }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        xhr.open("POST", "/api/gallery/upload")
-        xhr.withCredentials = true
-        xhr.timeout = 15 * 60 * 1000
-        xhr.upload.onprogress = (event) => {
-          if (!event.lengthComputable) return
-          const progress = Math.min(100, Math.round((event.loaded / event.total) * 100))
-          updatePendingMedia(item.id, { progress })
-        }
-        xhr.onload = () => resolve({ status: xhr.status, raw: xhr.responseText || "" })
-        xhr.onerror = () => reject(new Error("Gallery upload failed. Check the server logs and try again."))
-        xhr.ontimeout = () => reject(new Error("Gallery upload timed out after 15 minutes."))
-        xhr.onabort = () => reject(new Error("Gallery upload was cancelled."))
-        xhr.send(formData)
-      })
-
-      let data: { success?: boolean; items?: GalleryMedia[]; error?: string } = {}
-      try {
-        data = result.raw ? JSON.parse(result.raw) : {}
-      } catch {
-        data = {}
-      }
-
-      if (result.status < 200 || result.status >= 300) {
-        const message = result.status === 404
-          ? "Gallery upload API is not deployed. Make sure the updated app.ts is deployed and the server has been restarted."
-          : result.status === 401
-            ? "Your session has expired. Sign in again."
-            : result.status === 403
-              ? "You do not have permission to upload gallery media."
-              : data.error || `Gallery upload failed (${result.status}).`
-        throw new Error(message)
-      }
-
-      if (!Array.isArray(data.items) || !data.items[0]) {
-        throw new Error("Gallery upload returned an invalid response.")
-      }
-
-      const uploadedMedia = data.items[0]
-      updatePendingMedia(item.id, {
-        ...uploadedMedia,
-        id: item.id,
-        previewUrl: item.previewUrl,
-        file,
-        uploadedMedia,
-        processing: false,
-        progress: 100,
-        error: undefined,
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Gallery upload failed."
-      updatePendingMedia(item.id, {
-        processing: false,
-        progress: 0,
-        error: message,
-      })
-      throw error
-    }
-  }
-
-  async function importSinglePendingUrl(item: PendingMedia) {
-    updatePendingMedia(item.id, {
-      processing: true,
-      progress: 4,
-      error: undefined,
-    })
-
-    let simulatedProgress = 4
-    const progressTimer = window.setInterval(() => {
-      simulatedProgress = Math.min(
-        92,
-        simulatedProgress + Math.floor(Math.random() * 8) + 4,
-      )
-      updatePendingMedia(item.id, { progress: simulatedProgress })
-    }, 350)
-
-    try {
-      const importResponse = await fetch("/api/gallery/import-url", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: item.url,
-          type: item.type,
-          title: title.trim() || "gallery",
-          index: Math.max(0, pendingMedia.findIndex((entry) => entry.id === item.id)),
-        }),
-      })
-      const importData = await importResponse.json().catch(() => ({}))
-
-      if (!importResponse.ok || !importData.item) {
-        throw new Error(importData.error || "Failed to import the media URL.")
-      }
-
-      const importedMedia = importData.item as GalleryMedia
-      updatePendingMedia(item.id, {
-        ...importedMedia,
-        id: item.id,
-        previewUrl: item.previewUrl,
-        file: undefined,
-        uploadedMedia: importedMedia,
-        processing: false,
-        progress: 100,
-        error: undefined,
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to import the media URL."
-      updatePendingMedia(item.id, {
-        processing: false,
-        progress: 0,
-        error: message,
-      })
-      throw error
-    } finally {
-      window.clearInterval(progressTimer)
-    }
   }
 
   function addExternalUrl() {
@@ -1886,25 +1672,20 @@ export default function Gallery() {
         ? thumbnailInput.trim() || getYouTubeThumbnail(url)
         : ""
 
-    const item: PendingMedia = {
-      id: crypto.randomUUID(),
-      type,
-      url,
-      thumbnailUrl,
-      source: "url",
-      processing: true,
-      progress: 4,
-    }
-
-    setPendingMedia((current) => [...current, item])
+    setPendingMedia((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        type,
+        url,
+        thumbnailUrl,
+        source: "url",
+      },
+    ])
 
     setUrlInput("")
     setUrlType("image")
     setThumbnailInput("")
-
-    void importSinglePendingUrl(item).catch(() => {
-      toast.error("Failed to import the media URL.")
-    })
   }
 
   function handleFiles(
@@ -1927,8 +1708,6 @@ export default function Gallery() {
         source: "upload",
         previewUrl: URL.createObjectURL(file),
         file,
-        processing: true,
-        progress: 0,
       })
     }
 
@@ -1938,12 +1717,6 @@ export default function Gallery() {
     }
 
     setPendingMedia((current) => [...current, ...next])
-
-    for (const item of next) {
-      void uploadSinglePendingFile(item).catch(() => {
-        toast.error(`Failed to upload ${item.file?.name || "file"}.`)
-      })
-    }
   }
 
   function handleDragEnter(
@@ -2027,96 +1800,256 @@ export default function Gallery() {
     }
   }
 
+  async function uploadPendingFiles() {
+    const uploadItems = pendingMedia.filter((media) => media.source === "upload" && media.file)
+    if (!uploadItems.length) return []
+
+    const uploaded: GalleryMedia[] = []
+
+    setSavingStage("upload")
+
+    for (let index = 0; index < uploadItems.length; index += 1) {
+      const item = uploadItems[index]
+      const file = item.file as File
+
+      setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: true, progress: 0, error: undefined } : media))
+
+      const formData = new FormData()
+      formData.append("files", file, file.name)
+      formData.append("title", title.trim() || "gallery")
+
+      const result = await new Promise<{ status: number; raw: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open("POST", "/api/gallery/upload")
+        xhr.withCredentials = true
+        xhr.timeout = 15 * 60 * 1000
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) return
+          const progress = Math.min(100, Math.round((event.loaded / event.total) * 100))
+          setUploadProgress(progress)
+          setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, progress } : media))
+        }
+        xhr.onload = () => resolve({ status: xhr.status, raw: xhr.responseText || "" })
+        xhr.onerror = () => reject(new Error("Gallery upload failed. Check the server logs and try again."))
+        xhr.ontimeout = () => reject(new Error("Gallery upload timed out after 15 minutes."))
+        xhr.onabort = () => reject(new Error("Gallery upload was cancelled."))
+        xhr.send(formData)
+      })
+
+      let data: { success?: boolean; items?: GalleryMedia[]; error?: string } = {}
+      try { data = result.raw ? JSON.parse(result.raw) : {} } catch { data = {} }
+
+      if (result.status < 200 || result.status >= 300) {
+        const message = result.status === 404
+          ? "Gallery upload API is not deployed. Make sure the updated app.ts is deployed and the server has been restarted."
+          : result.status === 401
+            ? "Your session has expired. Sign in again."
+            : result.status === 403
+              ? "You do not have permission to upload gallery media."
+              : data.error || `Gallery upload failed (${result.status}).`
+        setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: false, error: message } : media))
+        throw new Error(message)
+      }
+
+      if (!Array.isArray(data.items) || !data.items[0]) {
+        const message = "Gallery upload returned an invalid response."
+        setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: false, error: message } : media))
+        throw new Error(message)
+      }
+
+      uploaded.push(data.items[0])
+      setPendingMedia((current) => current.map((media) => media.id === item.id ? { ...media, processing: false, progress: 100 } : media))
+      setUploadProgress(index === uploadItems.length - 1 ? 100 : 0)
+    }
+
+    return uploaded
+  }
+
   // Description is intentionally optional; only title and media are required.
   async function saveGallery() {
-    const cleanTitle = title.trim()
+    const cleanTitle =
+      title.trim()
 
     if (!cleanTitle) {
-      toast.error("Enter a gallery title.")
+      toast.error(
+        "Enter a gallery title.",
+      )
       return
     }
 
     if (!pendingMedia.length) {
-      toast.error("Add at least one image or video.")
-      return
-    }
-
-    const unfinishedMedia = pendingMedia.filter(
-      (media) => media.processing || media.error,
-    )
-
-    if (unfinishedMedia.length > 0) {
-      toast.error("Wait for every file and URL to finish processing before creating the gallery.")
+      toast.error(
+        "Add at least one image or video.",
+      )
       return
     }
 
     setSaving(true)
+    setSavingStage("save")
+    setUploadProgress(null)
 
     try {
-      const media: GalleryMedia[] = pendingMedia.map((item) =>
-        item.uploadedMedia
-          ? item.uploadedMedia
-          : {
-              id: item.id,
-              type: item.type,
-              url: item.url,
-              thumbnailUrl: item.thumbnailUrl || "",
-              source: item.source,
-              storageId: item.storageId,
+      const uploaded =
+        await uploadPendingFiles()
+
+      let uploadIndex = 0
+
+      const media: GalleryMedia[] =
+        []
+
+      for (const item of pendingMedia) {
+        if (item.file) {
+          const uploadedMedia =
+            uploaded[uploadIndex]
+
+          if (!uploadedMedia) {
+            throw new Error(
+              "One or more new media files failed to upload.",
+            )
+          }
+
+          media.push(
+            uploadedMedia,
+          )
+          uploadIndex += 1
+          continue
+        }
+
+        if (item.source === "url") {
+          setSavingStage("import")
+          setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, processing: true, progress: 0, error: undefined } : mediaItem))
+
+          let simulatedProgress = 4
+          const progressTimer = window.setInterval(() => {
+            simulatedProgress = Math.min(92, simulatedProgress + Math.floor(Math.random() * 9) + 4)
+            setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, progress: simulatedProgress } : mediaItem))
+          }, 450)
+
+          try {
+            const importResponse = await fetch("/api/gallery/import-url", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                url: item.url,
+                type: item.type,
+                title: cleanTitle,
+                index: media.length,
+              }),
+            })
+            const importData = await importResponse.json().catch(() => ({}))
+            if (!importResponse.ok || !importData.item) {
+              throw new Error(importData.error || "Failed to import the media URL.")
+            }
+            media.push(importData.item as GalleryMedia)
+            setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, processing: false, progress: 100 } : mediaItem))
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to import the media URL."
+            setPendingMedia((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, processing: false, error: message } : mediaItem))
+            throw error
+          } finally {
+            window.clearInterval(progressTimer)
+          }
+
+          continue
+        }
+
+        media.push({
+          id: item.id,
+          type: item.type,
+          url: item.url,
+          thumbnailUrl:
+            item.thumbnailUrl ||
+            "",
+          source: item.source,
+          storageId:
+            item.storageId,
+        })
+      }
+
+      setSavingStage("save")
+      setUploadProgress(null)
+
+      const response =
+        await fetch(
+          editingItem
+            ? `/api/gallery/${editingItem.id}`
+            : "/api/gallery",
+          {
+            method: editingItem
+              ? "PUT"
+              : "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type":
+                "application/json",
             },
-      )
-
-      const response = await fetch(
-        editingItem
-          ? `/api/gallery/${editingItem.id}`
-          : "/api/gallery",
-        {
-          method: editingItem ? "PUT" : "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
+            body: JSON.stringify({
+              title: cleanTitle,
+              description,
+              category,
+              tags,
+              media,
+            }),
           },
-          body: JSON.stringify({
-            title: cleanTitle,
-            description,
-            category,
-            tags,
-            media,
-          }),
-        },
-      )
+        )
 
-      const data = await response.json().catch(() => ({}))
+      const data =
+        await response
+          .json()
+          .catch(() => ({}))
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to save gallery.")
+        throw new Error(
+          data.error ||
+            "Failed to save gallery.",
+        )
       }
 
       if (!data.item) {
-        throw new Error("The server did not return the saved gallery item.")
+        throw new Error(
+          "The server did not return the saved gallery item.",
+        )
       }
 
       if (editingItem) {
         setItems((current) =>
           current.map((item) =>
-            item.id === editingItem.id ? data.item : item,
+            item.id ===
+            editingItem.id
+              ? data.item
+              : item,
           ),
         )
-        toast.success("Gallery updated.")
+
+        toast.success(
+          "Gallery updated.",
+        )
       } else {
-        setItems((current) => [data.item, ...current])
-        toast.success("Gallery item created.")
+        setItems((current) => [
+          data.item,
+          ...current,
+        ])
+
+        toast.success(
+          "Gallery item created.",
+        )
       }
 
       setShowModal(false)
       resetForm()
     } catch (error) {
       console.error(error)
+
       toast.error(
-        error instanceof Error ? error.message : "Failed to save gallery.",
+        error instanceof Error
+          ? error.message
+          : "Failed to save gallery.",
       )
     } finally {
       setSaving(false)
+      setSavingStage(null)
+      setUploadProgress(null)
     }
   }
 
@@ -2189,51 +2122,12 @@ export default function Gallery() {
     }
   }
 
-  function getGalleryDeepLink(item: GalleryItem) {
-    const url = new URL(window.location.href)
-    url.searchParams.set("gallery", item.slug || item.id)
-    url.hash = ""
-    return url.toString()
-  }
-
   function openInfo(item: GalleryItem) {
-    const url = new URL(window.location.href)
-    url.searchParams.set("gallery", item.slug || item.id)
-    url.hash = ""
-    window.history.replaceState({ gallery: item.slug || item.id }, "", url)
     setInfoItem(item)
   }
 
   function closeInfo() {
-    const url = new URL(window.location.href)
-    url.searchParams.delete("gallery")
-    window.history.replaceState({}, "", url)
     setInfoItem(null)
-  }
-
-  async function copyGalleryLink(item: GalleryItem) {
-    const link = getGalleryDeepLink(item)
-
-    try {
-      await navigator.clipboard.writeText(link)
-      toast.success("Gallery link copied.")
-    } catch {
-      const textarea = document.createElement("textarea")
-      textarea.value = link
-      textarea.style.position = "fixed"
-      textarea.style.opacity = "0"
-      document.body.appendChild(textarea)
-      textarea.focus()
-      textarea.select()
-      const copied = document.execCommand("copy")
-      textarea.remove()
-
-      if (copied) {
-        toast.success("Gallery link copied.")
-      } else {
-        toast.error("Could not copy the gallery link.")
-      }
-    }
   }
 
   function openViewer(
@@ -2417,11 +2311,7 @@ export default function Gallery() {
                   optionColors={galleryTagColors}
                 />
 
-                {(
-                  (categoryFilters.length > 0 && categoryFilters.length < galleryCategories.length) ||
-                  (mediaFilters.length > 0 && mediaFilters.length < DEFAULT_GALLERY_MEDIA_FILTERS.length) ||
-                  (tagFilters.length > 0 && tagFilters.length < availableFilterTags.length)
-                ) && (
+                {(categoryFilters.length > 0 || mediaFilters.length > 0 || tagFilters.length > 0) && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -2930,15 +2820,6 @@ export default function Gallery() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-5 py-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void copyGalleryLink(infoItem)}
-              >
-                <Copy className="mr-2 h-4 w-4" />
-                Copy Link
-              </Button>
-
               {canManageGallery && (
                 <Button
                   type="button"
@@ -3598,25 +3479,19 @@ export default function Gallery() {
                               )}
                             </div>
 
-                            {(media.processing || media.progress !== undefined || media.error) && (
-                              <div className="absolute inset-x-0 bottom-0 z-10 bg-black/80 px-2.5 py-2 backdrop-blur-sm">
-                                <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-medium text-white">
-                                  <span>{media.error ? "Failed" : media.processing ? "Processing" : "Ready"}</span>
+                            {(media.processing || media.progress !== undefined) && (
+                              <div className="absolute inset-x-0 bottom-0 z-10 bg-black/75 px-2.5 py-2 backdrop-blur-sm">
+                                <div className="mb-1 flex items-center justify-between text-[10px] font-medium text-white">
+                                  <span>{media.processing ? "Processing" : "Ready"}</span>
                                   <span>{media.progress ?? 0}%</span>
                                 </div>
                                 <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
-                                  <div className={`h-full transition-all duration-200 ${media.error ? "bg-red-500" : "bg-blue-500"}`} style={{ width: `${Math.max(0, Math.min(100, media.progress ?? 0))}%` }} />
+                                  <div className="h-full rounded-full bg-blue-500 transition-all duration-200" style={{ width: `${Math.max(0, Math.min(100, media.progress ?? 0))}%` }} />
                                 </div>
-                                {media.error && (
-                                  <div className="mt-1.5 flex items-center justify-between gap-2">
-                                    <span className="min-w-0 truncate text-[9px] text-red-200" title={media.error}>{media.error}</span>
-                                    <button type="button" className="shrink-0 rounded-md bg-white/10 px-2 py-1 text-[9px] font-semibold text-white hover:bg-white/20" onClick={() => retryPendingMedia(media)}>Retry</button>
-                                  </div>
-                                )}
                               </div>
                             )}
 
-                            <div className={`absolute inset-x-0 ${media.processing || media.progress !== undefined || media.error ? "bottom-[42px]" : "bottom-0"} flex items-center justify-between bg-black/60 px-2 py-1.5 text-[10px] text-white`}>
+                            <div className={`absolute inset-x-0 ${media.processing || media.progress !== undefined ? "bottom-[42px]" : "bottom-0"} flex items-center justify-between bg-black/60 px-2 py-1.5 text-[10px] text-white`}>
                               <span className="flex items-center gap-1">
                                 {media.type ===
                                 "image" ? (
@@ -3675,20 +3550,17 @@ export default function Gallery() {
                 onClick={() =>
                   void saveGallery()
                 }
-                disabled={
-                  saving ||
-                  !title.trim() ||
-                  pendingMedia.length === 0 ||
-                  pendingMedia.some((media) => media.processing || Boolean(media.error))
-                }
+                disabled={!canCreateGallery}
               >
                 {saving
-                  ? "Saving..."
-                  : pendingMedia.some((media) => media.processing)
-                    ? "Processing Media..."
-                    : editingItem
-                      ? "Save Changes"
-                      : "Create Gallery"}
+                  ? savingStage === "upload" && uploadProgress !== null && uploadProgress < 100
+                    ? `Uploading ${uploadProgress}%...`
+                    : savingStage === "import"
+                      ? "Importing video..."
+                      : "Saving..."
+                  : editingItem
+                    ? "Save Changes"
+                    : "Create Gallery"}
               </Button>
             </div>
           </div>
@@ -4355,104 +4227,62 @@ function GalleryMediaCollage({
   onClick: (media: GalleryMedia) => void
 }) {
   const visible = media.slice(0, 4)
-  const hidden = media.slice(4)
+  const hiddenCount = Math.max(0, media.length - 3)
 
   if (visible.length === 0) return null
 
-  const imageCount = media.filter((item) => item.type === "image").length
-  const videoCount = media.filter((item) => item.type === "video").length
-  const mediaLabel = (() => {
-    if (media.length === 1) return imageCount ? "Image" : "Video"
-    const parts: string[] = []
-    if (imageCount) parts.push(`${imageCount} Image${imageCount === 1 ? "" : "s"}`)
-    if (videoCount) parts.push(`${videoCount} Video${videoCount === 1 ? "" : "s"}`)
-    return parts.join(" / ") || `${media.length} Media`
-  })()
-
-  // The gallery preview has one fixed media area. This keeps every gallery
-  // card the same height and makes a multi-image entry a true collage rather
-  // than allowing each source image's natural height to stretch the card.
-  const previewClass = "h-full w-full object-cover"
-
-  const render = (item: GalleryMedia) => (
-    <GalleryMediaCard
-      media={item}
-      title={title}
-      onClick={() => onClick(item)}
-      showControls={false}
-      previewClassName={previewClass}
-      previewContainerClassName="h-full w-full"
-    />
-  )
-
-  const mediaAreaClass = "relative aspect-[1.94/1] w-full overflow-hidden bg-black"
-
   return (
-    <div className={mediaAreaClass}>
+    <div className="relative h-[320px] w-full overflow-hidden bg-black sm:h-[360px]">
       {visible.length === 1 && (
-        <div className="h-full w-full">{render(visible[0])}</div>
+        <GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} />
       )}
 
       {visible.length === 2 && (
-        <div className="grid h-full w-full grid-cols-2 gap-1 bg-black">
+        <div className="grid h-full min-h-0 grid-cols-2 gap-1 bg-black">
           {visible.map((item) => (
-            <div key={item.id} className="h-full min-w-0 overflow-hidden">
-              {render(item)}
-            </div>
+            <GalleryMediaCard key={item.id} media={item} title={title} onClick={() => onClick(item)} />
           ))}
         </div>
       )}
 
       {visible.length === 3 && (
-        <div className="grid h-full w-full grid-cols-3 gap-1 bg-black">
-          {visible.map((item) => (
-            <div key={item.id} className="h-full min-w-0 overflow-hidden">
-              {render(item)}
-            </div>
-          ))}
+        <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-1 bg-black">
+          <div className="min-h-0 min-w-0"><GalleryMediaCard media={visible[0]} title={title} onClick={() => onClick(visible[0])} /></div>
+          <div className="min-h-0 min-w-0"><GalleryMediaCard media={visible[1]} title={title} onClick={() => onClick(visible[1])} /></div>
+          <div className="col-span-2 min-h-0 min-w-0"><GalleryMediaCard media={visible[2]} title={title} onClick={() => onClick(visible[2])} /></div>
         </div>
       )}
 
       {visible.length === 4 && (
-        <div className="grid h-full w-full grid-cols-2 gap-1 bg-black">
+        <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-1 bg-black">
           {visible.map((item, index) => (
-            <div key={item.id} className="relative h-full min-w-0 overflow-hidden">
-              {render(item)}
-              {index === visible.length - 1 && hidden.length > 0 && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40">
-                  <span className="rounded-md bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-                    +{hidden.length} more
-                  </span>
-                </div>
+            <div key={item.id} className="group relative min-h-0 min-w-0">
+              <GalleryMediaCard media={item} title={title} onClick={() => onClick(item)} />
+              {index === 3 && media.length >= 5 && (
+                <>
+                  <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
+                      <Images className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
+                      +{hiddenCount} {(() => {
+                        const hidden = media.slice(3)
+                        const imageCount = hidden.filter((entry) => entry.type === "image").length
+                        const videoCount = hidden.filter((entry) => entry.type === "video").length
+                        const parts: string[] = []
+                        if (imageCount) parts.push(`${imageCount} image${imageCount === 1 ? "" : "s"}`)
+                        if (videoCount) parts.push(`${videoCount} video${videoCount === 1 ? "" : "s"}`)
+                        return parts.join(" / ") || "media"
+                      })()}
+                    </span>
+                  </div>
+                </>
               )}
             </div>
           ))}
         </div>
       )}
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-between p-2.5 text-white">
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-black/55 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
-          {imageCount > 0 && videoCount === 0 ? (
-            <ImageIcon className="h-3 w-3" />
-          ) : videoCount > 0 && imageCount === 0 ? (
-            <Video className="h-3 w-3" />
-          ) : (
-            <Images className="h-3 w-3" />
-          )}
-          {mediaLabel}
-        </span>
-
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            onClick(media[0])
-          }}
-          className="pointer-events-auto rounded-md bg-black/55 px-2.5 py-1 text-[10px] font-medium backdrop-blur-sm hover:bg-black/75"
-        >
-          View
-        </button>
-      </div>
     </div>
   )
 }
@@ -4465,7 +4295,7 @@ function YouTubeGalleryPreview({
   title: string
 }) {
   return (
-    <div className="relative aspect-video w-full overflow-hidden bg-black">
+    <div className="relative h-full w-full overflow-hidden bg-black">
       <iframe
         src={`https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&mute=1&controls=0&disablekb=1&fs=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&enablejsapi=1`}
         title={title}
@@ -4473,6 +4303,7 @@ function YouTubeGalleryPreview({
         className="pointer-events-none absolute inset-0 h-full w-full border-0"
         allow="autoplay; encrypted-media; picture-in-picture"
       />
+      <div className="pointer-events-none absolute inset-0" />
     </div>
   )
 }
@@ -4481,77 +4312,79 @@ function GalleryMediaCard({
   media,
   title,
   onClick,
-  showControls = true,
-  previewClassName,
-  previewContainerClassName,
 }: {
   media: GalleryMedia
   title: string
   onClick: () => void
-  showControls?: boolean
-  previewClassName?: string
-  previewContainerClassName?: string
 }) {
-  const mediaContent = getYouTubeVideoId(media.url) ? (
-    <YouTubeGalleryPreview
-      videoId={getYouTubeVideoId(media.url) || ""}
-      title={title}
-    />
-  ) : media.type === "image" ? (
-    <img
-      src={media.url}
-      alt={title}
-      className={previewClassName ?? "block h-auto w-full object-contain transition duration-300 group-hover:scale-[1.01]"}
-    />
-  ) : getMediaThumbnail(media) ? (
-    <img
-      src={getMediaThumbnail(media)}
-      alt={title}
-      className={previewClassName ?? "block h-auto w-full object-contain transition duration-300 group-hover:scale-[1.01]"}
-    />
-  ) : isEmbeddableVideo(media) ? (
-    <div className={previewContainerClassName ?? "aspect-video w-full bg-black"}>
-      <iframe
-        src={getVideoEmbedUrl(media.url)}
-        title={title}
-        tabIndex={-1}
-        className="pointer-events-none h-full w-full border-0"
-        allow="autoplay; encrypted-media; picture-in-picture"
-      />
-    </div>
-  ) : (
-    <video
-      src={media.url}
-      autoPlay
-      muted
-      loop
-      playsInline
-      preload="auto"
-      className={previewClassName ?? "block h-auto w-full bg-black object-contain transition duration-300 group-hover:scale-[1.01]"}
-    />
-  )
-
   return (
     <button
       type="button"
-      className="group relative block w-full overflow-hidden bg-background text-left"
+      className={[
+        "group relative flex h-full w-full items-center justify-center overflow-hidden bg-black text-left",
+        "min-h-0",
+      ].join(" ")}
       onClick={onClick}
       aria-label={`View ${title}`}
     >
-      {mediaContent}
-
-      {showControls && (
-        <>
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0 opacity-70 transition-opacity group-hover:opacity-100" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-2.5 text-white">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
-              {media.type === "image" ? <ImageIcon className="h-3 w-3" /> : <Video className="h-3 w-3" />}
-              {getMediaLabel(media.type)}
-            </span>
-            <span className="rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">View</span>
-          </div>
-        </>
+      {getYouTubeVideoId(media.url) ? (
+        <YouTubeGalleryPreview
+          videoId={getYouTubeVideoId(media.url) || ""}
+          title={title}
+        />
+      ) : media.type === "image" ? (
+        <img
+          src={media.url}
+          alt={title}
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+        />
+      ) : getMediaThumbnail(media) ? (
+        <div className="relative h-full w-full">
+          <img
+            src={getMediaThumbnail(media)}
+            alt={title}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+          />
+        </div>
+      ) : isEmbeddableVideo(media) ? (
+        <iframe
+          src={getVideoEmbedUrl(media.url)}
+          title={title}
+          tabIndex={-1}
+          className="pointer-events-none h-full w-full border-0"
+          allow="autoplay; encrypted-media; picture-in-picture"
+        />
+      ) : (
+        <video
+          src={media.url}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+        />
       )}
+
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0 opacity-70 transition-opacity group-hover:opacity-100" />
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-2.5 text-white">
+        <span className="inline-flex items-center gap-1.5 rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
+          {media.type === "image" ? (
+            <ImageIcon className="h-3 w-3" />
+          ) : (
+            <Video className="h-3 w-3" />
+          )}
+
+          {getMediaLabel(
+            media.type,
+          )}
+        </span>
+
+        <span className="rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
+          View
+        </span>
+      </div>
     </button>
   )
 }
