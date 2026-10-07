@@ -987,6 +987,7 @@ export default function ActivityRoster() {
 
   const clearStatuses = () => {
     setStatusFilters([])
+    setAllStatusesSelected(true)
     setSelectedCopied(false)
     void logAction({ module: "activity", action: "clear-status-filters", category: "roster", division, summary: `Cleared status filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
   }
@@ -1032,6 +1033,7 @@ export default function ActivityRoster() {
 
   const clearRanks = () => {
     setRankFilters([])
+    setAllRanksSelected(true)
     setSelectedCopied(false)
     void logAction({ module: "activity", action: "clear-rank-filters", category: "roster", division, summary: `Cleared rank filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
   }
@@ -1079,21 +1081,19 @@ export default function ActivityRoster() {
   }
 
   const filtersAreDefault =
+    allStatusesSelected &&
+    allRanksSelected &&
     statusFilters.length === 0 &&
     rankFilters.length === 0
 
-  /*
-   * All selected means no filtering is being applied, so the
-   * Active Filters row should display "None" in the default state.
-   */
+  // "All" is an explicit UI state. Selecting every individual option
+  // must NOT turn All back on, and those selections must remain visible
+  // in Active Filters even when every individual option is selected.
   const statusFilterIsActive =
-    statusFilters.length > 0 &&
-    statusFilters.length < statusOptions.length
+    !allStatusesSelected
 
   const rankFilterIsActive =
-    rankOptions.length > 0 &&
-    rankFilters.length > 0 &&
-    rankFilters.length < rankOptions.length
+    !allRanksSelected
 
   const hasFilterSelection =
     statusFilterIsActive ||
@@ -1116,11 +1116,8 @@ export default function ActivityRoster() {
 
   const hasFilters =
     Boolean(search.trim()) ||
-    (statusFilters.length > 0 &&
-      statusFilters.length < statusOptions.length) ||
-    (rankOptions.length > 0 &&
-      rankFilters.length > 0 &&
-      rankFilters.length < rankOptions.length)
+    statusFilterIsActive ||
+    rankFilterIsActive
 
   const selectedStatusCount =
     statusFilterIsActive ? statusFilters.length : 0
