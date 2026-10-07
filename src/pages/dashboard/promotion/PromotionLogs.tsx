@@ -248,7 +248,10 @@ const isChangePair = (value: unknown): boolean => {
   return (
     (hasOwn(value, "from") && hasOwn(value, "to")) ||
     (hasOwn(value, "old") && hasOwn(value, "new")) ||
-    (hasOwn(value, "before") && hasOwn(value, "after"))
+    (hasOwn(value, "before") && hasOwn(value, "after")) ||
+    (hasOwn(value, "oldValue") && hasOwn(value, "newValue")) ||
+    (hasOwn(value, "previous") && hasOwn(value, "current")) ||
+    (hasOwn(value, "fromValue") && hasOwn(value, "toValue"))
   )
 }
 
@@ -268,6 +271,27 @@ const getChangePair = (value: unknown) => {
     return {
       from: value.old,
       to: value.new,
+    }
+  }
+
+  if (hasOwn(value, "oldValue") || hasOwn(value, "newValue")) {
+    return {
+      from: value.oldValue,
+      to: value.newValue,
+    }
+  }
+
+  if (hasOwn(value, "previous") || hasOwn(value, "current")) {
+    return {
+      from: value.previous,
+      to: value.current,
+    }
+  }
+
+  if (hasOwn(value, "fromValue") || hasOwn(value, "toValue")) {
+    return {
+      from: value.fromValue,
+      to: value.toValue,
     }
   }
 
@@ -557,8 +581,10 @@ const collectRequirementChanges = (
     }
 
     if (isRecord(rawValue)) {
-      const nestedBefore = rawValue.before ?? rawValue.old ?? rawValue.previous
-      const nestedAfter = rawValue.after ?? rawValue.new ?? rawValue.current
+      const nestedBefore =
+        rawValue.before ?? rawValue.old ?? rawValue.previous ?? rawValue.oldValue
+      const nestedAfter =
+        rawValue.after ?? rawValue.new ?? rawValue.current ?? rawValue.newValue
 
       if (isRecord(nestedBefore) && isRecord(nestedAfter)) {
         collectBeforeAfterChanges(nestedBefore, nestedAfter, output)
@@ -735,12 +761,16 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
     ["hours", "oldHours", "newHours"],
     ["hours", "previousHours", "currentHours"],
     ["hours", "fromHours", "toHours"],
+    ["hours", "beforeHours", "afterHours"],
     ["timeInRankDays", "oldTimeInRankDays", "newTimeInRankDays"],
     ["timeInRankDays", "previousTimeInRankDays", "currentTimeInRankDays"],
+    ["timeInRankDays", "beforeTimeInRankDays", "afterTimeInRankDays"],
     ["trainingLogs", "oldTrainingLogs", "newTrainingLogs"],
     ["trainingLogs", "previousTrainingLogs", "currentTrainingLogs"],
+    ["trainingLogs", "beforeTrainingLogs", "afterTrainingLogs"],
     ["recruitmentLogs", "oldRecruitmentLogs", "newRecruitmentLogs"],
     ["recruitmentLogs", "previousRecruitmentLogs", "currentRecruitmentLogs"],
+    ["recruitmentLogs", "beforeRecruitmentLogs", "afterRecruitmentLogs"],
   ]
 
   for (const [field, oldKey, newKey] of flattenedPairs) {
@@ -2448,7 +2478,7 @@ export default function PromotionLogs() {
                                   />
 
                                   <span>·</span>
-                                  <span>{formatDateTime(log.createdAt).split(",")[0]}</span>
+                                  <span title={formatDateTime(log.createdAt)}>{formatDateTime(log.createdAt)}</span>
 
                                   <span>·</span>
                                   <span>{resolveLogModule(log) === "activity" ? "Activity" : "Promotion"}</span>
