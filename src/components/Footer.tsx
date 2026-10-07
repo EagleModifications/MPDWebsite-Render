@@ -23,6 +23,11 @@ export default function Footer() {
               The Metro Police Department is built around immersive law enforcement, dedicated officers,
               community interaction, and unforgettable stories across CaliRP.
             </p>
+
+            <p className="mt-3 max-w-sm text-xs leading-5 text-white/35">
+              Community roleplay project. Not affiliated with any real police department,
+              government agency, or law-enforcement organisation.
+            </p>
           </div>
 
           {/* Navigation */}
