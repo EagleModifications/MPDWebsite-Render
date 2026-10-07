@@ -71,3 +71,5 @@ services:
         generateValue: true
       - key: APP_ORIGIN
         sync: false
+      - key: GITHUB_RELEASE_TOKEN
+        sync: false
