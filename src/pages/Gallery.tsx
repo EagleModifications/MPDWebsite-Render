@@ -1751,7 +1751,7 @@ export default function Gallery() {
               </div>
             ) : (
               <div className="h-auto p-3 sm:p-4">
-                  <div className="columns-1 gap-3 sm:columns-2 lg:columns-4">
+                  <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 2xl:columns-4">
                   {filteredItems.map(
                     (item) => {
                       const mediaList =
@@ -1819,13 +1819,13 @@ export default function Gallery() {
                                   )}
                                 </div>
 
-                                <h3 className="line-clamp-2 max-w-[35ch] whitespace-pre-line text-sm font-semibold">
+                                <h3 className="line-clamp-2 w-[35ch] max-w-full whitespace-pre-line text-sm font-semibold">
                                   {item.title}
                                 </h3>
 
                                 {item.description && (
-                                  <div className="mt-1 max-w-[35ch]">
-                                    <p className="line-clamp-3 whitespace-pre-line text-xs leading-5 text-muted-foreground">
+                                  <div className="mt-1 w-[35ch] max-w-full">
+                                    <p className="line-clamp-3 w-[35ch] max-w-full whitespace-pre-line text-xs leading-5 text-muted-foreground">
                                       {item.description}
                                     </p>
 
