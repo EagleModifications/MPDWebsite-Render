@@ -393,12 +393,24 @@ const getEntryTitle = (log: ActionLog) => {
       : `Deselected Member${divisionSuffix}`
   }
 
-  if (action.includes("select-all-visible")) {
-    return `Selected All Visible${divisionSuffix}`
-  }
+  if (action.includes("select-all-visible") || action.includes("deselect-all-visible")) {
+    // Older persisted entries can contain the opposite action name while the
+    // summary contains the actual operation. Prefer the summary when explicit.
+    const summary = String(log.summary ?? "").trim()
+    const wasDeselected = /^deselected\b/i.test(summary)
+    const wasSelected = /^selected\b/i.test(summary)
 
-  if (action.includes("deselect-all-visible")) {
-    return `Deselected All Visible${divisionSuffix}`
+    if (wasDeselected) {
+      return `Deselected All Visible${divisionSuffix}`
+    }
+
+    if (wasSelected) {
+      return `Selected All Visible${divisionSuffix}`
+    }
+
+    return action.includes("deselect-all-visible")
+      ? `Deselected All Visible${divisionSuffix}`
+      : `Selected All Visible${divisionSuffix}`
   }
 
   if (
@@ -851,6 +863,18 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
     for (const item of changes) {
       if (!isRecord(item)) continue
 
+      // Requirement audit entries are stored as { rank, old: {...}, new: {...} }.
+      // Compare the old/new objects directly so the previous value is retained.
+      if (isRecord(item.old) && isRecord(item.new)) {
+        collectBeforeAfterChanges(item.old, item.new, output)
+        continue
+      }
+
+      if (isRecord(item.before) && isRecord(item.after)) {
+        collectBeforeAfterChanges(item.before, item.after, output)
+        continue
+      }
+
       // A change item may contain { field, from, to }.
       const field =
         typeof item.field === "string"
@@ -939,9 +963,28 @@ const getDetailEntries = (log: ActionLog): DetailEntry[] => {
     }
   }
 
-  return Array.from(unique.values()).sort(
+  const sorted = Array.from(unique.values()).sort(
     (a, b) => requirementKeyOrder(a.key) - requirementKeyOrder(b.key),
   )
+
+  // Always show the affected rank as its own row for requirement logs.
+  // This keeps the rank separate from the individual Hours/TIR/Logs rows.
+  if (isRequirementsLog(log)) {
+    const rank = getRequirementRank(log)
+    if (rank && !sorted.some((entry) => entry.key === "rank")) {
+      sorted.unshift({
+        key: "rank",
+        value: rank,
+      })
+    }
+  } else if (log.targetRank?.trim() && !sorted.some((entry) => entry.key === "rank" || entry.key === "targetRank")) {
+    sorted.unshift({
+      key: "rank",
+      value: log.targetRank.trim(),
+    })
+  }
+
+  return sorted
 }
 
 const getInitials = (value: string) =>
@@ -1520,9 +1563,7 @@ function FilterDropdown({
   const buttonLabel =
     selected.length === 0
       ? allLabel
-      : selected.length === selectable.length
-        ? allLabel
-        : `${selected.length} ${filterName}${selected.length === 1 ? "" : "s"} Selected`
+      : `${selected.length} ${filterName}${selected.length === 1 ? "" : "s"} selected`
 
   return (
     <div ref={dropdownRef} className={`relative ${width}`}>
