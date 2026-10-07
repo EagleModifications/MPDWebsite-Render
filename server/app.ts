@@ -574,6 +574,7 @@ type GalleryDocument = {
   createdBy: string
   createdAt: Date
   updatedAt: Date
+  slug?: string
   categories?: string[]
   tagCategories?: Record<string, string[]>
   categoryColors?: Record<string, string>
@@ -730,6 +731,9 @@ function normalizeGalleryMedia(
           item.storageId,
         )
 
+      const extension = cleanGalleryString(item.extension)
+      const publicSlug = cleanGalleryString(item.publicSlug)
+
       return {
         id:
           cleanGalleryString(item.id) ||
@@ -744,6 +748,8 @@ function normalizeGalleryMedia(
         ...(storageId
           ? { storageId }
           : {}),
+        ...(extension ? { extension } : {}),
+        ...(publicSlug ? { publicSlug } : {}),
       }
     })
     .filter(
@@ -842,6 +848,7 @@ function serializeGalleryItem(
 ) {
   return {
     id: item._id?.toString() ?? "",
+    slug: item.slug || slugifyGalleryTitle(item.title),
     title: item.title,
     description: item.description,
     category: item.category ?? "Community",
@@ -7663,7 +7670,7 @@ export function createApp() {
           return res.status(400).json({
             success: false,
             error:
-              "Gallery tags must be Dept, SWAT, MTF-7, MCD, TRU, or SAR.",
+              "Gallery tags must be configured Gallery sub tags.",
           })
         }
 
@@ -7766,6 +7773,7 @@ export function createApp() {
 
         const item: GalleryDocument = {
           title,
+          slug: slugifyGalleryTitle(title),
           description,
           category,
           tags,
@@ -7909,7 +7917,7 @@ export function createApp() {
           return res.status(400).json({
             success: false,
             error:
-              "Gallery tags must be Dept, SWAT, MTF-7, MCD, TRU, or SAR.",
+              "Gallery tags must be configured Gallery sub tags.",
           })
         }
 
@@ -8065,6 +8073,7 @@ export function createApp() {
           {
             $set: {
               title,
+              slug: slugifyGalleryTitle(title),
               description,
               category,
               tags,
