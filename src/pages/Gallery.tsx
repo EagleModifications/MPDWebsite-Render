@@ -16,6 +16,7 @@ import {
   Edit3,
   ExternalLink,
   FileImage,
+  Filter,
   Image as ImageIcon,
   Images,
   Plus,
@@ -40,6 +41,13 @@ import Footer from "@/components/Footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { getSession, type User } from "@/lib/auth"
 
 type YouTubeQuality = "highres" | "hd2160" | "hd1440" | "hd1080" | "hd720" | "large" | "medium" | "small" | "tiny" | "auto"
@@ -129,13 +137,18 @@ const DEFAULT_GALLERY_TAGS: readonly GalleryTag[] = [
   "SAR",
 ]
 
-const GALLERY_TAG_CLASSES: Record<string, string> = {
-  Dept: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  SWAT: "border-slate-500/40 bg-slate-800/80 text-slate-100 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-100",
-  "MTF-7": "border-sky-500/30 bg-sky-500/10 text-sky-800 dark:text-sky-300",
-  MCD: "border-blue-950/40 bg-blue-950/15 text-blue-950 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200",
-  TRU: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
-  SAR: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
+const DEFAULT_GALLERY_CATEGORY_COLORS: Record<string, string> = {
+  Community: "#3b82f6",
+  Fleet: "#f59e0b",
+}
+
+const DEFAULT_GALLERY_TAG_COLORS: Record<string, string> = {
+  Dept: "#3b82f6",
+  SWAT: "#64748b",
+  "MTF-7": "#0ea5e9",
+  MCD: "#1e3a8a",
+  TRU: "#eab308",
+  SAR: "#ef4444",
 }
 type GalleryMediaFilter = "Images" | "Videos"
 
@@ -362,10 +375,6 @@ function CustomMultiSelect({
         ].join(" ")}
       >
         <span className="flex min-w-0 items-center gap-2 truncate">
-          <span
-            aria-hidden="true"
-            className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"
-          />
           <span className={value.length === 0 ? "text-muted-foreground" : ""}>
             {selectedLabel}
           </span>
@@ -399,28 +408,11 @@ function CustomMultiSelect({
                 className={[
                   "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
                   selected
-                    ? "bg-muted/70 text-foreground"
+                    ? "bg-blue-500/10 text-blue-400"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 ].join(" ")}
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <span
-                    aria-hidden="true"
-                    className={[
-                      "h-1.5 w-1.5 shrink-0 rounded-full",
-                      option === "Dept"
-                        ? "bg-blue-500"
-                        : option === "SWAT"
-                          ? "bg-slate-500"
-                          : option === "MTF-7"
-                            ? "bg-sky-700"
-                            : option === "MCD"
-                              ? "bg-blue-950 dark:bg-blue-800"
-                              : option === "TRU"
-                                ? "bg-yellow-500"
-                                : "bg-red-500",
-                    ].join(" ")}
-                  />
                   <span>{option}</span>
                 </span>
                 {selected && <Check className="h-4 w-4 text-blue-500" />}
@@ -647,6 +639,80 @@ function getWrappedLineCount(
   }, 0)
 }
 
+
+function GalleryFilterDropdown({
+  label,
+  options,
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  label: string
+  options: readonly string[]
+  value: string[]
+  onChange: (value: string[]) => void
+  ariaLabel: string
+}) {
+  const allSelected = options.length > 0 && value.length === options.length
+
+  const toggle = (option: string) => {
+    onChange(
+      value.includes(option)
+        ? value.filter((item) => item !== option)
+        : [...value, option],
+    )
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={ariaLabel}
+          className="h-9 gap-2 xl:min-w-[150px]"
+        >
+          <Filter className="h-4 w-4 text-blue-400" />
+          <span>{label}</span>
+          {value.length > 0 && (
+            <span className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
+              {value.length}
+            </span>
+          )}
+          <ChevronDown className="ml-auto h-3.5 w-3.5 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem
+          onSelect={(event) => event.preventDefault()}
+          onClick={() => onChange(allSelected ? [] : [...options])}
+          className="gap-2"
+        >
+          <Checkbox checked={allSelected} tabIndex={-1} className="pointer-events-none" />
+          <span className="font-medium">All {label}s</span>
+        </DropdownMenuItem>
+        <div className="my-1 h-px bg-border" />
+        {options.map((option) => {
+          const checked = value.includes(option)
+          return (
+            <DropdownMenuItem
+              key={option}
+              onSelect={(event) => event.preventDefault()}
+              onClick={() => toggle(option)}
+              className={checked ? "gap-2 bg-blue-500/10 text-blue-400 focus:bg-blue-500/10 focus:text-blue-400" : "gap-2"}
+            >
+              <Checkbox checked={checked} tabIndex={-1} className="pointer-events-none" />
+              <span className="truncate">{option}</span>
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function makePendingFromMedia(
   media: GalleryMedia,
 ): PendingMedia {
@@ -684,6 +750,12 @@ export default function Gallery() {
   const [galleryTags, setGalleryTags] =
     useState<string[]>([...DEFAULT_GALLERY_TAGS])
 
+  const [galleryCategoryColors, setGalleryCategoryColors] =
+    useState<Record<string, string>>(DEFAULT_GALLERY_CATEGORY_COLORS)
+
+  const [galleryTagColors, setGalleryTagColors] =
+    useState<Record<string, string>>(DEFAULT_GALLERY_TAG_COLORS)
+
   const [showTaxonomyModal, setShowTaxonomyModal] =
     useState(false)
 
@@ -692,6 +764,12 @@ export default function Gallery() {
 
   const [newGalleryTag, setNewGalleryTag] =
     useState("")
+
+  const [newGalleryCategoryColor, setNewGalleryCategoryColor] =
+    useState("#3b82f6")
+
+  const [newGalleryTagColor, setNewGalleryTagColor] =
+    useState("#3b82f6")
 
   const [showModal, setShowModal] =
     useState(false)
@@ -848,6 +926,12 @@ export default function Gallery() {
           if (Array.isArray(optionsData.tags)) {
             setGalleryTags(optionsData.tags.map(String).filter(Boolean))
           }
+          if (optionsData.categoryColors && typeof optionsData.categoryColors === "object") {
+            setGalleryCategoryColors(optionsData.categoryColors)
+          }
+          if (optionsData.tagColors && typeof optionsData.tagColors === "object") {
+            setGalleryTagColors(optionsData.tagColors)
+          }
         }
       } catch (error) {
         console.error(error)
@@ -932,7 +1016,7 @@ export default function Gallery() {
     )
   }
 
-  async function addGalleryOption(type: "category" | "tag") {
+  async function addGalleryOption(type: "category" | "tag", color?: string) {
     const rawValue = type === "category" ? newGalleryCategory : newGalleryTag
     const value = rawValue.trim()
 
@@ -946,7 +1030,7 @@ export default function Gallery() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, value }),
+        body: JSON.stringify({ type, value, color: color || undefined }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || `Failed to create ${type}.`)
@@ -954,14 +1038,36 @@ export default function Gallery() {
       if (type === "category") {
         setGalleryCategories(Array.isArray(data.categories) ? data.categories : (current => [...current, value]))
         setNewGalleryCategory("")
+        setNewGalleryCategoryColor("#3b82f6")
       } else {
         setGalleryTags(Array.isArray(data.tags) ? data.tags : (current => [...current, value]))
         setNewGalleryTag("")
+        setNewGalleryTagColor("#3b82f6")
       }
+      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
+      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
 
       toast.success(`${type === "category" ? "Category" : "Tag"} created.`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : `Failed to create ${type}.`)
+    }
+  }
+
+  async function updateGalleryOptionColor(type: "category" | "tag", value: string, color: string) {
+    try {
+      const response = await fetch("/api/gallery/options", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, value, color }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || "Failed to update color.")
+      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
+      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      toast.success(`${type === "category" ? "Category" : "Tag"} color updated.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update color.")
     }
   }
 
@@ -1726,28 +1832,27 @@ export default function Gallery() {
                 </p>
               </div>
 
-              <DropdownProvider>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <CustomMultiSelect
-                  id="gallery-filter-type"
-                  value={mediaFilters}
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <GalleryFilterDropdown
+                  label="Type"
                   options={DEFAULT_GALLERY_MEDIA_FILTERS}
+                  value={mediaFilters}
                   ariaLabel="Filter by media type"
                   onChange={setMediaFilters}
                 />
 
-                <CustomMultiSelect
-                  id="gallery-filter-category"
-                  value={categoryFilters}
+                <GalleryFilterDropdown
+                  label="Category"
                   options={galleryCategories}
+                  value={categoryFilters}
                   ariaLabel="Filter by category"
                   onChange={setCategoryFilters}
                 />
 
-                <CustomMultiSelect
-                  id="gallery-filter-tags"
-                  value={tagFilters}
+                <GalleryFilterDropdown
+                  label="Tags"
                   options={galleryTags}
+                  value={tagFilters}
                   ariaLabel="Filter by tags"
                   onChange={setTagFilters}
                 />
@@ -1766,8 +1871,7 @@ export default function Gallery() {
                     Clear Filters
                   </Button>
                 )}
-                </div>
-              </DropdownProvider>
+              </div>
             </div>
 
             {loading ? (
@@ -1852,12 +1956,12 @@ export default function Gallery() {
                               >
                                 <div className="mb-1.5 flex flex-col items-start gap-1.5">
                                   <span
-                                    className={[
-                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                                      item.category === "Fleet"
-                                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                                        : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-                                    ].join(" ")}
+                                    className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                    style={{
+                                      borderColor: `${galleryCategoryColors[item.category ?? "Community"] ?? "#3b82f6"}55`,
+                                      backgroundColor: `${galleryCategoryColors[item.category ?? "Community"] ?? "#3b82f6"}1a`,
+                                      color: galleryCategoryColors[item.category ?? "Community"] ?? "#3b82f6",
+                                    }}
                                   >
                                     {item.category ?? "Community"}
                                   </span>
@@ -1867,10 +1971,12 @@ export default function Gallery() {
                                       {(item.tags ?? []).map((tag) => (
                                         <span
                                           key={`${item.id}-tag-${tag}`}
-                                          className={[
-                                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide",
-                                            GALLERY_TAG_CLASSES[tag],
-                                          ].join(" ")}
+                                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide"
+                                          style={{
+                                            borderColor: `${galleryTagColors[tag] ?? "#3b82f6"}55`,
+                                            backgroundColor: `${galleryTagColors[tag] ?? "#3b82f6"}1a`,
+                                            color: galleryTagColors[tag] ?? "#3b82f6",
+                                          }}
                                         >
                                           {tag}
                                         </span>
@@ -1973,26 +2079,15 @@ export default function Gallery() {
                 </span>
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
-                    <span>
-                      Images
+                  {galleryCategories.map((entry) => (
+                    <span key={`legend-${entry}`} className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: galleryCategoryColors[entry] ?? "#3b82f6" }}
+                      />
+                      <span>{entry}</span>
                     </span>
-                  </span>
-
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                    <span>
-                      Videos
-                    </span>
-                  </span>
-
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                    <span>
-                      Fleet
-                    </span>
-                  </span>
+                  ))}
                 </div>
               </div>
 
@@ -2024,13 +2119,16 @@ export default function Gallery() {
                   </p>
                 </div>
 
-                <Button
-                  type="button"
-                  onClick={openAdd}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Media
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" onClick={() => setShowTaxonomyModal(true)}>
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    Tags & Categories
+                  </Button>
+                  <Button type="button" onClick={openAdd}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Media
+                  </Button>
+                </div>
               </div>
 
               <div className="grid gap-3 p-4 sm:grid-cols-3">
@@ -2390,34 +2488,92 @@ export default function Gallery() {
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
             <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
               <div>
+                <div className="mb-1 flex items-center gap-2 text-xs font-bold text-blue-500">
+                  <Settings2 className="h-3.5 w-3.5" />
+                  GALLERY SETTINGS
+                </div>
                 <h2 className="text-lg font-semibold">Tags & Categories</h2>
-                <p className="mt-1 text-xs text-muted-foreground">Create the categories and tags available to Gallery entries and filters.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Create categories and sub-tags and choose the color shown throughout the gallery.</p>
               </div>
               <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowTaxonomyModal(false)} aria-label="Close">
                 <X className="h-4 w-4" />
               </Button>
             </div>
 
-            <div className="grid gap-5 p-5 sm:grid-cols-2">
-              <div className="rounded-xl border border-border/70 p-4">
-                <h3 className="text-sm font-semibold">Categories</h3>
-                <div className="mt-3 flex gap-2">
-                  <Input value={newGalleryCategory} onChange={(event) => setNewGalleryCategory(event.target.value)} placeholder="New category" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("category") }} />
-                  <Button type="button" onClick={() => void addGalleryOption("category")}><Plus className="mr-2 h-4 w-4" />Add</Button>
+            <div className="max-h-[70vh] overflow-y-auto p-5">
+              <div className="space-y-5">
+                <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">Categories</h3>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Main gallery categories such as Community and Fleet.</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Input value={newGalleryCategory} onChange={(event) => setNewGalleryCategory(event.target.value)} placeholder="Create category" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("category", newGalleryCategoryColor) }} />
+                    <input type="color" value={newGalleryCategoryColor} onChange={(event) => setNewGalleryCategoryColor(event.target.value)} className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-transparent p-1" aria-label="New category color" />
+                    <Button type="button" onClick={() => void addGalleryOption("category", newGalleryCategoryColor)}><Plus className="mr-2 h-4 w-4" />Create</Button>
+                  </div>
+                  <div className="mt-3 divide-y divide-border/60 rounded-lg border border-border/60">
+                    {galleryCategories.map((entry) => (
+                      <div key={entry} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: galleryCategoryColors[entry] ?? "#3b82f6" }} />
+                          <span className="truncate text-sm">{entry}</span>
+                        </div>
+                        <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                          <span>Color</span>
+                          <input
+                            type="color"
+                            value={galleryCategoryColors[entry] ?? "#3b82f6"}
+                            onChange={(event) => {
+                              const color = event.target.value
+                              setGalleryCategoryColors((current) => ({ ...current, [entry]: color }))
+                              void updateGalleryOptionColor("category", entry, color)
+                            }}
+                            className="h-8 w-10 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
+                            aria-label={`Set ${entry} category color`}
+                          />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {galleryCategories.map((entry) => <span key={entry} className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 text-xs text-blue-300">{entry}</span>)}
-                </div>
-              </div>
 
-              <div className="rounded-xl border border-border/70 p-4">
-                <h3 className="text-sm font-semibold">Tags</h3>
-                <div className="mt-3 flex gap-2">
-                  <Input value={newGalleryTag} onChange={(event) => setNewGalleryTag(event.target.value)} placeholder="New tag" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("tag") }} />
-                  <Button type="button" onClick={() => void addGalleryOption("tag")}><Plus className="mr-2 h-4 w-4" />Add</Button>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {galleryTags.map((entry) => <span key={entry} className={GALLERY_TAG_CLASSES[entry] ?? "rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 text-xs"}>{entry}</span>)}
+                <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Sub Tags</h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">More specific tags such as Dept, SWAT, MTF-7, MCD, TRU, and SAR.</p>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Input value={newGalleryTag} onChange={(event) => setNewGalleryTag(event.target.value)} placeholder="Create sub tag" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("tag", newGalleryTagColor) }} />
+                    <input type="color" value={newGalleryTagColor} onChange={(event) => setNewGalleryTagColor(event.target.value)} className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-transparent p-1" aria-label="New sub tag color" />
+                    <Button type="button" onClick={() => void addGalleryOption("tag", newGalleryTagColor)}><Plus className="mr-2 h-4 w-4" />Create</Button>
+                  </div>
+                  <div className="mt-3 divide-y divide-border/60 rounded-lg border border-border/60">
+                    {galleryTags.map((entry) => (
+                      <div key={entry} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: galleryTagColors[entry] ?? "#3b82f6" }} />
+                          <span className="truncate text-sm">{entry}</span>
+                        </div>
+                        <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                          <span>Color</span>
+                          <input
+                            type="color"
+                            value={galleryTagColors[entry] ?? "#3b82f6"}
+                            onChange={(event) => {
+                              const color = event.target.value
+                              setGalleryTagColors((current) => ({ ...current, [entry]: color }))
+                              void updateGalleryOptionColor("tag", entry, color)
+                            }}
+                            className="h-8 w-10 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
+                            aria-label={`Set ${entry} tag color`}
+                          />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
