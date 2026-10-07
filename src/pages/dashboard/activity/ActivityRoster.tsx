@@ -251,6 +251,14 @@ export default function ActivityRoster() {
   const [rankFilters, setRankFilters] =
     useState<string[]>([])
 
+  // "All" is an explicit selection. Selecting every individual option
+  // must never automatically select the All checkbox.
+  const [allStatusesSelected, setAllStatusesSelected] =
+    useState(true)
+
+  const [allRanksSelected, setAllRanksSelected] =
+    useState(true)
+
   const [selectedIds, setSelectedIds] =
     useState<string[]>([])
 
@@ -382,6 +390,8 @@ export default function ActivityRoster() {
           // checkbox is checked and no individual options are checked.
           setStatusFilters([])
           setRankFilters([])
+          setAllStatusesSelected(true)
+          setAllRanksSelected(true)
           setSearch("")
         }
 
@@ -952,6 +962,7 @@ export default function ActivityRoster() {
   const toggleStatusFilter = (
     status: Status,
   ) => {
+    setAllStatusesSelected(false)
     setStatusFilters((current) =>
       current.includes(status)
         ? current.filter(
@@ -968,6 +979,7 @@ export default function ActivityRoster() {
   const selectAllStatuses = () => {
     // "All Statuses" means no status restriction.
     setStatusFilters([])
+    setAllStatusesSelected(true)
 
     setSelectedCopied(false)
     void logAction({ module: "activity", action: "filter-status", category: "roster", division, summary: `Selected all status filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
@@ -986,6 +998,7 @@ export default function ActivityRoster() {
   const toggleRankFilter = (
     rank: string,
   ) => {
+    setAllRanksSelected(false)
     setRankFilters((current) => {
       const exists = current.some(
         (item) =>
@@ -1012,6 +1025,7 @@ export default function ActivityRoster() {
   const selectAllRanks = () => {
     // "All Ranks" means no rank restriction.
     setRankFilters([])
+    setAllRanksSelected(true)
     setSelectedCopied(false)
     void logAction({ module: "activity", action: "filter-rank", category: "roster", division, summary: `Selected all rank filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`, details: { ranks: rankOptions } })
   }
@@ -1029,6 +1043,8 @@ export default function ActivityRoster() {
   const clearFilters = () => {
     setStatusFilters([])
     setRankFilters([])
+    setAllStatusesSelected(true)
+    setAllRanksSelected(true)
     setSelectedCopied(false)
     selectionAnchorRef.current = null
     void logAction({ module: "activity", action: "clear-filters", category: "roster", division, summary: `Cleared all status and rank filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
@@ -1036,10 +1052,10 @@ export default function ActivityRoster() {
 
   const resetFilters = () => {
     selectionAnchorRef.current = null
-    setStatusFilters(
-      statusOptions.map((status) => status.id),
-    )
-    setRankFilters([...rankOptions])
+    setStatusFilters([])
+    setRankFilters([])
+    setAllStatusesSelected(true)
+    setAllRanksSelected(true)
     setSelectedCopied(false)
     void logAction({
       module: "activity",
@@ -1321,9 +1337,7 @@ export default function ActivityRoster() {
                   className="gap-2"
                 >
                   <Checkbox
-                    checked={
-                      statusFilters.length === 0
-                    }
+                    checked={allStatusesSelected}
                     tabIndex={-1}
                     className="pointer-events-none"
                   />
@@ -1442,9 +1456,7 @@ export default function ActivityRoster() {
                   className="gap-2"
                 >
                   <Checkbox
-                    checked={
-                      rankFilters.length === 0
-                    }
+                    checked={allRanksSelected}
                     tabIndex={-1}
                     className="pointer-events-none"
                   />
