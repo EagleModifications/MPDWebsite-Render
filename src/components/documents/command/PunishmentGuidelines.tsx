@@ -1,33 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { FileSpreadsheet, Filter, RefreshCw, Search, X } from "lucide-react"
+import {
+  FileSpreadsheet,
+  Filter,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react"
 
 const SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/1WlES0v7NUSRccYvdd7EUHQgHvcdrBPJGUoKqNWbTDP8/edit?gid=0#gid=0"
+  "https://docs.google.com/spreadsheets/d/1WlES0v7NUSRccYvdd7EUHQgHvcdrBPJGUoKqNWbTDP8/edit"
 
-const SECTION_NAMES = ["INFRACTION", "MODERATE", "SEVERE"] as const
-
-type SectionName = (typeof SECTION_NAMES)[number]
-
-type GvizCell = { v?: unknown; f?: unknown }
-type GvizRow = { c?: Array<GvizCell | null> }
-type GvizResponse = {
-  table?: {
-    cols?: Array<{ label?: string; id?: string }>
-    rows?: GvizRow[]
-  }
-  status?: string
-  errors?: Array<{ message?: string; detailed_message?: string }>
-}
-
-type PunishmentRow = {
-  id: string
-  section: SectionName | null
-  values: string[]
-}
-
-type SheetData = {
-  rows: PunishmentRow[]
-}
+const SHEET_NAME = "Sheet1"
 
 const HEADERS = [
   "Category",
@@ -38,127 +21,110 @@ const HEADERS = [
   "Elevated Action",
 ] as const
 
-function clean(value: unknown) {
+type Header = (typeof HEADERS)[number]
+type Section = "INFRACTION" | "MODERATE" | "SEVERE"
+
+type Row = {
+  id: string
+  section: Section
+  values: Record<Header, string>
+}
+
+type GvizCell = { v?: unknown; f?: unknown }
+type GvizRow = { c?: Array<GvizCell | null> }
+type GvizResponse = {
+  table?: { rows?: GvizRow[] }
+  status?: string
+  errors?: Array<{ message?: string; detailed_message?: string }>
+}
+
+function clean(value: unknown): string {
   return String(value ?? "")
     .replace(/\u00a0/g, " ")
-    .replace(/\r?\n/g, " ")
+    .replace(/\*+/g, "")
     .replace(/\s+/g, " ")
     .trim()
 }
 
-function key(value: unknown) {
+function key(value: unknown): string {
   return clean(value).toUpperCase()
 }
 
-function rowValues(row: GvizRow | undefined) {
-  return (row?.c ?? []).map((cell) => {
-    if (!cell) return ""
-    if (cell.f !== undefined && cell.f !== null) return clean(cell.f)
-    if (cell.v !== undefined && cell.v !== null) return clean(cell.v)
-    return ""
-  })
+function cellValue(row: GvizRow | undefined, column: number): string {
+  const cell = row?.c?.[column]
+  if (!cell) return ""
+  if (cell.f !== undefined && cell.f !== null) return String(cell.f)
+  if (cell.v !== undefined && cell.v !== null) return String(cell.v)
+  return ""
 }
 
 function parseGviz(raw: string): GvizResponse {
   const start = raw.indexOf("{")
   const end = raw.lastIndexOf("}")
-  if (start < 0 || end <= start) {
+  if (start < 0 || end < start) {
     throw new Error("Google Sheets returned an invalid response.")
   }
   return JSON.parse(raw.slice(start, end + 1)) as GvizResponse
 }
 
-function getSheetId() {
+function getSheetId(): string {
   const match = SHEET_URL.match(/\/spreadsheets\/d\/([^/]+)/)
   if (!match) throw new Error("The Punishment Guidelines Google Sheets URL is invalid.")
   return match[1]
 }
 
-function normalizeHeader(value: string) {
-  return key(value)
-    .replace(/\s+/g, " ")
-    .replace(/\s*\/\s*/g, " / ")
+function isSection(value: string): value is Section {
+  return ["INFRACTION", "MODERATE", "SEVERE"].includes(key(value))
 }
 
-function findHeaderColumns(rows: string[][]) {
-  const aliases = [
-    ["CATEGORY"],
-    ["OFFENSE / EXAMPLE", "OFFENSE/EXAMPLE", "OFFENSE EXAMPLE"],
-    ["OFFENSE #1", "OFFENSE 1"],
-    ["OFFENSE #2", "OFFENSE 2"],
-    ["OFFENSE #3", "OFFENSE 3"],
-    ["ELEVATED ACTION", "ELEVATED"],
-  ]
+function findHeaderRow(rows: GvizRow[]): number {
+  let bestIndex = -1
+  let bestScore = 0
 
-  for (let rowIndex = 0; rowIndex < Math.min(rows.length, 20); rowIndex += 1) {
-    const row = rows[rowIndex].map(normalizeHeader)
-    const indexes = aliases.map((variants) =>
-      row.findIndex((cell) => variants.some((variant) => cell === variant)),
-    )
+  for (let rowIndex = 0; rowIndex < Math.min(rows.length, 50); rowIndex += 1) {
+    const row = rows[rowIndex]
+    const values = row?.c ?? []
+    let score = 0
 
-    if (indexes.every((index) => index >= 0)) {
-      return indexes
+    for (let column = 0; column < values.length; column += 1) {
+      const value = key(cellValue(row, column))
+      if (HEADERS.some((header) => key(header) === value)) score += 1
+    }
+
+    if (score > bestScore) {
+      bestScore = score
+      bestIndex = rowIndex
     }
   }
 
-  // The current sheet layout places the six visible guideline columns in B:G.
-  return [1, 2, 3, 4, 5, 6]
+  if (bestScore < 4) {
+    throw new Error("Could not find the Punishment Guidelines column headings.")
+  }
+
+  return bestIndex
 }
 
-function sectionFromValue(value: string): SectionName | null {
-  const normalized = key(value).replace(/[*:_-]/g, "").trim()
-  if (normalized === "INFRACTION") return "INFRACTION"
-  if (normalized === "MODERATE") return "MODERATE"
-  if (normalized === "SEVERE") return "SEVERE"
-  return null
-}
-
-function isFooterRow(values: string[]) {
-  const joined = key(values.join(" "))
-  return (
-    joined.includes("THIS DOCUMENT SUPERCEDES") ||
-    joined.includes("THIS DOCUMENT SUPERSEDES") ||
-    joined.includes("LAST UPDATED")
-  )
-}
-
-function parseSheet(response: GvizResponse): SheetData {
-  const rawRows = response.table?.rows ?? []
-
-  if (!rawRows.length) {
+function parseSheet(response: GvizResponse): Row[] {
+  const rows = response.table?.rows ?? []
+  if (!rows.length) {
     throw new Error("The Punishment Guidelines sheet returned no data.")
   }
 
-  const rows = rawRows.map(rowValues)
-  const columns = findHeaderColumns(rows)
+  const headerRowIndex = findHeaderRow(rows)
+  const headerColumns = new Map<Header, number>()
 
-  let headerRowIndex = -1
-
-  for (let rowIndex = 0; rowIndex < Math.min(rows.length, 30); rowIndex += 1) {
-    const visible = columns.map((column) => normalizeHeader(rows[rowIndex][column] ?? ""))
-
-    const matchesHeader =
-      visible[0] === "CATEGORY" &&
-      visible[1] === "OFFENSE / EXAMPLE" &&
-      visible[2] === "OFFENSE #1" &&
-      visible[3] === "OFFENSE #2" &&
-      visible[4] === "OFFENSE #3" &&
-      visible[5] === "ELEVATED ACTION"
-
-    if (matchesHeader) {
-      headerRowIndex = rowIndex
-      break
-    }
+  for (
+    let column = 0;
+    column < (rows[headerRowIndex]?.c?.length ?? 0);
+    column += 1
+  ) {
+    const value = key(cellValue(rows[headerRowIndex], column))
+    const header = HEADERS.find((item) => key(item) === value)
+    if (header) headerColumns.set(header, column)
   }
 
-  if (headerRowIndex === -1) {
-    throw new Error(
-      "Could not find the six-column Punishment Guidelines header row.",
-    )
-  }
-
-  const parsed: PunishmentRow[] = []
-  let currentSection: SectionName | null = null
+  const rowsOut: Row[] = []
+  let currentSection: Section | null = null
 
   for (
     let rowIndex = headerRowIndex + 1;
@@ -166,118 +132,112 @@ function parseSheet(response: GvizResponse): SheetData {
     rowIndex += 1
   ) {
     const row = rows[rowIndex]
+    if (!row) continue
 
-    if (isFooterRow(row)) continue
-
-    const sectionCandidate = row
-      .map(sectionFromValue)
-      .find((value): value is SectionName => value !== null)
-
-    if (sectionCandidate) {
-      currentSection = sectionCandidate
-
-      const visible = columns.map((column) => clean(row[column]))
-      const meaningful = visible.filter(Boolean)
-
-      if (meaningful.length <= 1) {
-        parsed.push({
-          id: `punishment-section-${rowIndex}`,
-          section: sectionCandidate,
-          values: [sectionCandidate, "", "", "", "", ""],
-        })
-        continue
-      }
-    }
-
-    // Nothing before the first section belongs in the visible table.
-    if (!currentSection) continue
-
-    const values = columns.map((column) => clean(row[column]))
-
-    if (!values.some(Boolean)) continue
+    const allValues = (row.c ?? []).map((cell) =>
+      clean(cell?.f ?? cell?.v ?? ""),
+    )
+    const allText = key(allValues.join(" "))
 
     if (
-      normalizeHeader(values[0]) === "CATEGORY" &&
-      normalizeHeader(values[1]) === "OFFENSE / EXAMPLE"
+      !allText ||
+      allText.includes("THIS DOCUMENT SUPERCEDES") ||
+      allText.includes("THIS DOCUMENT SUPERSEDES") ||
+      allText.includes("LAST UPDATED")
     ) {
       continue
     }
 
-    parsed.push({
-      id: `punishment-${rowIndex}`,
+    // Some versions of the sheet put the section name in Category
+    // on the first data row; others use a standalone separator row.
+    const sectionCandidate = allValues.find((value) => isSection(value))
+    const nonEmptyValues = allValues.filter(Boolean)
+
+    if (sectionCandidate) {
+      currentSection = sectionCandidate as Section
+
+      // A section-only row is a visual separator and is not data.
+      if (nonEmptyValues.length === 1) {
+        continue
+      }
+    }
+
+    if (!currentSection) continue
+
+    const values = {} as Record<Header, string>
+    for (const header of HEADERS) {
+      const column = headerColumns.get(header)
+      values[header] =
+        column === undefined ? "" : clean(cellValue(row, column))
+    }
+
+    const hasData = HEADERS.some(
+      (header) => header !== "Category" && values[header],
+    )
+    if (!hasData) continue
+
+    // Category is represented by the section separator.
+    values.Category = ""
+
+    rowsOut.push({
+      id: `${currentSection}-${rowIndex}-${values["Offense / Example"] || rowIndex}`,
       section: currentSection,
       values,
     })
   }
 
-  if (!parsed.length) {
+  if (!rowsOut.length) {
     throw new Error(
-      "The Punishment Guidelines sheet contained no guideline rows after the table header.",
+      "The Punishment Guidelines loaded, but no guideline rows were found.",
     )
   }
 
-  return { rows: parsed }
-}
-
-function sectionLabel(section: SectionName) {
-  switch (section) {
-    case "INFRACTION":
-      return "INFRACTION"
-    case "MODERATE":
-      return "MODERATE"
-    case "SEVERE":
-      return "SEVERE"
-  }
+  return rowsOut
 }
 
 export default function PunishmentGuidelines() {
-  const [data, setData] = useState<SheetData | null>(null)
+  const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
 
-  const load = useCallback(async (manual = false) => {
+  const loadGuidelines = useCallback(async (manualRefresh = false) => {
     try {
-      if (manual) setRefreshing(true)
+      if (manualRefresh) setRefreshing(true)
       else setLoading(true)
 
       setError(null)
 
       const url =
         `https://docs.google.com/spreadsheets/d/${getSheetId()}/gviz/tq` +
-        `?headers=0&tqx=out:json&cacheBust=${Date.now()}`
+        `?sheet=${encodeURIComponent(SHEET_NAME)}` +
+        `&headers=0&tqx=out:json&cacheBust=${Date.now()}`
 
-      const response = await fetch(url, {
-        method: "GET",
-        cache: "no-store",
-      })
-
+      const response = await fetch(url, { method: "GET", cache: "no-store" })
       if (!response.ok) {
         throw new Error(`Google Sheets returned HTTP ${response.status}.`)
       }
 
       const raw = await response.text()
-
-      if (/<!doctype html|<html/i.test(raw)) {
+      if (raw.includes("<html") || raw.includes("<!DOCTYPE")) {
         throw new Error(
-          "Google Sheets returned a webpage instead of sheet data. Make sure the spreadsheet is publicly viewable.",
+          "Google Sheets did not return spreadsheet data. The sheet must be publicly viewable.",
         )
       }
 
-      const parsed = parseGviz(raw)
-
-      if (parsed.errors?.length) {
+      const responseData = parseGviz(raw)
+      if (responseData.errors?.length) {
         throw new Error(
-          parsed.errors[0]?.detailed_message ??
-            parsed.errors[0]?.message ??
+          responseData.errors[0]?.detailed_message ??
+            responseData.errors[0]?.message ??
             "Google Sheets returned an error.",
         )
       }
 
-      setData(parseSheet(parsed))
+      setRows(parseSheet(responseData))
     } catch (caught) {
-      setData(null)
+      setRows([])
       setError(
         caught instanceof Error
           ? caught.message
@@ -290,25 +250,38 @@ export default function PunishmentGuidelines() {
   }, [])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    void loadGuidelines()
+  }, [loadGuidelines])
 
   const filteredRows = useMemo(() => {
-    if (!data) return []
     const query = key(search)
+    if (!query) return rows
 
-    return data.rows.filter((row) => {
-      if (!query) return true
-      return key(row.values.join(" ")).includes(query)
-    })
-  }, [data, search])
+    return rows.filter((row) =>
+      HEADERS.some((header) => key(row.values[header]).includes(query)),
+    )
+  }, [rows, search])
 
-  const clearSearch = () => setSearch("")
+  const groupedRows = useMemo(() => {
+    const groups: Array<{ section: Section; rows: Row[] }> = []
+
+    for (const row of filteredRows) {
+      const existing = groups.find((group) => group.section === row.section)
+      if (existing) existing.rows.push(row)
+      else groups.push({ section: row.section, rows: [row] })
+    }
+
+    return groups
+  }, [filteredRows])
+
+  const rowsForSection = (section: Section) =>
+    groupedRows.find((group) => group.section === section)?.rows ?? []
+
 
   return (
     <div className="w-full min-w-0">
-      <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm">
-        <div className="border-b border-border/70 px-4 py-4 sm:px-5">
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm">
+        <div className="border-b border-border/70 bg-card/95 px-4 py-4 sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-500">
@@ -324,70 +297,65 @@ export default function PunishmentGuidelines() {
 
             <button
               type="button"
-              onClick={() => void load(true)}
+              onClick={() => void loadGuidelines(true)}
               disabled={refreshing}
-              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium hover:bg-muted disabled:opacity-50"
+              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
             >
               <RefreshCw
-                className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+                className={`h-4 w-4 text-blue-400 ${refreshing ? "animate-spin" : ""}`}
               />
               Refresh
             </button>
           </div>
 
-          {!loading && !error && data && (
-            <div className="mt-4 flex gap-2.5">
-              <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search punishment guidelines..."
-                  className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-9 text-sm outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={clearSearch}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label="Clear search"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          <div className="mt-4 relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search punishment guidelines..."
+              className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10"
+            />
+          </div>
         </div>
 
         {loading && (
-          <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
-            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-            Loading Punishment Guidelines...
+          <div className="flex min-h-[280px] items-center justify-center">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <RefreshCw className="h-4 w-4 animate-spin text-blue-400" />
+              Loading Punishment Guidelines...
+            </div>
           </div>
         )}
 
         {!loading && error && (
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-5">
-              <h3 className="text-sm font-semibold text-red-400">
-                Unable to load Punishment Guidelines
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-              <button
-                type="button"
-                onClick={() => void load(true)}
-                className="mt-4 inline-flex h-8 items-center gap-2 rounded-lg border border-border px-3 text-sm hover:bg-muted"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Try Again
-              </button>
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-400">
+                  <FileSpreadsheet className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-red-400">
+                    Unable to load Punishment Guidelines
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+                  <button
+                    type="button"
+                    onClick={() => void loadGuidelines(true)}
+                    className="mt-4 inline-flex h-8 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 text-blue-400" />
+                    Try Again
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {!loading && !error && data && (
-          <div className="w-full overflow-hidden">
+        {!loading && !error && (
+          <div className="max-h-[72vh] overflow-y-auto overflow-x-hidden">
             <table className="w-full table-fixed border-collapse">
               <colgroup>
                 <col className="w-[14%]" />
@@ -398,12 +366,12 @@ export default function PunishmentGuidelines() {
                 <col className="w-[15.75%]" />
               </colgroup>
 
-              <thead>
-                <tr className="border-y border-border/70 bg-muted/10">
+              <thead className="sticky top-0 z-30">
+                <tr className="border-b border-border/70 bg-card">
                   {HEADERS.map((header) => (
                     <th
                       key={header}
-                      className="border-r border-border/50 px-3 py-3 text-left text-[9px] font-bold uppercase tracking-wide text-blue-400 last:border-r-0 sm:px-4 sm:text-[10px]"
+                      className="border-r border-border/50 bg-card px-2 py-2.5 text-left text-[8px] font-bold uppercase tracking-[0.06em] text-blue-400 last:border-r-0 sm:px-4 sm:text-[9px]"
                     >
                       {header}
                     </th>
@@ -412,44 +380,39 @@ export default function PunishmentGuidelines() {
               </thead>
 
               <tbody>
-                {filteredRows.map((row) => {
-                  if (row.section && row.values.slice(1).every((value) => !value)) {
-                    return (
-                      <tr key={row.id}>
-                        <td
-                          colSpan={HEADERS.length}
-                          className="border-b border-blue-500/20 bg-blue-500/[0.035] px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-blue-400"
-                        >
-                          <span className="inline-flex items-center gap-1.5">
-                            <Filter className="h-3 w-3 text-blue-400" />
-                            {sectionLabel(row.section)}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  }
-
-                  return (
+                {groupedRows.flatMap((group) => [
+                  <tr key={`section-${group.section}`}>
+                    <td
+                      colSpan={HEADERS.length}
+                      className="border-b border-t border-blue-500/20 bg-muted/20 px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-[0.1em] text-blue-400 sm:px-4 sm:text-[10px]"
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <Filter className="h-3 w-3 text-blue-400" />
+                        {group.section}
+                      </span>
+                    </td>
+                  </tr>,
+                  ...group.rows.map((row) => (
                     <tr
                       key={row.id}
-                      className="border-b border-border/50 align-top hover:bg-blue-500/[0.025]"
+                      className="border-b border-border/50 hover:bg-muted/10"
                     >
-                      {HEADERS.map((header, index) => (
+                      {HEADERS.map((header) => (
                         <td
-                          key={header}
-                          className="border-r border-border/40 px-3 py-2.5 text-[10px] leading-4 text-foreground last:border-r-0 sm:px-4 sm:text-[11px]"
+                          key={`${row.id}-${header}`}
+                          className="border-r border-border/50 px-3 py-2.5 align-top text-[10px] leading-4 text-foreground last:border-r-0 sm:px-4 sm:text-[11px]"
                         >
-                          {row.values[index] || ""}
+                          {row.values[header]}
                         </td>
                       ))}
                     </tr>
-                  )
-                })}
+                  )),
+                ])}
               </tbody>
             </table>
 
-            {filteredRows.length === 0 && (
-              <div className="px-4 py-10 text-center">
+            {!filteredRows.length && (
+              <div className="border-t border-border/70 px-4 py-10 text-center">
                 <Search className="mx-auto h-5 w-5 text-muted-foreground/50" />
                 <p className="mt-2 text-sm font-medium">No results found</p>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -457,9 +420,17 @@ export default function PunishmentGuidelines() {
                 </p>
               </div>
             )}
+
+            <div className="border-t border-border/70 px-4 py-2.5 text-xs text-muted-foreground">
+              Showing{" "}
+              <span className="font-medium text-foreground">
+                {filteredRows.length}
+              </span>{" "}
+              guideline rows
+            </div>
           </div>
         )}
-      </section>
+      </div>
     </div>
   )
 }
