@@ -16,7 +16,6 @@ import {
   Edit3,
   ExternalLink,
   FileImage,
-  Filter,
   Image as ImageIcon,
   Images,
   Plus,
@@ -307,12 +306,16 @@ function CustomMultiSelect({
   options,
   onChange,
   ariaLabel,
+  optionColors,
+  optionKind,
 }: {
   id: string
   value: readonly string[]
   options: readonly string[]
   onChange: (value: string[]) => void
   ariaLabel: string
+  optionColors?: Record<string, string>
+  optionKind?: "type" | "category" | "tag"
 }) {
   const dropdown = useContext(DropdownContext)
 
@@ -571,18 +574,6 @@ function isVideoMedia(media: GalleryMedia) {
   return media.type === "video"
 }
 
-function getAspectClass(ratio?: number) {
-  if (!ratio || !Number.isFinite(ratio)) {
-    return "aspect-[4/3]"
-  }
-
-  if (ratio >= 1.85) return "aspect-[16/8]"
-  if (ratio >= 1.35) return "aspect-[4/3]"
-  if (ratio >= 1.05) return "aspect-square"
-  if (ratio >= 0.8) return "aspect-[4/5]"
-
-  return "aspect-[3/4]"
-}
 
 function formatDate(value: string) {
   const date = new Date(value)
@@ -718,7 +709,22 @@ function GalleryFilterDropdown({
               className={checked ? "gap-2 bg-blue-500/10 text-blue-400 focus:bg-blue-500/10 focus:text-blue-400" : "gap-2"}
             >
               <Checkbox checked={checked} tabIndex={-1} className="pointer-events-none" />
-              <span className="truncate">{option}</span>
+              <span className="flex min-w-0 items-center gap-2 truncate">
+                {optionKind === "category" || optionKind === "tag" ? (
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: optionColors?.[option] ?? "#3b82f6" }}
+                  />
+                ) : optionKind === "type" ? (
+                  option === "Images" ? (
+                    <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <Video className="h-3.5 w-3.5 shrink-0" />
+                  )
+                ) : null}
+                <span className="truncate">{option}</span>
+              </span>
             </DropdownMenuItem>
           )
         })}
@@ -2671,6 +2677,8 @@ export default function Gallery() {
                     options={galleryTags}
                     ariaLabel="Gallery tags"
                     onChange={setTags}
+                    optionKind="tag"
+                    optionColors={galleryTagColors}
                   />
                 </div>
 
