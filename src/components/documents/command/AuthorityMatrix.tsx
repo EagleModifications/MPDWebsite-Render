@@ -485,7 +485,7 @@ export default function AuthorityMatrix() {
                 ))}
               </colgroup>
 
-              <thead>
+              <thead className="sticky top-0 z-30">
                 <tr className="border-b border-border/70 bg-card">
                   <th
                     rowSpan={2}
