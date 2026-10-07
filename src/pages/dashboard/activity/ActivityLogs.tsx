@@ -1505,7 +1505,7 @@ function FilterDropdown({
   placeholder,
   options,
   onChange,
-  width = "w-[180px]",
+  width = "w-fit",
 }: {
   values: string[]
   placeholder: string
@@ -1520,6 +1520,9 @@ function FilterDropdown({
   const selected = values.filter((value) =>
     selectable.some((option) => option.value === value),
   )
+
+  const allSelected =
+    selectable.length > 0 && selected.length === selectable.length
 
   useEffect(() => {
     if (!open) return
@@ -1543,37 +1546,42 @@ function FilterDropdown({
     onChange(next)
   }
 
-  const allLabel =
-    placeholder === "Anyone"
-      ? "All Users"
-      : placeholder
+  const allLabel = placeholder === "Anyone" ? "All Users" : placeholder
 
-  const filterName = (() => {
+  const filterTitle = (() => {
     const normalized = placeholder
       .replace(/^All\s+/i, "")
       .trim()
 
-    if (/^actions?$/i.test(normalized)) return "action"
-    if (/^categories?$/i.test(normalized)) return "category"
-    if (/^divisions?$/i.test(normalized)) return "division"
-    if (/^users?$/i.test(normalized) || /^anyone$/i.test(normalized)) return "user"
-    return normalized.toLowerCase()
+    if (/^actions?$/i.test(normalized)) return "Actions"
+    if (/^categories?$/i.test(normalized)) return "Categories"
+    if (/^divisions?$/i.test(normalized)) return "Divisions"
+    if (/^users?$/i.test(normalized) || /^anyone$/i.test(normalized)) {
+      return "Users"
+    }
+
+    return normalized || placeholder
   })()
 
-  const buttonLabel =
-    selected.length === 0
-      ? allLabel
-      : `${selected.length} ${filterName}${selected.length === 1 ? "" : "s"} selected`
+  const showCount = selected.length > 0 && !allSelected
 
   return (
-    <div ref={dropdownRef} className={`relative ${width}`}>
+    <div ref={dropdownRef} className={`relative shrink-0 ${width}`}>
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-card px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/60"
+        className="flex h-9 w-max min-w-full items-center justify-between whitespace-nowrap rounded-lg border border-border bg-card px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/60"
       >
-        <span className="truncate">{buttonLabel}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span>{showCount ? filterTitle : allLabel}</span>
+          {showCount ? (
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500/15 px-1 text-[10px] font-semibold leading-none text-blue-400">
+              {selected.length}
+            </span>
+          ) : null}
+        </span>
+
         <ChevronDown
           className={`ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
             open ? "rotate-180" : ""
@@ -1582,19 +1590,19 @@ function FilterDropdown({
       </button>
 
       {open ? (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-[300] max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl">
+        <div className="absolute left-0 top-[calc(100%+4px)] z-[300] max-h-72 w-max min-w-full max-w-[min(360px,calc(100vw-24px))] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-popover p-1 shadow-2xl">
           <button
             type="button"
             className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${
-              selected.length === 0
+              selected.length === 0 || allSelected
                 ? "bg-blue-500/10 text-blue-400"
                 : "text-foreground hover:bg-accent"
             }`}
             onClick={() => onChange([])}
           >
-            <span>{allLabel}</span>
-            {selected.length === 0 ? (
-              <Check className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+            <span className="whitespace-nowrap">{allLabel}</span>
+            {selected.length === 0 || allSelected ? (
+              <Check className="ml-3 h-3.5 w-3.5 shrink-0 text-blue-400" />
             ) : null}
           </button>
 
@@ -1612,9 +1620,9 @@ function FilterDropdown({
                 }`}
                 onClick={() => toggle(option.value)}
               >
-                <span className="truncate">{option.label}</span>
+                <span className="whitespace-nowrap">{option.label}</span>
                 {active ? (
-                  <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-blue-400" />
+                  <Check className="ml-3 h-3.5 w-3.5 shrink-0 text-blue-400" />
                 ) : null}
               </button>
             )
@@ -1630,7 +1638,7 @@ function SingleSelectDropdown({
   placeholder,
   options,
   onChange,
-  width = "w-[92px]",
+  width = "w-fit",
 }: {
   value: string
   placeholder: string
@@ -1660,35 +1668,43 @@ function SingleSelectDropdown({
     placeholder
 
   return (
-    <div ref={dropdownRef} className={`relative ${width}`}>
+    <div ref={dropdownRef} className={`relative shrink-0 ${width}`}>
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-card px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/60"
+        className="flex h-9 w-max min-w-full items-center justify-between whitespace-nowrap rounded-lg border border-border bg-card px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/60"
       >
-        <span className="truncate">{selectedLabel}</span>
+        <span>{selectedLabel}</span>
         <ChevronDown
-          className={`ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          className={`ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
         />
       </button>
 
       {open ? (
-        <div className="absolute bottom-[calc(100%+4px)] left-0 z-[100] max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl">
+        <div className="absolute bottom-[calc(100%+4px)] left-0 z-[100] max-h-72 w-max min-w-full max-w-[min(360px,calc(100vw-24px))] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-popover p-1 shadow-2xl">
           {options.map((option) => {
             const active = option.value === value
             return (
               <button
                 key={`${option.value}-${option.label}`}
                 type="button"
-                className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${active ? "bg-blue-500/10 text-blue-400" : "text-foreground hover:bg-accent"}`}
+                className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${
+                  active
+                    ? "bg-blue-500/10 text-blue-400"
+                    : "text-foreground hover:bg-accent"
+                }`}
                 onClick={() => {
                   onChange(option.value)
                   setOpen(false)
                 }}
               >
-                <span className="truncate">{option.label}</span>
-                {active ? <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-blue-400" /> : null}
+                <span className="whitespace-nowrap">{option.label}</span>
+                {active ? (
+                  <Check className="ml-3 h-3.5 w-3.5 shrink-0 text-blue-400" />
+                ) : null}
               </button>
             )
           })}
@@ -2295,8 +2311,8 @@ export default function PromotionLogs() {
             </div>
 
             <div className="relative z-20 rounded-lg border border-border bg-card p-2.5">
-              <div className="grid w-full grid-cols-1 gap-2 lg:grid-cols-[minmax(260px,1fr)_170px_170px_170px_180px]">
-                <div className="relative min-w-0">
+              <div className="flex w-full flex-wrap items-center gap-2">
+                <div className="relative min-w-[260px] flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={search}
@@ -2311,7 +2327,6 @@ export default function PromotionLogs() {
                   placeholder="All Categories"
                   options={categoryOptions}
                   onChange={(values) => changeFilter(setCategories, values)}
-                  width="w-full"
                 />
 
                 <FilterDropdown
@@ -2319,7 +2334,6 @@ export default function PromotionLogs() {
                   placeholder="All Divisions"
                   options={divisionOptions}
                   onChange={(values) => changeFilter(setDivisions, values)}
-                  width="w-full"
                 />
 
                 <FilterDropdown
@@ -2342,7 +2356,6 @@ export default function PromotionLogs() {
                     ),
                   ]}
                   onChange={(values) => changeFilter(setUserIds, values)}
-                  width="w-full"
                 />
 
                 <FilterDropdown
@@ -2356,7 +2369,6 @@ export default function PromotionLogs() {
                     })),
                   ]}
                   onChange={(values) => changeFilter(setActions, values)}
-                  width="w-full"
                 />
               </div>
 
@@ -2809,7 +2821,7 @@ export default function PromotionLogs() {
                   { value: "100", label: "100" },
                 ]}
                 onChange={(value) => changePageSize(Number(value))}
-                width="w-[92px]"
+                width="w-fit"
               />
             </div>
 
