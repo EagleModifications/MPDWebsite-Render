@@ -115,7 +115,6 @@ type GalleryTag = string
 type GalleryItem = {
   id: string
   slug?: string
-  slug?: string
   title: string
   description: string
   category?: GalleryCategory
@@ -193,8 +192,6 @@ function CustomSelect({
 
   const { openDropdown, setOpenDropdown } = dropdown
   const open = openDropdown === id
-  const [search, setSearch] = useState("")
-
   useEffect(() => {
     if (!open) return
 
@@ -731,6 +728,7 @@ function GalleryMultiSelect({
 
   const { openDropdown, setOpenDropdown } = dropdown
   const open = openDropdown === id
+  const [search, setSearch] = useState("")
 
   useEffect(() => {
     if (!open) { setSearch(""); return }
@@ -1117,21 +1115,6 @@ export default function Gallery() {
   const [showTaxonomyModal, setShowTaxonomyModal] =
     useState(false)
 
-  const [newGalleryCategory, setNewGalleryCategory] =
-    useState("")
-
-  const [newGalleryTag, setNewGalleryTag] =
-    useState("")
-
-  const [newGalleryTagCategories, setNewGalleryTagCategories] =
-    useState<string[]>(["Community"])
-
-  const [newGalleryCategoryColor, setNewGalleryCategoryColor] =
-    useState("#3b82f6")
-
-  const [newGalleryTagColor, setNewGalleryTagColor] =
-    useState("#3b82f6")
-
   const [showModal, setShowModal] =
     useState(false)
 
@@ -1427,49 +1410,6 @@ export default function Gallery() {
           : isVideoMedia(media),
       ),
     )
-  }
-
-  async function addGalleryOption(type: "category" | "tag", color?: string) {
-    const rawValue = type === "category" ? newGalleryCategory : newGalleryTag
-    const value = rawValue.trim()
-
-    if (!value) {
-      toast.error(`Enter a ${type} name.`)
-      return
-    }
-
-    try {
-      const response = await fetch("/api/gallery/options", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type,
-          value,
-          color: color || undefined,
-          categories: type === "tag" ? newGalleryTagCategories : undefined,
-        }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || `Failed to create ${type}.`)
-
-      if (type === "category") {
-        setGalleryCategories(Array.isArray(data.categories) ? data.categories : (current => [...current, value]))
-        setNewGalleryCategory("")
-        setNewGalleryCategoryColor("#3b82f6")
-      } else {
-        setGalleryTags(Array.isArray(data.tags) ? data.tags : (current => [...current, value]))
-        setNewGalleryTag("")
-        setNewGalleryTagColor("#3b82f6")
-      }
-      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
-      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
-      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
-
-      toast.success(`${type === "category" ? "Category" : "Tag"} created.`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : `Failed to create ${type}.`)
-    }
   }
 
   function beginTaxonomyEdit(type: "category" | "tag", value: string) {
