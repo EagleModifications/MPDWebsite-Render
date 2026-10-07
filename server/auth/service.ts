@@ -52,12 +52,13 @@ async function findRosterUser(
   return null
 }
 
-export function getDiscordLoginUrl() {
+export function getDiscordLoginUrl(state: string) {
   const params = new URLSearchParams({
     client_id: env.discordClientId,
     response_type: "code",
     redirect_uri: env.discordRedirectUri,
     scope: "identify",
+    state,
   })
 
   return `https://discord.com/oauth2/authorize?${params.toString()}`
