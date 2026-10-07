@@ -346,13 +346,6 @@ export default function Navbar() {
                 ].join(" ")}
               >
                 Documents
-
-                <ChevronDown
-                  className={[
-                    "h-4 w-4 transition-transform duration-200",
-                    documentsOpen ? "rotate-180" : "",
-                  ].join(" ")}
-                />
               </button>
 
               {documentsOpen && (
