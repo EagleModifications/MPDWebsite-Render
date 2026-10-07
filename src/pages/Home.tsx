@@ -1294,8 +1294,8 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Category tabs sit directly above the first image, on the left. */}
-          <div className="mb-5 flex w-fit items-center gap-1 rounded-full border border-border/60 bg-background/60 p-1">
+          {/* Category tabs */}
+          <div className="mb-5 flex flex-wrap items-center gap-2">
             {["All", "Community", "Fleet"].map((category) => (
               <button
                 key={category}
@@ -1306,10 +1306,10 @@ export default function Home() {
                   )
                 }
                 className={[
-                  "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
+                  "rounded-lg border px-4 py-2 text-xs font-semibold transition-all",
                   galleryCategory === category
-                    ? "bg-blue-500/15 text-blue-400"
-                    : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground",
+                    ? "border-blue-500/60 bg-blue-500/10 text-blue-400 shadow-[0_0_14px_rgba(59,130,246,0.08)]"
+                    : "border-border/60 bg-background/40 text-muted-foreground hover:border-border hover:bg-white/[0.03] hover:text-foreground",
                 ].join(" ")}
               >
                 {category}
@@ -1391,56 +1391,38 @@ export default function Home() {
                       {/* Darker, cleaner image gradient */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
-                      {/* Category */}
-                      {item.category && (
-                        <span
-                          className={`absolute left-4 top-4 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                            galleryCategoryClasses[
-                              item.category
-                            ]
-                          }`}
-                        >
-                          {item.category}
-                        </span>
-                      )}
-
-                      {/* Color-coded department tags */}
-                      {tags.length > 0 && (
-                        <div className="absolute left-4 top-[3.15rem] flex max-w-[calc(100%-2rem)] flex-wrap gap-1.5">
-                          {tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${galleryTagClasses[tag]}`}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
 
-                    <div className="p-5">
-                      <h3 className="font-bold tracking-tight">
+                    <div className="border-t border-border/50 p-4">
+                      <div className="mb-2 flex flex-col items-start gap-1.5">
+                        {item.category && (
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${galleryCategoryClasses[item.category]}`}
+                          >
+                            {item.category}
+                          </span>
+                        )}
+
+                        {tags.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {tags.map((tag) => (
+                              <span
+                                key={`card-${tag}`}
+                                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${galleryTagClasses[tag]}`}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <h3 className="line-clamp-2 whitespace-pre-line text-sm font-semibold">
                         {item.title}
                       </h3>
 
-                      {/* Tags also appear below the title on cards
-                          when the image is too busy to read them */}
-                      {tags.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {tags.map((tag) => (
-                            <span
-                              key={`card-${tag}`}
-                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${galleryTagClasses[tag]}`}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
                       {item.description && (
-                        <p className="mt-3 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                        <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-5 text-muted-foreground">
                           {item.description}
                         </p>
                       )}
@@ -1602,27 +1584,70 @@ export default function Home() {
         </section>
 
         {/* ========================================================= */}
-        {/* FINAL SEPARATOR                                             */}
-        {/* ========================================================= */}
-        <div className="mx-auto w-full max-w-6xl px-6">
-          <div className="flex items-center gap-4">
-            <div className="h-px flex-1 bg-border/50" />
-
-            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
-
-            <div className="h-px flex-1 bg-border/50" />
-          </div>
-        </div>
-
-        {/* ========================================================= */}
         {/* JOIN THE DEPARTMENT CTA                                     */}
         {/* ========================================================= */}
-        <section className="relative isolate overflow-hidden border-t border-border/40 bg-white/[0.008]">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.055),transparent_55%)]" />
+        <section className="relative isolate overflow-hidden border-y border-border/40 bg-background/20">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.045),transparent_62%)]" />
+
+          {visibleDots.slice(0, 28).map((dot, index) => (
+            <span
+              key={`join-dot-${index}`}
+              className="absolute rounded-full bg-blue-300 mpd-star-twinkle"
+              style={
+                {
+                  left: dot.left,
+                  top: dot.top,
+                  width: dot.size,
+                  height: dot.size,
+                  opacity: dot.opacity * 0.7,
+                  filter: `blur(${dot.blur})`,
+                  animationDelay: `${index * 0.18}s`,
+                  animationDuration: `${2.2 + (index % 7) * 0.35}s`,
+                } as React.CSSProperties
+              }
+            />
+          ))}
+
+          <div className="relative mx-auto flex min-h-[360px] w-full max-w-6xl items-center justify-center px-6 py-20 text-center">
+            <div className="max-w-5xl">
+              <h2 className="text-4xl font-black uppercase leading-[0.94] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+                <span className="text-foreground">
+                  READY TO JOIN THE METRO POLICE
+                </span>{" "}
+                <span className="bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent">
+                  DEPARTMENT?
+                </span>
+              </h2>
+
+              <p className="mx-auto mt-6 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+                Take the next step, join our community, and begin your career with the Metro Police Department.
+              </p>
+
+              <div className="mt-8 flex justify-center">
+                <a
+                  href="https://discord.gg/metropd"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
+                >
+                  <span>Join Metro PD</span>
+
+                  <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================= */}
+        {/* FINAL DISCORD CTA                                           */}
+        {/* ========================================================= */}
+        <section className="relative isolate overflow-hidden border-b border-border/40 bg-background/10">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.055),transparent_62%)]" />
 
           {visibleDots.slice(0, 32).map((dot, index) => (
             <span
-              key={`join-cta-dot-${index}`}
+              key={`cta-dot-${index}`}
               className="absolute rounded-full bg-blue-300 mpd-star-twinkle"
               style={
                 {
@@ -1640,73 +1665,8 @@ export default function Home() {
           ))}
 
           <div className="relative mx-auto flex min-h-[360px] w-full max-w-6xl items-center justify-center px-6 py-20 text-center">
-            <div className="max-w-4xl">
-              <h2 className="text-4xl font-black uppercase leading-[0.92] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                <span className="text-foreground">
-                  READY TO JOIN THE
-                  <br />
-                  METRO POLICE
-                </span>
-
-                <span className="block bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent">
-                  DEPARTMENT?
-                </span>
-              </h2>
-
-              <p className="mx-auto mt-7 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Take the next step, join our community, and begin your career with the Metro Police Department.
-              </p>
-
-              <div className="mt-9 flex justify-center">
-                <a
-                  href="https://discord.gg/metropd"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group inline-flex h-12 min-w-[210px] items-center justify-center gap-3 rounded-md bg-blue-600 px-8 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/25"
-                >
-                  <span>Join Metro PD</span>
-
-                  <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border/40" />
-        </section>
-
-        {/* ========================================================= */}
-        {/* FINAL DISCORD CTA                                           */}
-        {/* ========================================================= */}
-        <section className="relative isolate overflow-hidden border-t border-border/40 bg-white/[0.008]">
-          {/* Subtle blue atmosphere to carry the same depth used throughout the page. */}
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(37,99,235,0.055),transparent_55%)]" />
-
-          {/* A few stars continue through the CTA */}
-          {visibleDots.slice(0, 32).map(
-            (dot, index) => (
-              <span
-                key={`cta-dot-${index}`}
-                className="absolute rounded-full bg-blue-300 mpd-star-twinkle"
-                style={
-                  {
-                    left: dot.left,
-                    top: dot.top,
-                    width: dot.size,
-                    height: dot.size,
-                    opacity: dot.opacity * 0.8,
-                    filter: `blur(${dot.blur})`,
-                    animationDelay: `${index * 0.18}s`,
-                    animationDuration: `${2.2 + (index % 7) * 0.35}s`,
-                  } as React.CSSProperties
-                }
-              />
-            ),
-          )}
-
-          <div className="relative mx-auto flex min-h-[360px] w-full max-w-6xl items-center justify-center px-6 py-20 text-center">
-            <div className="max-w-4xl">
-              <h2 className="text-4xl font-black uppercase leading-[0.92] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+            <div className="max-w-5xl">
+              <h2 className="text-4xl font-black uppercase leading-[0.94] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                 <span className="text-foreground">
                   THE METRO POLICE
                   <br />
@@ -1718,12 +1678,11 @@ export default function Home() {
                 </span>
               </h2>
 
-              <p className="mx-auto mt-7 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Join the Discord, create a ticket,
-                and start a story worth telling.
+              <p className="mx-auto mt-6 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+                Join the Discord, create a ticket, and start a story worth telling.
               </p>
 
-              <div className="mt-9 flex justify-center">
+              <div className="mt-8 flex justify-center">
                 <a
                   href="https://discord.gg/metropd"
                   target="_blank"
@@ -1737,10 +1696,8 @@ export default function Home() {
               </div>
             </div>
           </div>
-
-          {/* Very subtle divider instead of heavy bottom glow */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border/40" />
         </section>
+
       </main>
 
       <Footer />
