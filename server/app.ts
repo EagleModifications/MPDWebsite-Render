@@ -6546,7 +6546,8 @@ export function createApp() {
         const accept = String(req.headers.accept || "")
         if (accept.includes("text/html") && !req.headers.range) {
           const mediaUrl = `/gallery/${requestedType}/${filename}`
-          const title = String(document.title || "Gallery").replace(/[&<>\"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '\"': "&quot;" } as Record<string, string>)[char])
+          const escapedTitle = String(document.title || "Gallery").replace(/[&<>\"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" } as Record<string, string>)[char])
+          const title = `${escapedTitle} | Metro Police Department`
           const html = requestedType === "video"
             ? `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="icon" href="/logo.png"></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh"><video src="${mediaUrl}" controls autoplay style="max-width:100vw;max-height:100vh"></video></body></html>`
             : `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="icon" href="/logo.png"></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${mediaUrl}" alt="${title}" style="max-width:100vw;max-height:100vh;object-fit:contain"></body></html>`
