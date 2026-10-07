@@ -7050,17 +7050,18 @@ export function createApp() {
 
       const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
       const value = cleanGalleryString(req.body?.value)
-      const hasSubmittedCategories = Array.isArray(req.body?.categories)
-      const requestedCategories = hasSubmittedCategories
+      const requestedAssignments = Array.isArray(req.body?.assignments)
+        ? Array.from(new Set(req.body.assignments.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
+        : []
+      const requestedCategories = Array.isArray(req.body?.categories)
         ? Array.from(new Set(req.body.categories.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
         : []
       const legacyCategory = cleanGalleryString(req.body?.category)
-      const categoriesForTag = requestedCategories.length
-        ? requestedCategories
-        : (legacyCategory ? [legacyCategory] : [])
+      const categoriesForTag = requestedAssignments.length
+        ? requestedAssignments
+        : (requestedCategories.length ? requestedCategories : (legacyCategory ? [legacyCategory] : []))
       const color = normalizeGalleryColor(req.body?.color)
       if (!type || !value) return res.status(400).json({ success: false, error: "A valid category or tag name is required." })
-      if (type === "tag" && categoriesForTag.length === 0) return res.status(400).json({ success: false, error: "Select at least one category for this tag." })
       if (value.length > 40) return res.status(400).json({ success: false, error: "Names must be 40 characters or fewer." })
 
       const gallery = await getCollection<GalleryTagsConfigDocument>("galleryTags")
@@ -7075,7 +7076,7 @@ export function createApp() {
       const tagCategories = { ...(config.tagCategories ?? {}) }
 
       if (type === "category") {
-        tagCategories[value] = []
+        tagCategories[value] = config.tags.filter((tag) => requestedAssignments.includes(tag))
       } else {
         for (const categoryName of categoriesForTag) {
           if (config.categories.includes(categoryName)) {
@@ -7108,14 +7109,16 @@ export function createApp() {
       const type = req.body?.type === "category" || req.body?.type === "tag" ? req.body.type : ""
       const value = cleanGalleryString(req.body?.value)
       const newValue = cleanGalleryString(req.body?.newValue || value)
-      const hasSubmittedCategories = Array.isArray(req.body?.categories)
-      const requestedCategories = hasSubmittedCategories
+      const requestedAssignments = Array.isArray(req.body?.assignments)
+        ? Array.from(new Set(req.body.assignments.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
+        : []
+      const requestedCategories = Array.isArray(req.body?.categories)
         ? Array.from(new Set(req.body.categories.map((entry: unknown) => cleanGalleryString(entry)).filter(Boolean)))
         : []
       const legacyCategory = cleanGalleryString(req.body?.category)
-      const requestedTagCategories = requestedCategories.length
-        ? requestedCategories
-        : (legacyCategory ? [legacyCategory] : [])
+      const requestedTagCategories = requestedAssignments.length
+        ? requestedAssignments
+        : (requestedCategories.length ? requestedCategories : (legacyCategory ? [legacyCategory] : []))
       const color = normalizeGalleryColor(req.body?.color, "#3b82f6")
       if (!type || !value || !newValue) return res.status(400).json({ success: false, error: "A valid option name is required." })
       if (newValue.length > 40) return res.status(400).json({ success: false, error: "Names must be 40 characters or fewer." })
@@ -7139,24 +7142,17 @@ export function createApp() {
 
       if (type === "category") {
         categories = categories.map((entry) => entry === value ? newValue : entry)
-        const previousAssignedTags = tagCategories[value] ?? []
         delete tagCategories[value]
-
-        // A category can contain multiple sub-tags. When the edit dialog
-        // submits a selection, rebuild this category's assignments from it.
-        // If an older client does not submit categories, preserve the current assignments.
-        const assignedTags = hasSubmittedCategories
-          ? requestedCategories.filter((tag) => tags.includes(tag))
-          : previousAssignedTags.filter((tag) => tags.includes(tag))
-        tagCategories[newValue] = Array.from(new Set(assignedTags))
-
-        // Keep every other category intact. The category's own list is the
-        // authoritative assignment for the selected sub-tags.
+        tagCategories[newValue] = config.tags.filter((tag) => requestedAssignments.includes(tag))
         categoryColors[newValue] = color
         delete categoryColors[value]
 
+        const fallbackCategory = categories[0] ?? newValue
         const galleryItems = await getCollection<GalleryDocument>("gallery")
         await galleryItems.updateMany({ category: value }, { $set: { category: newValue } })
+        if (fallbackCategory !== value) {
+          await galleryItems.updateMany({ _galleryConfig: true, category: value }, { $set: { category: fallbackCategory } })
+        }
       } else {
         tags = tags.map((entry) => entry === value ? newValue : entry)
         for (const key of Object.keys(tagCategories)) {
