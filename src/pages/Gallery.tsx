@@ -1168,6 +1168,9 @@ export default function Gallery() {
   const [infoItem, setInfoItem] =
     useState<GalleryItem | null>(null)
 
+  const [copiedLink, setCopiedLink] =
+    useState(false)
+
   const [title, setTitle] =
     useState("")
 
@@ -2330,6 +2333,7 @@ export default function Gallery() {
   }
 
   function openInfo(item: GalleryItem) {
+    setCopiedLink(false)
     const url = new URL(window.location.href)
     url.searchParams.set("gallery", item.slug || item.id)
     url.hash = ""
@@ -2338,6 +2342,7 @@ export default function Gallery() {
   }
 
   function closeInfo() {
+    setCopiedLink(false)
     const url = new URL(window.location.href)
     url.searchParams.delete("gallery")
     window.history.replaceState({}, "", url)
@@ -2349,7 +2354,9 @@ export default function Gallery() {
 
     try {
       await navigator.clipboard.writeText(link)
+      setCopiedLink(true)
       toast.success("Gallery link copied.")
+      window.setTimeout(() => setCopiedLink(false), 1800)
     } catch {
       const textarea = document.createElement("textarea")
       textarea.value = link
@@ -2362,7 +2369,9 @@ export default function Gallery() {
       textarea.remove()
 
       if (copied) {
+        setCopiedLink(true)
         toast.success("Gallery link copied.")
+        window.setTimeout(() => setCopiedLink(false), 1800)
       } else {
         toast.error("Could not copy the gallery link.")
       }
@@ -2914,17 +2923,37 @@ export default function Gallery() {
                     {infoItem.title}
                   </h2>
 
-                  <span
-                    className={[
-                      "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                      infoItem.category === "Fleet"
-                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                        : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-                    ].join(" ")}
-                  >
-                    {infoItem.category ?? "Community"}
-                  </span>
+                  {infoItem.category && (
+                    <span
+                      className="rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                      style={{
+                        borderColor: `${galleryCategoryColors[infoItem.category] ?? "#3b82f6"}88`,
+                        backgroundColor: `${galleryCategoryColors[infoItem.category] ?? "#3b82f6"}1a`,
+                        color: galleryCategoryColors[infoItem.category] ?? "#3b82f6",
+                      }}
+                    >
+                      {infoItem.category}
+                    </span>
+                  )}
                 </div>
+
+                {Array.isArray(infoItem.tags) && infoItem.tags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {infoItem.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                        style={{
+                          borderColor: `${galleryTagColors[tag] ?? "#3b82f6"}88`,
+                          backgroundColor: `${galleryTagColors[tag] ?? "#3b82f6"}1a`,
+                          color: galleryTagColors[tag] ?? "#3b82f6",
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <Button
@@ -3042,8 +3071,8 @@ export default function Gallery() {
                             title={
                               infoItem.title
                             }
+                            showOverlay={false}
                             onClick={() => {
-                              closeInfo()
                               openViewer(
                                 infoItem,
                                 media,
@@ -3063,9 +3092,16 @@ export default function Gallery() {
                 type="button"
                 variant="outline"
                 onClick={() => void copyGalleryLink(infoItem)}
+                className="transition-all duration-200"
               >
-                <Copy className="mr-2 h-4 w-4" />
-                Copy Link
+                {copiedLink ? (
+                  <Check className="mr-2 h-4 w-4 text-emerald-500" />
+                ) : (
+                  <Copy className="mr-2 h-4 w-4" />
+                )}
+                <span className="transition-all duration-200">
+                  {copiedLink ? "Copied" : "Copy Link"}
+                </span>
               </Button>
 
               {canManageGallery && (
@@ -3224,32 +3260,80 @@ export default function Gallery() {
                         </Button>
                       </div>
 
-                      <div className="mt-3 divide-y divide-border/60 rounded-lg border border-border/60">
-                        {galleryCategories.map((entry) => (
-                          <div key={entry} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                            <span
-                              className="inline-flex max-w-[55%] items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                              style={{
-                                borderColor: `${galleryCategoryColors[entry] ?? "#3b82f6"}55`,
-                                backgroundColor: `${galleryCategoryColors[entry] ?? "#3b82f6"}1a`,
-                                color: galleryCategoryColors[entry] ?? "#3b82f6",
-                              }}
+                      <div className="mt-3 overflow-hidden rounded-lg border border-border/60">
+                        {galleryCategories.map((entry, index) => {
+                          const categoryColor = galleryCategoryColors[entry] ?? "#3b82f6"
+                          const assignedTags = galleryTags.filter((tag) =>
+                            (galleryTagCategories[entry] ?? []).includes(tag),
+                          )
+
+                          return (
+                            <div
+                              key={entry}
+                              className={`px-3.5 py-3.5 ${index > 0 ? "border-t border-border/60" : ""}`}
                             >
-                              <span className="truncate">{entry}</span>
-                            </span>
-                            <div className="flex shrink-0 items-center gap-1.5">
-                              <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => beginTaxonomyEdit("category", entry)} disabled={taxonomyBusy}>
-                                <Edit3 className="mr-1.5 h-3.5 w-3.5" />Edit
-                              </Button>
-                              <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => void duplicateTaxonomyOption("category", entry)} disabled={taxonomyBusy}>
-                                <Copy className="mr-1.5 h-3.5 w-3.5" />Duplicate
-                              </Button>
-                              <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("category", entry)} disabled={taxonomyBusy}>
-                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete
-                              </Button>
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide"
+                                      style={{
+                                        borderColor: `${categoryColor}55`,
+                                        backgroundColor: `${categoryColor}1a`,
+                                        color: categoryColor,
+                                      }}
+                                    >
+                                      <span className="truncate">{entry}</span>
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {assignedTags.length} {assignedTags.length === 1 ? "sub-tag" : "sub-tags"}
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-2.5 rounded-lg border border-border/50 bg-background/30 p-2.5">
+                                    <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                      Sub Tags
+                                    </div>
+                                    {assignedTags.length > 0 ? (
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {assignedTags.map((tag) => {
+                                          const tagColor = galleryTagColors[tag] ?? "#3b82f6"
+                                          return (
+                                            <span
+                                              key={`${entry}-${tag}`}
+                                              className="inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                                              style={{
+                                                borderColor: `${tagColor}55`,
+                                                backgroundColor: `${tagColor}12`,
+                                                color: tagColor,
+                                              }}
+                                            >
+                                              <span className="truncate">{tag}</span>
+                                            </span>
+                                          )
+                                        })}
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground">No sub-tags assigned.</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex shrink-0 flex-wrap items-center gap-1.5 lg:pt-0.5">
+                                  <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => beginTaxonomyEdit("category", entry)} disabled={taxonomyBusy}>
+                                    <Edit3 className="mr-1.5 h-3.5 w-3.5" />Edit
+                                  </Button>
+                                  <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => void duplicateTaxonomyOption("category", entry)} disabled={taxonomyBusy}>
+                                    <Copy className="mr-1.5 h-3.5 w-3.5" />Duplicate
+                                  </Button>
+                                  <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("category", entry)} disabled={taxonomyBusy}>
+                                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </section>
 
@@ -4581,18 +4665,9 @@ function GalleryMediaCollage({
   title: string
   onClick: (media: GalleryMedia) => void
 }) {
+  if (media.length === 0) return null
+
   const visible = media.slice(0, 4)
-  if (visible.length === 0) return null
-
-  const imageCount = media.filter((entry) => entry.type === "image").length
-  const videoCount = media.filter((entry) => entry.type === "video").length
-
-  const mediaLabel = (() => {
-    if (media.length === 1) return imageCount === 1 ? "Image" : "Video"
-    if (imageCount > 0 && videoCount > 0) return `${media.length} images/videos`
-    if (imageCount > 0) return `${media.length} images`
-    return `${media.length} videos`
-  })()
 
   const renderMedia = (item: GalleryMedia) => (
     <GalleryMediaCard
@@ -4605,72 +4680,79 @@ function GalleryMediaCollage({
     />
   )
 
+  const renderCell = (
+    item: GalleryMedia,
+    options?: { blur?: boolean },
+  ) => (
+    <div
+      key={item.id}
+      className="group relative min-w-0 flex-1 overflow-hidden"
+    >
+      {renderMedia(item)}
+
+      {options?.blur ? (
+        <>
+          <div className="pointer-events-none absolute inset-0 bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
+              <Images className="h-3.5 w-3.5" />
+            </span>
+            <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
+              {(() => {
+                const hidden = media.slice(2)
+                const hiddenImages = hidden.filter((entry) => entry.type === "image").length
+                const hiddenVideos = hidden.filter((entry) => entry.type === "video").length
+
+                if (hiddenImages > 0 && hiddenVideos > 0) {
+                  return `${hidden.length}+ images/videos`
+                }
+                if (hiddenImages > 0) return `${hidden.length}+ images`
+                if (hiddenVideos > 0) return `${hidden.length}+ videos`
+                return `${hidden.length}+ media`
+              })()}
+            </span>
+          </div>
+        </>
+      ) : null}
+    </div>
+  )
+
   return (
     <div className="relative w-full overflow-hidden">
-      {visible.length === 1 ? (
+      {media.length === 1 ? (
+        // 1: one full-width item, preserving its original aspect ratio.
         <div className="w-full overflow-hidden">
-          {renderMedia(visible[0])}
+          {renderMedia(media[0])}
         </div>
-      ) : visible.length === 2 ? (
-        <div className="grid w-full grid-cols-2 gap-px bg-black">
-          {visible.map((item) => (
-            <div key={item.id} className="min-w-0 overflow-hidden">
-              {renderMedia(item)}
-            </div>
-          ))}
+      ) : media.length === 2 ? (
+        // 2: one full-width item on top and one full-width item underneath.
+        <div className="flex w-full flex-col gap-px bg-black">
+          {renderMedia(media[0])}
+          {renderMedia(media[1])}
         </div>
-      ) : visible.length === 3 ? (
-        <div className="grid w-full grid-cols-3 gap-px bg-black">
-          {visible.map((item) => (
-            <div key={item.id} className="min-w-0 overflow-hidden">{renderMedia(item)}</div>
-          ))}
+      ) : media.length === 3 ? (
+        // 3: two items across the top and one full-width item underneath.
+        <div className="flex w-full flex-col gap-px bg-black">
+          <div className="flex w-full gap-px">
+            {renderCell(media[0])}
+            {renderCell(media[1])}
+          </div>
+          {renderMedia(media[2])}
         </div>
       ) : (
-        <div className="grid w-full grid-cols-2 gap-px bg-black">
-          {visible.map((item, index) => (
-            <div key={item.id} className="group relative min-w-0 overflow-hidden">
-              {renderMedia(item)}
-
-              {index === 3 && media.length >= 5 ? (
-                <>
-                  <div className="pointer-events-none absolute inset-0 bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
-                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
-                      <Images className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
-                      {(() => {
-                        const hidden = media.slice(3)
-                        const hiddenImages = hidden.filter((entry) => entry.type === "image").length
-                        const hiddenVideos = hidden.filter((entry) => entry.type === "video").length
-                        if (hiddenImages > 0 && hiddenVideos > 0) return `${hidden.length}+ images/videos`
-                        if (hiddenImages > 0) return `${hidden.length}+ images`
-                        if (hiddenVideos > 0) return `${hidden.length}+ videos`
-                        return `${hidden.length}+ media`
-                      })()}
-                    </span>
-                  </div>
-                </>
-              ) : null}
-            </div>
-          ))}
+        // 4+: two items across the top and two across the bottom.
+        // For 5+, the bottom-left item is the "more" preview.
+        <div className="flex w-full flex-col gap-px bg-black">
+          <div className="flex w-full gap-px">
+            {renderCell(visible[0])}
+            {renderCell(visible[1])}
+          </div>
+          <div className="flex w-full gap-px">
+            {renderCell(visible[2], { blur: media.length >= 5 })}
+            {renderCell(visible[3])}
+          </div>
         </div>
       )}
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 pt-8 text-white">
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-[10px] font-medium">
-          {imageCount > 0 && videoCount > 0 ? <Images className="h-3 w-3" /> : imageCount > 0 ? <ImageIcon className="h-3 w-3" /> : <Video className="h-3 w-3" />}
-          {mediaLabel}
-        </span>
-        <button
-          type="button"
-          className="pointer-events-auto rounded-md bg-black/60 px-2.5 py-1 text-[10px] font-semibold transition-colors hover:bg-black/80"
-          onClick={() => onClick(visible[0])}
-          aria-label={`View ${title}`}
-        >
-          View
-        </button>
-      </div>
     </div>
   )
 }
