@@ -1384,8 +1384,6 @@ export default function PromotionRoster() {
 
                       setDivision(item.id)
                       setSearch("")
-                      setStatusFilters(statusOptions.map((status) => status.id))
-                      setRankFilters([])
                       setSelectedIds([])
                       setSelectedCopied(false)
                       setError(null)
@@ -1994,35 +1992,53 @@ export default function PromotionRoster() {
               </span>
             ) : (
               <>
-                {statusFilters.map((status) => {
-                  const Icon = getStatusIcon(status)
+                {/* Always show the individual selected statuses, including when
+                    All Statuses is selected. */}
+                {statusOptions
+                  .filter((status) =>
+                    statusFilters.includes(status.id),
+                  )
+                  .map((status) => {
+                    const Icon = getStatusIcon(status)
 
-                  return (
+                    return (
+                      <button
+                        key={`status-${status.id}`}
+                        type="button"
+                        onClick={() =>
+                          toggleStatusFilter(status.id)
+                        }
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80 ${getStatusClasses(status.id)}`}
+                      >
+                        <Icon className="h-3 w-3" />
+                        {getStatusLabel(status.id)}
+                        <X className="h-3 w-3" />
+                      </button>
+                    )
+                  })}
+
+                {/* Always show the individual selected ranks, including when
+                    All Ranks is selected. */}
+                {rankOptions
+                  .filter((rank) =>
+                    rankFilters.some(
+                      (selectedRank) =>
+                        normalizeRank(selectedRank) ===
+                        normalizeRank(rank),
+                    ),
+                  )
+                  .map((rank) => (
                     <button
-                      key={`status-${status}`}
+                      key={`rank-${rank}`}
                       type="button"
-                      onClick={() => toggleStatusFilter(status)}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80 ${getStatusClasses(status)}`}
+                      onClick={() => toggleRankFilter(rank)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
                     >
-                      <Icon className="h-3 w-3" />
-                      {getStatusLabel(status)}
+                      <Shield className="h-3 w-3" />
+                      {rank}
                       <X className="h-3 w-3" />
                     </button>
-                  )
-                })}
-
-                {rankFilters.map((rank) => (
-                  <button
-                    key={`rank-${rank}`}
-                    type="button"
-                    onClick={() => toggleRankFilter(rank)}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
-                  >
-                    <Shield className="h-3 w-3" />
-                    {rank}
-                    <X className="h-3 w-3" />
-                  </button>
-                ))}
+                  ))}
               </>
             )}
 
