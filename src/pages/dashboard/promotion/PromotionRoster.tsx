@@ -1999,7 +1999,7 @@ export default function PromotionRoster() {
                     statusFilters.includes(status.id),
                   )
                   .map((status) => {
-                    const Icon = getStatusIcon(status)
+                    const Icon = getStatusIcon(status.id)
 
                     return (
                       <button
