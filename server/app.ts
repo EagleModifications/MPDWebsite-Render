@@ -36,14 +36,136 @@ import { randomUUID } from "node:crypto"
 import { Readable } from "node:stream"
 import youtubeDl from "youtube-dl-exec"
 
-// Gallery uploads use disk-backed temporary storage so large videos are not
-// kept in RAM while they are being copied into MongoDB GridFS.
 const GALLERY_UPLOAD_DIR = path.join(
   os.tmpdir(),
   "mpd-gallery-uploads",
 )
 
 fs.mkdirSync(GALLERY_UPLOAD_DIR, { recursive: true })
+
+// Remove abandoned temporary gallery files left by interrupted/failed URL
+// imports. Browser uploads no longer use this directory.
+try {
+  for (const name of fs.readdirSync(GALLERY_UPLOAD_DIR)) {
+    try {
+      fs.unlinkSync(path.join(GALLERY_UPLOAD_DIR, name))
+    } catch {
+      // Ignore individual cleanup failures.
+    }
+  }
+} catch {
+  // Ignore startup cleanup failures.
+}
+
+async function safeUnlinkGalleryTempFile(filePath: string | undefined) {
+  if (!filePath) return
+
+  try {
+    await fs.promises.unlink(filePath)
+  } catch {
+    // The temporary file may already have been removed.
+  }
+}
+
+// Gallery uploads are streamed directly into MongoDB GridFS.
+// This avoids writing the complete upload to the Render filesystem first,
+// so large videos do not consume the app's temporary disk quota.
+class GalleryGridFsStorage {
+  async _handleFile(
+    _req: express.Request,
+    file: Express.Multer.File & { stream: NodeJS.ReadableStream },
+    callback: (error: Error | null, info?: Record<string, unknown>) => void,
+  ) {
+    try {
+      const type = getGalleryFileType(
+        file.mimetype,
+        file.originalname,
+      )
+
+      if (!type) {
+        file.stream.resume()
+        callback(
+          new Error(
+            `Unsupported gallery file type: ${file.originalname || "file"}`,
+          ),
+        )
+        return
+      }
+
+      const bucket = await getGalleryBucket()
+      const originalFilename =
+        file.originalname?.trim() || `gallery-${Date.now()}`
+      const contentType = getGalleryContentType(
+        file.mimetype,
+        originalFilename,
+        type,
+      )
+
+      const uploadStream = bucket.openUploadStream(
+        originalFilename,
+        {
+          contentType,
+          metadata: {
+            originalName: originalFilename,
+            mediaType: type,
+            contentType,
+          },
+        },
+      )
+
+      const input = file.stream as NodeJS.ReadableStream & {
+        pipe: (destination: NodeJS.WritableStream) => unknown
+      }
+
+      input.once("error", (error) => {
+        uploadStream.destroy(error as Error)
+        callback(error as Error)
+      })
+      uploadStream.once("error", (error) => callback(error))
+      uploadStream.once("finish", () => {
+        const extension =
+          path.extname(originalFilename).replace(/^\./, "").toLowerCase() ||
+          "bin"
+
+        callback(null, {
+          size: uploadStream.length,
+          filename: originalFilename,
+          destination: "mongodb://gridfs/galleryFiles",
+          path: "",
+          mimetype: contentType,
+          gridFsId: uploadStream.id.toString(),
+          gridFsFilename: originalFilename,
+          gridFsType: type,
+          gridFsExtension: extension,
+          gridFsContentType: contentType,
+        })
+      })
+
+      input.pipe(uploadStream)
+    } catch (error) {
+      callback(
+        error instanceof Error
+          ? error
+          : new Error("Failed to start gallery upload"),
+      )
+    }
+  }
+
+  async _removeFile(
+    _req: express.Request,
+    file: Express.Multer.File & { gridFsId?: string },
+    callback: (error: Error | null) => void,
+  ) {
+    try {
+      if (file.gridFsId) {
+        await deleteGalleryStoredFile(file.gridFsId)
+      }
+      callback(null)
+    } catch (error) {
+      callback(error instanceof Error ? error : new Error("Failed to remove gallery upload"))
+    }
+  }
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -54,17 +176,7 @@ const upload = multer({
 })
 
 const galleryUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, callback) => {
-      callback(null, GALLERY_UPLOAD_DIR)
-    },
-    filename: (_req, file, callback) => {
-      callback(
-        null,
-        `${Date.now()}-${randomUUID()}-${path.basename(file.originalname || "gallery-file")}`,
-      )
-    },
-  }),
+  storage: new GalleryGridFsStorage(),
   limits: {
     files: 20,
   },
@@ -982,18 +1094,6 @@ function getGalleryContentType(
   )
 }
 
-async function safeUnlinkGalleryTempFile(
-  filePath: string | undefined,
-) {
-  if (!filePath) return
-
-  try {
-    await fs.promises.unlink(filePath)
-  } catch {
-    // The file may already have been removed.
-  }
-}
-
 function slugifyGalleryTitle(value: string) {
   return cleanGalleryString(value)
     .normalize("NFKD")
@@ -1005,13 +1105,17 @@ function slugifyGalleryTitle(value: string) {
 }
 
 async function storeGalleryFile(
-  file: Express.Multer.File,
+  file: Express.Multer.File & {
+    gridFsId?: string
+    gridFsFilename?: string
+    gridFsType?: GalleryMediaType
+    gridFsExtension?: string
+  },
   publicBaseName?: string,
 ) {
-  const type = getGalleryFileType(
-    file.mimetype,
-    file.originalname,
-  )
+  const type =
+    file.gridFsType ||
+    getGalleryFileType(file.mimetype, file.originalname)
 
   if (!type) {
     await safeUnlinkGalleryTempFile(file.path)
@@ -1020,6 +1124,41 @@ async function storeGalleryFile(
     )
   }
 
+  // Normal browser uploads are already streamed into GridFS by the custom
+  // Multer storage engine. Keep this fast path so the request never copies a
+  // large upload to disk a second time.
+  if (file.gridFsId) {
+    const storageId = file.gridFsId
+    const originalFilename =
+      file.gridFsFilename ||
+      file.originalname?.trim() ||
+      `gallery-${Date.now()}`
+    const extension =
+      file.gridFsExtension ||
+      path.extname(originalFilename).replace(/^\./, "").toLowerCase() ||
+      "bin"
+    const publicSlug = slugifyGalleryTitle(
+      publicBaseName ||
+        path.basename(originalFilename, path.extname(originalFilename)),
+    )
+    const filePath = `/gallery/${type}/${publicSlug}.${extension}`
+
+    return {
+      id: storageId,
+      type,
+      url: APP_ORIGIN
+        ? `${APP_ORIGIN}${filePath}`
+        : filePath,
+      thumbnailUrl: "",
+      source: "upload" as const,
+      storageId,
+      extension,
+      publicSlug,
+    }
+  }
+
+  // URL imports and other server-side callers still provide a temporary file.
+  // Preserve that path so importing external media continues to work.
   if (!file.path) {
     throw new Error("Gallery upload did not create a temporary file.")
   }
@@ -1044,9 +1183,16 @@ async function storeGalleryFile(
         originalName: filename,
         mediaType: type,
         contentType,
-        publicSlug: slugifyGalleryTitle(publicBaseName || path.basename(filename, path.extname(filename))),
-        galleryTitle: publicBaseName || path.basename(filename, path.extname(filename)),
-        publicExtension: path.extname(filename).replace(/^\./, "").toLowerCase() || "bin",
+        publicSlug: slugifyGalleryTitle(
+          publicBaseName ||
+            path.basename(filename, path.extname(filename)),
+        ),
+        galleryTitle:
+          publicBaseName ||
+          path.basename(filename, path.extname(filename)),
+        publicExtension:
+          path.extname(filename).replace(/^\./, "").toLowerCase() ||
+          "bin",
       },
     },
   )
@@ -1063,8 +1209,13 @@ async function storeGalleryFile(
     })
 
     const storageId = uploadStream.id.toString()
-    const extension = path.extname(filename).replace(/^\./, "").toLowerCase() || "bin"
-    const publicSlug = slugifyGalleryTitle(publicBaseName || path.basename(filename, path.extname(filename)))
+    const extension =
+      path.extname(filename).replace(/^\./, "").toLowerCase() ||
+      "bin"
+    const publicSlug = slugifyGalleryTitle(
+      publicBaseName ||
+        path.basename(filename, path.extname(filename)),
+    )
     const filePath = `/gallery/${type}/${publicSlug}.${extension}`
 
     return {
@@ -1081,9 +1232,7 @@ async function storeGalleryFile(
     }
   } catch (error) {
     if (uploadStream.id) {
-      await deleteGalleryStoredFile(
-        uploadStream.id.toString(),
-      )
+      await deleteGalleryStoredFile(uploadStream.id.toString())
     }
     throw error
   } finally {
