@@ -7027,6 +7027,42 @@ export function createApp() {
     }
   })
 
+  app.get("/api/gallery", async (_req, res) => {
+    try {
+      // Public read endpoint: guests can view the gallery.
+      // Upload/edit/delete endpoints below still require authentication + permission.
+      const gallery = await getCollection<GalleryDocument>("gallery")
+      const results = await gallery
+        .find({ _galleryConfig: { $ne: true } })
+        .sort({ createdAt: -1 })
+        .toArray()
+
+      return res.json({
+        success: true,
+        items: results.map(serializeGalleryItem),
+      })
+    } catch (error) {
+      console.error("GET /api/gallery failed:", error)
+      return res.status(500).json({
+        success: false,
+        error: "Failed to load gallery",
+      })
+    }
+  })
+
+  app.get("/api/gallery/options", async (_req, res) => {
+    try {
+      const options = await getGalleryConfig()
+      return res.json({ success: true, ...options })
+    } catch (error) {
+      console.error("GET /api/gallery/options failed:", error)
+      return res.status(500).json({
+        success: false,
+        error: "Failed to load gallery options",
+      })
+    }
+  })
+
   app.post("/api/gallery/options", async (req, res) => {
     try {
       const user = await getRequestUser(req)
