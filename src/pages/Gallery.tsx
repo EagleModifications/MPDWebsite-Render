@@ -4347,7 +4347,7 @@ function GalleryMediaCollage({
       onClick={() => onClick(item)}
       showControls={false}
       className={className}
-      mediaClassName="h-full w-full !aspect-auto object-cover"
+      mediaClassName="h-full w-full object-cover"
     />
   )
 
@@ -4370,16 +4370,12 @@ function GalleryMediaCollage({
       )}
 
       {visible.length === 3 && (
-        <div className="grid aspect-video min-h-0 grid-cols-2 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-px bg-background">
-          <div className="min-h-0 min-w-0 overflow-hidden">
-            {render(visible[0], "h-full w-full")}
-          </div>
-          <div className="min-h-0 min-w-0 overflow-hidden">
-            {render(visible[1], "h-full w-full")}
-          </div>
-          <div className="col-span-2 min-h-0 min-w-0 overflow-hidden">
-            {render(visible[2], "h-full w-full")}
-          </div>
+        <div className="grid aspect-video min-h-0 grid-cols-3 gap-px bg-background">
+          {visible.map((item) => (
+            <div key={item.id} className="min-h-0 min-w-0 overflow-hidden">
+              {render(item, "h-full w-full")}
+            </div>
+          ))}
         </div>
       )}
 
