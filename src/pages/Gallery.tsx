@@ -953,21 +953,42 @@ function GalleryFilterDropdown({
   optionColors?: Record<string, string>
   optionKind?: "type" | "category" | "tag"
 }) {
-  const allSelected = options.length > 0 && value.length === options.length
+  // An empty filter array means "All". This keeps the UI separate from the
+  // actual list of individually selected options, so manually selecting every
+  // option never turns the All item on automatically.
+  const allSelected = value.length === 0
   const selectedCount = value.length
-  const showCount = selectedCount > 0 && !allSelected
+  const showCount = selectedCount > 0
+
+  const allLabel =
+    label === "Type"
+      ? "All Types"
+      : label === "Category"
+        ? "All Categories"
+        : "All Tags"
+
+  const longestLabel = useMemo(() => {
+    return [allLabel, ...options].reduce(
+      (longest, option) =>
+        option.length > longest.length ? option : longest,
+      "",
+    )
+  }, [allLabel, options])
+
+  // Keep the trigger exactly as wide as the menu needs to be. The hidden
+  // sizing text participates in layout while remaining invisible.
+  const triggerWidth = `${Math.max(82, longestLabel.length * 7.2 + 78)}px`
 
   const toggle = (option: string) => {
-    onChange(
-      value.includes(option)
-        ? value.filter((item) => item !== option)
-        : [...value, option],
-    )
+    if (value.includes(option)) {
+      onChange(value.filter((item) => item !== option))
+      return
+    }
+
+    onChange([...value, option])
   }
 
-  const clearToAll = () => onChange([...options])
-
-  const displayLabel = showCount ? label : label
+  const clearToAll = () => onChange([])
 
   return (
     <DropdownMenu>
@@ -977,15 +998,19 @@ function GalleryFilterDropdown({
           variant="outline"
           size="sm"
           aria-label={ariaLabel}
-          className="h-10 w-fit min-w-0 shrink-0 justify-between gap-2 whitespace-nowrap px-3 text-sm font-medium"
+          style={{ width: triggerWidth }}
+          className="h-10 shrink-0 justify-between gap-2 whitespace-nowrap px-3 text-sm font-medium"
         >
-          <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
-            <span>{displayLabel}</span>
+          <span className="relative flex min-w-0 items-center whitespace-nowrap">
+            <span>{label}</span>
             {showCount && (
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500/15 px-1 text-[10px] font-semibold leading-none text-blue-400">
+              <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500/15 px-1 text-[10px] font-semibold leading-none text-blue-400">
                 {selectedCount}
               </span>
             )}
+            <span aria-hidden="true" className="absolute -z-10 whitespace-nowrap opacity-0">
+              {longestLabel}
+            </span>
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
         </Button>
@@ -993,7 +1018,8 @@ function GalleryFilterDropdown({
 
       <DropdownMenuContent
         align="end"
-        className="z-[120] w-max min-w-[100%] max-w-[min(360px,calc(100vw-24px))] rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl"
+        style={{ width: triggerWidth }}
+        className="z-[120] max-w-[min(360px,calc(100vw-24px))] rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl"
       >
         <DropdownMenuItem
           onSelect={(event) => event.preventDefault()}
@@ -1005,9 +1031,7 @@ function GalleryFilterDropdown({
               : "text-foreground hover:bg-accent",
           ].join(" ")}
         >
-          <span className="font-medium">
-            All {label === "Type" ? "Types" : `${label}s`}
-          </span>
+          <span className="font-medium">{allLabel}</span>
           {allSelected && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
         </DropdownMenuItem>
 
@@ -1037,13 +1061,18 @@ function GalleryFilterDropdown({
                   <span
                     aria-hidden="true"
                     className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: optionColors?.[option] ?? "#3b82f6" }}
+                    style={{
+                      backgroundColor:
+                        optionColors?.[option] ?? "#3b82f6",
+                    }}
                   />
                 )}
                 <span>{option}</span>
               </span>
 
-              {checked && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
+              {checked && (
+                <Check className="h-4 w-4 shrink-0 text-blue-500" />
+              )}
             </DropdownMenuItem>
           )
         })}
@@ -1075,13 +1104,13 @@ export default function Gallery() {
     useState(false)
 
   const [categoryFilters, setCategoryFilters] =
-    useState<string[]>([...DEFAULT_GALLERY_CATEGORIES])
+    useState<string[]>([])
 
   const [mediaFilters, setMediaFilters] =
-    useState<string[]>([...DEFAULT_GALLERY_MEDIA_FILTERS])
+    useState<string[]>([])
 
   const [tagFilters, setTagFilters] =
-    useState<string[]>([...DEFAULT_GALLERY_TAGS])
+    useState<string[]>([])
 
   const [galleryCategories, setGalleryCategories] =
     useState<string[]>([...DEFAULT_GALLERY_CATEGORIES])
@@ -1306,14 +1335,14 @@ export default function Gallery() {
           if (Array.isArray(optionsData.categories)) {
             const categories = optionsData.categories.map(String).filter(Boolean)
             setGalleryCategories(categories)
-            setCategoryFilters(categories)
+            setCategoryFilters([])
           }
           if (Array.isArray(optionsData.tags)) {
             const tags = optionsData.tags.map(String).filter(Boolean)
             setGalleryTags(tags)
-            setTagFilters(tags)
+            setTagFilters([])
           }
-          setMediaFilters([...DEFAULT_GALLERY_MEDIA_FILTERS])
+          setMediaFilters([])
           if (optionsData.tagCategories && typeof optionsData.tagCategories === "object") {
             setGalleryTagCategories(optionsData.tagCategories)
           }
@@ -2366,18 +2395,18 @@ export default function Gallery() {
                 />
 
                 {(
-                  (categoryFilters.length > 0 && categoryFilters.length < galleryCategories.length) ||
-                  (mediaFilters.length > 0 && mediaFilters.length < DEFAULT_GALLERY_MEDIA_FILTERS.length) ||
-                  (tagFilters.length > 0 && tagFilters.length < availableFilterTags.length)
+                  (categoryFilters.length > 0) ||
+                  (mediaFilters.length > 0) ||
+                  (tagFilters.length > 0)
                 ) && (
                   <Button
                     type="button"
                     variant="ghost"
                     className="h-10 px-3 text-xs text-muted-foreground hover:text-blue-400"
                     onClick={() => {
-                      setCategoryFilters([...galleryCategories])
-                      setMediaFilters([...DEFAULT_GALLERY_MEDIA_FILTERS])
-                      setTagFilters([...galleryTags])
+                      setCategoryFilters([])
+                      setMediaFilters([])
+                      setTagFilters([])
                     }}
                   >
                     Clear Filters
@@ -4332,25 +4361,25 @@ function GalleryMediaCollage({
       {visible.length === 1 && render(visible[0])}
 
       {visible.length === 2 && (
-        <div className="grid grid-cols-2 items-start gap-1 bg-background">
+        <div className="grid grid-cols-2 gap-1 bg-background auto-rows-fr">
           {visible.map((item) => (
-            <div key={item.id} className="min-w-0 self-start">{render(item)}</div>
+            <div key={item.id} className="min-w-0">{render(item)}</div>
           ))}
         </div>
       )}
 
       {visible.length === 3 && (
-        <div className="grid grid-cols-2 items-start gap-1 bg-background">
-          <div className="min-w-0 self-start">{render(visible[0])}</div>
-          <div className="min-w-0 self-start">{render(visible[1])}</div>
-          <div className="col-span-2 min-w-0 self-start">{render(visible[2])}</div>
+        <div className="grid grid-cols-2 gap-1 bg-background auto-rows-fr">
+          <div className="min-w-0">{render(visible[0])}</div>
+          <div className="min-w-0">{render(visible[1])}</div>
+          <div className="col-span-2 min-w-0">{render(visible[2])}</div>
         </div>
       )}
 
       {visible.length === 4 && (
-        <div className="grid grid-cols-2 items-start gap-1 bg-background">
+        <div className="grid grid-cols-2 gap-1 bg-background auto-rows-fr">
           {visible.map((item) => (
-            <div key={item.id} className="relative min-w-0 self-start">
+            <div key={item.id} className="relative min-w-0">
               {render(item)}
               {item.id === visible[3].id && hidden.length > 0 && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40">
@@ -4433,16 +4462,16 @@ function GalleryMediaCard({
     <img
       src={media.url}
       alt={title}
-      className="block h-auto w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+      className="block aspect-video h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
     />
   ) : getMediaThumbnail(media) ? (
     <img
       src={getMediaThumbnail(media)}
       alt={title}
-      className="block h-auto w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+      className="block aspect-video h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
     />
   ) : isEmbeddableVideo(media) ? (
-    <div className="aspect-video w-full bg-black">
+    <div className="aspect-video w-full overflow-hidden bg-black">
       <iframe
         src={getVideoEmbedUrl(media.url)}
         title={title}
@@ -4459,7 +4488,7 @@ function GalleryMediaCard({
       loop
       playsInline
       preload="auto"
-      className="block h-auto w-full bg-black object-contain transition duration-300 group-hover:scale-[1.01]"
+      className="block aspect-video h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
     />
   )
 
