@@ -385,10 +385,22 @@ export default function ActivityRoster() {
         setMembers(roster)
 
         if (resetFilters) {
-          // "All" means every option is selected. Keep the explicit
-          // All state enabled so every individual checkbox renders checked.
-          setStatusFilters([])
-          setRankFilters([])
+          const defaultRanks = Array.from(
+            new Map(
+              roster.map((member) => [
+                normalizeRank(member.rank),
+                cleanValue(member.rank),
+              ] as const),
+            ).values(),
+          ).filter(Boolean)
+
+          // "All" means every option is selected. Keep the underlying
+          // selections populated so the dropdown checkboxes and Active
+          // Filters row both show every selected option.
+          setStatusFilters(
+            statusOptions.map((status) => status.id),
+          )
+          setRankFilters(defaultRanks)
           setAllStatusesSelected(true)
           setAllRanksSelected(true)
           setSearch("")
@@ -991,7 +1003,9 @@ export default function ActivityRoster() {
   }
 
   const clearStatuses = () => {
-    setStatusFilters([])
+    setStatusFilters(
+      statusOptions.map((status) => status.id),
+    )
     setAllStatusesSelected(true)
     setSelectedCopied(false)
     void logAction({ module: "activity", action: "clear-status-filters", category: "roster", division, summary: `Cleared status filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
@@ -1037,7 +1051,7 @@ export default function ActivityRoster() {
   }
 
   const clearRanks = () => {
-    setRankFilters([])
+    setRankFilters([...rankOptions])
     setAllRanksSelected(true)
     setSelectedCopied(false)
     void logAction({ module: "activity", action: "clear-rank-filters", category: "roster", division, summary: `Cleared rank filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.` })
@@ -1048,8 +1062,10 @@ export default function ActivityRoster() {
   ───────────────────────────────────────────── */
 
   const clearFilters = () => {
-    setStatusFilters([])
-    setRankFilters([])
+    setStatusFilters(
+      statusOptions.map((status) => status.id),
+    )
+    setRankFilters([...rankOptions])
     setAllStatusesSelected(true)
     setAllRanksSelected(true)
     setSelectedCopied(false)
@@ -1059,8 +1075,10 @@ export default function ActivityRoster() {
 
   const resetFilters = () => {
     selectionAnchorRef.current = null
-    setStatusFilters([])
-    setRankFilters([])
+    setStatusFilters(
+      statusOptions.map((status) => status.id),
+    )
+    setRankFilters([...rankOptions])
     setAllStatusesSelected(true)
     setAllRanksSelected(true)
     setSelectedCopied(false)
@@ -1087,9 +1105,7 @@ export default function ActivityRoster() {
 
   const filtersAreDefault =
     allStatusesSelected &&
-    allRanksSelected &&
-    statusFilters.length === 0 &&
-    rankFilters.length === 0
+    allRanksSelected
 
   // "All" is an explicit UI state. Selecting every individual option
   // must NOT turn All back on, and those selections must remain visible
@@ -1845,67 +1861,42 @@ export default function ActivityRoster() {
               Active filters:
             </div>
 
-            {!statusFilterIsActive &&
-            !rankFilterIsActive ? (
-              <span className="text-xs text-muted-foreground">
-                None
-              </span>
-            ) : (
-              <>
-                {statusFilterIsActive &&
-                  statusFilters.map(
-                  (status) => {
-                    const Icon =
-                      getStatusIcon(status)
+            {statusFilters.map((status) => {
+              const Icon = getStatusIcon(status)
 
-                    return (
-                      <button
-                        key={`status-${status}`}
-                        type="button"
-                        onClick={() =>
-                          toggleStatusFilter(
-                            status,
-                          )
-                        }
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80 ${getStatusClasses(
-                          status,
-                        )}`}
-                      >
-                        <Icon className="h-3 w-3" />
+              return (
+                <button
+                  key={`status-${status}`}
+                  type="button"
+                  onClick={() => toggleStatusFilter(status)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80 ${getStatusClasses(status)}`}
+                >
+                  <Icon className="h-3 w-3" />
+                  {getStatusLabel(status)}
+                  <X className="h-3 w-3" />
+                </button>
+              )
+            })}
 
-                        {getStatusLabel(
-                          status,
-                        )}
+            {rankFilters.map((rank) => (
+              <button
+                key={`rank-${rank}`}
+                type="button"
+                onClick={() => toggleRankFilter(rank)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
+              >
+                <Shield className="h-3 w-3" />
+                {rank}
+                <X className="h-3 w-3" />
+              </button>
+            ))}
 
-                        <X className="h-3 w-3" />
-                      </button>
-                    )
-                  },
-                )}
-
-                {rankFilterIsActive &&
-                  rankFilters.map(
-                  (rank) => (
-                    <button
-                      key={`rank-${rank}`}
-                      type="button"
-                      onClick={() =>
-                        toggleRankFilter(
-                          rank,
-                        )
-                      }
-                      className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-500/20"
-                    >
-                      <Shield className="h-3 w-3" />
-
-                      {rank}
-
-                      <X className="h-3 w-3" />
-                    </button>
-                  ),
-                )}
-              </>
-            )}
+            {statusFilters.length === 0 &&
+              rankFilters.length === 0 && (
+                <span className="text-xs text-muted-foreground">
+                  None
+                </span>
+              )}
 
             {(hasFilterSelection || hasFilterChanges) && (
               <div className="flex items-center gap-2">
