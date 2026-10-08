@@ -4710,18 +4710,21 @@ function GalleryMediaCard({
   title,
   onClick,
   showOverlay = true,
+  className,
 }: {
   media: GalleryMedia
   title: string
   onClick: () => void
   showOverlay?: boolean
+  className?: string
 }) {
   return (
     <button
       type="button"
       className={[
         "group relative flex h-auto min-h-0 w-full items-center justify-center overflow-hidden bg-black text-left",
-      ].join(" ")}
+        className,
+      ].filter(Boolean).join(" ")}
       onClick={onClick}
       aria-label={`View ${title}`}
     >
