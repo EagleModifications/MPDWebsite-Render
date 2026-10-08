@@ -4600,44 +4600,35 @@ function GalleryMediaCollage({
       media={item}
       title={title}
       showOverlay={false}
-      className="h-full min-h-0"
+      className="min-h-0"
       onClick={() => onClick(item)}
     />
   )
 
-  const collageClass =
-    visible.length === 1
-      ? "aspect-[2/1]"
-      : visible.length === 2
-        ? "aspect-[2/1]"
-        : visible.length === 3
-          ? "aspect-[2/1]"
-          : "aspect-[2/1]"
-
   return (
-    <div className={`relative w-full overflow-hidden bg-black ${collageClass}`}>
+    <div className="relative w-full overflow-hidden">
       {visible.length === 1 ? (
-        <div className="h-full w-full min-h-0 overflow-hidden">
+        <div className="w-full overflow-hidden">
           {renderMedia(visible[0])}
         </div>
       ) : visible.length === 2 ? (
-        <div className="grid h-full w-full min-h-0 grid-cols-2 gap-px bg-black">
+        <div className="grid w-full grid-cols-2 gap-px bg-black">
           {visible.map((item) => (
-            <div key={item.id} className="h-full min-h-0 min-w-0 overflow-hidden">
+            <div key={item.id} className="min-w-0 overflow-hidden">
               {renderMedia(item)}
             </div>
           ))}
         </div>
       ) : visible.length === 3 ? (
-        <div className="grid h-full w-full min-h-0 grid-cols-2 grid-rows-2 gap-px bg-black">
-          <div className="h-full min-h-0 min-w-0 overflow-hidden">{renderMedia(visible[0])}</div>
-          <div className="h-full min-h-0 min-w-0 overflow-hidden">{renderMedia(visible[1])}</div>
-          <div className="col-span-2 h-full min-h-0 min-w-0 overflow-hidden">{renderMedia(visible[2])}</div>
+        <div className="grid w-full grid-cols-3 gap-px bg-black">
+          {visible.map((item) => (
+            <div key={item.id} className="min-w-0 overflow-hidden">{renderMedia(item)}</div>
+          ))}
         </div>
       ) : (
-        <div className="grid h-full w-full min-h-0 grid-cols-2 grid-rows-2 gap-px bg-black">
+        <div className="grid w-full grid-cols-2 gap-px bg-black">
           {visible.map((item, index) => (
-            <div key={item.id} className="group relative h-full min-h-0 min-w-0 overflow-hidden">
+            <div key={item.id} className="group relative min-w-0 overflow-hidden">
               {renderMedia(item)}
 
               {index === 3 && media.length >= 5 ? (
@@ -4722,7 +4713,7 @@ function GalleryMediaCard({
     <button
       type="button"
       className={[
-        "group relative flex h-auto min-h-0 w-full items-center justify-center overflow-hidden bg-black text-left",
+        "group relative flex h-auto min-h-0 w-full items-start justify-center overflow-hidden bg-black text-left",
         className,
       ].filter(Boolean).join(" ")}
       onClick={onClick}
