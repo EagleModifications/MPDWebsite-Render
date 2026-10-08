@@ -12,6 +12,7 @@ import { createPortal } from "react-dom"
 import {
   Check,
   Copy,
+  Copy,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -114,6 +115,7 @@ type GalleryTag = string
 
 type GalleryItem = {
   id: string
+  slug?: string
   slug?: string
   title: string
   description: string
@@ -709,8 +711,6 @@ function GalleryMultiSelect({
   optionColors,
   placeholder,
   allowEmpty = false,
-  searchable = false,
-  searchPlaceholder = "Search...",
   onChange,
 }: {
   id: string
@@ -719,12 +719,9 @@ function GalleryMultiSelect({
   optionColors?: Record<string, string>
   placeholder: string
   allowEmpty?: boolean
-  searchable?: boolean
-  searchPlaceholder?: string
   onChange: (value: string[]) => void
 }) {
   const dropdown = useContext(DropdownContext)
-  const [searchValue, setSearchValue] = useState("")
 
   if (!dropdown) {
     throw new Error("GalleryMultiSelect must be used inside DropdownProvider.")
@@ -734,10 +731,7 @@ function GalleryMultiSelect({
   const open = openDropdown === id
 
   useEffect(() => {
-    if (!open) {
-      setSearchValue("")
-      return
-    }
+    if (!open) return
 
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as HTMLElement
@@ -762,11 +756,7 @@ function GalleryMultiSelect({
     ? placeholder
     : value.length === 1
       ? value[0]
-      : `${value.length} selected`
-
-  const visibleOptions = searchable
-    ? options.filter((option) => option.toLowerCase().includes(searchValue.trim().toLowerCase()))
-    : options
+      : `${value.length} categories selected`
 
   function toggle(option: string) {
     if (value.includes(option)) {
@@ -786,29 +776,17 @@ function GalleryMultiSelect({
         onClick={() => setOpenDropdown(open ? null : id)}
         className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none transition-all hover:border-blue-500/30 hover:bg-muted/40"
       >
-        <span className={`min-w-0 truncate text-left ${value.length === 0 ? "text-muted-foreground" : ""}`}>{selectedLabel}</span>
+        <span className="min-w-0 truncate text-left">{selectedLabel}</span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+6px)] z-[10070] w-full min-w-[240px] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl ring-1 ring-black/10">
-          {searchable ? (
-            <div className="border-b border-border/70 p-2">
-              <Input
-                autoFocus
-                value={searchValue}
-                onChange={(event) => setSearchValue(event.target.value)}
-                placeholder={searchPlaceholder}
-                className="h-8 text-xs"
-              />
-            </div>
-          ) : null}
-
+        <div className="absolute left-0 top-[calc(100%+6px)] z-[10070] w-full min-w-[220px] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl ring-1 ring-black/10">
           <div className="max-h-64 overflow-y-auto p-1.5" role="listbox" aria-multiselectable="true">
-            {visibleOptions.length === 0 ? (
-              <div className="px-3 py-3 text-xs text-muted-foreground">No matches found.</div>
+            {options.length === 0 ? (
+              <div className="px-3 py-3 text-xs text-muted-foreground">No categories available.</div>
             ) : (
-              visibleOptions.map((option) => {
+              options.map((option) => {
                 const selected = value.includes(option)
                 const color = optionColors?.[option] ?? "#3b82f6"
                 return (
@@ -818,11 +796,13 @@ function GalleryMultiSelect({
                     role="option"
                     aria-selected={selected}
                     onClick={() => toggle(option)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${selected ? "bg-blue-500/10 text-blue-400" : "hover:bg-muted/60"}`}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/60"
                   >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-border bg-background">
+                      {selected && <Check className="h-3.5 w-3.5 text-blue-500" />}
+                    </span>
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                     <span className="min-w-0 flex-1 truncate">{option}</span>
-                    {selected ? <Check className="h-4 w-4 shrink-0 text-blue-500" /> : null}
                   </button>
                 )
               })
@@ -830,9 +810,9 @@ function GalleryMultiSelect({
           </div>
           <div className="flex items-center justify-between border-t border-border/70 px-2.5 py-2">
             <span className="text-[11px] text-muted-foreground">
-              {value.length === 0 ? `No ${placeholder.toLowerCase()} selected` : `${value.length} selected`}
+              {value.length === 0 ? "No categories selected" : `${value.length} selected`}
             </span>
-            {allowEmpty && value.length > 0 ? (
+            {allowEmpty && value.length > 0 && (
               <button
                 type="button"
                 className="text-[11px] font-medium text-blue-500 hover:text-blue-400"
@@ -840,7 +820,7 @@ function GalleryMultiSelect({
               >
                 Clear
               </button>
-            ) : null}
+            )}
           </div>
         </div>
       )}
@@ -975,7 +955,9 @@ function GalleryFilterDropdown({
   optionColors?: Record<string, string>
   optionKind?: "type" | "category" | "tag"
 }) {
-  const hasSpecificSelection = value.length > 0
+  const allSelected = options.length > 0 && value.length === options.length
+  const selectedCount = value.length
+  const showCount = selectedCount > 0 && !allSelected
 
   const toggle = (option: string) => {
     onChange(
@@ -985,26 +967,9 @@ function GalleryFilterDropdown({
     )
   }
 
-  const pluralLabel =
-    label === "Type"
-      ? "Types"
-      : label === "Category"
-        ? "Categories"
-        : "Tags"
+  const clearToAll = () => onChange([...options])
 
-  // Keep the trigger and dropdown the same width, sized from the longest
-  // visible option rather than using a fixed width.
-  const longestFilterText = [
-    `All ${pluralLabel}`,
-    label,
-    ...options,
-  ].reduce((longest, text) =>
-    text.length > longest.length ? text : longest,
-  "")
-  const filterWidth = `${Math.max(
-    104,
-    Math.min(320, Math.ceil(longestFilterText.length * 7.2 + 68)),
-  )}px`
+  const displayLabel = showCount ? label : label
 
   return (
     <DropdownMenu>
@@ -1014,14 +979,13 @@ function GalleryFilterDropdown({
           variant="outline"
           size="sm"
           aria-label={ariaLabel}
-          className="h-10 shrink-0 justify-between gap-2 px-3 text-sm font-medium"
-          style={{ width: filterWidth }}
+          className="h-10 w-fit min-w-0 shrink-0 justify-between gap-2 whitespace-nowrap px-3 text-sm font-medium"
         >
-          <span className="flex min-w-0 items-center gap-2 truncate">
-            <span className="truncate">{label}</span>
-            {hasSpecificSelection && (
-              <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-bold leading-none text-blue-400">
-                {value.length}
+          <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+            <span>{displayLabel}</span>
+            {showCount && (
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500/15 px-1 text-[10px] font-semibold leading-none text-blue-400">
+                {selectedCount}
               </span>
             )}
           </span>
@@ -1031,23 +995,22 @@ function GalleryFilterDropdown({
 
       <DropdownMenuContent
         align="end"
-        className="z-[120] rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl"
-        style={{ width: filterWidth }}
+        className="z-[120] w-max min-w-[100%] max-w-[min(360px,calc(100vw-24px))] rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl"
       >
         <DropdownMenuItem
           onSelect={(event) => event.preventDefault()}
-          onClick={() => onChange([])}
+          onClick={clearToAll}
           className={[
-            "rounded-lg px-3 py-2.5 text-sm",
-            !hasSpecificSelection
+            "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 whitespace-nowrap",
+            allSelected
               ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/10 focus:text-blue-400"
-              : "text-muted-foreground",
+              : "text-foreground hover:bg-accent",
           ].join(" ")}
         >
-          <span className="min-w-0 flex-1 font-medium">All {pluralLabel}</span>
-          {!hasSpecificSelection && (
-            <Check className="ml-auto h-4 w-4 shrink-0 text-blue-500" />
-          )}
+          <span className="font-medium">
+            All {label === "Type" ? "Types" : `${label}s`}
+          </span>
+          {allSelected && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
         </DropdownMenuItem>
 
         {options.map((option) => {
@@ -1059,31 +1022,30 @@ function GalleryFilterDropdown({
               onSelect={(event) => event.preventDefault()}
               onClick={() => toggle(option)}
               className={[
-                "rounded-lg px-3 py-2.5 text-sm",
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 whitespace-nowrap",
                 checked
                   ? "bg-blue-500/10 text-blue-400 focus:bg-blue-500/10 focus:text-blue-400"
-                  : "text-muted-foreground",
+                  : "text-foreground hover:bg-accent",
               ].join(" ")}
             >
-              {optionKind === "type" ? (
-                option === "Images" ? (
-                  <ImageIcon className="h-4 w-4 shrink-0 text-blue-500" />
+              <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                {optionKind === "type" ? (
+                  option === "Images" ? (
+                    <ImageIcon className="h-4 w-4 shrink-0 text-blue-500" />
+                  ) : (
+                    <Video className="h-4 w-4 shrink-0 text-blue-500" />
+                  )
                 ) : (
-                  <Video className="h-4 w-4 shrink-0 text-blue-500" />
-                )
-              ) : (
-                <span
-                  aria-hidden="true"
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: optionColors?.[option] ?? "#3b82f6",
-                  }}
-                />
-              )}
-              <span className="min-w-0 flex-1 truncate">{option}</span>
-              {checked && (
-                <Check className="ml-auto h-4 w-4 shrink-0 text-blue-500" />
-              )}
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: optionColors?.[option] ?? "#3b82f6" }}
+                  />
+                )}
+                <span>{option}</span>
+              </span>
+
+              {checked && <Check className="h-4 w-4 shrink-0 text-blue-500" />}
             </DropdownMenuItem>
           )
         })}
@@ -1115,13 +1077,13 @@ export default function Gallery() {
     useState(false)
 
   const [categoryFilters, setCategoryFilters] =
-    useState<string[]>([])
+    useState<string[]>([...DEFAULT_GALLERY_CATEGORIES])
 
   const [mediaFilters, setMediaFilters] =
-    useState<string[]>([])
+    useState<string[]>([...DEFAULT_GALLERY_MEDIA_FILTERS])
 
   const [tagFilters, setTagFilters] =
-    useState<string[]>([])
+    useState<string[]>([...DEFAULT_GALLERY_TAGS])
 
   const [galleryCategories, setGalleryCategories] =
     useState<string[]>([...DEFAULT_GALLERY_CATEGORIES])
@@ -1144,14 +1106,20 @@ export default function Gallery() {
   const [showTaxonomyModal, setShowTaxonomyModal] =
     useState(false)
 
-  const [taxonomyCreate, setTaxonomyCreate] =
-    useState<"category" | "tag" | null>(null)
-  const [taxonomyCreateName, setTaxonomyCreateName] =
+  const [newGalleryCategory, setNewGalleryCategory] =
     useState("")
-  const [taxonomyCreateColor, setTaxonomyCreateColor] =
+
+  const [newGalleryTag, setNewGalleryTag] =
+    useState("")
+
+  const [newGalleryTagCategories, setNewGalleryTagCategories] =
+    useState<string[]>(["Community"])
+
+  const [newGalleryCategoryColor, setNewGalleryCategoryColor] =
     useState("#3b82f6")
-  const [taxonomyCreateTags, setTaxonomyCreateTags] =
-    useState<string[]>([])
+
+  const [newGalleryTagColor, setNewGalleryTagColor] =
+    useState("#3b82f6")
 
   const [showModal, setShowModal] =
     useState(false)
@@ -1167,9 +1135,6 @@ export default function Gallery() {
 
   const [infoItem, setInfoItem] =
     useState<GalleryItem | null>(null)
-
-  const [copiedLink, setCopiedLink] =
-    useState(false)
 
   const [title, setTitle] =
     useState("")
@@ -1248,17 +1213,13 @@ export default function Gallery() {
       html.style.overflow = previousHtmlOverflow
       body.style.paddingRight = previousBodyPaddingRight
     }
-  }, [showModal, showTaxonomyModal, viewer, infoItem, deleteTarget, taxonomyEdit, taxonomyCreate])
+  }, [showModal, showTaxonomyModal, viewer, infoItem, deleteTarget, taxonomyEdit])
 
   useEffect(() => {
-    if (!showTaxonomyModal && !taxonomyEdit && !taxonomyCreate) return
+    if (!showTaxonomyModal && !taxonomyEdit) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
-      if (taxonomyCreate) {
-        setTaxonomyCreate(null)
-        return
-      }
       if (taxonomyEdit) {
         setTaxonomyEdit(null)
         setShowTaxonomyModal(true)
@@ -1269,7 +1230,7 @@ export default function Gallery() {
 
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [showTaxonomyModal, taxonomyEdit, taxonomyCreate])
+  }, [showTaxonomyModal, taxonomyEdit])
 
   const dragDepthRef =
     useRef(0)
@@ -1345,11 +1306,16 @@ export default function Gallery() {
         if (optionsResponse.ok) {
           const optionsData = await optionsResponse.json()
           if (Array.isArray(optionsData.categories)) {
-            setGalleryCategories(optionsData.categories.map(String).filter(Boolean))
+            const categories = optionsData.categories.map(String).filter(Boolean)
+            setGalleryCategories(categories)
+            setCategoryFilters(categories)
           }
           if (Array.isArray(optionsData.tags)) {
-            setGalleryTags(optionsData.tags.map(String).filter(Boolean))
+            const tags = optionsData.tags.map(String).filter(Boolean)
+            setGalleryTags(tags)
+            setTagFilters(tags)
           }
+          setMediaFilters([...DEFAULT_GALLERY_MEDIA_FILTERS])
           if (optionsData.tagCategories && typeof optionsData.tagCategories === "object") {
             setGalleryTagCategories(optionsData.tagCategories)
           }
@@ -1448,180 +1414,52 @@ export default function Gallery() {
     )
   }
 
-  function getDuplicateName(value: string, existing: readonly string[]) {
-    const base = `${value} Copy`.slice(0, 40).trim()
-    if (!existing.some((entry) => entry.toLowerCase() === base.toLowerCase())) {
-      return base
-    }
+  async function addGalleryOption(type: "category" | "tag", color?: string) {
+    const rawValue = type === "category" ? newGalleryCategory : newGalleryTag
+    const value = rawValue.trim()
 
-    for (let index = 2; index < 1000; index += 1) {
-      const suffix = ` Copy ${index}`
-      const candidate = `${value}${suffix}`.slice(0, 40).trim()
-      if (!existing.some((entry) => entry.toLowerCase() === candidate.toLowerCase())) {
-        return candidate
-      }
-    }
-
-    return `${value} Copy`.slice(0, 40).trim()
-  }
-
-  async function refreshGalleryTaxonomy(data: Record<string, unknown>) {
-    if (Array.isArray(data.categories)) setGalleryCategories(data.categories.map(String).filter(Boolean))
-    if (Array.isArray(data.tags)) setGalleryTags(data.tags.map(String).filter(Boolean))
-    if (data.categoryColors && typeof data.categoryColors === "object") {
-      setGalleryCategoryColors(data.categoryColors as Record<string, string>)
-    }
-    if (data.tagColors && typeof data.tagColors === "object") {
-      setGalleryTagColors(data.tagColors as Record<string, string>)
-    }
-    if (data.tagCategories && typeof data.tagCategories === "object") {
-      setGalleryTagCategories(data.tagCategories as Record<string, string[]>)
-    }
-  }
-
-  async function updateTagAssignments(
-    categoryName: string,
-    selectedTags: readonly string[],
-  ) {
-    const desired = new Set(selectedTags)
-    const assignments = { ...galleryTagCategories }
-
-    for (const tag of galleryTags) {
-      const currentCategories = galleryCategories.filter((name) =>
-        (assignments[name] ?? []).includes(tag),
-      )
-      const nextCategories = currentCategories.filter((name) => name !== categoryName)
-      if (desired.has(tag)) nextCategories.push(categoryName)
-
-      const unique = Array.from(new Set(nextCategories))
-      if (unique.join("\u0000") === currentCategories.join("\u0000")) continue
-
-      const response = await fetch("/api/gallery/options", {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "tag",
-          value: tag,
-          newValue: tag,
-          color: galleryTagColors[tag] ?? "#3b82f6",
-          categories: unique,
-        }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || `Failed to update sub-tag ${tag}.`)
-      await refreshGalleryTaxonomy(data)
-    }
-  }
-
-  async function createTaxonomyOption() {
-    if (!taxonomyCreate) return
-
-    const value = taxonomyCreateName.trim()
     if (!value) {
-      toast.error(`Enter a ${taxonomyCreate === "category" ? "category" : "sub-tag"} name.`)
+      toast.error(`Enter a ${type} name.`)
       return
     }
-    if (value.length > 40) {
-      toast.error("Names must be 40 characters or fewer.")
-      return
-    }
-    setTaxonomyBusy(true)
+
     try {
-      const response = await fetch("/api/gallery/options", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: taxonomyCreate,
-          value,
-          color: taxonomyCreateColor,
-        }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || `Failed to create ${taxonomyCreate}.`)
-      await refreshGalleryTaxonomy(data)
-
-      if (taxonomyCreate === "category" && taxonomyCreateTags.length > 0) {
-        await updateTagAssignments(value, taxonomyCreateTags)
-      }
-
-      setTaxonomyCreate(null)
-      setTaxonomyCreateName("")
-      setTaxonomyCreateColor("#3b82f6")
-      setTaxonomyCreateTags([])
-      toast.success(`${taxonomyCreate === "category" ? "Category" : "Sub-tag"} created.`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to create gallery option.")
-    } finally {
-      setTaxonomyBusy(false)
-    }
-  }
-
-  function beginTaxonomyCreate(type: "category" | "tag", copyFrom?: string) {
-    setTaxonomyCreate(type)
-    setTaxonomyCreateName(copyFrom ? getDuplicateName(copyFrom, type === "category" ? galleryCategories : galleryTags) : "")
-    setTaxonomyCreateColor(
-      copyFrom
-        ? type === "category"
-          ? galleryCategoryColors[copyFrom] ?? "#3b82f6"
-          : galleryTagColors[copyFrom] ?? "#3b82f6"
-        : "#3b82f6",
-    )
-
-    if (copyFrom && type === "category") {
-      setTaxonomyCreateTags(galleryTagCategories[copyFrom] ?? [])
-    } else {
-      setTaxonomyCreateTags([])
-    }
-  }
-
-  async function duplicateTaxonomyOption(type: "category" | "tag", value: string) {
-    const existing = type === "category" ? galleryCategories : galleryTags
-    const duplicateName = getDuplicateName(value, existing)
-    const color = type === "category"
-      ? galleryCategoryColors[value] ?? "#3b82f6"
-      : galleryTagColors[value] ?? "#3b82f6"
-
-    setTaxonomyBusy(true)
-    try {
-      const assignedCategories = type === "tag"
-        ? galleryCategories.filter((categoryName) =>
-            (galleryTagCategories[categoryName] ?? []).includes(value),
-          )
-        : []
-      const assignedTags = type === "category"
-        ? galleryTagCategories[value] ?? []
-        : []
-
       const response = await fetch("/api/gallery/options", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
-          value: duplicateName,
-          color,
-          categories: type === "tag" ? assignedCategories : undefined,
+          value,
+          color: color || undefined,
+          categories: type === "tag" ? newGalleryTagCategories : undefined,
         }),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || `Failed to duplicate ${type}.`)
-      await refreshGalleryTaxonomy(data)
+      if (!response.ok) throw new Error(data.error || `Failed to create ${type}.`)
 
-      if (type === "category" && assignedTags.length > 0) {
-        await updateTagAssignments(duplicateName, assignedTags)
+      if (type === "category") {
+        setGalleryCategories(Array.isArray(data.categories) ? data.categories : (current => [...current, value]))
+        setNewGalleryCategory("")
+        setNewGalleryCategoryColor("#3b82f6")
+      } else {
+        setGalleryTags(Array.isArray(data.tags) ? data.tags : (current => [...current, value]))
+        setNewGalleryTag("")
+        setNewGalleryTagColor("#3b82f6")
       }
+      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
+      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
 
-      toast.success(`${type === "category" ? "Category" : "Sub-tag"} duplicated as ${duplicateName}.`)
+      toast.success(`${type === "category" ? "Category" : "Tag"} created.`)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : `Failed to duplicate ${type}.`)
-    } finally {
-      setTaxonomyBusy(false)
+      toast.error(error instanceof Error ? error.message : `Failed to create ${type}.`)
     }
   }
 
   function beginTaxonomyEdit(type: "category" | "tag", value: string) {
+    // Close the management modal before opening the edit modal so the edit
+    // dialog can never render behind its parent/backdrop.
     setShowTaxonomyModal(false)
     setTaxonomyEdit({ type, value })
     setTaxonomyEditName(value)
@@ -1630,8 +1468,11 @@ export default function Gallery() {
         ? galleryCategoryColors[value] ?? "#3b82f6"
         : galleryTagColors[value] ?? "#3b82f6",
     )
-    if (type === "category") {
-      setTaxonomyEditCategories(galleryTagCategories[value] ?? [])
+    if (type === "tag") {
+      const assigned = galleryCategories.filter((categoryName) =>
+        (galleryTagCategories[categoryName] ?? []).includes(value),
+      )
+      setTaxonomyEditCategories(assigned)
     } else {
       setTaxonomyEditCategories([])
     }
@@ -1644,79 +1485,41 @@ export default function Gallery() {
       toast.error("Enter a name.")
       return
     }
-    if (newValue.length > 40) {
-      toast.error("Names must be 40 characters or fewer.")
-      return
-    }
 
     setTaxonomyBusy(true)
     try {
-      const oldValue = taxonomyEdit.value
-      const type = taxonomyEdit.type
       const response = await fetch("/api/gallery/options", {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          type,
-          value: oldValue,
+          type: taxonomyEdit.type,
+          value: taxonomyEdit.value,
           newValue,
           color: taxonomyEditColor,
+          categories: taxonomyEdit.type === "tag" ? taxonomyEditCategories : undefined,
         }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || "Failed to update gallery option.")
-      await refreshGalleryTaxonomy(data)
 
-      if (type === "category") {
-        // The category PUT preserves its existing sub-tag assignments. Rebuild
-        // those assignments from the searchable multi-select so removing a
-        // sub-tag also persists.
-        const selectedTags = taxonomyEditCategories
-        const assignmentCategory = newValue
-        const assignmentsAfterRename = data.tagCategories && typeof data.tagCategories === "object"
-          ? data.tagCategories as Record<string, string[]>
-          : galleryTagCategories
+      if (Array.isArray(data.categories)) setGalleryCategories(data.categories)
+      if (Array.isArray(data.tags)) setGalleryTags(data.tags)
+      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
+      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
 
-        for (const tag of galleryTags) {
-          const currentCategories = Object.entries(assignmentsAfterRename)
-            .filter(([, values]) => Array.isArray(values) && values.includes(tag))
-            .map(([name]) => name)
-          const nextCategories = currentCategories.filter((name) => name !== oldValue && name !== assignmentCategory)
-          if (selectedTags.includes(tag)) nextCategories.push(assignmentCategory)
-
-          const unique = Array.from(new Set(nextCategories))
-          if (unique.join("\u0000") === currentCategories.join("\u0000")) continue
-
-          const tagResponse = await fetch("/api/gallery/options", {
-            method: "PUT",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              type: "tag",
-              value: tag,
-              newValue: tag,
-              color: galleryTagColors[tag] ?? "#3b82f6",
-              categories: unique,
-            }),
-          })
-          const tagData = await tagResponse.json().catch(() => ({}))
-          if (!tagResponse.ok) throw new Error(tagData.error || `Failed to update sub-tag ${tag}.`)
-          await refreshGalleryTaxonomy(tagData)
-        }
+      if (taxonomyEdit.type === "category" && categoryFilters.includes(taxonomyEdit.value)) {
+        setCategoryFilters((current) => current.map((item) => item === taxonomyEdit.value ? newValue : item))
+      }
+      if (taxonomyEdit.type === "tag" && tagFilters.includes(taxonomyEdit.value)) {
+        setTagFilters((current) => current.map((item) => item === taxonomyEdit.value ? newValue : item))
       }
 
-      if (type === "category" && categoryFilters.includes(oldValue)) {
-        setCategoryFilters((current) => current.map((item) => item === oldValue ? newValue : item))
-      }
-      if (type === "tag" && tagFilters.includes(oldValue)) {
-        setTagFilters((current) => current.map((item) => item === oldValue ? newValue : item))
-      }
-
-      const editedType = type
+      const editedType = taxonomyEdit.type
       setTaxonomyEdit(null)
       setShowTaxonomyModal(true)
-      toast.success(`${editedType === "category" ? "Category" : "Sub-tag"} updated.`)
+      toast.success(`${editedType === "category" ? "Category" : "Tag"} updated.`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update gallery option.")
     } finally {
@@ -1725,7 +1528,7 @@ export default function Gallery() {
   }
 
   async function deleteTaxonomyOption(type: "category" | "tag", value: string) {
-    if (!window.confirm(`Delete ${type === "category" ? "category" : "sub-tag"} \"${value}\"?`)) return
+    if (!window.confirm(`Delete ${type === "category" ? "category" : "tag"} \"${value}\"?`)) return
 
     setTaxonomyBusy(true)
     try {
@@ -1737,10 +1540,15 @@ export default function Gallery() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || "Failed to delete gallery option.")
-      await refreshGalleryTaxonomy(data)
+
+      if (Array.isArray(data.categories)) setGalleryCategories(data.categories)
+      if (Array.isArray(data.tags)) setGalleryTags(data.tags)
+      if (data.categoryColors && typeof data.categoryColors === "object") setGalleryCategoryColors(data.categoryColors)
+      if (data.tagColors && typeof data.tagColors === "object") setGalleryTagColors(data.tagColors)
+      if (data.tagCategories && typeof data.tagCategories === "object") setGalleryTagCategories(data.tagCategories)
       setCategoryFilters((current) => current.filter((item) => item !== value))
       setTagFilters((current) => current.filter((item) => item !== value))
-      toast.success(`${type === "category" ? "Category" : "Sub-tag"} deleted.`)
+      toast.success(`${type === "category" ? "Category" : "Tag"} deleted.`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete gallery option.")
     } finally {
@@ -1879,7 +1687,13 @@ export default function Gallery() {
         xhr.timeout = 15 * 60 * 1000
         xhr.upload.onprogress = (event) => {
           if (!event.lengthComputable) return
-          const progress = Math.min(100, Math.round((event.loaded / event.total) * 100))
+          const rawProgress = (event.loaded / event.total) * 100
+          // 100% means the server has finished processing the upload, not merely
+          // that the browser has finished sending the request body. Keep the UI at
+          // 99% until the response arrives, then switch immediately to 100% / Ready.
+          const progress = event.loaded >= event.total
+            ? 99.9
+            : Math.min(99.9, Number(rawProgress.toFixed(1)))
           updatePendingMedia(item.id, { progress })
         }
         xhr.onload = () => resolve({ status: xhr.status, raw: xhr.responseText || "" })
@@ -2333,7 +2147,6 @@ export default function Gallery() {
   }
 
   function openInfo(item: GalleryItem) {
-    setCopiedLink(false)
     const url = new URL(window.location.href)
     url.searchParams.set("gallery", item.slug || item.id)
     url.hash = ""
@@ -2342,7 +2155,6 @@ export default function Gallery() {
   }
 
   function closeInfo() {
-    setCopiedLink(false)
     const url = new URL(window.location.href)
     url.searchParams.delete("gallery")
     window.history.replaceState({}, "", url)
@@ -2354,9 +2166,7 @@ export default function Gallery() {
 
     try {
       await navigator.clipboard.writeText(link)
-      setCopiedLink(true)
       toast.success("Gallery link copied.")
-      window.setTimeout(() => setCopiedLink(false), 1800)
     } catch {
       const textarea = document.createElement("textarea")
       textarea.value = link
@@ -2369,9 +2179,7 @@ export default function Gallery() {
       textarea.remove()
 
       if (copied) {
-        setCopiedLink(true)
         toast.success("Gallery link copied.")
-        window.setTimeout(() => setCopiedLink(false), 1800)
       } else {
         toast.error("Could not copy the gallery link.")
       }
@@ -2559,15 +2367,19 @@ export default function Gallery() {
                   optionColors={galleryTagColors}
                 />
 
-                {(categoryFilters.length > 0 || mediaFilters.length > 0 || tagFilters.length > 0) && (
+                {(
+                  (categoryFilters.length > 0 && categoryFilters.length < galleryCategories.length) ||
+                  (mediaFilters.length > 0 && mediaFilters.length < DEFAULT_GALLERY_MEDIA_FILTERS.length) ||
+                  (tagFilters.length > 0 && tagFilters.length < availableFilterTags.length)
+                ) && (
                   <Button
                     type="button"
                     variant="ghost"
                     className="h-10 px-3 text-xs text-muted-foreground hover:text-blue-400"
                     onClick={() => {
-                      setCategoryFilters([])
-                      setMediaFilters([])
-                      setTagFilters([])
+                      setCategoryFilters([...galleryCategories])
+                      setMediaFilters([...DEFAULT_GALLERY_MEDIA_FILTERS])
+                      setTagFilters([...galleryTags])
                     }}
                   >
                     Clear Filters
@@ -2923,37 +2735,17 @@ export default function Gallery() {
                     {infoItem.title}
                   </h2>
 
-                  {infoItem.category && (
-                    <span
-                      className="rounded-full border px-2 py-0.5 text-[10px] font-medium"
-                      style={{
-                        borderColor: `${galleryCategoryColors[infoItem.category] ?? "#3b82f6"}88`,
-                        backgroundColor: `${galleryCategoryColors[infoItem.category] ?? "#3b82f6"}1a`,
-                        color: galleryCategoryColors[infoItem.category] ?? "#3b82f6",
-                      }}
-                    >
-                      {infoItem.category}
-                    </span>
-                  )}
+                  <span
+                    className={[
+                      "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                      infoItem.category === "Fleet"
+                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                        : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+                    ].join(" ")}
+                  >
+                    {infoItem.category ?? "Community"}
+                  </span>
                 </div>
-
-                {Array.isArray(infoItem.tags) && infoItem.tags.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {infoItem.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full border px-2 py-0.5 text-[10px] font-medium"
-                        style={{
-                          borderColor: `${galleryTagColors[tag] ?? "#3b82f6"}88`,
-                          backgroundColor: `${galleryTagColors[tag] ?? "#3b82f6"}1a`,
-                          color: galleryTagColors[tag] ?? "#3b82f6",
-                        }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <Button
@@ -3059,25 +2851,26 @@ export default function Gallery() {
                     </span>
                   </div>
 
-                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="mt-2 grid grid-cols-2 items-start gap-2 sm:grid-cols-3">
                     {infoItem.media.map(
                       (media) => (
                         <div
                           key={media.id}
-                          className="overflow-hidden rounded-xl border border-border/70 bg-background/50"
+                          className="self-start overflow-hidden rounded-xl border border-border/70 bg-background/50"
                         >
                           <GalleryMediaCard
                             media={media}
                             title={
                               infoItem.title
                             }
-                            showOverlay={false}
                             onClick={() => {
+                              closeInfo()
                               openViewer(
                                 infoItem,
                                 media,
                               )
                             }}
+                            showView={false}
                           />
                         </div>
                       ),
@@ -3092,16 +2885,9 @@ export default function Gallery() {
                 type="button"
                 variant="outline"
                 onClick={() => void copyGalleryLink(infoItem)}
-                className="transition-all duration-200"
               >
-                {copiedLink ? (
-                  <Check className="mr-2 h-4 w-4 text-emerald-500" />
-                ) : (
-                  <Copy className="mr-2 h-4 w-4" />
-                )}
-                <span className="transition-all duration-200">
-                  {copiedLink ? "Copied" : "Copy Link"}
-                </span>
+                <Copy className="mr-2 h-4 w-4" />
+                Copy Link
               </Button>
 
               {canManageGallery && (
@@ -3226,192 +3012,143 @@ export default function Gallery() {
             }}
           >
             <DropdownProvider>
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="gallery-taxonomy-title"
-                className="relative z-[9999] flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-2xl"
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
-                  <div>
-                    <div className="mb-1 flex items-center gap-2 text-xs font-bold text-blue-500">
-                      <Settings2 className="h-3.5 w-3.5" />
-                      GALLERY SETTINGS
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="gallery-taxonomy-title"
+              className="relative z-[9999] flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-2xl"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+            <div className="flex items-start justify-between border-b border-border/70 px-5 py-4">
+              <div>
+                <div className="mb-1 flex items-center gap-2 text-xs font-bold text-blue-500">
+                  <Settings2 className="h-3.5 w-3.5" />
+                  GALLERY SETTINGS
+                </div>
+                <h2 id="gallery-taxonomy-title" className="text-lg font-semibold">Add Tags & Categories</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Create categories and sub-tags and choose the color shown throughout the gallery.</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowTaxonomyModal(false)} aria-label="Close">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto p-5">
+              <div className="space-y-5">
+                <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">Categories</h3>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Main gallery categories such as Community and Fleet.</p>
                     </div>
-                    <h2 id="gallery-taxonomy-title" className="text-lg font-semibold">Add Tags &amp; Categories</h2>
-                    <p className="mt-1 text-xs text-muted-foreground">Create categories and sub-tags and choose the color shown throughout the gallery.</p>
                   </div>
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowTaxonomyModal(false)} aria-label="Close">
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div className="mt-3 flex gap-2">
+                    <Input value={newGalleryCategory} onChange={(event) => setNewGalleryCategory(event.target.value)} placeholder="Create category" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("category", newGalleryCategoryColor) }} />
+                    <GalleryColorPicker value={newGalleryCategoryColor} onChange={setNewGalleryCategoryColor} ariaLabel="New category color" />
+                    <Button type="button" onClick={() => void addGalleryOption("category", newGalleryCategoryColor)}><Plus className="mr-2 h-4 w-4" />Create</Button>
+                  </div>
+                  <div className="mt-3 divide-y divide-border/60 rounded-lg border border-border/60">
+                    {galleryCategories.map((entry) => (
+                      <div key={entry} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                        <span
+                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                          style={{
+                            borderColor: `${galleryCategoryColors[entry] ?? "#3b82f6"}55`,
+                            backgroundColor: `${galleryCategoryColors[entry] ?? "#3b82f6"}1a`,
+                            color: galleryCategoryColors[entry] ?? "#3b82f6",
+                          }}
+                        >
+                          {entry}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => beginTaxonomyEdit("category", entry)} disabled={taxonomyBusy}>
+                            <Edit3 className="mr-1.5 h-3.5 w-3.5" />Edit
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("category", entry)} disabled={taxonomyBusy}>
+                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="max-h-[70vh] overflow-y-auto p-5">
-                  <div className="space-y-5">
-                    <section className="rounded-xl border border-border/70 bg-background/40 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <h3 className="text-sm font-semibold">Categories</h3>
-                          <p className="mt-0.5 text-xs text-muted-foreground">Main gallery categories. Sub-tags can be assigned to one or multiple categories.</p>
-                        </div>
-                        <Button type="button" onClick={() => beginTaxonomyCreate("category")} disabled={taxonomyBusy}>
-                          <Plus className="mr-2 h-4 w-4" />Create
-                        </Button>
-                      </div>
-
-                      <div className="mt-3 overflow-hidden rounded-lg border border-border/60">
-                        {galleryCategories.map((entry, index) => {
-                          const categoryColor = galleryCategoryColors[entry] ?? "#3b82f6"
-                          const assignedTags = galleryTags.filter((tag) =>
-                            (galleryTagCategories[entry] ?? []).includes(tag),
-                          )
-
-                          return (
-                            <div
-                              key={entry}
-                              className={`px-3.5 py-3.5 ${index > 0 ? "border-t border-border/60" : ""}`}
-                            >
-                              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className="inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide"
-                                      style={{
-                                        borderColor: `${categoryColor}55`,
-                                        backgroundColor: `${categoryColor}1a`,
-                                        color: categoryColor,
-                                      }}
-                                    >
-                                      <span className="truncate">{entry}</span>
-                                    </span>
-                                    <span className="text-[10px] text-muted-foreground">
-                                      {assignedTags.length} {assignedTags.length === 1 ? "sub-tag" : "sub-tags"}
-                                    </span>
-                                  </div>
-
-                                  <div className="mt-2.5 rounded-lg border border-border/50 bg-background/30 p-2.5">
-                                    <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                      Sub Tags
-                                    </div>
-                                    {assignedTags.length > 0 ? (
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {assignedTags.map((tag) => {
-                                          const tagColor = galleryTagColors[tag] ?? "#3b82f6"
-                                          return (
-                                            <span
-                                              key={`${entry}-${tag}`}
-                                              className="inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
-                                              style={{
-                                                borderColor: `${tagColor}55`,
-                                                backgroundColor: `${tagColor}12`,
-                                                color: tagColor,
-                                              }}
-                                            >
-                                              <span className="truncate">{tag}</span>
-                                            </span>
-                                          )
-                                        })}
-                                      </div>
-                                    ) : (
-                                      <span className="text-[10px] text-muted-foreground">No sub-tags assigned.</span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="flex shrink-0 flex-wrap items-center gap-1.5 lg:pt-0.5">
-                                  <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => beginTaxonomyEdit("category", entry)} disabled={taxonomyBusy}>
-                                    <Edit3 className="mr-1.5 h-3.5 w-3.5" />Edit
+                <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Sub Tags</h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Create tags inside a main category. Each tag keeps its own color.</p>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_220px_auto_auto]">
+                    <Input value={newGalleryTag} onChange={(event) => setNewGalleryTag(event.target.value)} placeholder="Create sub tag" onKeyDown={(event) => { if (event.key === "Enter") void addGalleryOption("tag", newGalleryTagColor) }} />
+                    <GalleryMultiSelect
+                      id="gallery-new-tag-categories"
+                      value={newGalleryTagCategories}
+                      options={galleryCategories}
+                      optionColors={galleryCategoryColors}
+                      placeholder="Assign categories"
+                      onChange={setNewGalleryTagCategories}
+                    />
+                    <GalleryColorPicker value={newGalleryTagColor} onChange={setNewGalleryTagColor} ariaLabel="New sub tag color" />
+                    <Button type="button" onClick={() => void addGalleryOption("tag", newGalleryTagColor)} disabled={newGalleryTagCategories.length === 0}><Plus className="mr-2 h-4 w-4" />Create</Button>
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {galleryCategories.map((categoryName) => {
+                      const categoryTags = Array.isArray(galleryTagCategories[categoryName])
+                        ? galleryTagCategories[categoryName]
+                        : []
+                      return (
+                        <div key={categoryName} className="rounded-lg border border-border/60 bg-background/30 p-3">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: `${galleryCategoryColors[categoryName] ?? "#3b82f6"}55`, backgroundColor: `${galleryCategoryColors[categoryName] ?? "#3b82f6"}1a`, color: galleryCategoryColors[categoryName] ?? "#3b82f6" }}>{categoryName}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {categoryTags.length ? categoryTags.map((entry) => (
+                              <div key={`${categoryName}-${entry}`} className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide" style={{ borderColor: `${galleryTagColors[entry] ?? "#3b82f6"}55`, backgroundColor: `${galleryTagColors[entry] ?? "#3b82f6"}1a`, color: galleryTagColors[entry] ?? "#3b82f6" }}>
+                                <span>{entry}</span>
+                                <div className="ml-1 flex items-center gap-1">
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => beginTaxonomyEdit("tag", entry)} disabled={taxonomyBusy} aria-label={`Edit ${entry}`}>
+                                    <Edit3 className="h-3 w-3" />
                                   </Button>
-                                  <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => void duplicateTaxonomyOption("category", entry)} disabled={taxonomyBusy}>
-                                    <Copy className="mr-1.5 h-3.5 w-3.5" />Duplicate
-                                  </Button>
-                                  <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("category", entry)} disabled={taxonomyBusy}>
-                                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete
+                                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("tag", entry)} disabled={taxonomyBusy} aria-label={`Delete ${entry}`}>
+                                    <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
                               </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </section>
-
-                    <section className="rounded-xl border border-border/70 bg-background/40 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <h3 className="text-sm font-semibold">Sub Tags</h3>
-                          <p className="mt-0.5 text-xs text-muted-foreground">All sub-tags are shown here, with their assigned categories.</p>
+                            )) : <span className="text-xs text-muted-foreground">No tags yet.</span>}
+                          </div>
                         </div>
-                        <Button type="button" onClick={() => beginTaxonomyCreate("tag")} disabled={taxonomyBusy}>
-                          <Plus className="mr-2 h-4 w-4" />Create
-                        </Button>
-                      </div>
-
-                      <div className="mt-3 divide-y divide-border/60 rounded-lg border border-border/60">
-                        {galleryTags.length === 0 ? (
-                          <div className="px-3 py-4 text-xs text-muted-foreground">No sub-tags yet.</div>
-                        ) : (
-                          galleryTags.map((entry) => {
-                            const assignedCategories = galleryCategories.filter((categoryName) =>
-                              (galleryTagCategories[categoryName] ?? []).includes(entry),
-                            )
-                            const tagColor = galleryTagColors[entry] ?? "#3b82f6"
-
-                            return (
-                              <div key={entry} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                                  <span
-                                    className="inline-flex max-w-[220px] items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                                    style={{
-                                      borderColor: `${tagColor}55`,
-                                      backgroundColor: `${tagColor}1a`,
-                                      color: tagColor,
-                                    }}
-                                  >
-                                    <span className="truncate">{entry}</span>
-                                  </span>
-                                  {assignedCategories.map((categoryName) => {
-                                    const categoryColor = galleryCategoryColors[categoryName] ?? "#3b82f6"
-                                    return (
-                                      <span
-                                        key={`${entry}-${categoryName}`}
-                                        className="inline-flex max-w-[160px] items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
-                                        style={{
-                                          borderColor: `${categoryColor}45`,
-                                          backgroundColor: `${categoryColor}0d`,
-                                          color: categoryColor,
-                                        }}
-                                      >
-                                        <span className="truncate">{categoryName}</span>
-                                      </span>
-                                    )
-                                  })}
-                                  {assignedCategories.length === 0 ? (
-                                    <span className="text-[10px] text-muted-foreground">Unassigned</span>
-                                  ) : null}
-                                </div>
-
-                                <div className="flex shrink-0 items-center gap-1.5">
-                                  <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => beginTaxonomyEdit("tag", entry)} disabled={taxonomyBusy}>
-                                    <Edit3 className="mr-1.5 h-3.5 w-3.5" />Edit
-                                  </Button>
-                                  <Button type="button" variant="outline" size="sm" className="h-8 px-2.5" onClick={() => void duplicateTaxonomyOption("tag", entry)} disabled={taxonomyBusy}>
-                                    <Copy className="mr-1.5 h-3.5 w-3.5" />Duplicate
-                                  </Button>
-                                  <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("tag", entry)} disabled={taxonomyBusy}>
-                                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete
-                                  </Button>
-                                </div>
+                      )
+                    })}
+                    {(() => {
+                      const assignedTags = new Set(Object.values(galleryTagCategories).flat())
+                      const unassignedTags = galleryTags.filter((entry) => !assignedTags.has(entry))
+                      if (unassignedTags.length === 0) return null
+                      return (
+                        <div className="rounded-lg border border-border/60 bg-background/30 p-3">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Unassigned</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {unassignedTags.map((entry) => (
+                              <div key={`unassigned-${entry}`} className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide" style={{ borderColor: `${galleryTagColors[entry] ?? "#3b82f6"}55`, backgroundColor: `${galleryTagColors[entry] ?? "#3b82f6"}1a`, color: galleryTagColors[entry] ?? "#3b82f6" }}>
+                                <span>{entry}</span>
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => beginTaxonomyEdit("tag", entry)} disabled={taxonomyBusy} aria-label={`Edit ${entry}`}>
+                                  <Edit3 className="h-3 w-3" />
+                                </Button>
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-300" onClick={() => void deleteTaxonomyOption("tag", entry)} disabled={taxonomyBusy} aria-label={`Delete ${entry}`}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
                               </div>
-                            )
-                          })
-                        )}
-                      </div>
-                    </section>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>
+            </div>
+            </div>
             </DropdownProvider>
           </div>,
           document.body,
@@ -3420,148 +3157,51 @@ export default function Gallery() {
       {taxonomyEdit && typeof document !== "undefined" && createPortal(
         <div
           className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) {
-              setTaxonomyEdit(null)
-              setShowTaxonomyModal(true)
-            }
-          }}
+          onMouseDown={(event) => { if (event.currentTarget === event.target) { setTaxonomyEdit(null); setShowTaxonomyModal(true) } }}
         >
           <DropdownProvider>
-            <div className="relative z-[10051] w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="taxonomy-edit-title">
-              <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="relative z-[10051] w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="taxonomy-edit-title">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 id="taxonomy-edit-title" className="text-lg font-semibold">Edit {taxonomyEdit.type === "category" ? "Category" : "Sub Tag"}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Change the name, color, or category assignment.</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setTaxonomyEdit(null); setShowTaxonomyModal(true) }} aria-label="Close">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Name</label>
+                <Input value={taxonomyEditName} onChange={(event) => setTaxonomyEditName(event.target.value)} />
+              </div>
+              {taxonomyEdit.type === "tag" && (
                 <div>
-                  <h3 id="taxonomy-edit-title" className="text-lg font-semibold">Edit {taxonomyEdit.type === "category" ? "Category" : "Sub Tag"}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {taxonomyEdit.type === "category"
-                      ? "Change the name, sub-tags, and color."
-                      : "Change the name and color."}
-                  </p>
+                  <label className="mb-1.5 block text-sm font-medium">Category</label>
+                  <GalleryMultiSelect
+                    id="taxonomy-edit-categories"
+                    value={taxonomyEditCategories}
+                    options={galleryCategories}
+                    optionColors={galleryCategoryColors}
+                    placeholder="Assign categories"
+                    allowEmpty
+                    onChange={setTaxonomyEditCategories}
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">Select one or multiple categories. Clear every selection to reset the sub-tag to unassigned.</p>
                 </div>
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setTaxonomyEdit(null); setShowTaxonomyModal(true) }} aria-label="Close">
-                  <X className="h-4 w-4" />
+              )}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Color</label>
+                <GalleryColorPicker value={taxonomyEditColor} onChange={setTaxonomyEditColor} ariaLabel="Edit gallery label color" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => { setTaxonomyEdit(null); setShowTaxonomyModal(true) }} disabled={taxonomyBusy}>Cancel</Button>
+                <Button type="button" onClick={() => void saveTaxonomyEdit()} disabled={taxonomyBusy || !taxonomyEditName.trim()}>
+                  {taxonomyBusy ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Name</label>
-                  <Input
-                    value={taxonomyEditName}
-                    maxLength={40}
-                    onChange={(event) => setTaxonomyEditName(event.target.value)}
-                    placeholder={taxonomyEdit.type === "category" ? "Category name" : "Sub-tag name"}
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">{taxonomyEditName.length}/40</p>
-                </div>
-
-                {taxonomyEdit.type === "category" && (
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium">Sub Tags</label>
-                    <GalleryMultiSelect
-                      id="taxonomy-edit-assignments"
-                      value={taxonomyEditCategories}
-                      options={galleryTags}
-                      optionColors={galleryTagColors}
-                      placeholder="Select sub-tags"
-                      searchable
-                      searchPlaceholder="Search sub-tags..."
-                      allowEmpty
-                      onChange={setTaxonomyEditCategories}
-                    />
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      Select one or multiple sub-tags. Clear the selection to remove all assignments.
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Color</label>
-                  <GalleryColorPicker value={taxonomyEditColor} onChange={setTaxonomyEditColor} ariaLabel="Edit gallery label color" />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={() => { setTaxonomyEdit(null); setShowTaxonomyModal(true) }} disabled={taxonomyBusy}>Cancel</Button>
-                  <Button type="button" onClick={() => void saveTaxonomyEdit()} disabled={taxonomyBusy || !taxonomyEditName.trim()}>
-                    {taxonomyBusy ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
-              </div>
             </div>
-          </DropdownProvider>
-        </div>,
-        document.body,
-      )}
-
-      {taxonomyCreate && typeof document !== "undefined" && createPortal(
-        <div
-          className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) setTaxonomyCreate(null)
-          }}
-        >
-          <DropdownProvider>
-            <div className="relative z-[10061] w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="taxonomy-create-title">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <h3 id="taxonomy-create-title" className="text-lg font-semibold">Create {taxonomyCreate === "category" ? "Category" : "Sub Tag"}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {taxonomyCreate === "category"
-                      ? "Set the name, sub-tags, and color."
-                      : "Set the name and color."}
-                  </p>
-                </div>
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTaxonomyCreate(null)} aria-label="Close">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Name</label>
-                  <Input
-                    autoFocus
-                    value={taxonomyCreateName}
-                    maxLength={40}
-                    onChange={(event) => setTaxonomyCreateName(event.target.value)}
-                    placeholder={taxonomyCreate === "category" ? "Category name" : "Sub-tag name"}
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">{taxonomyCreateName.length}/40</p>
-                </div>
-
-                {taxonomyCreate === "category" && (
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium">Sub Tags</label>
-                    <GalleryMultiSelect
-                      id="taxonomy-create-assignments"
-                      value={taxonomyCreateTags}
-                      options={galleryTags}
-                      optionColors={galleryTagColors}
-                      placeholder="Select sub-tags"
-                      searchable
-                      searchPlaceholder="Search sub-tags..."
-                      allowEmpty
-                      onChange={setTaxonomyCreateTags}
-                    />
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      Select any sub-tags to assign to this category.
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Color</label>
-                  <GalleryColorPicker value={taxonomyCreateColor} onChange={setTaxonomyCreateColor} ariaLabel="New gallery label color" />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={() => setTaxonomyCreate(null)} disabled={taxonomyBusy}>Cancel</Button>
-                  <Button type="button" onClick={() => void createTaxonomyOption()} disabled={taxonomyBusy || !taxonomyCreateName.trim()}>
-                    {taxonomyBusy ? "Creating..." : "Create"}
-                  </Button>
-                </div>
-              </div>
-            </div>
+          </div>
           </DropdownProvider>
         </div>,
         document.body,
@@ -4665,94 +4305,90 @@ function GalleryMediaCollage({
   title: string
   onClick: (media: GalleryMedia) => void
 }) {
-  if (media.length === 0) return null
-
   const visible = media.slice(0, 4)
+  const hidden = media.slice(4)
 
-  const renderMedia = (item: GalleryMedia) => (
+  if (visible.length === 0) return null
+
+  const imageCount = media.filter((item) => item.type === "image").length
+  const videoCount = media.filter((item) => item.type === "video").length
+  const mediaLabel = (() => {
+    if (media.length === 1) return imageCount ? "Image" : "Video"
+    const parts: string[] = []
+    if (imageCount) parts.push(`${imageCount} Image${imageCount === 1 ? "" : "s"}`)
+    if (videoCount) parts.push(`${videoCount} Video${videoCount === 1 ? "" : "s"}`)
+    return parts.join(" / ") || `${media.length} Media`
+  })()
+
+  const render = (item: GalleryMedia) => (
     <GalleryMediaCard
-      key={item.id}
       media={item}
       title={title}
-      showOverlay={false}
-      className="min-h-0"
       onClick={() => onClick(item)}
+      showControls={false}
     />
   )
 
-  const renderCell = (
-    item: GalleryMedia,
-    options?: { blur?: boolean },
-  ) => (
-    <div
-      key={item.id}
-      className="group relative min-w-0 flex-1 overflow-hidden"
-    >
-      {renderMedia(item)}
-
-      {options?.blur ? (
-        <>
-          <div className="pointer-events-none absolute inset-0 bg-black/45 backdrop-blur-[5px] transition-colors group-hover:bg-black/35" />
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-white">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 shadow-sm backdrop-blur-sm">
-              <Images className="h-3.5 w-3.5" />
-            </span>
-            <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm backdrop-blur-sm">
-              {(() => {
-                const hidden = media.slice(2)
-                const hiddenImages = hidden.filter((entry) => entry.type === "image").length
-                const hiddenVideos = hidden.filter((entry) => entry.type === "video").length
-
-                if (hiddenImages > 0 && hiddenVideos > 0) {
-                  return `${hidden.length}+ images/videos`
-                }
-                if (hiddenImages > 0) return `${hidden.length}+ images`
-                if (hiddenVideos > 0) return `${hidden.length}+ videos`
-                return `${hidden.length}+ media`
-              })()}
-            </span>
-          </div>
-        </>
-      ) : null}
-    </div>
-  )
-
   return (
-    <div className="relative w-full overflow-hidden">
-      {media.length === 1 ? (
-        // 1: one full-width item, preserving its original aspect ratio.
-        <div className="w-full overflow-hidden">
-          {renderMedia(media[0])}
-        </div>
-      ) : media.length === 2 ? (
-        // 2: one full-width item on top and one full-width item underneath.
-        <div className="flex w-full flex-col gap-px bg-black">
-          {renderMedia(media[0])}
-          {renderMedia(media[1])}
-        </div>
-      ) : media.length === 3 ? (
-        // 3: two items across the top and one full-width item underneath.
-        <div className="flex w-full flex-col gap-px bg-black">
-          <div className="flex w-full gap-px">
-            {renderCell(media[0])}
-            {renderCell(media[1])}
-          </div>
-          {renderMedia(media[2])}
-        </div>
-      ) : (
-        // 4+: two items across the top and two across the bottom.
-        // For 5+, the bottom-left item is the "more" preview.
-        <div className="flex w-full flex-col gap-px bg-black">
-          <div className="flex w-full gap-px">
-            {renderCell(visible[0])}
-            {renderCell(visible[1])}
-          </div>
-          <div className="flex w-full gap-px">
-            {renderCell(visible[2], { blur: media.length >= 5 })}
-            {renderCell(visible[3])}
-          </div>
+    <div className="relative w-full overflow-hidden bg-background">
+      {visible.length === 1 && render(visible[0])}
+
+      {visible.length === 2 && (
+        <div className="grid grid-cols-2 items-start gap-1 bg-background">
+          {visible.map((item) => (
+            <div key={item.id} className="min-w-0 self-start">{render(item)}</div>
+          ))}
         </div>
       )}
+
+      {visible.length === 3 && (
+        <div className="grid grid-cols-2 items-start gap-1 bg-background">
+          <div className="min-w-0 self-start">{render(visible[0])}</div>
+          <div className="min-w-0 self-start">{render(visible[1])}</div>
+          <div className="col-span-2 min-w-0 self-start">{render(visible[2])}</div>
+        </div>
+      )}
+
+      {visible.length === 4 && (
+        <div className="grid grid-cols-2 items-start gap-1 bg-background">
+          {visible.map((item) => (
+            <div key={item.id} className="relative min-w-0 self-start">
+              {render(item)}
+              {item.id === visible[3].id && hidden.length > 0 && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40">
+                  <span className="rounded-md bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+                    +{hidden.length} more
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-between p-2.5 text-white">
+        <span className="inline-flex items-center gap-1.5 rounded-md bg-black/55 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
+          {imageCount > 0 && videoCount === 0 ? (
+            <ImageIcon className="h-3 w-3" />
+          ) : videoCount > 0 && imageCount === 0 ? (
+            <Video className="h-3 w-3" />
+          ) : (
+            <Images className="h-3 w-3" />
+          )}
+          {mediaLabel}
+        </span>
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onClick(media[0])
+          }}
+          className="pointer-events-auto rounded-md bg-black/55 px-2.5 py-1 text-[10px] font-medium backdrop-blur-sm hover:bg-black/75"
+        >
+          View
+        </button>
+      </div>
     </div>
   )
 }
@@ -4765,7 +4401,7 @@ function YouTubeGalleryPreview({
   title: string
 }) {
   return (
-    <div className="relative h-full w-full overflow-hidden bg-black">
+    <div className="relative aspect-video w-full overflow-hidden bg-black">
       <iframe
         src={`https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&mute=1&controls=0&disablekb=1&fs=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&enablejsapi=1`}
         title={title}
@@ -4773,7 +4409,6 @@ function YouTubeGalleryPreview({
         className="pointer-events-none absolute inset-0 h-full w-full border-0"
         allow="autoplay; encrypted-media; picture-in-picture"
       />
-      <div className="pointer-events-none absolute inset-0" />
     </div>
   )
 }
@@ -4782,85 +4417,76 @@ function GalleryMediaCard({
   media,
   title,
   onClick,
-  showOverlay = true,
-  className,
+  showControls = true,
+  showView = true,
 }: {
   media: GalleryMedia
   title: string
   onClick: () => void
-  showOverlay?: boolean
-  className?: string
+  showControls?: boolean
+  showView?: boolean
 }) {
+  const mediaContent = getYouTubeVideoId(media.url) ? (
+    <YouTubeGalleryPreview
+      videoId={getYouTubeVideoId(media.url) || ""}
+      title={title}
+    />
+  ) : media.type === "image" ? (
+    <img
+      src={media.url}
+      alt={title}
+      className="block h-auto w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+    />
+  ) : getMediaThumbnail(media) ? (
+    <img
+      src={getMediaThumbnail(media)}
+      alt={title}
+      className="block h-auto w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+    />
+  ) : isEmbeddableVideo(media) ? (
+    <div className="aspect-video w-full bg-black">
+      <iframe
+        src={getVideoEmbedUrl(media.url)}
+        title={title}
+        tabIndex={-1}
+        className="pointer-events-none h-full w-full border-0"
+        allow="autoplay; encrypted-media; picture-in-picture"
+      />
+    </div>
+  ) : (
+    <video
+      src={media.url}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="auto"
+      className="block h-auto w-full bg-black object-contain transition duration-300 group-hover:scale-[1.01]"
+    />
+  )
+
   return (
     <button
       type="button"
-      className={[
-        "group relative flex h-auto min-h-0 w-full items-start justify-center overflow-hidden bg-black text-left",
-        className,
-      ].filter(Boolean).join(" ")}
+      className="group relative block w-full overflow-hidden bg-background text-left"
       onClick={onClick}
       aria-label={`View ${title}`}
     >
-      {getYouTubeVideoId(media.url) ? (
-        <YouTubeGalleryPreview
-          videoId={getYouTubeVideoId(media.url) || ""}
-          title={title}
-        />
-      ) : media.type === "image" ? (
-        <img
-          src={media.url}
-          alt={title}
-          className="block h-auto max-h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
-        />
-      ) : getMediaThumbnail(media) ? (
-        <div className="relative w-full">
-          <img
-            src={getMediaThumbnail(media)}
-            alt={title}
-            className="block h-auto max-h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
-          />
-        </div>
-      ) : isEmbeddableVideo(media) ? (
-        <iframe
-          src={getVideoEmbedUrl(media.url)}
-          title={title}
-          tabIndex={-1}
-          className="pointer-events-none aspect-video h-auto min-h-0 w-full border-0"
-          allow="autoplay; encrypted-media; picture-in-picture"
-        />
-      ) : (
-        <video
-          src={media.url}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          className="block h-auto max-h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
-        />
-      )}
+      {mediaContent}
 
-      {showOverlay ? (
+      {showControls && (
         <>
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0 opacity-70 transition-opacity group-hover:opacity-100" />
-
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-2.5 text-white">
             <span className="inline-flex items-center gap-1.5 rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
-              {media.type === "image" ? (
-                <ImageIcon className="h-3 w-3" />
-              ) : (
-                <Video className="h-3 w-3" />
-              )}
-
+              {media.type === "image" ? <ImageIcon className="h-3 w-3" /> : <Video className="h-3 w-3" />}
               {getMediaLabel(media.type)}
             </span>
-
-            <span className="rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
-              View
-            </span>
+            {showView && (
+              <span className="rounded-md bg-black/45 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">View</span>
+            )}
           </div>
         </>
-      ) : null}
+      )}
     </button>
   )
 }
