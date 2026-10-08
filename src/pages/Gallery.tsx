@@ -4360,7 +4360,7 @@ function GalleryMediaCollage({
       )}
 
       {visible.length === 2 && (
-        <div className="grid aspect-video grid-cols-2 gap-px bg-background">
+        <div className="grid aspect-video min-h-0 grid-cols-1 grid-rows-2 gap-px bg-background">
           {visible.map((item) => (
             <div key={item.id} className="min-h-0 min-w-0 overflow-hidden">
               {render(item, "h-full w-full")}
@@ -4370,7 +4370,21 @@ function GalleryMediaCollage({
       )}
 
       {visible.length === 3 && (
-        <div className="grid aspect-video min-h-0 grid-cols-3 gap-px bg-background">
+        <div className="grid aspect-video min-h-0 grid-cols-2 grid-rows-2 gap-px bg-background">
+          <div className="min-h-0 min-w-0 overflow-hidden">
+            {render(visible[0], "h-full w-full")}
+          </div>
+          <div className="min-h-0 min-w-0 overflow-hidden">
+            {render(visible[1], "h-full w-full")}
+          </div>
+          <div className="col-span-2 min-h-0 min-w-0 overflow-hidden">
+            {render(visible[2], "h-full w-full")}
+          </div>
+        </div>
+      )}
+
+      {visible.length === 4 && (
+        <div className="grid aspect-video min-h-0 grid-cols-2 grid-rows-2 gap-px bg-background">
           {visible.map((item) => (
             <div key={item.id} className="min-h-0 min-w-0 overflow-hidden">
               {render(item, "h-full w-full")}
@@ -4379,7 +4393,7 @@ function GalleryMediaCollage({
         </div>
       )}
 
-      {visible.length === 4 && (
+      {media.length >= 5 && (
         <div className="grid aspect-video min-h-0 grid-cols-2 grid-rows-2 gap-px bg-background">
           {visible.map((item, index) => (
             <div key={item.id} className="relative min-h-0 min-w-0 overflow-hidden">
