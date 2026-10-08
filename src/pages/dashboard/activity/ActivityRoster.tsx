@@ -491,14 +491,16 @@ export default function ActivityRoster() {
               .includes(query),
           )
 
+        // The explicit All state means the filter must actually behave
+        // as "all", not merely look selected in the dropdown.
         const matchesStatus =
-          statusFilters.length === 0 ||
+          allStatusesSelected ||
           statusFilters.includes(
             member.status,
           )
 
         const matchesRank =
-          rankFilters.length === 0 ||
+          allRanksSelected ||
           rankFilters.some(
             (rank) =>
               normalizeRank(rank) ===
@@ -517,6 +519,8 @@ export default function ActivityRoster() {
     search,
     statusFilters,
     rankFilters,
+    allStatusesSelected,
+    allRanksSelected,
   ])
 
   /* ─────────────────────────────────────────────
