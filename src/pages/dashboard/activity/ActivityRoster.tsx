@@ -385,9 +385,8 @@ export default function ActivityRoster() {
         setMembers(roster)
 
         if (resetFilters) {
-          // "All" is a virtual filter option. The default state is
-          // represented by empty filter arrays, so only the All
-          // checkbox is checked and no individual options are checked.
+          // "All" means every option is selected. Keep the explicit
+          // All state enabled so every individual checkbox renders checked.
           setStatusFilters([])
           setRankFilters([])
           setAllStatusesSelected(true)
@@ -981,8 +980,10 @@ export default function ActivityRoster() {
   }
 
   const selectAllStatuses = () => {
-    // "All Statuses" means no status restriction.
-    setStatusFilters([])
+    // Selecting "All Statuses" checks every status option as well.
+    setStatusFilters(
+      statusOptions.map((status) => status.id),
+    )
     setAllStatusesSelected(true)
 
     setSelectedCopied(false)
@@ -1028,8 +1029,8 @@ export default function ActivityRoster() {
   }
 
   const selectAllRanks = () => {
-    // "All Ranks" means no rank restriction.
-    setRankFilters([])
+    // Selecting "All Ranks" checks every rank option as well.
+    setRankFilters([...rankOptions])
     setAllRanksSelected(true)
     setSelectedCopied(false)
     void logAction({ module: "activity", action: "filter-rank", category: "roster", division, summary: `Selected all rank filters on the ${division === "department" ? "Department" : division.toUpperCase()} activity roster.`, details: { ranks: rankOptions } })
@@ -1360,6 +1361,7 @@ export default function ActivityRoster() {
                       status.icon
 
                     const checked =
+                      allStatusesSelected ||
                       statusFilters.includes(
                         status.id,
                       )
@@ -1484,6 +1486,7 @@ export default function ActivityRoster() {
                   rankOptions.map(
                     (rank) => {
                       const checked =
+                        allRanksSelected ||
                         rankFilters.some(
                           (item) =>
                             normalizeRank(
