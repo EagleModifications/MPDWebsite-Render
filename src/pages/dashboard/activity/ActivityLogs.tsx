@@ -1562,13 +1562,27 @@ function FilterDropdown({
 
   const showCount = selected.length > 0
 
+  const menuWidthLabel = selectable.reduce(
+    (longest, option) =>
+      option.label.length > longest.length ? option.label : longest,
+    allLabel,
+  )
+
   return (
-    <div ref={dropdownRef} className={`relative shrink-0 ${width}`}>
+    <div ref={dropdownRef} className={`relative inline-grid shrink-0 ${width}`}>
+      <span
+        aria-hidden="true"
+        className="invisible col-start-1 row-start-1 flex h-9 w-max min-w-full items-center whitespace-nowrap rounded-lg border px-2.5 text-[12px]"
+      >
+        <span>{menuWidthLabel}</span>
+        <span className="ml-3 mr-2 h-3.5 w-3.5 shrink-0" />
+      </span>
+
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className="flex h-9 w-max min-w-full items-center justify-between whitespace-nowrap rounded-lg border border-border bg-card px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/60"
+        className="col-start-1 row-start-1 flex h-9 w-full min-w-full items-center justify-between whitespace-nowrap rounded-lg border border-border bg-card px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-blue-500/40 focus:border-blue-500/60"
       >
         <span className="flex min-w-0 items-center gap-1.5">
           <span>{showCount ? filterTitle : allLabel}</span>
@@ -1587,7 +1601,7 @@ function FilterDropdown({
       </button>
 
       {open ? (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-[300] max-h-72 w-max min-w-full max-w-[min(360px,calc(100vw-24px))] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-popover p-1 shadow-2xl">
+        <div className="absolute left-0 top-[calc(100%+4px)] z-[300] max-h-72 w-full max-w-[min(360px,calc(100vw-24px))] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-popover p-1 shadow-2xl">
           <button
             type="button"
             className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[12px] transition-colors ${
