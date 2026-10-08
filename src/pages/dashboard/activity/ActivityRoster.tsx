@@ -1116,9 +1116,11 @@ export default function ActivityRoster() {
   const rankFilterIsActive =
     !allRanksSelected
 
+  // Match the Promotion Roster: Clear Filters is available whenever
+  // there are selected individual status/rank options.
   const hasFilterSelection =
-    statusFilterIsActive ||
-    rankFilterIsActive
+    statusFilters.length > 0 ||
+    rankFilters.length > 0
 
   const hasFilterChanges =
     !filtersAreDefault
