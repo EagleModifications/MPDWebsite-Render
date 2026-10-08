@@ -1715,11 +1715,11 @@ export default function Gallery() {
         xhr.upload.onprogress = (event) => {
           if (!event.lengthComputable) return
           const rawProgress = (event.loaded / event.total) * 100
-          // 100% means the server has finished processing the upload, not merely
-          // that the browser has finished sending the request body. Keep the UI at
-          // 99% until the response arrives, then switch immediately to 100% / Ready.
+          // The upload progress event represents the bytes sent by the browser.
+          // Show the real value, including 100%, instead of artificially holding
+          // the UI at 99.9% while the server finishes the GridFS write.
           const progress = event.loaded >= event.total
-            ? 99.9
+            ? 100
             : Math.min(99.9, Number(rawProgress.toFixed(1)))
           updatePendingMedia(item.id, { progress })
         }
@@ -4339,49 +4339,56 @@ function GalleryMediaCollage({
 
   const imageCount = media.filter((item) => item.type === "image").length
   const videoCount = media.filter((item) => item.type === "video").length
-  const mediaLabel = (() => {
-    if (media.length === 1) return imageCount ? "Image" : "Video"
-    const parts: string[] = []
-    if (imageCount) parts.push(`${imageCount} Image${imageCount === 1 ? "" : "s"}`)
-    if (videoCount) parts.push(`${videoCount} Video${videoCount === 1 ? "" : "s"}`)
-    return parts.join(" / ") || `${media.length} Media`
-  })()
 
-  const render = (item: GalleryMedia) => (
+  const render = (item: GalleryMedia, className = "") => (
     <GalleryMediaCard
       media={item}
       title={title}
       onClick={() => onClick(item)}
       showControls={false}
+      className={className}
+      mediaClassName="h-full w-full object-cover"
     />
   )
 
   return (
     <div className="relative w-full overflow-hidden bg-background">
-      {visible.length === 1 && render(visible[0])}
+      {visible.length === 1 && (
+        <div className="aspect-video w-full">
+          {render(visible[0], "h-full w-full")}
+        </div>
+      )}
 
       {visible.length === 2 && (
-        <div className="grid grid-cols-2 gap-1 bg-background auto-rows-fr">
+        <div className="grid aspect-video grid-cols-2 gap-px bg-background">
           {visible.map((item) => (
-            <div key={item.id} className="min-w-0">{render(item)}</div>
+            <div key={item.id} className="min-h-0 min-w-0 overflow-hidden">
+              {render(item, "h-full w-full")}
+            </div>
           ))}
         </div>
       )}
 
       {visible.length === 3 && (
-        <div className="grid grid-cols-2 gap-1 bg-background auto-rows-fr">
-          <div className="min-w-0">{render(visible[0])}</div>
-          <div className="min-w-0">{render(visible[1])}</div>
-          <div className="col-span-2 min-w-0">{render(visible[2])}</div>
+        <div className="grid aspect-video min-h-0 grid-cols-2 grid-rows-2 gap-px bg-background">
+          <div className="min-h-0 min-w-0 overflow-hidden">
+            {render(visible[0], "h-full w-full")}
+          </div>
+          <div className="min-h-0 min-w-0 overflow-hidden">
+            {render(visible[1], "h-full w-full")}
+          </div>
+          <div className="col-span-2 min-h-0 min-w-0 overflow-hidden">
+            {render(visible[2], "h-full w-full")}
+          </div>
         </div>
       )}
 
       {visible.length === 4 && (
-        <div className="grid grid-cols-2 gap-1 bg-background auto-rows-fr">
-          {visible.map((item) => (
-            <div key={item.id} className="relative min-w-0">
-              {render(item)}
-              {item.id === visible[3].id && hidden.length > 0 && (
+        <div className="grid aspect-video min-h-0 grid-cols-2 grid-rows-2 gap-px bg-background">
+          {visible.map((item, index) => (
+            <div key={item.id} className="relative min-h-0 min-w-0 overflow-hidden">
+              {render(item, "h-full w-full")}
+              {index === 3 && hidden.length > 0 && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40">
                   <span className="rounded-md bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
                     +{hidden.length} more
@@ -4395,14 +4402,27 @@ function GalleryMediaCollage({
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-between p-2.5 text-white">
         <span className="inline-flex items-center gap-1.5 rounded-md bg-black/55 px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
-          {imageCount > 0 && videoCount === 0 ? (
-            <ImageIcon className="h-3 w-3" />
-          ) : videoCount > 0 && imageCount === 0 ? (
-            <Video className="h-3 w-3" />
+          {media.length > 1 ? (
+            <>
+              {imageCount > 0 && videoCount === 0 ? (
+                <ImageIcon className="h-3 w-3" />
+              ) : videoCount > 0 && imageCount === 0 ? (
+                <Video className="h-3 w-3" />
+              ) : (
+                <Images className="h-3 w-3" />
+              )}
+              {imageCount > 0 && videoCount > 0
+                ? `${media.length} Images/Videos`
+                : imageCount > 0
+                  ? `${media.length} Images`
+                  : `${media.length} Videos`}
+            </>
           ) : (
-            <Images className="h-3 w-3" />
+            <>
+              {imageCount ? <ImageIcon className="h-3 w-3" /> : <Video className="h-3 w-3" />}
+              {imageCount ? "Image" : "Video"}
+            </>
           )}
-          {mediaLabel}
         </span>
 
         <button
@@ -4446,12 +4466,16 @@ function GalleryMediaCard({
   onClick,
   showControls = true,
   showView = true,
+  className = "",
+  mediaClassName = "",
 }: {
   media: GalleryMedia
   title: string
   onClick: () => void
   showControls?: boolean
   showView?: boolean
+  className?: string
+  mediaClassName?: string
 }) {
   const mediaContent = getYouTubeVideoId(media.url) ? (
     <YouTubeGalleryPreview
@@ -4462,21 +4486,21 @@ function GalleryMediaCard({
     <img
       src={media.url}
       alt={title}
-      className="block aspect-video h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+      className={`block aspect-video h-full w-full object-cover transition duration-300 group-hover:scale-[1.01] ${mediaClassName}`}
     />
   ) : getMediaThumbnail(media) ? (
     <img
       src={getMediaThumbnail(media)}
       alt={title}
-      className="block aspect-video h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+      className={`block aspect-video h-full w-full object-cover transition duration-300 group-hover:scale-[1.01] ${mediaClassName}`}
     />
   ) : isEmbeddableVideo(media) ? (
-    <div className="aspect-video w-full overflow-hidden bg-black">
+    <div className={`h-full w-full overflow-hidden bg-black ${mediaClassName}`}>
       <iframe
         src={getVideoEmbedUrl(media.url)}
         title={title}
         tabIndex={-1}
-        className="pointer-events-none h-full w-full border-0"
+        className={`pointer-events-none h-full w-full border-0 ${mediaClassName}`}
         allow="autoplay; encrypted-media; picture-in-picture"
       />
     </div>
@@ -4488,14 +4512,14 @@ function GalleryMediaCard({
       loop
       playsInline
       preload="auto"
-      className="block aspect-video h-full w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+      className={`block aspect-video h-full w-full object-cover transition duration-300 group-hover:scale-[1.01] ${mediaClassName}`}
     />
   )
 
   return (
     <button
       type="button"
-      className="group relative block w-full overflow-hidden bg-background text-left"
+      className={`group relative block w-full overflow-hidden bg-background text-left ${className}`}
       onClick={onClick}
       aria-label={`View ${title}`}
     >
