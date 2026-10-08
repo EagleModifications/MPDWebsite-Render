@@ -12,7 +12,6 @@ import { createPortal } from "react-dom"
 import {
   Check,
   Copy,
-  Copy,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -115,7 +114,6 @@ type GalleryTag = string
 
 type GalleryItem = {
   id: string
-  slug?: string
   slug?: string
   title: string
   description: string
